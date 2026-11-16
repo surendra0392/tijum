@@ -1,0 +1,1 @@
+function e(e){if(!e)return null;if(e.startsWith(`/images/public/`)&&e.endsWith(`.jpg`)&&!/-\d+w\.jpg$/.test(e)){let t=e.endsWith(`/hero-stay.jpg`)?1200:e.endsWith(`/hero-meal.jpg`)?960:800;return e.replace(/\.jpg$/,`-${t}w.jpg`)}return e}function t(e){return!!(e&&(e.endsWith(`/hero-stay.jpg`)||e.endsWith(`/hero-stay-1200w.jpg`)))}export{e as n,t};

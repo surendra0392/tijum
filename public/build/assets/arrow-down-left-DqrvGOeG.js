@@ -1,0 +1,1 @@
+import{n as e}from"./dist-4vGJ-UaM.js";var t=e(`ArrowDownLeft`,[[`path`,{d:`M17 7 7 17`,key:`15tmo1`}],[`path`,{d:`M17 17H7V7`,key:`1org7z`}]]);export{t};

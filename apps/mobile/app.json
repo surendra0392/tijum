@@ -1,0 +1,73 @@
+{
+    "expo": {
+        "name": "TIJUM",
+        "slug": "tijum",
+        "owner": "tijum-app",
+        "version": "1.0.0",
+        "orientation": "portrait",
+        "icon": "./assets/icon.png",
+        "scheme": "tijum",
+        "userInterfaceStyle": "light",
+        "splash": {
+            "image": "./assets/splash-icon.png",
+            "resizeMode": "contain",
+            "backgroundColor": "#442F41"
+        },
+        "ios": {
+            "supportsTablet": false,
+            "bundleIdentifier": "com.tijum.app",
+            "associatedDomains": ["applinks:tijum.com"]
+        },
+        "android": {
+            "adaptiveIcon": {
+                "foregroundImage": "./assets/adaptive-icon.png",
+                "backgroundColor": "#442F41"
+            },
+            "package": "com.tijum.app",
+            "intentFilters": [
+                {
+                    "action": "VIEW",
+                    "autoVerify": true,
+                    "data": [
+                        {
+                            "scheme": "https",
+                            "host": "tijum.com",
+                            "pathPrefix": "/properties"
+                        },
+                        {
+                            "scheme": "https",
+                            "host": "tijum.com",
+                            "pathPrefix": "/reservations"
+                        }
+                    ],
+                    "category": ["BROWSABLE", "DEFAULT"]
+                }
+            ]
+        },
+        "web": {
+            "favicon": "./assets/favicon.png"
+        },
+        "plugins": [
+            "expo-router",
+            "expo-secure-store",
+            [
+                "expo-notifications",
+                {
+                    "icon": "./assets/notification-icon.png",
+                    "color": "#FF7A67"
+                }
+            ]
+        ],
+        "extra": {
+            "eas": {
+                "projectId": "b8ab7524-7056-43e3-99d6-1631315a58c2"
+            }
+        },
+        "runtimeVersion": {
+            "policy": "appVersion"
+        },
+        "updates": {
+            "url": "https://u.expo.dev/b8ab7524-7056-43e3-99d6-1631315a58c2"
+        }
+    }
+}

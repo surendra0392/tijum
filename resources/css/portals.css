@@ -1,0 +1,569 @@
+/* ==========================================================================
+   TIJUM AUTHENTICATED PORTALS THEME ARCHITECTURE
+   Unified Dark Mode / Light Mode tokens & typography for:
+   1. Customer Portal (.tijum-customer)
+   2. Owner/Partner Portal (.tijum-owner)
+   3. Admin Portal (.tijum-admin, .tijum-admin-theme)
+   Public marketing and auth layouts are strictly isolated.
+   ========================================================================== */
+
+.tijum-portal,
+.tijum-customer,
+.tijum-owner,
+.tijum-admin,
+.tijum-admin-theme {
+    font-family: var(--font-body);
+    color: var(--foreground);
+}
+
+.tijum-portal h1,
+.tijum-portal h2,
+.tijum-portal h3,
+.tijum-portal h4,
+.tijum-portal nav,
+.tijum-portal label,
+.tijum-portal button,
+.tijum-portal [data-slot='card-title'],
+.tijum-portal .font-heading,
+.tijum-customer h1,
+.tijum-customer h2,
+.tijum-customer h3,
+.tijum-customer h4,
+.tijum-customer h5,
+.tijum-customer h6,
+.tijum-owner h1,
+.tijum-owner h2,
+.tijum-owner h3,
+.tijum-owner h4,
+.tijum-owner h5,
+.tijum-owner h6,
+.tijum-admin h1,
+.tijum-admin h2,
+.tijum-admin h3,
+.tijum-admin h4,
+.tijum-admin h5,
+.tijum-admin h6,
+.tijum-admin-theme h1,
+.tijum-admin-theme h2,
+.tijum-admin-theme h3,
+.tijum-admin-theme h4,
+.tijum-admin-theme h5,
+.tijum-admin-theme h6,
+.tijum-customer [data-slot='card-title'],
+.tijum-owner [data-slot='card-title'],
+.tijum-admin [data-slot='card-title'],
+.tijum-admin-theme [data-slot='card-title'],
+.tijum-customer [data-slot='dialog-title'],
+.tijum-owner [data-slot='dialog-title'],
+.tijum-admin [data-slot='dialog-title'],
+.tijum-admin-theme [data-slot='dialog-title'] {
+    font-family: var(--font-heading);
+}
+
+/* ==========================================================================
+   ADMIN PORTAL THEME OVERRIDES
+   ========================================================================== */
+.tijum-admin-theme,
+.tijum-admin-theme [data-sidebar='sidebar'] {
+    --sidebar: #442f41;
+    --sidebar-foreground: #fff4ee;
+    --sidebar-primary: #ff7a67;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: rgba(255, 255, 255, 0.14);
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: rgba(255, 255, 255, 0.14);
+    --sidebar-ring: #ff7a67;
+    --color-sidebar: #442f41;
+    --color-sidebar-foreground: #fff4ee;
+    --color-sidebar-primary: #ff7a67;
+    --color-sidebar-primary-foreground: #ffffff;
+    --color-sidebar-accent: rgba(255, 255, 255, 0.14);
+    --color-sidebar-accent-foreground: #ffffff;
+    --color-sidebar-border: rgba(255, 255, 255, 0.14);
+    --color-sidebar-ring: #ff7a67;
+}
+
+.dark .tijum-admin-theme,
+.dark .tijum-admin-theme [data-sidebar='sidebar'] {
+    --sidebar: #1e131d;
+    --sidebar-foreground: #fff4ee;
+    --sidebar-primary: #ff7a67;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: rgba(255, 255, 255, 0.08);
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: #382436;
+    --sidebar-ring: #ff7a67;
+    --color-sidebar: #1e131d;
+    --color-sidebar-foreground: #fff4ee;
+    --color-sidebar-primary: #ff7a67;
+    --color-sidebar-primary-foreground: #ffffff;
+    --color-sidebar-accent: rgba(255, 255, 255, 0.08);
+    --color-sidebar-accent-foreground: #ffffff;
+    --color-sidebar-border: #382436;
+    --color-sidebar-ring: #ff7a67;
+}
+
+.tijum-admin-theme [data-sidebar='menu-button'][data-active='true'] {
+    background-color: rgba(255, 122, 103, 0.18);
+    color: #ffffff;
+    box-shadow: inset 3px 0 0 #ff7a67;
+}
+
+.tijum-admin-theme [data-sidebar='menu-button'][data-active='true'] svg {
+    color: #ffb6a3;
+}
+
+/* ==========================================================================
+   DARK MODE PORTAL ELEVATION & CONTRAST
+   Ensures cards, panels, inputs, tables, and typography have crisp contrast
+   ========================================================================== */
+
+/* Typography contrast in Dark Mode */
+.dark .tijum-customer .text-tijum-plum,
+.dark .tijum-owner .text-tijum-plum,
+.dark .tijum-admin .text-tijum-plum,
+.dark .tijum-admin-theme .text-tijum-plum {
+    color: var(--foreground);
+}
+
+.dark .tijum-customer .text-tijum-plum-muted,
+.dark .tijum-customer .text-tijum-lavender,
+.dark .tijum-owner .text-tijum-plum-muted,
+.dark .tijum-owner .text-tijum-lavender,
+.dark .tijum-admin .text-tijum-plum-muted,
+.dark .tijum-admin-theme .text-tijum-plum-muted {
+    color: var(--muted-foreground);
+}
+
+/* Headings in Dark Mode */
+.dark .tijum-customer h1,
+.dark .tijum-customer h2,
+.dark .tijum-customer h3,
+.dark .tijum-customer h4,
+.dark .tijum-customer h5,
+.dark .tijum-customer h6,
+.dark .tijum-owner h1,
+.dark .tijum-owner h2,
+.dark .tijum-owner h3,
+.dark .tijum-owner h4,
+.dark .tijum-owner h5,
+.dark .tijum-owner h6,
+.dark .tijum-admin h1,
+.dark .tijum-admin h2,
+.dark .tijum-admin h3,
+.dark .tijum-admin h4,
+.dark .tijum-admin h5,
+.dark .tijum-admin h6,
+.dark .tijum-admin-theme h1,
+.dark .tijum-admin-theme h2,
+.dark .tijum-admin-theme h3,
+.dark .tijum-admin-theme h4,
+.dark .tijum-admin-theme h5,
+.dark .tijum-admin-theme h6 {
+    color: var(--foreground);
+}
+
+/* Card and surface elevation in Dark Mode */
+.dark .tijum-customer .bg-white,
+.dark .tijum-owner .bg-white,
+.dark .tijum-admin .bg-white,
+.dark .tijum-admin-theme .bg-white {
+    background-color: var(--card);
+}
+
+.dark .tijum-customer .bg-white\/95,
+.dark .tijum-owner .bg-white\/95,
+.dark .tijum-admin .bg-white\/95,
+.dark .tijum-admin-theme .bg-white\/95 {
+    background-color: rgba(40, 26, 39, 0.95);
+}
+
+.dark .tijum-customer .bg-white\/90,
+.dark .tijum-owner .bg-white\/90,
+.dark .tijum-admin .bg-white\/90,
+.dark .tijum-admin-theme .bg-white\/90 {
+    background-color: rgba(40, 26, 39, 0.9);
+}
+
+.dark .tijum-customer .bg-white\/80,
+.dark .tijum-owner .bg-white\/80,
+.dark .tijum-admin .bg-white\/80,
+.dark .tijum-admin-theme .bg-white\/80,
+.dark .tijum-customer .bg-white\/70,
+.dark .tijum-owner .bg-white\/70,
+.dark .tijum-admin .bg-white\/70,
+.dark .tijum-admin-theme .bg-white\/70 {
+    background-color: rgba(40, 26, 39, 0.8);
+}
+
+/* Cream tint surfaces in Dark Mode */
+.dark .tijum-customer .bg-tijum-cream,
+.dark .tijum-owner .bg-tijum-cream,
+.dark .tijum-admin .bg-tijum-cream,
+.dark .tijum-admin-theme .bg-tijum-cream {
+    background-color: var(--muted);
+}
+
+.dark .tijum-customer .bg-tijum-cream\/30,
+.dark .tijum-customer .bg-tijum-cream\/40,
+.dark .tijum-customer .bg-tijum-cream\/50,
+.dark .tijum-customer .bg-tijum-cream\/55,
+.dark .tijum-owner .bg-tijum-cream\/30,
+.dark .tijum-owner .bg-tijum-cream\/40,
+.dark .tijum-owner .bg-tijum-cream\/50,
+.dark .tijum-owner .bg-tijum-cream\/55,
+.dark .tijum-admin .bg-tijum-cream\/40,
+.dark .tijum-admin-theme .bg-tijum-cream\/40,
+.dark .tijum-customer .bg-tijum-cream\/60,
+.dark .tijum-customer .bg-tijum-cream\/65,
+.dark .tijum-owner .bg-tijum-cream\/60,
+.dark .tijum-owner .bg-tijum-cream\/65,
+.dark .tijum-admin .bg-tijum-cream\/60,
+.dark .tijum-admin-theme .bg-tijum-cream\/60,
+.dark .tijum-customer .bg-tijum-cream\/70,
+.dark .tijum-owner .bg-tijum-cream\/70,
+.dark .tijum-admin .bg-tijum-cream\/70,
+.dark .tijum-admin-theme .bg-tijum-cream\/70,
+.dark .tijum-customer .bg-tijum-cream\/80,
+.dark .tijum-customer .bg-tijum-cream\/90,
+.dark .tijum-owner .bg-tijum-cream\/80,
+.dark .tijum-owner .bg-tijum-cream\/90,
+.dark .tijum-admin .bg-tijum-cream\/80,
+.dark .tijum-admin-theme .bg-tijum-cream\/80 {
+    background-color: rgba(255, 244, 238, 0.05);
+}
+
+/* Border adaptation in Dark Mode */
+.dark .tijum-customer .border-tijum-surface,
+.dark .tijum-owner .border-tijum-surface,
+.dark .tijum-admin .border-tijum-surface,
+.dark .tijum-admin-theme .border-tijum-surface,
+.dark .tijum-customer .border-tijum-surface\/80,
+.dark .tijum-owner .border-tijum-surface\/80,
+.dark .tijum-admin .border-tijum-surface\/80,
+.dark .tijum-admin-theme .border-tijum-surface\/80,
+.dark .tijum-customer .border-tijum-surface\/60,
+.dark .tijum-owner .border-tijum-surface\/60,
+.dark .tijum-admin .border-tijum-surface\/60,
+.dark .tijum-admin-theme .border-tijum-surface\/60,
+.dark .tijum-customer .border-tijum-border-control,
+.dark .tijum-owner .border-tijum-border-control,
+.dark .tijum-admin .border-tijum-border-control,
+.dark .tijum-admin-theme .border-tijum-border-control {
+    border-color: var(--border);
+}
+
+/* Customer portal Dark Mode card, symbol fallback & badge fidelity */
+.dark .tijum-customer .tijum-fallback-icon-light {
+    display: none;
+}
+
+.dark .tijum-customer .tijum-fallback-icon-dark {
+    display: block;
+}
+
+.dark .tijum-customer .bg-tijum-surface\/30,
+.dark .tijum-customer .bg-tijum-surface\/45 {
+    background-color: rgba(255, 244, 238, 0.05);
+}
+
+.dark .tijum-customer .bg-tijum-cream\/90 {
+    background-color: rgba(40, 26, 39, 0.92);
+}
+
+.dark .tijum-customer .bg-tijum-plum\/92 {
+    background-color: rgba(30, 19, 29, 0.92);
+    border-color: var(--border);
+}
+
+.dark .tijum-customer .text-tijum-plum\/60 {
+    color: var(--muted-foreground);
+}
+
+.dark .tijum-customer .text-tijum-plum\/80 {
+    color: var(--foreground);
+}
+
+.dark .tijum-customer .tijum-gender-badge-female {
+    border-color: rgba(244, 114, 182, 0.35);
+    background-color: rgba(244, 114, 182, 0.14);
+    color: #f9a8d4;
+}
+
+.dark .tijum-customer .tijum-gender-badge-female svg {
+    color: #f472b6;
+}
+
+.dark .tijum-customer .tijum-gender-badge-male {
+    border-color: rgba(56, 189, 248, 0.35);
+    background-color: rgba(56, 189, 248, 0.14);
+    color: #7dd3fc;
+}
+
+.dark .tijum-customer .tijum-gender-badge-male svg {
+    color: #38bdf8;
+}
+
+.dark .tijum-customer .tijum-gender-badge-both {
+    border-color: rgba(255, 122, 103, 0.35);
+    background-color: rgba(255, 122, 103, 0.15);
+    color: #ffb6a3;
+}
+
+.dark .tijum-customer .tijum-gender-badge-both svg {
+    color: #ffb6a3;
+}
+
+/* Neutral palette dark adaptation for portal surfaces and text */
+.dark .tijum-owner .text-neutral-900,
+.dark .tijum-owner .text-neutral-800,
+.dark .tijum-owner .text-neutral-700,
+.dark .tijum-admin .text-neutral-900,
+.dark .tijum-admin-theme .text-neutral-900,
+.dark .tijum-admin .text-neutral-800,
+.dark .tijum-admin-theme .text-neutral-800,
+.dark .tijum-admin .text-neutral-700,
+.dark .tijum-admin-theme .text-neutral-700,
+.dark .tijum-admin .text-slate-900,
+.dark .tijum-admin .text-slate-800,
+.dark .tijum-admin .text-slate-700,
+.dark .tijum-admin .text-gray-900,
+.dark .tijum-admin .text-gray-800,
+.dark .tijum-admin .text-gray-700 {
+    color: var(--foreground);
+}
+
+.dark .tijum-owner .text-neutral-600,
+.dark .tijum-owner .text-neutral-500,
+.dark .tijum-admin .text-neutral-600,
+.dark .tijum-admin-theme .text-neutral-600,
+.dark .tijum-admin .text-neutral-500,
+.dark .tijum-admin-theme .text-neutral-500,
+.dark .tijum-admin .text-slate-600,
+.dark .tijum-admin .text-slate-500,
+.dark .tijum-admin .text-gray-600,
+.dark .tijum-admin .text-gray-500 {
+    color: var(--muted-foreground);
+}
+
+.dark .tijum-owner .bg-neutral-50,
+.dark .tijum-owner .bg-neutral-100,
+.dark .tijum-admin .bg-neutral-50,
+.dark .tijum-admin-theme .bg-neutral-50,
+.dark .tijum-admin .bg-neutral-100,
+.dark .tijum-admin-theme .bg-neutral-100,
+.dark .tijum-admin .bg-slate-50,
+.dark .tijum-admin .bg-slate-100,
+.dark .tijum-admin .bg-gray-50,
+.dark .tijum-admin .bg-gray-100 {
+    background-color: var(--muted);
+}
+
+.dark .tijum-owner .border-neutral-200,
+.dark .tijum-admin .border-neutral-200,
+.dark .tijum-admin-theme .border-neutral-200,
+.dark .tijum-admin .border-slate-200,
+.dark .tijum-admin .border-gray-200 {
+    border-color: var(--border);
+}
+
+/* Form input, select, textarea surfaces in Dark Mode */
+.dark
+    .tijum-customer
+    input:not([type='checkbox']):not([type='radio']):not([type='submit']):not(
+        [type='button']
+    ),
+.dark
+    .tijum-owner
+    input:not([type='checkbox']):not([type='radio']):not([type='submit']):not(
+        [type='button']
+    ),
+.dark
+    .tijum-admin
+    input:not([type='checkbox']):not([type='radio']):not([type='submit']):not(
+        [type='button']
+    ),
+.dark
+    .tijum-admin-theme
+    input:not([type='checkbox']):not([type='radio']):not([type='submit']):not(
+        [type='button']
+    ),
+.dark .tijum-customer select,
+.dark .tijum-owner select,
+.dark .tijum-admin select,
+.dark .tijum-admin-theme select,
+.dark .tijum-customer textarea,
+.dark .tijum-owner textarea,
+.dark .tijum-admin textarea,
+.dark .tijum-admin-theme textarea {
+    background-color: var(--card);
+    border-color: var(--border);
+    color: var(--foreground);
+}
+
+/* Tables in Dark Mode */
+.dark .tijum-customer table,
+.dark .tijum-owner table,
+.dark .tijum-admin table,
+.dark .tijum-admin-theme table {
+    border-color: var(--border);
+}
+
+.dark .tijum-customer th,
+.dark .tijum-owner th,
+.dark .tijum-admin th,
+.dark .tijum-admin-theme th {
+    background-color: rgba(255, 244, 238, 0.04);
+    color: var(--foreground);
+    border-color: var(--border);
+}
+
+.dark .tijum-customer td,
+.dark .tijum-owner td,
+.dark .tijum-admin td,
+.dark .tijum-admin-theme td {
+    border-color: var(--border);
+    color: var(--foreground);
+}
+
+.dark .tijum-customer tr:hover td,
+.dark .tijum-owner tr:hover td,
+.dark .tijum-admin tr:hover td,
+.dark .tijum-admin-theme tr:hover td {
+    background-color: rgba(255, 244, 238, 0.03);
+}
+
+/* Contrast Preservation for Peach Avatar Fallbacks */
+.dark .tijum-customer [class*='bg-tijum-peach'] .text-tijum-plum,
+.dark .tijum-owner [class*='bg-tijum-peach'] .text-tijum-plum,
+.dark .tijum-admin [class*='bg-tijum-peach'] .text-tijum-plum,
+.dark .tijum-admin-theme [class*='bg-tijum-peach'] .text-tijum-plum,
+.dark [data-slot='avatar-fallback'].bg-tijum-peach\/65 {
+    color: #442f41 !important;
+}
+
+/* ==========================================================================
+   TABLE RESPONSIVE CONTAINERS & MEDIA QUERIES
+   ========================================================================== */
+
+.tijum-table-region {
+    container-type: inline-size;
+    overflow: auto;
+    max-inline-size: 100%;
+}
+
+.tijum-table-region table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.tijum-table-region thead {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 1;
+}
+
+html > body[data-scroll-locked] {
+    margin-right: 0 !important;
+    padding-right: 0 !important;
+    overflow: visible !important;
+}
+
+html > body[data-scroll-locked][data-tijum-select-open] {
+    overflow: visible !important;
+}
+
+@container (width < 600px) {
+    .tijum-table-region.tijum-table-responsive table,
+    .tijum-table-region.tijum-table-responsive thead,
+    .tijum-table-region.tijum-table-responsive tbody,
+    .tijum-table-region.tijum-table-responsive tr,
+    .tijum-table-region.tijum-table-responsive th,
+    .tijum-table-region.tijum-table-responsive td {
+        display: block;
+    }
+
+    .tijum-table-region.tijum-table-responsive thead {
+        display: none;
+    }
+
+    .tijum-table-region.tijum-table-responsive tbody tr {
+        margin-block-end: 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background-color: var(--card);
+        padding: 0.5rem 0.75rem;
+    }
+
+    .tijum-table-region.tijum-table-responsive tbody th,
+    .tijum-table-region.tijum-table-responsive tbody td {
+        border: 0;
+        padding: 0.375rem 0;
+        text-align: start;
+    }
+
+    .tijum-table-region.tijum-table-responsive tbody th[data-label]::before,
+    .tijum-table-region.tijum-table-responsive tbody td[data-label]::before {
+        content: attr(data-label) ': ';
+        font-family: var(--font-heading);
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--muted-foreground);
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    html {
+        scroll-behavior: smooth;
+    }
+
+    .tijum-faq-item::details-content {
+        transition:
+            block-size 0.28s ease-in-out,
+            content-visibility 0.28s ease-in-out;
+        transition-behavior: allow-discrete;
+    }
+
+    .tijum-faq-chevron {
+        transition: rotate 0.2s ease-out;
+    }
+}
+
+.tijum-anchor-target {
+    scroll-margin-top: 5.5rem;
+}
+
+.tijum-faq-summary {
+    list-style: none;
+}
+
+.tijum-faq-summary::-webkit-details-marker {
+    display: none;
+}
+
+.tijum-faq-item::details-content {
+    interpolate-size: allow-keywords;
+    overflow: clip;
+    contain: layout;
+}
+
+.tijum-faq-item:not([open])::details-content {
+    block-size: 0;
+}
+
+.tijum-faq-chevron {
+    rotate: -90deg;
+}
+
+.tijum-faq-item[open] > .tijum-faq-summary .tijum-faq-chevron {
+    rotate: 0deg;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+    }
+}

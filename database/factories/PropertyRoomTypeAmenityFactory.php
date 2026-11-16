@@ -1,0 +1,50 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Factories;
+
+use App\Enums\AmenityAvailability;
+use App\Enums\AmenityVerificationStatus;
+use App\Models\Amenity;
+use App\Models\Property;
+use App\Models\PropertyRoomTypeAmenity;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
+
+/**
+ * @extends Factory<PropertyRoomTypeAmenity>
+ */
+class PropertyRoomTypeAmenityFactory extends Factory
+{
+    public function definition(): array
+    {
+        return [
+            'property_id' => Property::factory(),
+            'property_room_type_id' => null,
+            'amenity_id' => Amenity::factory(),
+            'assignment_group_id' => (string) Str::ulid(),
+            'parent_property_room_type_amenity_id' => null,
+            'superseded_by_property_room_type_amenity_id' => null,
+            'assignment_reference' => 'TRA-'.strtoupper((string) fake()->unique()->bothify('####??##')),
+            'availability' => AmenityAvailability::Included,
+            'status' => AmenityVerificationStatus::Draft,
+            'revision_number' => 1,
+            'is_current' => true,
+            'is_customer_visible' => true,
+            'details' => null,
+            'declaration_version' => null,
+            'declaration_accepted_at' => null,
+            'submitted_at' => null,
+            'under_review_at' => null,
+            'reviewed_at' => null,
+            'approved_at' => null,
+            'assigned_admin_id' => null,
+            'reviewed_by_admin_id' => null,
+            'requested_information' => null,
+            'decision_reason' => null,
+            'internal_reviewer_notes' => null,
+            'approved_snapshot' => null,
+        ];
+    }
+}

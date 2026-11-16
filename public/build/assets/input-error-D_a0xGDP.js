@@ -1,0 +1,1 @@
+import{a as e,r as t}from"./dist-4vGJ-UaM.js";var n=e();function r({message:e,className:r=``,...i}){return e?(0,n.jsx)(`p`,{...i,className:t(`text-sm font-medium text-status-error-fg`,r),children:e}):null}export{r as t};

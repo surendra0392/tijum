@@ -1,0 +1,252 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Admin\Support;
+
+use App\Enums\SupportTicketPriority;
+use App\Enums\SupportTicketStatus;
+use App\Enums\SupportTicketType;
+use App\Http\Controllers\Controller;
+use App\Models\Admin;
+use App\Models\SupportTicket;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class AdminPartnerSupportController extends Controller
+{
+    public function index(Request $request): Response
+    {
+        $status = $request->query('status');
+        $category = $request->query('category');
+        $priority = $request->query('priority');
+        $overdue = $request->boolean('overdue');
+        $search = $request->query('search');
+
+        $baseQuery = SupportTicket::query()->where('ticket_type', SupportTicketType::Partner);
+
+        $now = CarbonImmutable::now();
+        $stats = [
+            'total_active' => (clone $baseQuery)->whereNotIn('status', [SupportTicketStatus::Resolved->value, SupportTicketStatus::Closed->value])->count(),
+            'awaiting_agent' => (clone $baseQuery)->where(static function ($q): void {
+                $q->where('status', SupportTicketStatus::Open->value)
+                    ->orWhere('last_reply_by_type', 'partner');
+            })->whereNotIn('status', [SupportTicketStatus::Resolved->value, SupportTicketStatus::Closed->value])->count(),
+            'overdue' => (clone $baseQuery)->whereNotIn('status', [SupportTicketStatus::Resolved->value, SupportTicketStatus::Closed->value])
+                ->where('sla_due_at', '<', $now)->count(),
+            'resolved_today' => (clone $baseQuery)->where('status', SupportTicketStatus::Resolved->value)
+                ->whereDate('resolved_at', $now->toDateString())->count(),
+        ];
+
+        $query = (clone $baseQuery)
+            ->with(['owner.businessProfile', 'property.city', 'assignedAdmin'])
+            ->latest('id');
+
+        if (is_string($status) && $status !== '' && SupportTicketStatus::tryFrom($status) !== null) {
+            $query->where('status', $status);
+        }
+
+        if (is_string($category) && $category !== '') {
+            $query->where('category', $category);
+        }
+
+        if (is_string($priority) && $priority !== '' && SupportTicketPriority::tryFrom($priority) !== null) {
+            $query->where('priority', $priority);
+        }
+
+        if ($overdue) {
+            $query->whereNotIn('status', [SupportTicketStatus::Resolved->value, SupportTicketStatus::Closed->value])
+                ->where('sla_due_at', '<', $now);
+        }
+
+        if (is_string($search) && trim($search) !== '') {
+            $term = '%'.trim($search).'%';
+            $query->where(static function (Builder $q) use ($term): void {
+                $q->where('ticket_reference', 'like', $term)
+                    ->orWhere('subject', 'like', $term)
+                    ->orWhereHas('owner', static fn ($o) => $o->where('name', 'like', $term)->orWhere('email', 'like', $term)->orWhere('phone', 'like', $term))
+                    ->orWhereHas('property', static fn ($p) => $p->where('name', 'like', $term));
+            });
+        }
+
+        $paginator = $query->paginate(20)->withQueryString();
+
+        $tickets = [
+            'data' => collect($paginator->items())->map(static fn (SupportTicket $t): array => [
+                'id' => $t->id,
+                'ticket_reference' => $t->ticket_reference,
+                'subject' => $t->subject,
+                'category' => $t->category,
+                'status' => $t->status->value,
+                'status_label' => $t->status->label(),
+                'status_badge' => $t->status->badgeVariant(),
+                'priority' => $t->priority->value,
+                'priority_label' => $t->priority->label(),
+                'partner_name' => $t->owner?->name ?? 'Partner',
+                'business_name' => $t->owner?->businessProfile?->display_business_name ?? $t->owner?->businessProfile?->legal_business_name,
+                'partner_email' => $t->owner?->email,
+                'partner_phone' => $t->owner?->phone,
+                'property_name' => $t->property?->name,
+                'city_name' => $t->property?->city?->name,
+                'assigned_admin_name' => $t->assignedAdmin?->name,
+                'sla_due_at' => $t->sla_due_at?->toISOString(),
+                'is_overdue' => $t->isOverdue(),
+                'last_reply_at' => $t->last_reply_at?->toISOString(),
+                'last_reply_by_type' => $t->last_reply_by_type,
+                'created_at' => $t->created_at->toISOString(),
+            ])->all(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+
+        return Inertia::render('admin/support/partner/index', [
+            'tickets' => $tickets,
+            'stats' => $stats,
+            'filters' => [
+                'status' => $status ?? 'all',
+                'category' => $category ?? 'all',
+                'priority' => $priority ?? 'all',
+                'overdue' => $overdue,
+                'search' => $search ?? '',
+            ],
+            'admins' => Admin::query()->where('is_active', true)->get(['id', 'name'])->all(),
+        ]);
+    }
+
+    public function show(SupportTicket $ticket): Response
+    {
+        abort_unless($ticket->ticket_type === SupportTicketType::Partner, 404);
+
+        $ticket->loadMissing([
+            'owner.businessProfile',
+            'property.city',
+            'assignedAdmin',
+            'messages',
+        ]);
+
+        return Inertia::render('admin/support/partner/show', [
+            'ticket' => [
+                'id' => $ticket->id,
+                'ticket_reference' => $ticket->ticket_reference,
+                'subject' => $ticket->subject,
+                'category' => $ticket->category,
+                'status' => $ticket->status->value,
+                'status_label' => $ticket->status->label(),
+                'priority' => $ticket->priority->value,
+                'priority_label' => $ticket->priority->label(),
+                'message' => $ticket->message,
+                'partner_name' => $ticket->owner?->name ?? 'Partner',
+                'business_name' => $ticket->owner?->businessProfile?->display_business_name ?? $ticket->owner?->businessProfile?->legal_business_name,
+                'partner_email' => $ticket->owner?->email,
+                'partner_phone' => $ticket->owner?->phone,
+                'property_name' => $ticket->property?->name,
+                'city_name' => $ticket->property?->city?->name,
+                'assigned_admin_id' => $ticket->assigned_admin_id,
+                'assigned_admin_name' => $ticket->assignedAdmin?->name,
+                'sla_due_at' => $ticket->sla_due_at?->toISOString(),
+                'is_overdue' => $ticket->isOverdue(),
+                'resolved_at' => $ticket->resolved_at?->toISOString(),
+                'resolution_summary' => $ticket->resolution_summary,
+                'closed_at' => $ticket->closed_at?->toISOString(),
+                'created_at' => $ticket->created_at->toISOString(),
+            ],
+            'messages' => $ticket->messages->map(static fn ($m) => [
+                'id' => $m->id,
+                'sender_type' => $m->sender_type,
+                'sender_name' => $m->sender_name,
+                'message' => $m->message,
+                'is_internal_note' => $m->is_internal_note,
+                'created_at' => $m->created_at->toISOString(),
+            ])->all(),
+            'admins' => Admin::query()->where('is_active', true)->get(['id', 'name'])->all(),
+        ]);
+    }
+
+    public function storeMessage(Request $request, SupportTicket $ticket): RedirectResponse
+    {
+        abort_unless($ticket->ticket_type === SupportTicketType::Partner, 404);
+
+        $validated = $request->validate([
+            'message' => ['required', 'string', 'max:5000'],
+            'is_internal_note' => ['boolean'],
+        ]);
+
+        $admin = $request->user('admin');
+
+        $ticket->messages()->create([
+            'sender_type' => 'admin',
+            'sender_id' => $admin ? $admin->id : 1,
+            'sender_name' => $admin ? $admin->name : 'TIJUM Partner Support',
+            'message' => $validated['message'],
+            'is_internal_note' => (bool) ($validated['is_internal_note'] ?? false),
+        ]);
+
+        if (! ($validated['is_internal_note'] ?? false)) {
+            $ticket->forceFill([
+                'last_reply_at' => now(),
+                'last_reply_by_type' => 'admin',
+                'status' => SupportTicketStatus::InProgress,
+            ])->save();
+        }
+
+        return back()->with('status', 'Response sent to partner.');
+    }
+
+    public function updateStatus(Request $request, SupportTicket $ticket): RedirectResponse
+    {
+        abort_unless($ticket->ticket_type === SupportTicketType::Partner, 404);
+
+        $validated = $request->validate([
+            'status' => ['required', 'string', 'in:open,in_progress,waiting_user,resolved,closed'],
+        ]);
+
+        $status = SupportTicketStatus::from($validated['status']);
+        $updates = ['status' => $status];
+
+        if ($status === SupportTicketStatus::Closed) {
+            $updates['closed_at'] = now();
+        }
+
+        $ticket->forceFill($updates)->save();
+
+        return back()->with('status', "Ticket status updated to {$status->label()}.");
+    }
+
+    public function assign(Request $request, SupportTicket $ticket): RedirectResponse
+    {
+        abort_unless($ticket->ticket_type === SupportTicketType::Partner, 404);
+
+        $validated = $request->validate([
+            'assigned_admin_id' => ['nullable', 'exists:admins,id'],
+        ]);
+
+        $ticket->forceFill(['assigned_admin_id' => $validated['assigned_admin_id']])->save();
+
+        return back()->with('status', 'Ticket assigned.');
+    }
+
+    public function resolve(Request $request, SupportTicket $ticket): RedirectResponse
+    {
+        abort_unless($ticket->ticket_type === SupportTicketType::Partner, 404);
+
+        $validated = $request->validate([
+            'resolution_summary' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $ticket->forceFill([
+            'status' => SupportTicketStatus::Resolved,
+            'resolved_at' => now(),
+            'resolution_summary' => $validated['resolution_summary'],
+        ])->save();
+
+        return back()->with('status', 'Partner ticket resolved.');
+    }
+}

@@ -1,0 +1,9 @@
+
+node_modules/
+.expo/
+dist/
+__tests__/
+npm-debug.*
+*.apk
+*.aab
+

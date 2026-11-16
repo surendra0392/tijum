@@ -1,0 +1,1045 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Actions/Owner/Auth/RegisterOwner.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>state" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Actions/Owner/Auth/RegisterOwner.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>value" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Actions/Owner/Properties/CreateProperty.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>value" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Actions/Owner/Properties/UpdatePropertyDetails.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Actions/Payments/ProcessWebhookEvent.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type Carbon\\CarbonImmutable\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Actions/Payments/ProcessWebhookEvent.php
+
+		-
+			message: '#^Variable \$payment on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.variable
+			count: 1
+			path: app/Actions/Payments/ReconcileExpiredReservations.php
+
+		-
+			message: '#^Offset ''message'' on array\{message\: string, attachment\?\: Illuminate\\Http\\UploadedFile\|null, is_internal_note\?\: bool, status\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Actions/Protection/AddCaseMessage.php
+
+		-
+			message: '#^Offset ''description'' on array\{category\: string, description\: string, priority\?\: string\|null, attachment\?\: Illuminate\\Http\\UploadedFile\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Actions/Protection/CreateProtectionCase.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Console/Commands/SendScheduledNotificationRemindersCommand.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Http/Controllers/Admin/AdminProfileController.php
+
+		-
+			message: '#^Parameter \#3 \$data of method App\\Actions\\Protection\\AddCaseMessage\:\:execute\(\) expects array\{message\: string, attachment\?\: Illuminate\\Http\\UploadedFile\|null, is_internal_note\?\: bool, status\?\: string\|null\}, array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Admin/CustomerCases/AdminCustomerCaseController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Admin/Financial/AdminCommissionAgreementController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>gst_registered" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Admin/Financial/AdminFinancialProfileController.php
+
+		-
+			message: '#^Parameter \$owner of method App\\Actions\\Financial\\CreatePartnerSettlement\:\:execute\(\) expects App\\Models\\Owner, App\\Models\\Owner\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Owner\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Admin/Financial/AdminSettlementController.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between string and App\\Enums\\EmailCampaignStatus\:\:Sent will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Http/Controllers/Admin/Marketing/AdminMarketingEmailCampaignController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Admin/Notifications/AdminNotificationController.php
+
+		-
+			message: '#^Call to function abort_unless\(\) with true and 403 will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 3
+			path: app/Http/Controllers/Admin/Notifications/AdminNotificationController.php
+
+		-
+			message: '#^Instanceof between App\\Models\\Admin and App\\Models\\Admin will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 3
+			path: app/Http/Controllers/Admin/Notifications/AdminNotificationController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Admin/Notifications/AdminNotificationController.php
+
+		-
+			message: '#^Call to function abort_unless\(\) with true and 403 will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Http/Controllers/Admin/Notifications/AdminNotificationProviderController.php
+
+		-
+			message: '#^Instanceof between App\\Models\\Admin and App\\Models\\Admin will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: app/Http/Controllers/Admin/Notifications/AdminNotificationProviderController.php
+
+		-
+			message: '#^Call to function abort_unless\(\) with true and 403 will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: app/Http/Controllers/Admin/Notifications/AdminNotificationTemplateController.php
+
+		-
+			message: '#^Instanceof between App\\Models\\Admin and App\\Models\\Admin will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 2
+			path: app/Http/Controllers/Admin/Notifications/AdminNotificationTemplateController.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Http/Controllers/Admin/Operations/AdminCheckInController.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Http/Controllers/Admin/Operations/AdminCheckOutController.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Carbon\\CarbonImmutable\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Http/Controllers/Admin/Payments/AdminPaymentController.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type App\\Models\\Admin\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Admin/Payments/AdminPaymentController.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type App\\Models\\Reservation\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Controllers/Admin/Payments/AdminPaymentController.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type App\\Models\\User\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 6
+			path: app/Http/Controllers/Admin/Payments/AdminPaymentController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>value" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Admin/Properties/AdminPropertyController.php
+
+		-
+			message: '#^Parameter \#3 \$data of method App\\Actions\\Protection\\CreateRelocationOffer\:\:execute\(\) expects array\{destination_property_id\: int, destination_room_type_id\: int, destination_owner_accepted\?\: bool, admin_notes\?\: string\|null, validity_hours\?\: int\|null\}, array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Admin/Relocations/AdminRelocationController.php
+
+		-
+			message: '#^Parameter \#4 \$case of method App\\Actions\\Protection\\CreateRelocationOffer\:\:execute\(\) expects App\\Models\\CustomerProtectionCase\|null, App\\Models\\CustomerProtectionCase\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\CustomerProtectionCase\>\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Admin/Relocations/AdminRelocationController.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 3
+			path: app/Http/Controllers/Admin/Reports/AdminReportExportController.php
+
+		-
+			message: '#^Instanceof between App\\Enums\\CommissionAgreementStatus and BackedEnum will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: app/Http/Controllers/Admin/Reports/AdminReportExportController.php
+
+		-
+			message: '#^Instanceof between App\\Enums\\CommissionBaseType and BackedEnum will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: app/Http/Controllers/Admin/Reports/AdminReportExportController.php
+
+		-
+			message: '#^Instanceof between App\\Enums\\CommissionGstType and BackedEnum will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: app/Http/Controllers/Admin/Reports/AdminReportExportController.php
+
+		-
+			message: '#^Instanceof between App\\Enums\\LedgerEntryCategory and BackedEnum will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: app/Http/Controllers/Admin/Reports/AdminReportExportController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Admin\\Reports\\AdminReportExportController\:\:streamCsv\(\) has parameter \$headers with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/Admin/Reports/AdminReportExportController.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Carbon\\CarbonImmutable\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Http/Controllers/Admin/Reports/AdminReportExportController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>bank_account_number_masked" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Admin/Reports/AdminReportExportController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 9
+			path: app/Http/Controllers/Admin/Reports/AdminReportExportController.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Http/Controllers/Admin/Reviews/AdminReviewController.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: mixed$#'
+			identifier: match.unhandled
+			count: 1
+			path: app/Http/Controllers/Admin/Reviews/AdminReviewController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Admin/Reviews/AdminReviewController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Controllers/Admin/Support/AdminCustomerSupportController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>display_business_name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Controllers/Admin/Support/AdminPartnerSupportController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Controllers/Admin/Support/AdminPartnerSupportController.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 2
+			path: app/Http/Controllers/Admin/System/AdminAccountController.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type App\\Enums\\AdminRole\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Admin/System/AdminAccountController.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Laravel\\Sanctum\\PersonalAccessToken\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/V1/Auth/CustomerAuthController.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Laravel\\Sanctum\\PersonalAccessToken\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/V1/Auth/OwnerAuthController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ReservationPayment\:\:\$amount_paise\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/V1/Customer/CustomerPaymentController.php
+
+		-
+			message: '#^Property App\\Services\\Reviews\\ReviewEligibilityResult\:\:\$reason \(string\) on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.property
+			count: 1
+			path: app/Http/Controllers/Api/V1/Customer/CustomerReviewController.php
+
+		-
+			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Http/Controllers/Api/V1/Public/PublicContentController.php
+
+		-
+			message: '#^Parameter \#2 \$user of method App\\Actions\\Payments\\InitiatePaymentOrder\:\:execute\(\) expects App\\Models\\User, App\\Models\\Admin\|App\\Models\\Owner\|App\\Models\\User given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Customer/CustomerPaymentController.php
+
+		-
+			message: '#^Parameter \#2 \$user of method App\\Actions\\Payments\\VerifyCheckoutPayment\:\:execute\(\) expects App\\Models\\User, App\\Models\\Admin\|App\\Models\\Owner\|App\\Models\\User given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Customer/CustomerPaymentController.php
+
+		-
+			message: '#^Parameter \#3 \$data of method App\\Actions\\Protection\\AddCaseMessage\:\:execute\(\) expects array\{message\: string, attachment\?\: Illuminate\\Http\\UploadedFile\|null, is_internal_note\?\: bool, status\?\: string\|null\}, array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Customer/CustomerProtectionCaseController.php
+
+		-
+			message: '#^Parameter \#3 \$data of method App\\Actions\\Protection\\CreateProtectionCase\:\:execute\(\) expects array\{category\: string, description\: string, priority\?\: string\|null, attachment\?\: Illuminate\\Http\\UploadedFile\|null\}, array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Customer/CustomerProtectionCaseController.php
+
+		-
+			message: '#^Call to function abort_unless\(\) with true and 403 will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 6
+			path: app/Http/Controllers/Customer/NotificationController.php
+
+		-
+			message: '#^Instanceof between App\\Models\\User and App\\Models\\User will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 6
+			path: app/Http/Controllers/Customer/NotificationController.php
+
+		-
+			message: '#^Parameter \#3 \$data of method App\\Actions\\Protection\\AddCaseMessage\:\:execute\(\) expects array\{message\: string, attachment\?\: Illuminate\\Http\\UploadedFile\|null, is_internal_note\?\: bool, status\?\: string\|null\}, array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Owner/CustomerCases/OwnerCustomerCaseController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Owner/Financial/OwnerCommissionAgreementController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>legal_business_name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Owner/Financial/OwnerSettlementController.php
+
+		-
+			message: '#^Call to function abort_unless\(\) with true and 403 will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 6
+			path: app/Http/Controllers/Owner/OwnerNotificationController.php
+
+		-
+			message: '#^Instanceof between App\\Models\\Owner and App\\Models\\Owner will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 6
+			path: app/Http/Controllers/Owner/OwnerNotificationController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>average_rating" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Owner/OwnerReviewController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Owner/OwnerReviewController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>published_review_count" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Owner/OwnerReviewController.php
+
+		-
+			message: '#^Instanceof between App\\Enums\\PropertyGenderPolicy and App\\Enums\\PropertyGenderPolicy will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: app/Http/Controllers/Public/CityLandingPageController.php
+
+		-
+			message: '#^Offset ''intro'' on array\{tagline\: string, intro\: string, popular_neighborhoods\: list\<array\{name\: string, description\: string\}\>, faqs\: list\<array\{question\: string, answer\: string\}\>\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Public/CityLandingPageController.php
+
+		-
+			message: '#^Offset ''popular…'' on array\{tagline\: string, intro\: string, popular_neighborhoods\: list\<array\{name\: string, description\: string\}\>, faqs\: list\<array\{question\: string, answer\: string\}\>, description\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Public/CityLandingPageController.php
+
+		-
+			message: '#^Property App\\Http\\Controllers\\Public\\CityLandingPageController\:\:\$eligibility is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: app/Http/Controllers/Public/CityLandingPageController.php
+
+		-
+			message: '#^Property App\\Http\\Controllers\\Public\\CityLandingPageController\:\:\$publicData is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: app/Http/Controllers/Public/CityLandingPageController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>published_review_count" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Public/CityLandingPageController.php
+
+		-
+			message: '#^Cannot call method isPubliclyViewable\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Public/CmsPageController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Public/CmsPageController.php
+
+		-
+			message: '#^Property App\\Http\\Controllers\\Public\\PublicPageController\:\:\$seoService is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: app/Http/Controllers/Public/PublicPageController.php
+
+		-
+			message: '#^Offset ''message'' on array\{success\: false, message\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Webhooks/SmsWebhookController.php
+
+		-
+			message: '#^Offset ''message'' on array\{success\: false, message\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Webhooks/WhatsAppWebhookController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>value" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Requests/Owner/Properties/StoreOrUpdatePropertyRequest.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>published_review_count" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Resources/Api/V1/PropertyCardResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>published_review_count" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Resources/Api/V1/PropertyDetailResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\Api\\V1\\ReservationResource\:\:\$check_out_date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/Api/V1/ReservationResource.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Http/Resources/Api/V1/ReservationResource.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Carbon\\CarbonImmutable\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Resources/Api/V1/ReservationResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Resources/Api/V1/ReservationResource.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 2
+			path: app/Http/Resources/Api/V1/RoomTypeResource.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type App\\Enums\\PropertyRoomTypeMode\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Resources/Api/V1/RoomTypeResource.php
+
+		-
+			message: '#^Instanceof between App\\Enums\\AdminRole and App\\Enums\\AdminRole will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: app/Models/Admin.php
+
+		-
+			message: '#^Offset ''is_secret'' on array\{value\: mixed, group\: string, is_secret\: bool, is_public\: bool, data_type\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Models/PlatformSetting.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between non\-falsy\-string and '''' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Models/PlatformSetting.php
+
+		-
+			message: '#^Instanceof between App\\Enums\\PropertyGenderPolicy and App\\Enums\\PropertyGenderPolicy will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: app/Models/Property.php
+
+		-
+			message: '#^Parameter \#1 \$string of function mb_substr expects string, string\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Models/PropertyReview.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between Carbon\\CarbonImmutable and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Models/PropertyReview.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 4
+			path: app/Services/Admin/AdminActivityFeedService.php
+
+		-
+			message: '#^Match arm comparison between ''approved''\|''cancelled''\|''draft''\|''failed''\|''on_hold''\|''pending_approval''\|''reversed''\|''settled''\|''transfer_pending'' and ''completed'' is always false\.$#'
+			identifier: match.alwaysFalse
+			count: 1
+			path: app/Services/Admin/AdminActivityFeedService.php
+
+		-
+			message: '#^Match arm comparison between ''approved''\|''cancelled''\|''draft''\|''failed''\|''on_hold''\|''pending_approval''\|''reversed''\|''settled''\|''transfer_pending'' and ''pending'' is always false\.$#'
+			identifier: match.alwaysFalse
+			count: 1
+			path: app/Services/Admin/AdminActivityFeedService.php
+
+		-
+			message: '#^Match arm comparison between ''cancelled''\|''draft''\|''failed''\|''on_hold''\|''pending_approval''\|''reversed''\|''settled''\|''transfer_pending'' and ''processing'' is always false\.$#'
+			identifier: match.alwaysFalse
+			count: 1
+			path: app/Services/Admin/AdminActivityFeedService.php
+
+		-
+			message: '#^Method App\\Services\\Admin\\AdminActivityFeedService\:\:getRecentActivities\(\) should return list\<array\<string, mixed\>\> but returns array\<int, mixed\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Admin/AdminActivityFeedService.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Carbon\\CarbonImmutable\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 4
+			path: app/Services/Admin/AdminActivityFeedService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>timestamp" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Services/Admin/AdminActivityFeedService.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type App\\Models\\Reservation\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Services/Admin/AdminActivityFeedService.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 12
+			path: app/Services/Admin/AdminDashboardMetricsService.php
+
+		-
+			message: '#^Method App\\Services\\Admin\\AdminGlobalSearchService\:\:search\(\) should return array\<string, list\<array\<string, mixed\>\>\> but returns array\{reservations\: array\<int, array\{id\: int, title\: string, subtitle\: string, url\: string, badge\: string\}\>, cases\: array\<int, array\{id\: int, title\: string, subtitle\: string, url\: string, badge\: string\}\>, settlements\: array\<int, array\{id\: int, title\: string, subtitle\: string, url\: string, badge\: string\}\>, payments\: array\<int, array\{id\: int, title\: string, subtitle\: string, url\: string, badge\: string\}\>, partners\: array\<int, array\{id\: int, title\: string, subtitle\: string, url\: string, badge\: string\}\>, properties\: array\<int, array\{id\: int, title\: string, subtitle\: string, url\: string, badge\: string\}\>, customers\: array\<int, array\{id\: int, title\: string, subtitle\: string, url\: string, badge\: string\}\>, reviews\: array\<int, array\{id\: int, title\: string, subtitle\: string, status\: string, url\: string\}\>\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Admin/AdminGlobalSearchService.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type App\\Models\\Reservation\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/Admin/AdminGlobalSearchService.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Services/Admin/AdminOperationsQueueService.php
+
+		-
+			message: '#^Method App\\Services\\Admin\\AdminOperationsQueueService\:\:getCustomerProtectionQueue\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\{id\: int, case_reference\: string, category\: string, category_label\: string, priority\: string, priority_label\: string, customer_name\: string, property_name\: string, \.\.\.\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Admin/AdminOperationsQueueService.php
+
+		-
+			message: '#^Method App\\Services\\Admin\\AdminOperationsQueueService\:\:getPartnerOnboardingQueue\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\{id\: int, name\: string, email\: string, business_name\: string, status\: string, status_label\: string, type\: string, badge\: string, \.\.\.\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Admin/AdminOperationsQueueService.php
+
+		-
+			message: '#^Method App\\Services\\Admin\\AdminOperationsQueueService\:\:getPropertyApprovalQueue\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\{id\: int, property_id\: int, property_name\: string, city\: string, category\: string, owner_name\: string, status\: App\\Enums\\PropertyVerificationStatus, submitted_at\: string\|null, \.\.\.\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Admin/AdminOperationsQueueService.php
+
+		-
+			message: '#^Method App\\Services\\Admin\\AdminOperationsQueueService\:\:getReservationOperationsQueue\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\{id\: int, booking_reference\: string, property_name\: string, city\: string, guest_name\: mixed, stay_dates\: string, status\: string, status_label\: string, \.\.\.\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Admin/AdminOperationsQueueService.php
+
+		-
+			message: '#^Method App\\Services\\Admin\\AdminOperationsQueueService\:\:getReviewModerationQueue\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\{id\: int, customer_display_name\: string, property_name\: string, city_name\: string\|null, overall_rating\: int, title\: string\|null, submitted_at\: string\|null, submitted_formatted\: string\|null, \.\.\.\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Admin/AdminOperationsQueueService.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Carbon\\CarbonImmutable\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Services/Admin/AdminOperationsQueueService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>display_business_name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/Admin/AdminOperationsQueueService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>legal_business_name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/Admin/AdminOperationsQueueService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 12
+			path: app/Services/Admin/AdminOperationsQueueService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>settlement_reference" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/Admin/AdminOperationsQueueService.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type App\\Models\\Reservation\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Services/Admin/AdminOperationsQueueService.php
+
+		-
+			message: '#^Parameter \#2 \$tags of method App\\Services\\Blog\\BlogArticleService\:\:syncTags\(\) expects list\<string\>, array\<mixed, mixed\> given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/Blog/BlogArticleService.php
+
+		-
+			message: '#^Result of && is always false\.$#'
+			identifier: booleanAnd.alwaysFalse
+			count: 1
+			path: app/Services/Blog/BlogArticleService.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between string and App\\Enums\\ContentStatus\:\:Published will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Services/Blog/BlogArticleService.php
+
+		-
+			message: '#^Offset ''seo_description'' on string\|null on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Content/ContentPageService.php
+
+		-
+			message: '#^Offset ''seo_title'' on string\|null on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Content/ContentPageService.php
+
+		-
+			message: '#^Result of && is always false\.$#'
+			identifier: booleanAnd.alwaysFalse
+			count: 1
+			path: app/Services/Content/ContentPageService.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between string and App\\Enums\\ContentStatus\:\:Published will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Services/Content/ContentPageService.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type App\\Models\\Reservation\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 6
+			path: app/Services/Financial/FinancialLedgerService.php
+
+		-
+			message: '#^Method App\\Services\\Financial\\FinancialReconciliationService\:\:getUnreconciledExceptions\(\) should return Illuminate\\Support\\Collection\<int, array\<string, mixed\>\> but returns Illuminate\\Support\\Collection\<int, array\{settlement_id\: int, settlement_reference\: string, owner_name\: string\|null, amount_minor\: int, status\: string, status_label\: string, reconciliation_status\: string, reconciliation_label\: string, \.\.\.\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Financial/FinancialReconciliationService.php
+
+		-
+			message: '#^Method App\\Services\\Financial\\SettlementCalculationService\:\:calculateSettlementSummary\(\) should return array\{gross_booking_value_minor\: int, commission_amount_minor\: int, commission_tax_amount_minor\: int, statutory_deductions_minor\: int, refund_adjustments_minor\: int, relocation_adjustments_minor\: int, other_adjustments_minor\: int, net_settlement_amount_minor\: int, \.\.\.\} but returns array\{gross_booking_value_minor\: int, commission_amount_minor\: int\<0, max\>, commission_tax_amount_minor\: int\<0, max\>, statutory_deductions_minor\: int, refund_adjustments_minor\: \(float\|int\), relocation_adjustments_minor\: 0, other_adjustments_minor\: 0, net_settlement_amount_minor\: float\|int\<0, max\>, \.\.\.\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Financial/SettlementCalculationService.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Services/Financial/TaxCalculationService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>gst_registered" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/Financial/TaxCalculationService.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type App\\Models\\OwnerFinancialProfile\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/Financial/TaxCalculationService.php
+
+		-
+			message: '#^Method App\\Services\\LocationAutocompleteService\:\:autocomplete\(\) should return list\<array\{id\: string, name\: string, type\: ''city''\|''landmark''\|''locality'', secondary_text\: string, label\: string, city\: string, city_name\: string, locality\: string\|null, \.\.\.\}\> but returns array\<mixed, mixed\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/LocationAutocompleteService.php
+
+		-
+			message: '#^Method App\\Services\\LocationAutocompleteService\:\:queryPhoton\(\) should return list\<array\{id\: string, name\: string, type\: ''city''\|''landmark''\|''locality'', secondary_text\: string, label\: string, city\: string, city_name\: string, locality\: string\|null, \.\.\.\}\> but returns list\<array\{id\: string, name\: string, type\: string, secondary_text\: string, label\: string, city\: string, city_name\: string, locality\: string\|null, \.\.\.\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/LocationAutocompleteService.php
+
+		-
+			message: '#^Parameter \#2 \$activeCitySlugs of method App\\Services\\LocationAutocompleteService\:\:matchCitySlug\(\) expects list\<string\>, array\<int, \(int\|string\)\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/LocationAutocompleteService.php
+
+		-
+			message: '#^Call to function in_array\(\) with arguments string, array\{App\\Enums\\EmailCampaignStatus\:\:Sending, App\\Enums\\EmailCampaignStatus\:\:Sent\} and true will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Services/Marketing/MarketingCampaignService.php
+
+		-
+			message: '#^Offset 0 on array\{0\: int\<0, max\>, 1\: int\<0, max\>, 2\: int, 3\: string, mime\: string, channels\?\: int, bits\?\: int\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Media/MediaStorageService.php
+
+		-
+			message: '#^Offset 1 on array\{0\: int\<0, max\>, 1\: int\<0, max\>, 2\: int, 3\: string, mime\: string, channels\?\: int, bits\?\: int\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Media/MediaStorageService.php
+
+		-
+			message: '#^Method App\\Services\\Notifications\\Channels\\InAppDatabaseChannel\:\:send\(\) has parameter \$rendered with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/Notifications/Channels/InAppDatabaseChannel.php
+
+		-
+			message: '#^Method App\\Services\\Notifications\\NotificationDispatcher\:\:dispatch\(\) has parameter \$notifiable with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/Notifications/NotificationDispatcher.php
+
+		-
+			message: '#^Parameter \#2 \$recipients of method App\\Services\\Notifications\\NotificationDispatcher\:\:dispatch\(\) expects Illuminate\\Database\\Eloquent\\Model\|list\<Illuminate\\Database\\Eloquent\\Model\>, array\<int, App\\Models\\Admin\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Notifications/NotificationDispatcher.php
+
+		-
+			message: '#^Result of && is always false\.$#'
+			identifier: booleanAnd.alwaysFalse
+			count: 1
+			path: app/Services/Notifications/NotificationPreferenceService.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between string and App\\Enums\\ConsentStatus\:\:OptedIn will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Services/Notifications/NotificationPreferenceService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>enabled" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Services/Notifications/NotificationPreferenceService.php
+
+		-
+			message: '#^Method App\\Services\\Notifications\\WebhookProcessingService\:\:updateDeliveryFromWhatsAppStatus\(\) has parameter \$raw with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/Notifications/WebhookProcessingService.php
+
+		-
+			message: '#^Parameter \#3 \$timestamp of method App\\Services\\Notifications\\WebhookProcessingService\:\:updateDeliveryFromWhatsAppStatus\(\) expects Illuminate\\Support\\Carbon, Carbon\\CarbonImmutable\|Illuminate\\Support\\Carbon given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Notifications/WebhookProcessingService.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
+			count: 1
+			path: app/Services/PropertyPublicData.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/PropertyPublicData.php
+
+		-
+			message: '#^Unable to resolve the template type TKey in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Services/PropertySearchCustomerData.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Services/PropertySearchCustomerData.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>display_order" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Services/PropertySearchCustomerData.php
+
+		-
+			message: '#^Call to function is_array\(\) with string\|null will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Services/Protection/CancellationPolicyService.php
+
+		-
+			message: '#^Instanceof between App\\Enums\\PropertyGenderPolicy and App\\Enums\\PropertyGenderPolicy will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: app/Services/Protection/RelocationMatchingService.php
+
+		-
+			message: '#^Match arm comparison between \*NEVER\* and null is always false\.$#'
+			identifier: match.alwaysFalse
+			count: 1
+			path: app/Services/Protection/RelocationMatchingService.php
+
+		-
+			message: '#^Property App\\Services\\Protection\\RelocationMatchingService\:\:\$pricing is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: app/Services/Protection/RelocationMatchingService.php
+
+		-
+			message: '#^Method App\\Services\\ReservationData\:\:refundsSummary\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\{id\: int, gateway_refund_id\: string\|null, amount_minor\: int, currency_code\: string, status\: string, status_label\: string, reason\: string, admin_name\: string, \.\.\.\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/ReservationData.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Carbon\\CarbonImmutable\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Services/ReservationData.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>isEligible" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/ReservationData.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>reason" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/ReservationData.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type App\\Models\\Admin\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/ReservationData.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\PropertyRatingSummary\:\:\$total_published_reviews\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Seo/SeoService.php
+
+		-
+			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Services/Seo/SeoService.php
+
+		-
+			message: '#^Cannot cast array\<mixed\>\|string to string\.$#'
+			identifier: cast.string
+			count: 1
+			path: app/Services/Seo/SeoService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/Seo/SeoService.php
+
+		-
+			message: '#^Cannot call method toIso8601String\(\) on Carbon\\CarbonImmutable\|string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Services/Seo/SitemapService.php
+
+		-
+			message: '#^Parameter \#2 \$string of function explode expects string, bool\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: config/sanctum.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\PropertyRoomType\:\:factory\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: database/factories/PropertyReviewFactory.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: database/seeders/CustomerSeeder.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: database/seeders/OwnerSeeder.php
+
+		-
+			message: '#^Offset ''data_type'' on array\{key\: ''brand\.color_accent''\|''brand\.color_primary''\|''brand\.color…''\|''brand\.dark_logo_url''\|''brand\.email_header…''\|''brand\.favicon_url''\|''brand\.horizontal…''\|''brand\.light_logo_url''\|''brand\.mobile_icon…''\|''brand\.og_image_url''\|''brand\.primary_logo…''\|''features\.allow…''\|''features\.instant…''\|''features…''\|''features\.referral…''\|''features\.rewards…''\|''financial\.gst_rate…''\|''financial\.minimum…''\|''financial\.platform…''\|''financial…''\|''financial\.tds_rate…''\|''general\.default…''\|''general\.description''\|''general\.platform…''\|''general\.support…''\|''general\.tagline''\|''general\.website_url''\|''grievance…''\|''grievance\.officer…''\|''integrations…''\|''integrations\.sms…''\|''localization…''\|''localization\.date…''\|''localization\.phone…''\|''localization\.time…''\|''notifications…''\|''notifications\.email…''\|''notifications\.push…''\|''notifications\.sms…''\|''security\.api_rate…''\|''security\.enforce…''\|''security\.lockout…''\|''security\.max_login…''\|''security\.require…''\|''security\.session…''\|''seo\.canonical_url…''\|''seo\.default_meta…''\|''seo\.og_site_name''\|''seo\.robots_directive''\|''seo\.sitemap_enabled''\|''seo\.twitter_handle''\|''timings\.allow…''\|''timings\.check_in…''\|''timings\.check_out…''\|''timings\.curfew_time''\|''timings\.quiet_hours…'', value\: 1\.0\|5\|5\.0\|7\|10\.0\|12\.0\|15\|24\|60\|120\|500\.0\|''\#5C2D54''\|''\#FF9580''\|''\#FFF8F0''\|''\+91''\|''\+91 40 6828 0000''\|''\+91 40 6828 0099''\|''/brand/app/tijum…''\|''/brand/icons/tijum…''\|''/brand/logo/tijum…''\|''/images/public/og…''\|''06\:00''\|''11\:00''\|''12\:00''\|''12h''\|''22\:30''\|''23\:00''\|''@tijum_stays''\|''Asia/Kolkata''\|''DD/MM/YYYY''\|''Discover verified…''\|''grievance@tijum\.com''\|''https\://tijum\.com''\|''IN''\|''index, follow, max…''\|''India''\|''INR''\|''Level 4, Cyber…''\|''msg91''\|''Platform is…''\|''Stay easy\. Eat well…''\|''support@tijum\.com''\|''test''\|''TIJUM''\|''TIJUM Accommodations''\|''TIJUM is India\\''s…''\|''TIJUM Marketplace…''\|''TIJUM Stays''\|''TIJUM \| Verified…''\|''TIJUMS''\|''Vikram Rao''\|''₹''\|bool, group\: ''brand''\|''features''\|''financial''\|''general''\|''grievance''\|''integrations''\|''localization''\|''notifications''\|''security''\|''seo''\|''timings'', description\: ''Active loyalty coin…''\|''Allow new hostel…''\|''App launcher icon…''\|''Appointed Grievance…''\|''Automated XML…''\|''Bilingual…''\|''Branded logo…''\|''Canonical root URL…''\|''Clock display…''\|''Conclusion of quiet…''\|''Currency symbol…''\|''Customer and…''\|''Dark variant logo…''\|''Default global meta…''\|''Default global…''\|''Default…''\|''Default social card…''\|''Direct escalation…''\|''Duration of…''\|''Enforce customer…''\|''Expo mobile push…''\|''Failed credential…''\|''Favicon icon for…''\|''Global indexing…''\|''Global marketplace…''\|''GST tax percentage…''\|''Header name used on…''\|''Hostel night entry…''\|''Idle admin and…''\|''ISO 3166\-1 alpha\-2…''\|''Light variant logo…''\|''Mandated maximum…''\|''Mandatory TOTP Two…''\|''Minimum ledger…''\|''Official platform…''\|''Open new customer…''\|''OpenGraph site name…''\|''Payout settlement…''\|''Permit digital late…''\|''Permit instant…''\|''Platform fee…''\|''Platform mission…''\|''Primary brand mark…''\|''Primary helpline…''\|''Primary platform…''\|''Public API throttle…''\|''Public brand and…''\|''Razorpay payment…''\|''Referral reward…''\|''Regional date…''\|''Registered…''\|''Require email…''\|''Secondary platform…''\|''Selected telecom…''\|''SMS gateway…''\|''Standard…''\|''Standard guest…''\|''Standard property…''\|''Start of quiet…''\|''Statutory billing…''\|''Statutory dispute…''\|''Statutory legal…''\|''Surface background…''\|''TDS rate under…''\|''TRAI/DLT approved 6…''\|''Transactional email…''\|''Twitter/X publisher…''\|''WhatsApp Cloud API…''\|''Wide horizontal…'', is_public\: bool, data_type\: ''boolean''\|''number''\|''string''\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: database/seeders/PlatformSettingSeeder.php
+
+		-
+			message: '#^Offset ''description'' on array\{key\: ''brand\.color_accent''\|''brand\.color_primary''\|''brand\.color…''\|''brand\.dark_logo_url''\|''brand\.email_header…''\|''brand\.favicon_url''\|''brand\.horizontal…''\|''brand\.light_logo_url''\|''brand\.mobile_icon…''\|''brand\.og_image_url''\|''brand\.primary_logo…''\|''features\.allow…''\|''features\.instant…''\|''features…''\|''features\.referral…''\|''features\.rewards…''\|''financial\.gst_rate…''\|''financial\.minimum…''\|''financial\.platform…''\|''financial…''\|''financial\.tds_rate…''\|''general\.default…''\|''general\.description''\|''general\.platform…''\|''general\.support…''\|''general\.tagline''\|''general\.website_url''\|''grievance…''\|''grievance\.officer…''\|''integrations…''\|''integrations\.sms…''\|''localization…''\|''localization\.date…''\|''localization\.phone…''\|''localization\.time…''\|''notifications…''\|''notifications\.email…''\|''notifications\.push…''\|''notifications\.sms…''\|''security\.api_rate…''\|''security\.enforce…''\|''security\.lockout…''\|''security\.max_login…''\|''security\.require…''\|''security\.session…''\|''seo\.canonical_url…''\|''seo\.default_meta…''\|''seo\.og_site_name''\|''seo\.robots_directive''\|''seo\.sitemap_enabled''\|''seo\.twitter_handle''\|''timings\.allow…''\|''timings\.check_in…''\|''timings\.check_out…''\|''timings\.curfew_time''\|''timings\.quiet_hours…'', value\: 1\.0\|5\|5\.0\|7\|10\.0\|12\.0\|15\|24\|60\|120\|500\.0\|''\#5C2D54''\|''\#FF9580''\|''\#FFF8F0''\|''\+91''\|''\+91 40 6828 0000''\|''\+91 40 6828 0099''\|''/brand/app/tijum…''\|''/brand/icons/tijum…''\|''/brand/logo/tijum…''\|''/images/public/og…''\|''06\:00''\|''11\:00''\|''12\:00''\|''12h''\|''22\:30''\|''23\:00''\|''@tijum_stays''\|''Asia/Kolkata''\|''DD/MM/YYYY''\|''Discover verified…''\|''grievance@tijum\.com''\|''https\://tijum\.com''\|''IN''\|''index, follow, max…''\|''India''\|''INR''\|''Level 4, Cyber…''\|''msg91''\|''Platform is…''\|''Stay easy\. Eat well…''\|''support@tijum\.com''\|''test''\|''TIJUM''\|''TIJUM Accommodations''\|''TIJUM is India\\''s…''\|''TIJUM Marketplace…''\|''TIJUM Stays''\|''TIJUM \| Verified…''\|''TIJUMS''\|''Vikram Rao''\|''₹''\|bool, group\: ''brand''\|''features''\|''financial''\|''general''\|''grievance''\|''integrations''\|''localization''\|''notifications''\|''security''\|''seo''\|''timings'', description\: ''Active loyalty coin…''\|''Allow new hostel…''\|''App launcher icon…''\|''Appointed Grievance…''\|''Automated XML…''\|''Bilingual…''\|''Branded logo…''\|''Canonical root URL…''\|''Clock display…''\|''Conclusion of quiet…''\|''Currency symbol…''\|''Customer and…''\|''Dark variant logo…''\|''Default global meta…''\|''Default global…''\|''Default…''\|''Default social card…''\|''Direct escalation…''\|''Duration of…''\|''Enforce customer…''\|''Expo mobile push…''\|''Failed credential…''\|''Favicon icon for…''\|''Global indexing…''\|''Global marketplace…''\|''GST tax percentage…''\|''Header name used on…''\|''Hostel night entry…''\|''Idle admin and…''\|''ISO 3166\-1 alpha\-2…''\|''Light variant logo…''\|''Mandated maximum…''\|''Mandatory TOTP Two…''\|''Minimum ledger…''\|''Official platform…''\|''Open new customer…''\|''OpenGraph site name…''\|''Payout settlement…''\|''Permit digital late…''\|''Permit instant…''\|''Platform fee…''\|''Platform mission…''\|''Primary brand mark…''\|''Primary helpline…''\|''Primary platform…''\|''Public API throttle…''\|''Public brand and…''\|''Razorpay payment…''\|''Referral reward…''\|''Regional date…''\|''Registered…''\|''Require email…''\|''Secondary platform…''\|''Selected telecom…''\|''SMS gateway…''\|''Standard…''\|''Standard guest…''\|''Standard property…''\|''Start of quiet…''\|''Statutory billing…''\|''Statutory dispute…''\|''Statutory legal…''\|''Surface background…''\|''TDS rate under…''\|''TRAI/DLT approved 6…''\|''Transactional email…''\|''Twitter/X publisher…''\|''WhatsApp Cloud API…''\|''Wide horizontal…'', is_public\: bool, data_type\: ''boolean''\|''number''\|''string''\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: database/seeders/PlatformSettingSeeder.php
+
+		-
+			message: '#^Offset ''is_public'' on array\{key\: ''brand\.color_accent''\|''brand\.color_primary''\|''brand\.color…''\|''brand\.dark_logo_url''\|''brand\.email_header…''\|''brand\.favicon_url''\|''brand\.horizontal…''\|''brand\.light_logo_url''\|''brand\.mobile_icon…''\|''brand\.og_image_url''\|''brand\.primary_logo…''\|''features\.allow…''\|''features\.instant…''\|''features…''\|''features\.referral…''\|''features\.rewards…''\|''financial\.gst_rate…''\|''financial\.minimum…''\|''financial\.platform…''\|''financial…''\|''financial\.tds_rate…''\|''general\.default…''\|''general\.description''\|''general\.platform…''\|''general\.support…''\|''general\.tagline''\|''general\.website_url''\|''grievance…''\|''grievance\.officer…''\|''integrations…''\|''integrations\.sms…''\|''localization…''\|''localization\.date…''\|''localization\.phone…''\|''localization\.time…''\|''notifications…''\|''notifications\.email…''\|''notifications\.push…''\|''notifications\.sms…''\|''security\.api_rate…''\|''security\.enforce…''\|''security\.lockout…''\|''security\.max_login…''\|''security\.require…''\|''security\.session…''\|''seo\.canonical_url…''\|''seo\.default_meta…''\|''seo\.og_site_name''\|''seo\.robots_directive''\|''seo\.sitemap_enabled''\|''seo\.twitter_handle''\|''timings\.allow…''\|''timings\.check_in…''\|''timings\.check_out…''\|''timings\.curfew_time''\|''timings\.quiet_hours…'', value\: 1\.0\|5\|5\.0\|7\|10\.0\|12\.0\|15\|24\|60\|120\|500\.0\|''\#5C2D54''\|''\#FF9580''\|''\#FFF8F0''\|''\+91''\|''\+91 40 6828 0000''\|''\+91 40 6828 0099''\|''/brand/app/tijum…''\|''/brand/icons/tijum…''\|''/brand/logo/tijum…''\|''/images/public/og…''\|''06\:00''\|''11\:00''\|''12\:00''\|''12h''\|''22\:30''\|''23\:00''\|''@tijum_stays''\|''Asia/Kolkata''\|''DD/MM/YYYY''\|''Discover verified…''\|''grievance@tijum\.com''\|''https\://tijum\.com''\|''IN''\|''index, follow, max…''\|''India''\|''INR''\|''Level 4, Cyber…''\|''msg91''\|''Platform is…''\|''Stay easy\. Eat well…''\|''support@tijum\.com''\|''test''\|''TIJUM''\|''TIJUM Accommodations''\|''TIJUM is India\\''s…''\|''TIJUM Marketplace…''\|''TIJUM Stays''\|''TIJUM \| Verified…''\|''TIJUMS''\|''Vikram Rao''\|''₹''\|bool, group\: ''brand''\|''features''\|''financial''\|''general''\|''grievance''\|''integrations''\|''localization''\|''notifications''\|''security''\|''seo''\|''timings'', description\: ''Active loyalty coin…''\|''Allow new hostel…''\|''App launcher icon…''\|''Appointed Grievance…''\|''Automated XML…''\|''Bilingual…''\|''Branded logo…''\|''Canonical root URL…''\|''Clock display…''\|''Conclusion of quiet…''\|''Currency symbol…''\|''Customer and…''\|''Dark variant logo…''\|''Default global meta…''\|''Default global…''\|''Default…''\|''Default social card…''\|''Direct escalation…''\|''Duration of…''\|''Enforce customer…''\|''Expo mobile push…''\|''Failed credential…''\|''Favicon icon for…''\|''Global indexing…''\|''Global marketplace…''\|''GST tax percentage…''\|''Header name used on…''\|''Hostel night entry…''\|''Idle admin and…''\|''ISO 3166\-1 alpha\-2…''\|''Light variant logo…''\|''Mandated maximum…''\|''Mandatory TOTP Two…''\|''Minimum ledger…''\|''Official platform…''\|''Open new customer…''\|''OpenGraph site name…''\|''Payout settlement…''\|''Permit digital late…''\|''Permit instant…''\|''Platform fee…''\|''Platform mission…''\|''Primary brand mark…''\|''Primary helpline…''\|''Primary platform…''\|''Public API throttle…''\|''Public brand and…''\|''Razorpay payment…''\|''Referral reward…''\|''Regional date…''\|''Registered…''\|''Require email…''\|''Secondary platform…''\|''Selected telecom…''\|''SMS gateway…''\|''Standard…''\|''Standard guest…''\|''Standard property…''\|''Start of quiet…''\|''Statutory billing…''\|''Statutory dispute…''\|''Statutory legal…''\|''Surface background…''\|''TDS rate under…''\|''TRAI/DLT approved 6…''\|''Transactional email…''\|''Twitter/X publisher…''\|''WhatsApp Cloud API…''\|''Wide horizontal…'', is_public\: bool, data_type\: ''boolean''\|''number''\|''string''\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: database/seeders/PlatformSettingSeeder.php
+
+		-
+			message: '#^Offset ''category\-homestay''\|''category\-hostel''\|''category\-pg''\|''city\-guntur''\|''city\-hyderabad''\|''city\-vijayawada''\|''city\-visakhapatnam''\|''food\-breakfast''\|''food\-dining''\|''hero\-stay''\|''partner\-hospitality'' on array\{category\-hostel\: string, category\-pg\: string, category\-homestay\: string, hero\-stay\: string, food\-breakfast\: string, food\-dining\: string, partner\-hospitality\: string, city\-hyderabad\: string, \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: database/seeders/PropertySeeder.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>state" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: database/seeders/PropertySeeder.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 12
+			path: database/seeders/ReservationSeeder.php

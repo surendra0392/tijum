@@ -1,0 +1,1 @@
+function e(e){if(!e)return``;let[t,n]=e.split(`:`),r=Number(t),i=r>=12?`PM`:`AM`;return`${r%12==0?12:r%12}:${n} ${i}`}export{e as t};
