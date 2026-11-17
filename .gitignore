@@ -55,4 +55,6 @@ yarn-error.log
 /scratch
 /storage/*.phar
 /storage/*.txt
+/tests
+apps/mobile/__tests__
 
