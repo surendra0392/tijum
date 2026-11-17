@@ -9,15 +9,15 @@ use App\Models\Admin;
 use App\Models\BlogArticle;
 use App\Models\BlogTag;
 use App\Models\SeoRedirect;
+use App\Services\Security\HtmlSanitizer;
 use App\Services\Seo\SitemapService;
 use Illuminate\Support\Str;
 
 class BlogArticleService
 {
-    private const ALLOWED_ARTICLE_TAGS = '<p><br><strong><em><b><i><u><h3><h4><h5><ul><ol><li><a><blockquote><code><pre><hr><table><thead><tbody>tr><th><td><img>';
-
     public function __construct(
         private readonly SitemapService $sitemapService,
+        private readonly ?HtmlSanitizer $htmlSanitizer = null,
     ) {}
 
     /**
@@ -25,7 +25,7 @@ class BlogArticleService
      */
     public function createArticle(array $data, Admin $admin): BlogArticle
     {
-        $slug = Str::slug((string) ($data['slug'] ?: $data['title']));
+        $slug = Str::slug((string) (($data['slug'] ?? null) ?: $data['title']));
         $status = ContentStatus::from((string) ($data['status'] ?? 'draft'));
         $publishedAt = $status === ContentStatus::Published ? now() : null;
 
@@ -174,8 +174,6 @@ class BlogArticleService
 
     private function sanitizeContent(string $html): string
     {
-        $clean = strip_tags($html, self::ALLOWED_ARTICLE_TAGS);
-
-        return (string) preg_replace('/(javascript:|on\w+=)/i', '', $clean);
+        return ($this->htmlSanitizer ?? new HtmlSanitizer)->sanitizeRichHtml($html, true);
     }
 }

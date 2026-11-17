@@ -42,6 +42,10 @@ class WhatsAppWebhookController extends Controller
         $appSecret = (string) (config('tijum.notifications.channels.whatsapp.app_secret') ?: config('services.whatsapp.webhook_secret', ''));
         $signature = $request->header('X-Hub-Signature-256');
 
+        if ($appSecret === '' && ! app()->environment(['local', 'testing'])) {
+            return response()->json(['error' => 'Webhook verification is not configured.'], 503);
+        }
+
         if ($appSecret !== '' && ($signature === null || trim($signature) === '')) {
             return response()->json(['error' => 'Missing X-Hub-Signature-256 header'], 401);
         }

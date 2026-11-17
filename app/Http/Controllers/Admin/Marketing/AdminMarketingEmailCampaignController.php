@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\MarketingCampaign;
 use App\Models\MarketingEmailCampaign;
 use App\Services\Marketing\MarketingCampaignService;
+use App\Services\Security\HtmlSanitizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -56,6 +57,7 @@ class AdminMarketingEmailCampaignController extends Controller
             'scheduled_for' => ['nullable', 'date'],
         ]);
 
+        $validated['content_html'] = (new HtmlSanitizer)->sanitizeRichHtml((string) $validated['content_html'], true);
         $validated['admin_id'] = auth('admin')->id();
         $validated['status'] = $request->filled('scheduled_for')
             ? EmailCampaignStatus::Scheduled
@@ -91,6 +93,8 @@ class AdminMarketingEmailCampaignController extends Controller
             'target_segment' => ['required', 'string'],
             'scheduled_for' => ['nullable', 'date'],
         ]);
+
+        $validated['content_html'] = (new HtmlSanitizer)->sanitizeRichHtml((string) $validated['content_html'], true);
 
         $emailCampaign->update($validated);
 

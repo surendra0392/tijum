@@ -29,7 +29,7 @@ class WebhookProcessingService
     public function processWhatsAppWebhook(array $payload, string $rawContent, ?string $signature): array
     {
         // 1. Signature verification. A configured secret makes the signature mandatory.
-        $appSecret = (string) config('tijum.notifications.channels.whatsapp.app_secret', '');
+        $appSecret = (string) (config('tijum.notifications.channels.whatsapp.app_secret') ?: config('services.whatsapp.webhook_secret', ''));
         if ($appSecret !== '') {
             if ($signature === null || $signature === '') {
                 Log::warning('WhatsApp Webhook rejected because the signature header is missing.');
@@ -43,7 +43,7 @@ class WebhookProcessingService
 
                 return ['success' => false, 'message' => 'Invalid webhook signature.'];
             }
-        } elseif (app()->isProduction()) {
+        } elseif (! app()->environment(['local', 'testing'])) {
             Log::error('WhatsApp Webhook rejected because the app secret is not configured.');
 
             return ['success' => false, 'message' => 'Webhook verification is not configured.'];
@@ -125,7 +125,7 @@ class WebhookProcessingService
 
                 return ['success' => false, 'message' => 'Invalid webhook signature.'];
             }
-        } elseif (app()->isProduction()) {
+        } elseif (! app()->environment(['local', 'testing'])) {
             Log::error('SMS Webhook rejected because the webhook secret is not configured.');
 
             return ['success' => false, 'message' => 'Webhook verification is not configured.'];

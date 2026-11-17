@@ -24,6 +24,10 @@ class SmsWebhookController extends Controller
     {
         $webhookSecret = (string) (config('services.sms.webhook_secret') ?: config('tijum.notifications.channels.sms.webhook_secret', ''));
 
+        if ($webhookSecret === '' && ! app()->environment(['local', 'testing'])) {
+            return response()->json(['success' => false, 'message' => 'Webhook verification is not configured.'], 503);
+        }
+
         if ($webhookSecret !== '') {
             $secretHeader = $request->header('X-Webhook-Secret');
             $signatureHeader = $request->header('X-Webhook-Signature') ?? $request->header('X-MSG91-Signature');

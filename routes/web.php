@@ -61,8 +61,12 @@ Route::get('/{category}-in-{citySlug}', [CategoryRedirectController::class, 'han
     ->where('category', 'pgs|homestays|coliving|co-living|hostels-pg|hotels|lodges|guest-houses');
 
 // Canonical Category Direct Routes & Legacy Redirects
-Route::get('/api/referrals/validate', [ReferralRedirectController::class, 'validateCode'])->name('api.referrals.validate');
-Route::get('/r/{code}', [ReferralRedirectController::class, 'handle'])->name('public.referral');
+Route::get('/api/referrals/validate', [ReferralRedirectController::class, 'validateCode'])
+    ->middleware('throttle:30,1')
+    ->name('api.referrals.validate');
+Route::get('/r/{code}', [ReferralRedirectController::class, 'handle'])
+    ->middleware('throttle:30,1')
+    ->name('public.referral');
 Route::get('/hostels', fn () => redirect()->route('public.search', ['category' => 'hostels-pg'], 301));
 Route::get('/pg', fn () => redirect()->route('public.search', ['category' => 'hostels-pg'], 301));
 Route::get('/pgs', fn () => redirect()->route('public.search', ['category' => 'hostels-pg'], 301));
@@ -84,7 +88,9 @@ Route::get('/p/{slug}', [CmsPageController::class, 'show'])->name('public.conten
 Route::post('/newsletter/subscribe', [NewsletterSubscriptionController::class, 'subscribe'])
     ->middleware('throttle:10,1')
     ->name('public.newsletter.subscribe');
-Route::match(['get', 'post'], '/unsubscribe/{token}', [NewsletterSubscriptionController::class, 'unsubscribe'])->name('public.newsletter.unsubscribe');
+Route::match(['get', 'post'], '/unsubscribe/{token}', [NewsletterSubscriptionController::class, 'unsubscribe'])
+    ->middleware('throttle:20,1')
+    ->name('public.newsletter.unsubscribe');
 
 // Module I: First-Party Marketing Analytics
 Route::post('/api/marketing/track', [MarketingTrackingController::class, 'track'])

@@ -6,6 +6,7 @@ namespace App\Services\Media;
 
 use App\Models\Admin;
 use App\Models\MediaAsset;
+use App\Services\Security\HtmlSanitizer;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -54,10 +55,7 @@ class MediaStorageService
 
         // SVG sanitization check to prevent script injection
         if ($mime === 'image/svg+xml' || $ext === 'svg') {
-            $content = (string) file_get_contents($file->getRealPath());
-            if (preg_match('/<script|onload|onerror|javascript:/i', $content)) {
-                throw new InvalidArgumentException('Uploaded SVG contains potentially unsafe script content.');
-            }
+            (new HtmlSanitizer)->assertSafeSvg((string) file_get_contents($file->getRealPath()));
         }
 
         $directory = 'media/'.date('Y/m');

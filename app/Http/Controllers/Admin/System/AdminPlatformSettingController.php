@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Admin\System;
 
 use App\Http\Controllers\Controller;
 use App\Models\Admin;
+use App\Services\Security\HtmlSanitizer;
 use App\Services\Settings\PlatformSettingsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -372,6 +373,18 @@ class AdminPlatformSettingController extends Controller
         $file = $request->file('file');
         $type = $request->string('asset_type')->toString();
         $ext = strtolower($file->getClientOriginalExtension());
+        $mime = strtolower((string) ($file->getMimeType() ?: $file->getClientMimeType()));
+
+        if ($ext === 'svg' || $mime === 'image/svg+xml') {
+            try {
+                (new HtmlSanitizer)->assertSafeSvg((string) file_get_contents($file->getRealPath()));
+            } catch (\InvalidArgumentException $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+        }
 
         $filename = "{$type}_".Str::random(10).".{$ext}";
         $path = $file->storeAs('brand', $filename, 'public');

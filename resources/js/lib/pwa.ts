@@ -177,7 +177,7 @@ export function initPwaClient(): void {
         window.location.reload();
     });
 
-    window.addEventListener('load', () => {
+    const registerWorker = () => {
         navigator.serviceWorker
             .register('/sw.js', {
                 scope: '/',
@@ -213,7 +213,13 @@ export function initPwaClient(): void {
             .catch(() => {
                 // Keep web experience uninterrupted if SW registration fails
             });
-    });
+    };
+
+    if (document.readyState === 'complete') {
+        registerWorker();
+    } else {
+        window.addEventListener('load', registerWorker, { once: true });
+    }
 
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && swRegistration) {

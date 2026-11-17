@@ -215,7 +215,9 @@ export function Breadcrumbs({
         >
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaData) }}
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify(schemaData).replaceAll('<', '\\u003c'),
+                }}
             />
             <ol className="flex flex-wrap items-center gap-1.5 leading-none">
                 {showHome && normalizedItems[0]?.title !== 'Home' && (

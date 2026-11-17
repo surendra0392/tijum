@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services\Content;
 
+use App\Services\Security\HtmlSanitizer;
+
 class ContentBlockSanitizer
 {
-    private const ALLOWED_TAGS = '<p><br><strong><em><b><i><u><h3><h4><h5><ul><ol><li><a><blockquote><code>';
+    public function __construct(
+        private readonly ?HtmlSanitizer $htmlSanitizer = null,
+    ) {}
 
     /**
      * @param  array<mixed>  $blocks
@@ -104,20 +108,11 @@ class ContentBlockSanitizer
 
     private function sanitizeHtml(string $html): string
     {
-        // Strip forbidden tags
-        $clean = strip_tags($html, self::ALLOWED_TAGS);
-
-        // Remove dangerous javascript: URIs or event handlers
-        return (string) preg_replace('/(javascript:|on\w+=)/i', '', $clean);
+        return ($this->htmlSanitizer ?? new HtmlSanitizer)->sanitizeRichHtml($html, false);
     }
 
     private function sanitizeUrl(string $url): string
     {
-        $url = trim($url);
-        if (str_starts_with($url, 'javascript:') || str_starts_with($url, 'data:')) {
-            return '#';
-        }
-
-        return $url;
+        return ($this->htmlSanitizer ?? new HtmlSanitizer)->sanitizeUrl($url);
     }
 }

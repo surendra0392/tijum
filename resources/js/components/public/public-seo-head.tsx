@@ -80,7 +80,10 @@ export function PublicSeoHead({
                     head-key="structured-data"
                     type="application/ld+json"
                     dangerouslySetInnerHTML={{
-                        __html: JSON.stringify(seo.structuredData),
+                        __html: JSON.stringify(seo.structuredData).replaceAll(
+                            '<',
+                            '\\u003c',
+                        ),
                     }}
                 />
             )}

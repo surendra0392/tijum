@@ -14,6 +14,7 @@ use App\Models\SupportTicket;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -82,7 +83,10 @@ class OwnerSupportTicketController extends Controller
             'category' => ['required', 'string', 'max:64'],
             'priority' => ['required', 'string', 'in:low,standard,high,urgent'],
             'message' => ['required', 'string', 'max:5000'],
-            'property_id' => ['nullable', 'exists:properties,id'],
+            'property_id' => [
+                'nullable',
+                Rule::exists('properties', 'id')->where('owner_id', $owner->id),
+            ],
         ]);
 
         $priority = SupportTicketPriority::from($validated['priority']);

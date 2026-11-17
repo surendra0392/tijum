@@ -68,7 +68,7 @@
                 <meta data-inertia="twitter-description" name="twitter:description" content="{{ $seo['description'] }}">
                 <meta data-inertia="twitter-image" name="twitter:image" content="{{ $seo['ogImage'] }}">
                 @if (isset($seo['structuredData']))
-                    <script data-inertia="structured-data" type="application/ld+json">{!! json_encode($seo['structuredData'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
+                    <script data-inertia="structured-data" type="application/ld+json">{!! json_encode($seo['structuredData'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
                 @endif
             @endif
         </x-inertia::head>
