@@ -43,11 +43,14 @@ class PushNotificationChannel
         $deviceMap = [];
 
         foreach ($devices as $index => $device) {
+            $safeData = $delivery->payload ?? [];
+            unset($safeData['otp_code'], $safeData['password'], $safeData['token'], $safeData['secret']);
+
             $messages[] = [
                 'to' => $device->push_token,
                 'title' => $rendered['title'],
                 'body' => $rendered['body'],
-                'data' => array_merge($delivery->payload ?? [], [
+                'data' => array_merge($safeData, [
                     'delivery_id' => $delivery->id,
                     'event_id' => $delivery->event_id,
                     'action_url' => $delivery->payload['action_url'] ?? null,

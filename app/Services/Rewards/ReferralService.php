@@ -12,8 +12,10 @@ use App\Models\CustomerReferralProfile;
 use App\Models\Reservation;
 use App\Models\RewardsSetting;
 use App\Models\User;
+use App\Services\Notifications\NotificationDispatcher;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ReferralService
@@ -89,7 +91,7 @@ class ReferralService
             return null;
         }
 
-        return DB::transaction(function () use ($referrer, $referredUser, $normalizedCode, $ip, $userAgent, $deviceFingerprint, $profile): CustomerReferral {
+        $referral = DB::transaction(function () use ($referrer, $referredUser, $normalizedCode, $ip, $userAgent, $deviceFingerprint, $profile): CustomerReferral {
             $referrerReward = (int) RewardsSetting::get('referral_referrer_reward_points', 500);
             $referredReward = (int) RewardsSetting::get('referral_referred_reward_points', 250);
 
@@ -126,6 +128,30 @@ class ReferralService
 
             return $referral;
         });
+
+        try {
+            $firstName = Str::before(trim($referredUser->name), ' ');
+            $displayName = $firstName !== '' ? $firstName : 'A friend';
+            app(NotificationDispatcher::class)->dispatch(
+                eventType: 'rewards.referral_attributed',
+                recipients: $referrer,
+                variables: [
+                    'customer_name' => $referrer->name,
+                    'referral_code' => $normalizedCode,
+                    'referred_customer_display_name' => $displayName,
+                    'action_url' => url('/rewards'),
+                ],
+                related: $referral,
+                relatedReference: $normalizedCode,
+                idempotencySeed: 'referral_attributed_'.$referral->id
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Failed to dispatch rewards.referral_attributed notification: '.$e->getMessage(), [
+                'referral_id' => $referral->id,
+            ]);
+        }
+
+        return $referral;
     }
 
     /**
@@ -137,7 +163,9 @@ class ReferralService
             return null;
         }
 
-        return DB::transaction(function () use ($reservation): ?CustomerReferral {
+        $pointsCredited = 0;
+
+        $referral = DB::transaction(function () use ($reservation, &$pointsCredited): ?CustomerReferral {
             /** @var CustomerReferral|null $referral */
             $referral = CustomerReferral::query()
                 ->lockForUpdate()
@@ -167,7 +195,6 @@ class ReferralService
                 ->value('successful_referrals_count');
 
             // 1. Credit Referrer Points strictly if under max referral earnings cap
-            $pointsCredited = 0;
             if ($currentSuccessful < $maxReferrals) {
                 $this->pointsService->creditPoints(
                     user: $referrer,
@@ -200,6 +227,34 @@ class ReferralService
 
             return $referral;
         });
+
+        if ($referral !== null && $pointsCredited > 0) {
+            try {
+                $referral->loadMissing('referrer');
+                $referrerUser = $referral->referrer;
+                $wallet = $this->pointsService->getOrCreateWallet($referrerUser);
+                app(NotificationDispatcher::class)->dispatch(
+                    eventType: 'rewards.referral_points_credited',
+                    recipients: $referrerUser,
+                    variables: [
+                        'customer_name' => $referrerUser->name,
+                        'points_credited' => number_format($pointsCredited),
+                        'points_balance' => number_format($wallet->available_points),
+                        'referral_reference' => $referral->referral_code_used ?? ('REF-'.$referral->id),
+                        'action_url' => url('/rewards'),
+                    ],
+                    related: $referral,
+                    relatedReference: $referral->referral_code_used ?? $reservation->booking_reference,
+                    idempotencySeed: 'referral_points_credited_'.$referral->id
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Failed to dispatch rewards.referral_points_credited notification: '.$e->getMessage(), [
+                    'referral_id' => $referral->id,
+                ]);
+            }
+        }
+
+        return $referral;
     }
 
     private function generateUniqueReferralCode(User $user): string

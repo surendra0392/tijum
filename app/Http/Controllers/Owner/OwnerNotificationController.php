@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Owner;
 
 use App\Http\Controllers\Controller;
+use App\Models\NotificationDelivery;
 use App\Models\Owner;
 use App\Services\Notifications\NotificationPreferenceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -67,7 +69,21 @@ class OwnerNotificationController extends Controller
         /** @var DatabaseNotification|null $notification */
         $notification = $owner->notifications()->where('id', $id)->first();
         if ($notification !== null) {
-            $notification->markAsRead();
+            DB::transaction(static function () use ($notification, $owner): void {
+                $now = $notification->read_at ?? now();
+
+                if ($notification->read_at === null) {
+                    $notification->forceFill(['read_at' => $now])->save();
+                }
+
+                NotificationDelivery::query()
+                    ->where('notifiable_type', $owner->getMorphClass())
+                    ->where('notifiable_id', $owner->id)
+                    ->where('channel', 'in_app')
+                    ->where('provider_message_id', $notification->id)
+                    ->whereNull('read_at')
+                    ->update(['read_at' => $now]);
+            }, 3);
         }
 
         if ($request->wantsJson()) {
@@ -83,7 +99,18 @@ class OwnerNotificationController extends Controller
         $owner = $request->user('owner');
         abort_unless($owner instanceof Owner, 403);
 
-        $owner->unreadNotifications->markAsRead();
+        DB::transaction(static function () use ($owner): void {
+            $now = now();
+
+            $owner->unreadNotifications()->update(['read_at' => $now]);
+
+            NotificationDelivery::query()
+                ->where('notifiable_type', $owner->getMorphClass())
+                ->where('notifiable_id', $owner->id)
+                ->where('channel', 'in_app')
+                ->whereNull('read_at')
+                ->update(['read_at' => $now]);
+        }, 3);
 
         if ($request->wantsJson()) {
             return response()->json(['success' => true]);

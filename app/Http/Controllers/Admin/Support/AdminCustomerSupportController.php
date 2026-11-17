@@ -10,10 +10,13 @@ use App\Enums\SupportTicketType;
 use App\Http\Controllers\Controller;
 use App\Models\Admin;
 use App\Models\SupportTicket;
+use App\Services\Notifications\NotificationDispatcher;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -181,7 +184,7 @@ class AdminCustomerSupportController extends Controller
 
         $admin = $request->user('admin');
 
-        $ticket->messages()->create([
+        $ticketMessage = $ticket->messages()->create([
             'sender_type' => 'admin',
             'sender_id' => $admin ? $admin->id : 1,
             'sender_name' => $admin ? $admin->name : 'TIJUM Support',
@@ -195,6 +198,12 @@ class AdminCustomerSupportController extends Controller
                 'last_reply_by_type' => 'admin',
                 'status' => SupportTicketStatus::InProgress,
             ])->save();
+
+            $this->dispatchStatusNotification(
+                ticket: $ticket,
+                latestUpdate: Str::limit($validated['message'], 160),
+                idempotencySeed: 'support_msg_'.$ticketMessage->id
+            );
         }
 
         return back()->with('status', 'Response sent successfully.');
@@ -208,6 +217,7 @@ class AdminCustomerSupportController extends Controller
             'status' => ['required', 'string', 'in:open,in_progress,waiting_user,resolved,closed'],
         ]);
 
+        $previousStatus = $ticket->status;
         $status = SupportTicketStatus::from($validated['status']);
         $updates = ['status' => $status];
 
@@ -216,6 +226,14 @@ class AdminCustomerSupportController extends Controller
         }
 
         $ticket->forceFill($updates)->save();
+
+        if ($previousStatus !== $status) {
+            $this->dispatchStatusNotification(
+                ticket: $ticket,
+                latestUpdate: "Your support request status changed to {$status->label()}.",
+                idempotencySeed: 'support_status_'.$ticket->id.'_'.$status->value.'_'.$ticket->updated_at->timestamp
+            );
+        }
 
         return back()->with('status', "Ticket status changed to {$status->label()}.");
     }
@@ -247,6 +265,42 @@ class AdminCustomerSupportController extends Controller
             'resolution_summary' => $validated['resolution_summary'],
         ])->save();
 
+        $this->dispatchStatusNotification(
+            ticket: $ticket,
+            latestUpdate: Str::limit($validated['resolution_summary'], 180),
+            idempotencySeed: 'support_resolved_'.$ticket->id
+        );
+
         return back()->with('status', 'Ticket marked as resolved.');
+    }
+
+    private function dispatchStatusNotification(SupportTicket $ticket, string $latestUpdate, string $idempotencySeed): void
+    {
+        try {
+            $ticket->loadMissing('user');
+            if ($ticket->user === null) {
+                return;
+            }
+
+            app(NotificationDispatcher::class)->dispatch(
+                eventType: 'support.status_updated',
+                recipients: $ticket->user,
+                variables: [
+                    'customer_name' => $ticket->user->name,
+                    'ticket_reference' => $ticket->ticket_reference,
+                    'ticket_status' => $ticket->status->label(),
+                    'latest_update' => $latestUpdate,
+                    'updated_at' => $ticket->updated_at->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
+                    'action_url' => route('support.tickets.show', $ticket->ticket_reference),
+                ],
+                related: $ticket,
+                relatedReference: $ticket->ticket_reference,
+                idempotencySeed: $idempotencySeed
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Failed to dispatch support.status_updated notification: '.$e->getMessage(), [
+                'ticket_id' => $ticket->id,
+            ]);
+        }
     }
 }

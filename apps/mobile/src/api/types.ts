@@ -38,6 +38,14 @@ export interface PropertyCard {
     city: { id: number; name: string; slug: string } | null;
     locality: string;
     address_line: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    distance_km?: number | null;
+    distance_label?: string | null;
+    is_locality_match?: boolean | null;
+    gender_eligibility?: string;
+    starting_price_daily_paise?: number | null;
+    starting_price_weekly_paise?: number | null;
     starting_price_monthly_paise: number;
     rating_average: number;
     reviews_count: number;
@@ -46,6 +54,15 @@ export interface PropertyCard {
     breakfast_included: boolean;
     lunch_included: boolean;
     dinner_included: boolean;
+    food_inclusions?: {
+        provided: boolean;
+        breakfast: boolean;
+        lunch: boolean;
+        dinner: boolean;
+        breakfast_timing?: string;
+        lunch_timing?: string;
+        dinner_timing?: string;
+    };
     included_meals: string[];
     included_meals_label: string;
     is_verified: boolean;
@@ -57,13 +74,27 @@ export interface RoomType {
     name: string;
     code?: string;
     accommodation_mode: 'shared' | 'private';
+    accommodation_mode_label?: string;
     sharing_type?: string;
+    sharing_label?: string;
+    pricing_basis?: 'per_guest' | 'per_room';
+    pricing_basis_label?: string;
     is_shared: boolean;
     gender_policy:
         | 'male_only'
         | 'female_only'
         | 'all_genders'
         | 'not_applicable';
+    gender_policy_label?: string;
+    preferred_guest_gender?: 'male' | 'female' | 'mixed';
+    preferred_guest_gender_label?: string;
+    strict_gender_preference?: boolean;
+    allowed_guest_genders?: Array<{
+        value: 'male' | 'female' | 'mixed';
+        label: string;
+    }>;
+    allowed_guest_compositions?: Array<{ value: string; label: string }>;
+    default_guest_composition?: string;
     guest_composition_policy?: string[];
     max_guests_per_room: number;
     sharing_capacity: number;
@@ -81,8 +112,10 @@ export interface RoomType {
 
 export interface PropertyDetail extends PropertyCard {
     description: string;
+    landmark?: string | null;
     pincode?: string;
     address_line1?: string;
+    google_maps_url?: string | null;
     status?: string;
     check_in_time?: string;
     check_out_time?: string;
@@ -92,7 +125,6 @@ export interface PropertyDetail extends PropertyCard {
     meals_description?: string;
     rating?: number;
     reviews?: any[];
-    starting_price_daily_paise?: number;
     gallery: Array<{
         id: number;
         url: string;
@@ -102,15 +134,21 @@ export interface PropertyDetail extends PropertyCard {
     amenities: Array<{
         id: number;
         name: string;
+        code?: string;
         category?: string;
         icon?: string;
+        icon_key?: string;
     }>;
     room_types: RoomType[];
     timing?: {
-        check_in_time: string;
-        checkout_time: string;
-        earliest_arrival_time: string;
-        policy_notice: string;
+        timezone?: string;
+        standard_check_in_time?: string;
+        standard_check_out_time?: string;
+        check_in_time?: string;
+        checkout_time?: string;
+        earliest_arrival_time?: string;
+        earliest_early_check_in_time?: string;
+        policy_notice?: string;
     };
 }
 
@@ -126,20 +164,38 @@ export interface Reservation {
         | 'completed'
         | 'payment_pending';
     status_label: string;
+    status_semantic?: string;
     is_cancellable: boolean;
     is_awaiting_payment: boolean;
+    is_confirmed?: boolean;
+    is_cancelled?: boolean;
+    is_expired?: boolean;
     check_in_date: string;
     check_out_date: string;
     duration_type: 'daily' | 'weekly' | 'monthly';
     duration_quantity: number;
+    total_stay_days?: number;
     quantity: number;
     guest_count: number;
+    original_amount_paise?: number;
     total_amount_paise: number;
+    coupon_code?: string | null;
+    coupon_discount_paise?: number;
+    points_redeemed?: number;
+    points_discount_paise?: number;
+    points_awarded_potential?: number;
     base_amount_paise?: number;
     tax_amount_paise?: number;
     deposit_amount_paise?: number;
-    guest_composition?: any;
+    guest_composition?: string;
+    guest_composition_label?: string;
+    contact_name?: string;
+    contact_email?: string;
+    contact_phone?: string;
     currency_code: string;
+    early_check_in_requested?: boolean;
+    requested_arrival_time?: string | null;
+    cancellation_reason?: string | null;
     payment_deadline_at?: string;
     payment_window_expires_at?: string;
     owner_decision_deadline_at?: string;
@@ -154,7 +210,15 @@ export interface Reservation {
     owner_payable_paise?: number;
     check_in_time?: string;
     check_out_time?: string;
-    food_inclusions?: any;
+    food_inclusions?: {
+        provided: boolean;
+        breakfast: boolean;
+        lunch: boolean;
+        dinner: boolean;
+        breakfast_timing?: string;
+        lunch_timing?: string;
+        dinner_timing?: string;
+    };
     property: {
         id: number;
         name: string;
@@ -162,6 +226,8 @@ export interface Reservation {
         locality: string;
         city?: string;
         address?: string;
+        latitude?: number | null;
+        longitude?: number | null;
         cover_image_url?: string;
         food_provided?: boolean;
         breakfast_included?: boolean;
@@ -175,9 +241,109 @@ export interface Reservation {
         is_air_conditioned: boolean;
     };
     timing?: {
-        check_in_time: string;
-        checkout_time: string;
-        earliest_arrival_time: string;
+        timezone?: string;
+        standard_check_in_time?: string;
+        standard_check_out_time?: string;
+        check_in_time?: string;
+        checkout_time?: string;
+        earliest_arrival_time?: string;
+    };
+}
+
+export interface LocationPrediction {
+    id: string;
+    name: string;
+    display: string;
+    city: string;
+    city_name: string;
+    locality: string;
+    lat: number;
+    lng: number;
+    source: string;
+}
+
+export interface ReverseGeocodeResult {
+    display: string;
+    locality: string;
+    city: string;
+    city_slug: string;
+    formatted_address: string;
+    lat: number;
+    lng: number;
+    provider: string;
+}
+
+export interface ContactFieldValidation {
+    valid: boolean;
+    message: string;
+    normalized?: string;
+}
+
+export interface GuestContactValidationResult {
+    phone?: ContactFieldValidation;
+    email?: ContactFieldValidation;
+    name?: ContactFieldValidation;
+}
+
+export interface StayQuoteResponse {
+    quote: {
+        check_in_date: string;
+        check_out_date: string;
+        duration_type: 'daily' | 'weekly' | 'monthly';
+        duration_quantity: number;
+        total_stay_days: number;
+        quantity: number;
+        quantity_basis: string;
+        quantity_basis_label: string;
+        guest_count: number;
+        unit_rate_minor: number;
+        rate_unit: string;
+        rate_unit_label: string;
+        total_amount_minor: number;
+        currency_code: string;
+        early_check_in_allowed: boolean;
+        allowed_guest_genders: Array<{
+            value: 'male' | 'female' | 'mixed';
+            label: string;
+        }>;
+        preferred_guest_gender: 'male' | 'female' | 'mixed';
+        preferred_guest_gender_label: string;
+        strict_gender_preference: boolean;
+        allowed_guest_compositions: Array<{ value: string; label: string }>;
+        default_guest_composition: string;
+        timing: Record<string, any>;
+    };
+    availability: {
+        available: boolean;
+        minimum_remaining: number;
+    };
+    property: {
+        id: number;
+        name: string;
+        slug: string;
+        locality?: string;
+        city?: string;
+        category?: string;
+        food_provided: boolean;
+        breakfast_included: boolean;
+        lunch_included: boolean;
+        dinner_included: boolean;
+    };
+    room_type: {
+        id: number;
+        name: string;
+        accommodation_mode: 'shared' | 'private';
+        sharing_label: string;
+        is_air_conditioned: boolean;
+        gender_policy: string;
+        early_check_in_enabled: boolean;
+    };
+    booking_options: {
+        booking_for_options: Array<{
+            value: 'self' | 'other';
+            label: string;
+        }>;
+        contact_phone_digits: number;
     };
 }
 

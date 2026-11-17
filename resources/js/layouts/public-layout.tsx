@@ -14,6 +14,7 @@ import {
 import type { ComponentProps, MouseEvent, PropsWithChildren } from 'react';
 import { useEffect, useState } from 'react';
 import BrandLogo from '@/components/brand/brand-logo';
+import { PWAInstallButton } from '@/components/pwa/PWAInstallPrompt';
 import { BackToTop } from '@/components/public/back-to-top';
 import { MobileAppFloating } from '@/components/public/mobile-app-floating';
 import { ResponsiveContainer } from '@/components/shared/responsive-container';
@@ -402,6 +403,12 @@ export default function PublicLayout({ children }: PropsWithChildren) {
                                     </nav>
 
                                     <div className="mt-auto space-y-3 pt-8">
+                                        <PWAInstallButton
+                                            className="w-full border-tijum-cream/35 bg-tijum-cream/10 text-tijum-cream hover:bg-tijum-cream/20 hover:text-tijum-cream"
+                                            onActionComplete={() =>
+                                                setMobileOpen(false)
+                                            }
+                                        />
                                         {customer ? (
                                             <Button className="w-full" asChild>
                                                 <Link

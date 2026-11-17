@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Notifications\WebPushSubscriptionController;
 use App\Http\Controllers\Owner\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Owner\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Owner\Auth\EmailVerificationPromptController;
@@ -135,6 +136,8 @@ Route::prefix('owner')
                 Route::get('/unread-count', 'unreadCount')->name('unread-count');
                 Route::post('/{id}/read', 'markAsRead')->name('mark-read');
                 Route::post('/mark-all-read', 'markAllAsRead')->name('mark-all-read');
+                Route::post('/push-subscriptions', [WebPushSubscriptionController::class, 'store'])->name('push-subscriptions.store');
+                Route::delete('/push-subscriptions', [WebPushSubscriptionController::class, 'destroy'])->name('push-subscriptions.destroy');
             });
 
             Route::get('settings/notifications', [OwnerNotificationController::class, 'preferences'])->name('settings.notifications');

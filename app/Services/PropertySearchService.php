@@ -115,8 +115,8 @@ class PropertySearchService
             $minRating = isset($filters['min_rating']) && is_numeric($filters['min_rating'])
                 ? (float) $filters['min_rating']
                 : null;
-            $avgRating = (float) ($property->ratingSummary?->average_rating ?? 0.0);
-            $reviewCount = (int) ($property->ratingSummary?->published_review_count ?? 0);
+            $avgRating = $property->ratingSummary ? (float) $property->ratingSummary->average_rating : 0.0;
+            $reviewCount = $property->ratingSummary ? (int) $property->ratingSummary->published_review_count : 0;
             if ($minRating !== null && $minRating > 0 && ($reviewCount === 0 || $avgRating < $minRating)) {
                 continue;
             }
@@ -314,7 +314,7 @@ class PropertySearchService
      * @param  array<string, mixed>  $filters
      * @return array{lat: float, lng: float}|null
      */
-    private function resolveReferenceCoordinates(array $filters): ?array
+    public function resolveReferenceCoordinates(array $filters): ?array
     {
         if (isset($filters['lat'], $filters['lng']) && is_numeric($filters['lat']) && is_numeric($filters['lng'])) {
             return [
@@ -397,8 +397,11 @@ class PropertySearchService
             return $cityCenters[$cityId];
         }
 
-        if (isset($filters['city'])) {
-            $city = City::query()->find((int) $filters['city']);
+        if (isset($filters['city']) && $filters['city'] !== '') {
+            $cityParam = $filters['city'];
+            $city = is_numeric($cityParam)
+                ? City::query()->find((int) $cityParam)
+                : City::query()->where('slug', (string) $cityParam)->orWhereRaw('LOWER(name) = ?', [strtolower((string) $cityParam)])->first();
             if ($city) {
                 $slug = $city->slug;
                 if ($slug === 'hyderabad') {
@@ -422,7 +425,7 @@ class PropertySearchService
     /**
      * Compute Haversine distance in kilometers between two lat/lng coordinates.
      */
-    private function calculateDistanceKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    public function calculateDistanceKm(float $lat1, float $lng1, float $lat2, float $lng2): float
     {
         $earthRadius = 6371; // km
         $dLat = deg2rad($lat2 - $lat1);

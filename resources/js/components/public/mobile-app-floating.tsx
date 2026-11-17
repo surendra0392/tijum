@@ -2,6 +2,7 @@ import { Link } from '@inertiajs/react';
 import { Building2 } from 'lucide-react';
 import { useState } from 'react';
 import { TIJUM_BRAND_ASSETS } from '@/components/brand/brand-logo';
+import { PWAInstallButton } from '@/components/pwa/PWAInstallPrompt';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -179,7 +180,12 @@ export function MobileAppFloating() {
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="mt-6">
+                    <div className="mt-6 space-y-2.5">
+                        <PWAInstallButton
+                            className="h-11 w-full rounded-full"
+                            label="Install Web App now"
+                            onActionComplete={() => setOpen(false)}
+                        />
                         <Button
                             type="button"
                             onClick={() => setOpen(false)}

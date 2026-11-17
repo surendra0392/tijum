@@ -58,6 +58,7 @@ use App\Http\Controllers\Admin\System\AdminCategoryController;
 use App\Http\Controllers\Admin\System\AdminCityController;
 use App\Http\Controllers\Admin\System\AdminPlatformSettingController;
 use App\Http\Controllers\Admin\System\AdminRoleController;
+use App\Http\Controllers\Notifications\WebPushSubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin')
@@ -233,6 +234,8 @@ Route::prefix('admin')
                     Route::get('/providers', [AdminNotificationProviderController::class, 'index'])->name('providers');
                     Route::post('/providers/email/verify', [AdminNotificationProviderController::class, 'verifyEmailConnection'])->name('providers.email.verify');
                     Route::post('/providers/email/test-send', [AdminNotificationProviderController::class, 'sendTestEmail'])->name('providers.email.test-send');
+                    Route::post('/push-subscriptions', [WebPushSubscriptionController::class, 'store'])->name('push-subscriptions.store');
+                    Route::delete('/push-subscriptions', [WebPushSubscriptionController::class, 'destroy'])->name('push-subscriptions.destroy');
                     Route::get('/{delivery}', [AdminNotificationController::class, 'show'])->name('show');
                     Route::post('/{delivery}/retry', [AdminNotificationController::class, 'retry'])->name('retry');
                 });

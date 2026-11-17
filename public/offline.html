@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#442F41">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Offline · TIJUM</title>
+    <link rel="icon" type="image/png" href="/pwa/icon-192x192.png">
+    <style>
+        :root {
+            --plum: #442F41;
+            --coral: #FF7A67;
+            --cream: #FFF4EE;
+            --surface: #E6E0DB;
+            --lavender: #8B6B82;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            min-height: 100%;
+            background: var(--cream);
+            color: var(--plum);
+            font-family: 'Nunito', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .wrap {
+            min-height: 100svh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+        }
+        .card {
+            width: 100%;
+            max-width: 440px;
+            background: #ffffff;
+            border: 1px solid var(--surface);
+            border-radius: 24px;
+            padding: 36px 28px;
+            text-align: center;
+            box-shadow: 0 18px 55px -34px rgba(68, 47, 65, 0.35);
+        }
+        .logo-badge {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 20px;
+            border-radius: 18px;
+            overflow: hidden;
+            background: var(--plum);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 24px -14px rgba(68, 47, 65, 0.45);
+        }
+        .logo-badge img {
+            width: 72px;
+            height: 72px;
+            object-fit: cover;
+            display: block;
+        }
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(255, 122, 103, 0.14);
+            color: #c2410c;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin-bottom: 14px;
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: var(--coral);
+        }
+        h1 {
+            margin: 0 0 10px;
+            font-family: 'Montserrat', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            line-height: 1.25;
+            color: var(--plum);
+        }
+        p {
+            margin: 0 0 24px;
+            font-size: 15px;
+            line-height: 1.6;
+            color: var(--lavender);
+        }
+        .notice {
+            text-align: left;
+            background: var(--cream);
+            border: 1px solid var(--surface);
+            border-radius: 14px;
+            padding: 12px 14px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--plum);
+            margin-bottom: 24px;
+        }
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        button, a.btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            min-height: 46px;
+            border-radius: 999px;
+            font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            transition: opacity 0.15s ease, transform 0.1s ease;
+        }
+        button.btn-primary {
+            border: 0;
+            background: var(--coral);
+            color: #ffffff;
+        }
+        button.btn-primary:hover {
+            opacity: 0.92;
+        }
+        button.btn-primary:active {
+            transform: scale(0.99);
+        }
+        a.btn-secondary {
+            border: 1px solid var(--surface);
+            background: #ffffff;
+            color: var(--plum);
+        }
+        .hint {
+            margin-top: 14px;
+            font-size: 12px;
+            color: var(--lavender);
+            min-height: 18px;
+        }
+    </style>
+</head>
+<body>
+    <main class="wrap">
+        <section class="card" role="status" aria-live="polite">
+            <div class="logo-badge">
+                <img src="/pwa/icon-192x192.png" alt="TIJUM" width="72" height="72">
+            </div>
+            <div class="status-pill">
+                <span class="dot" aria-hidden="true"></span>
+                <span>Offline</span>
+            </div>
+            <h1>You're currently offline.</h1>
+            <p>Reconnect to the internet to search availability, manage bookings and complete payments.</p>
+            <div class="notice">
+                To keep your room inventory, reservations, and Razorpay payments accurate and secure, TIJUM never displays cached availability or processes bookings offline.
+            </div>
+            <div class="actions">
+                <button type="button" class="btn-primary" id="retry-btn">Retry connection</button>
+                <a href="/" class="btn-secondary">Return to TIJUM home</a>
+            </div>
+            <p class="hint" id="connection-hint"></p>
+        </section>
+    </main>
+
+    <script>
+        (function () {
+            var retryBtn = document.getElementById('retry-btn');
+            var hint = document.getElementById('connection-hint');
+            var checking = false;
+
+            function attemptReconnect() {
+                if (checking) return;
+                checking = true;
+                if (hint) hint.textContent = 'Checking connection to TIJUM...';
+
+                fetch('/up', { method: 'GET', cache: 'no-store' })
+                    .then(function (res) {
+                        if (res.ok) {
+                            if (window.history.length > 1 && document.referrer && new URL(document.referrer).origin === window.location.origin) {
+                                window.location.replace(document.referrer);
+                            } else {
+                                window.location.replace('/');
+                            }
+                            return;
+                        }
+                        throw new Error('Server unreachable');
+                    })
+                    .catch(function () {
+                        checking = false;
+                        if (hint) hint.textContent = 'Still offline. Please check your Wi-Fi or mobile data and try again.';
+                    });
+            }
+
+            if (retryBtn) {
+                retryBtn.addEventListener('click', attemptReconnect);
+            }
+
+            window.addEventListener('online', function () {
+                attemptReconnect();
+            });
+        })();
+    </script>
+</body>
+</html>

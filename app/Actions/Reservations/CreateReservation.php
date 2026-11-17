@@ -193,8 +193,9 @@ class CreateReservation
                 $saved = $reservation->fresh() ?? $reservation;
 
                 try {
-                    $saved->loadMissing(['user', 'property.owner']);
+                    $saved->loadMissing(['user', 'property.owner', 'roomType']);
                     if ($saved->user !== null && $saved->property !== null) {
+                        $tz = $this->pricing->timezone();
                         app(NotificationDispatcher::class)->dispatch(
                             eventType: 'reservation.submitted',
                             recipients: $saved->user,
@@ -202,8 +203,11 @@ class CreateReservation
                                 'customer_name' => $saved->user->name,
                                 'booking_reference' => $saved->booking_reference,
                                 'property_name' => $saved->property->name,
-                                'payment_deadline' => $saved->payment_deadline_at?->setTimezone($this->pricing->timezone())->format('H:i').' IST',
-                                'amount' => number_format($saved->total_amount_minor / 100, 2),
+                                'room_type' => $saved->snapshot_room_type_name ?: $saved->roomType->name,
+                                'check_in_date' => $saved->check_in_date->format('d M Y'),
+                                'checkout_date' => $saved->checkout_date->format('d M Y'),
+                                'payment_deadline' => ($saved->payment_deadline_at?->setTimezone($tz)->format('H:i').' IST'),
+                                'amount' => '₹'.number_format($saved->total_amount_minor / 100, 2),
                                 'action_url' => url("/reservations/{$saved->id}"),
                             ],
                             related: $saved,

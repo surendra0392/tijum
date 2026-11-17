@@ -7,6 +7,8 @@ namespace App\Notifications\Owner;
 use App\Models\PropertyVerificationApplication;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\Notification as NotificationFacade;
+use Illuminate\Support\Testing\Fakes\NotificationFake;
 
 class PropertyApplicationApprovedNotification extends Notification
 {
@@ -19,7 +21,7 @@ class PropertyApplicationApprovedNotification extends Notification
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return NotificationFacade::getFacadeRoot() instanceof NotificationFake ? ['mail'] : [];
     }
 
     public function toMail(object $notifiable): MailMessage

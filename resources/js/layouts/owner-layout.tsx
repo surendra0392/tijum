@@ -21,6 +21,7 @@ import {
 import type { PropsWithChildren } from 'react';
 import { AppContent } from '@/components/app-content';
 import { AppShell } from '@/components/app-shell';
+import { clearPwaUserCaches } from '@/lib/pwa';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import BrandLogo from '@/components/brand/brand-logo';
 import { NotificationBell } from '@/components/notifications/notification-bell';
@@ -437,6 +438,7 @@ export default function OwnerLayout({
                                             href={logout.url()}
                                             method="post"
                                             as="button"
+                                            onClick={() => clearPwaUserCaches()}
                                             className="w-full cursor-pointer text-status-error-fg"
                                             data-test="owner-logout-button"
                                         >

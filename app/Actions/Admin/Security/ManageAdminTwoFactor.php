@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Actions\Admin\Security;
 
 use App\Models\Admin;
+use App\Services\Notifications\NotificationDispatcher;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
 use Laravel\Fortify\RecoveryCode;
@@ -63,6 +65,25 @@ final class ManageAdminTwoFactor
             'two_factor_confirmed_at' => now(),
         ])->save();
 
+        try {
+            app(NotificationDispatcher::class)->dispatch(
+                eventType: 'admin.security_alert',
+                recipients: $admin,
+                variables: [
+                    'reason' => 'Two-factor authentication (TOTP) was enabled on your administrator account.',
+                    'admin_reference' => $admin->email,
+                    'created_at' => now()->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
+                    'severity' => 'Medium',
+                    'action_url' => url('/admin'),
+                ],
+                related: $admin,
+                relatedReference: 'ADM-2FA-'.$admin->id,
+                idempotencySeed: 'admin_2fa_enabled_'.$admin->id.'_'.now()->timestamp
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Failed to dispatch admin.security_alert notification: '.$e->getMessage());
+        }
+
         return $codes;
     }
 
@@ -94,6 +115,25 @@ final class ManageAdminTwoFactor
         $admin->forceFill([
             'two_factor_recovery_codes' => $codes,
         ])->save();
+
+        try {
+            app(NotificationDispatcher::class)->dispatch(
+                eventType: 'admin.security_alert',
+                recipients: $admin,
+                variables: [
+                    'reason' => 'Two-factor recovery codes were regenerated for your administrator account.',
+                    'admin_reference' => $admin->email,
+                    'created_at' => now()->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
+                    'severity' => 'High',
+                    'action_url' => url('/admin'),
+                ],
+                related: $admin,
+                relatedReference: 'ADM-2FA-RC-'.$admin->id,
+                idempotencySeed: 'admin_2fa_recovery_'.$admin->id.'_'.now()->timestamp
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Failed to dispatch admin.security_alert notification: '.$e->getMessage());
+        }
 
         return $codes;
     }

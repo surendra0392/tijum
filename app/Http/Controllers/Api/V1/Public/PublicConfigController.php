@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Public;
 
+use App\Enums\PropertyGuestComposition;
 use App\Http\Controllers\Api\V1\ApiController;
 use App\Http\Resources\Api\V1\PropertyCategoryResource;
 use App\Models\City;
@@ -44,6 +45,30 @@ class PublicConfigController extends ApiController
             'payment_gateways' => [
                 'primary' => 'razorpay',
                 'supported' => ['razorpay'],
+            ],
+            'durations' => config('tijum.pricing.durations', []),
+            'booking_options' => [
+                'guest_genders' => [
+                    ['value' => 'male', 'label' => 'Male'],
+                    ['value' => 'female', 'label' => 'Female'],
+                    ['value' => 'mixed', 'label' => 'Both'],
+                ],
+                'guest_compositions' => [
+                    [
+                        'value' => PropertyGuestComposition::Individuals->value,
+                        'label' => PropertyGuestComposition::Individuals->label(),
+                    ],
+                ],
+                'default_guest_composition' => PropertyGuestComposition::Individuals->value,
+                'booking_for_options' => [
+                    ['value' => 'self', 'label' => 'Booking for myself'],
+                    ['value' => 'other', 'label' => 'Booking for another person'],
+                ],
+                'contact_phone_rules' => [
+                    'digits' => 10,
+                    'pattern' => '^[6-9]\\d{9}$',
+                    'description' => '10-digit Indian mobile number starting with 6, 7, 8, or 9.',
+                ],
             ],
             'support' => [
                 'email' => $platformConfig['support_email'] ?? 'support@tijum.com',

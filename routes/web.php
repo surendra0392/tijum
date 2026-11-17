@@ -13,6 +13,7 @@ use App\Http\Controllers\Customer\ReservationController;
 use App\Http\Controllers\Customer\RewardsController;
 use App\Http\Controllers\Customer\WishlistController;
 use App\Http\Controllers\Dev\DesignSystemController;
+use App\Http\Controllers\Notifications\WebPushSubscriptionController;
 use App\Http\Controllers\Public\BlogController;
 use App\Http\Controllers\Public\CategoryRedirectController;
 use App\Http\Controllers\Public\CityLandingPageController;
@@ -139,6 +140,8 @@ Route::middleware(['auth:web', 'verified'])->group(function () {
     Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
     Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-read');
     Route::post('notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+    Route::post('notifications/push-subscriptions', [WebPushSubscriptionController::class, 'store'])->name('notifications.push-subscriptions.store');
+    Route::delete('notifications/push-subscriptions', [WebPushSubscriptionController::class, 'destroy'])->name('notifications.push-subscriptions.destroy');
 
     // Customer Wishlist
     Route::get('wishlist', [WishlistController::class, 'index'])->name('customer.wishlist.index');

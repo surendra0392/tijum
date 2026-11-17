@@ -1,4 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
+import { clearPwaUserCaches } from '@/lib/pwa';
 import type { LucideIcon } from 'lucide-react';
 import {
     ArrowRightLeft,
@@ -1143,6 +1144,7 @@ export default function AdminLayout({
                                                     href={logout.url()}
                                                     method="post"
                                                     as="button"
+                                                    onClick={() => clearPwaUserCaches()}
                                                     className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl p-2 text-xs font-medium text-status-error-fg transition-colors hover:bg-status-error-bg/70"
                                                     data-test="admin-logout-button"
                                                 >

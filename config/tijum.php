@@ -194,6 +194,13 @@ return [
                 'provider' => 'expo',
                 'endpoint' => env('EXPO_PUSH_ENDPOINT', 'https://exp.host/--/api/v2/push/send'),
             ],
+            'web_push' => [
+                'enabled' => (bool) env('TIJUM_WEB_PUSH_ENABLED', true),
+                'vapid_public_key' => env('VAPID_PUBLIC_KEY', ''),
+                'vapid_private_key' => env('VAPID_PRIVATE_KEY', ''),
+                'vapid_subject' => env('VAPID_SUBJECT', 'mailto:notifications@tijum.com'),
+                'ttl' => (int) env('TIJUM_WEB_PUSH_TTL', 2419200),
+            ],
         ],
         'retention_days' => (int) env('TIJUM_NOTIFICATION_RETENTION_DAYS', 90),
         'max_retry_attempts' => (int) env('TIJUM_NOTIFICATION_MAX_RETRIES', 3),

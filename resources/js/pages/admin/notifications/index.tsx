@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { ConfirmationDialog } from '@/components/shared/confirmation-dialog';
+import { WebPushToggle } from '@/components/pwa/WebPushToggle';
 import { EmptyState } from '@/components/shared/empty-state';
 import { StatCard } from '@/components/shared/info-card';
 import { PageHeader } from '@/components/shared/page-header';
@@ -295,6 +296,7 @@ export default function AdminNotificationDeliveriesIndex({
                     description="Audit real-time transactional dispatches across In-App, Email, SMS (DLT), and Meta WhatsApp Business API."
                     actions={
                         <>
+                            <WebPushToggle compact />
                             <Button asChild variant="outline" size="sm">
                                 <Link href="/admin/notifications/templates">
                                     <Layers

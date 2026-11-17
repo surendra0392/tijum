@@ -10,8 +10,11 @@ use App\Models\CustomerProtectionCase;
 use App\Models\CustomerProtectionCaseMessage;
 use App\Models\Owner;
 use App\Models\User;
+use App\Services\Notifications\NotificationDispatcher;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AddCaseMessage
@@ -59,7 +62,7 @@ class AddCaseMessage
             $isInternal = false;
         }
 
-        return DB::transaction(function () use ($case, $sender, $senderType, $message, $isInternal, $data): CustomerProtectionCaseMessage {
+        $caseMessage = DB::transaction(function () use ($case, $sender, $senderType, $message, $isInternal, $data): CustomerProtectionCaseMessage {
             $lockedCase = CustomerProtectionCase::query()->whereKey($case->id)->lockForUpdate()->firstOrFail();
 
             $attachment = $data['attachment'] ?? null;
@@ -101,5 +104,36 @@ class AddCaseMessage
 
             return $caseMessage;
         }, 3);
+
+        if (! $isInternal && in_array($senderType, ['admin', 'owner'], true)) {
+            try {
+                $freshCase = $case->fresh(['user', 'property', 'reservation']);
+                if ($freshCase !== null) {
+                    app(NotificationDispatcher::class)->dispatch(
+                        eventType: 'grievance.status_updated',
+                        recipients: $freshCase->user,
+                        variables: [
+                            'customer_name' => $freshCase->user->name,
+                            'case_reference' => $freshCase->case_reference,
+                            'property_name' => $freshCase->reservation->snapshot_property_name ?: $freshCase->property->name,
+                            'case_status' => $freshCase->status->label(),
+                            'reason' => Str::limit($message, 160),
+                            'updated_at' => $caseMessage->created_at->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
+                            'action_url' => url("/my-support/{$freshCase->case_reference}"),
+                        ],
+                        related: $freshCase,
+                        relatedReference: $freshCase->case_reference,
+                        idempotencySeed: 'grievance_msg_'.$caseMessage->id
+                    );
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Failed to dispatch grievance message notification: '.$e->getMessage(), [
+                    'case_id' => $case->id,
+                    'message_id' => $caseMessage->id,
+                ]);
+            }
+        }
+
+        return $caseMessage;
     }
 }

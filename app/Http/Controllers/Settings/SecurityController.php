@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\PasswordUpdateRequest;
 use App\Http\Requests\Settings\TwoFactorAuthenticationRequest;
 use App\Models\User;
+use App\Services\Notifications\NotificationDispatcher;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -73,6 +75,26 @@ class SecurityController extends Controller
         $user->update([
             'password' => $request->password,
         ]);
+
+        try {
+            app(NotificationDispatcher::class)->dispatch(
+                eventType: 'auth.security_alert',
+                recipients: $user,
+                variables: [
+                    'customer_name' => $user->name,
+                    'reason' => 'Your TIJUM account password was updated.',
+                    'created_at' => now()->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
+                    'action_url' => url('/settings/security'),
+                ],
+                related: $user,
+                relatedReference: 'SEC-PWD-'.$user->id,
+                idempotencySeed: 'auth_pwd_changed_'.$user->id.'_'.now()->timestamp
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Failed to dispatch auth.security_alert notification: '.$e->getMessage(), [
+                'user_id' => $user->id,
+            ]);
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Password updated.')]);
 

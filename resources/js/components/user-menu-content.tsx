@@ -14,8 +14,10 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import { PWAInstallButton } from '@/components/pwa/PWAInstallPrompt';
 import { UserInfo } from '@/components/user-info';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
+import { clearPwaUserCaches } from '@/lib/pwa';
 import { logout } from '@/routes';
 import { edit as appearanceEdit } from '@/routes/appearance';
 import { edit as profileEdit } from '@/routes/profile';
@@ -32,6 +34,7 @@ export function UserMenuContent({ user }: Props) {
 
     const handleLogout = () => {
         cleanup();
+        clearPwaUserCaches();
         router.flushAll();
     };
 
@@ -112,6 +115,10 @@ export function UserMenuContent({ user }: Props) {
                 </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
+            <PWAInstallButton
+                variant="menu"
+                onActionComplete={cleanup}
+            />
             <DropdownMenuItem asChild>
                 <Link
                     className="flex w-full cursor-pointer items-center gap-2 text-status-error-fg focus:text-status-error-fg"

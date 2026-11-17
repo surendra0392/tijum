@@ -24,6 +24,16 @@ class WhatsAppCloudApiChannel
      */
     public function send(NotificationDelivery $delivery, TemplateDefinition $template, array $rendered): void
     {
+        if (! (bool) config('tijum.notifications.channels.whatsapp.enabled', false)) {
+            $delivery->update([
+                'status' => NotificationDeliveryStatus::Suppressed,
+                'error_code' => 'CHANNEL_DISABLED',
+                'error_description' => 'WhatsApp notification channel is disabled.',
+            ]);
+
+            return;
+        }
+
         $recipient = $delivery->notifiable;
         if ($recipient === null) {
             $delivery->update([

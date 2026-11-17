@@ -11,8 +11,10 @@ use App\Models\Property;
 use App\Models\PropertyVerificationApplication;
 use App\Models\PropertyVerificationEvent;
 use App\Notifications\Owner\PropertyApplicationSubmittedNotification;
+use App\Services\Notifications\NotificationDispatcher;
 use App\Services\PropertyVerificationChecklist;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class SubmitPropertyVerificationApplication
@@ -100,9 +102,48 @@ class SubmitPropertyVerificationApplication
                     ->find($appId);
 
                 if ($app?->property?->owner !== null) {
-                    $app->property->owner->notify(
+                    $owner = $app->property->owner;
+                    $owner->notify(
                         new PropertyApplicationSubmittedNotification($app, $isResubmission),
                     );
+
+                    try {
+                        $submittedAt = ($app->submitted_at ?? now())->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST';
+                        $dispatcher = app(NotificationDispatcher::class);
+
+                        $dispatcher->dispatch(
+                            eventType: 'partner.property.submitted',
+                            recipients: $owner,
+                            variables: [
+                                'owner_name' => $owner->name,
+                                'property_name' => $app->property->name,
+                                'submission_reference' => $app->application_number,
+                                'submitted_at' => $submittedAt,
+                                'action_url' => route('owner.properties.verification.show', $app->property_id),
+                            ],
+                            related: $app,
+                            relatedReference: $app->application_number,
+                            idempotencySeed: 'partner_property_submitted_'.$app->id.'_'.$app->revision_number
+                        );
+
+                        $dispatcher->dispatchToAdmins(
+                            eventType: 'admin.property_review_required',
+                            variables: [
+                                'property_name' => $app->property->name,
+                                'owner_name' => $owner->name,
+                                'submission_reference' => $app->application_number,
+                                'submitted_at' => $submittedAt,
+                                'action_url' => route('admin.properties.show', $app->property_id),
+                            ],
+                            related: $app,
+                            relatedReference: $app->application_number,
+                            idempotencySeed: 'admin_property_review_'.$app->id.'_'.$app->revision_number
+                        );
+                    } catch (\Throwable $e) {
+                        Log::warning('Failed to dispatch property submission notification: '.$e->getMessage(), [
+                            'application_id' => $app->id,
+                        ]);
+                    }
                 }
             });
 

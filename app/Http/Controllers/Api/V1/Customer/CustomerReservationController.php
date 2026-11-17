@@ -75,6 +75,7 @@ class CustomerReservationController extends ApiController
             (string) $validated['duration_type'],
             (int) $validated['duration_quantity'],
             (int) $validated['quantity'],
+            $validated['requested_arrival_time'] ?? null,
         );
 
         if (! $quoteResult['eligible'] || ! is_array($quoteResult['quote'])) {
@@ -86,23 +87,10 @@ class CustomerReservationController extends ApiController
             );
         }
 
-        return $this->success([
-            'quote' => $quoteResult['quote'],
-            'availability' => $quoteResult['availability'],
-            'property' => [
-                'id' => $property->id,
-                'name' => $property->name,
-                'slug' => $property->slug,
-                'breakfast_included' => (bool) $property->breakfast_included,
-                'lunch_included' => (bool) $property->lunch_included,
-                'dinner_included' => (bool) $property->dinner_included,
-            ],
-            'room_type' => [
-                'id' => $roomType->id,
-                'name' => $roomType->name,
-                'is_air_conditioned' => (bool) $roomType->is_air_conditioned,
-            ],
-        ]);
+        return $this->success(
+            $this->quotes->formatApiQuotePayload($property, $roomType, $quoteResult),
+            'Reservation quote calculated successfully.'
+        );
     }
 
     public function store(StoreReservationRequest $request): JsonResponse

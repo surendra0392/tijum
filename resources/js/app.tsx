@@ -1,7 +1,11 @@
-import { createInertiaApp } from '@inertiajs/react';
+import { createInertiaApp, router } from '@inertiajs/react';
+import { PWAInstallPrompt } from '@/components/pwa/PWAInstallPrompt';
+import { PWAOfflineBanner } from '@/components/pwa/PWAOfflineBanner';
+import { PWAUpdateBanner } from '@/components/pwa/PWAUpdateBanner';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';
+import { clearPwaUserCaches, initPwaClient } from '@/lib/pwa';
 import AdminLayout from '@/layouts/admin-layout';
 import AdminAuthLayout from '@/layouts/admin/admin-auth-layout';
 import CustomerLayout from '@/layouts/customer-layout';
@@ -51,7 +55,10 @@ void createInertiaApp({
     withApp(app) {
         return (
             <TooltipProvider delayDuration={0}>
+                <PWAOfflineBanner />
                 {app}
+                <PWAUpdateBanner />
+                <PWAInstallPrompt />
                 <Toaster />
             </TooltipProvider>
         );
@@ -61,5 +68,20 @@ void createInertiaApp({
     },
 });
 
-// Initialize TIJUM light-first theme on client boot
+// Initialize TIJUM light-first theme and PWA runtime on client boot
 initializeTheme();
+initPwaClient();
+
+let hadAuthenticatedActor = false;
+router.on('success', (event) => {
+    const auth = event.detail.page.props.auth as
+        | { user?: unknown; owner?: unknown; admin?: unknown }
+        | undefined;
+    const hasActor = Boolean(auth?.user || auth?.owner || auth?.admin);
+
+    if (hadAuthenticatedActor && !hasActor) {
+        clearPwaUserCaches();
+    }
+
+    hadAuthenticatedActor = hasActor;
+});

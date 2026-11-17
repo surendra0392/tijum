@@ -1,0 +1,1 @@
+import{n as e,t}from"./jsx-runtime-B91NXjOl.js";var n=t();function r({message:t,className:r=``,...i}){return t?(0,n.jsx)(`p`,{...i,className:e(`text-sm font-medium text-status-error-fg`,r),children:t}):null}export{r as t};

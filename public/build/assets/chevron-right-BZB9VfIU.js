@@ -1,1 +1,0 @@
-import{n as e}from"./dist-4vGJ-UaM.js";var t=e(`ChevronRight`,[[`path`,{d:`m9 18 6-6-6-6`,key:`mthhwq`}]]);export{t};

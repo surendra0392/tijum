@@ -19,6 +19,16 @@ class SmsGatewayManager
      */
     public function send(NotificationDelivery $delivery, TemplateDefinition $template, array $rendered): void
     {
+        if (! (bool) config('tijum.notifications.channels.sms.enabled', false)) {
+            $delivery->update([
+                'status' => NotificationDeliveryStatus::Suppressed,
+                'error_code' => 'CHANNEL_DISABLED',
+                'error_description' => 'SMS notification channel is disabled.',
+            ]);
+
+            return;
+        }
+
         // 1. DLT Template Check
         if (empty($template->dltTemplateId)) {
             $delivery->update([

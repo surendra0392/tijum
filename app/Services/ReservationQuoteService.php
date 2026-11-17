@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\PropertyGenderPolicy;
+use App\Enums\PropertyGuestComposition;
 use App\Enums\PropertyOperationalStatus;
 use App\Enums\PropertyRoomStatus;
+use App\Enums\PropertyRoomTypeMode;
+use App\Enums\ReservationQuantityBasis;
 use App\Models\Property;
 use App\Models\PropertyRoomType;
 use Carbon\CarbonImmutable;
@@ -165,6 +169,99 @@ class ReservationQuoteService
             'room_type_has_active_room' => $roomType->rooms()->where('operational_status', PropertyRoomStatus::Active->value)->exists(),
             'publicly_eligible' => $eligible,
             'room_type_publicly_eligible' => $roomTypeEligible,
+        ];
+    }
+
+    /**
+     * Resolve allowed guest gender and composition policy rules for a room type.
+     *
+     * @return array<string, mixed>
+     */
+    public function guestPolicyMetadata(PropertyRoomType $roomType): array
+    {
+        $allowedGenders = [
+            ['value' => 'male', 'label' => 'Male'],
+            ['value' => 'female', 'label' => 'Female'],
+            ['value' => 'mixed', 'label' => 'Both'],
+        ];
+
+        [$preferredGender, $preferredGenderLabel, $strictGenderPreference] = match ($roomType->gender_policy) {
+            PropertyGenderPolicy::MaleOnly => ['male', 'Male', true],
+            PropertyGenderPolicy::FemaleOnly => ['female', 'Female', true],
+            PropertyGenderPolicy::AllGenders, PropertyGenderPolicy::NotApplicable => ['mixed', 'Both', false],
+        };
+
+        $allowedCompositions = [
+            [
+                'value' => PropertyGuestComposition::Individuals->value,
+                'label' => PropertyGuestComposition::Individuals->label(),
+            ],
+        ];
+
+        return [
+            'allowed_guest_genders' => $allowedGenders,
+            'preferred_guest_gender' => $preferredGender,
+            'preferred_guest_gender_label' => $preferredGenderLabel,
+            'strict_gender_preference' => $strictGenderPreference,
+            'allowed_guest_compositions' => $allowedCompositions,
+            'default_guest_composition' => PropertyGuestComposition::Individuals->value,
+        ];
+    }
+
+    /**
+     * Build the standardized quote payload returned to API and mobile clients.
+     *
+     * @param  array<string, mixed>  $quoteResult
+     * @return array<string, mixed>
+     */
+    public function formatApiQuotePayload(Property $property, PropertyRoomType $roomType, array $quoteResult): array
+    {
+        $property->loadMissing(['city', 'category']);
+
+        /** @var array<string, mixed> $quote */
+        $quote = $quoteResult['quote'];
+        $isShared = $roomType->accommodation_mode === PropertyRoomTypeMode::Shared;
+        $policy = $this->guestPolicyMetadata($roomType);
+
+        return [
+            'quote' => array_merge($quote, $policy, [
+                'quantity_basis_label' => ReservationQuantityBasis::from((string) $quote['quantity_basis'])->label(),
+                'rate_unit_label' => $isShared ? 'Rate per guest' : 'Rate per private room',
+                'early_check_in_allowed' => (bool) $roomType->early_check_in_enabled,
+                'timing' => $this->timing->timingSummary(),
+            ]),
+            'availability' => $quoteResult['availability'],
+            'property' => [
+                'id' => $property->id,
+                'name' => $property->name,
+                'slug' => $property->slug,
+                'locality' => $property->locality,
+                'city' => $property->city?->name,
+                'category' => $property->category?->name,
+                'food_provided' => (bool) $property->food_provided,
+                'breakfast_included' => (bool) $property->breakfast_included,
+                'lunch_included' => (bool) $property->lunch_included,
+                'dinner_included' => (bool) $property->dinner_included,
+            ],
+            'room_type' => [
+                'id' => $roomType->id,
+                'name' => $roomType->name,
+                'accommodation_mode' => $roomType->accommodation_mode->value,
+                'sharing_label' => $isShared
+                    ? sprintf('%d Sharing', (int) ($roomType->sharing_capacity ?? $roomType->max_guests_per_room))
+                    : 'Private Room',
+                'is_air_conditioned' => (bool) $roomType->is_air_conditioned,
+                'gender_policy' => $roomType->gender_policy->value,
+                'early_check_in_enabled' => (bool) $roomType->early_check_in_enabled,
+            ],
+            'guest_policies' => $policy,
+            'booking_options' => [
+                'booking_for_options' => [
+                    ['value' => 'self', 'label' => 'Booking for myself'],
+                    ['value' => 'other', 'label' => 'Booking for another person'],
+                ],
+                'contact_phone_digits' => 10,
+            ],
         ];
     }
 }

@@ -13,9 +13,11 @@ use App\Models\PointsReservationHold;
 use App\Models\Reservation;
 use App\Models\RewardsSetting;
 use App\Models\User;
+use App\Services\Notifications\NotificationDispatcher;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -327,7 +329,10 @@ class LoyaltyPointsService
      */
     public function activatePendingPoints(Reservation $reservation): ?CustomerPointsLedger
     {
-        return DB::transaction(function () use ($reservation): ?CustomerPointsLedger {
+        /** @var int|null $newAvailableBalance */
+        $newAvailableBalance = null;
+
+        $ledgerEntry = DB::transaction(function () use ($reservation, &$newAvailableBalance): ?CustomerPointsLedger {
             /** @var CustomerPointsLedger|null $pendingEntry */
             $pendingEntry = CustomerPointsLedger::query()
                 ->lockForUpdate()
@@ -363,9 +368,40 @@ class LoyaltyPointsService
             ]);
 
             $reservation->update(['points_awarded_credited' => $points]);
+            $freshWallet = $wallet->fresh();
+            $newAvailableBalance = $freshWallet !== null ? $freshWallet->available_points : ($wallet->available_points + $points);
 
             return $pendingEntry;
         });
+
+        if ($ledgerEntry !== null) {
+            try {
+                $reservation->loadMissing(['user', 'property']);
+                if ($reservation->user !== null) {
+                    app(NotificationDispatcher::class)->dispatch(
+                        eventType: 'rewards.points_credited',
+                        recipients: $reservation->user,
+                        variables: [
+                            'customer_name' => $reservation->user->name,
+                            'property_name' => $reservation->snapshot_property_name ?: $reservation->property->name,
+                            'booking_reference' => $reservation->booking_reference,
+                            'points_credited' => number_format($ledgerEntry->points),
+                            'points_balance' => number_format($newAvailableBalance),
+                            'action_url' => url('/rewards'),
+                        ],
+                        related: $reservation,
+                        relatedReference: $reservation->booking_reference,
+                        idempotencySeed: 'points_credited_'.$reservation->id.'_'.$ledgerEntry->id
+                    );
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Failed to dispatch rewards.points_credited notification: '.$e->getMessage(), [
+                    'reservation_id' => $reservation->id,
+                ]);
+            }
+        }
+
+        return $ledgerEntry;
     }
 
     /**

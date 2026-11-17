@@ -14,8 +14,11 @@ use App\Models\PropertyVerificationApplication;
 use App\Models\PropertyVerificationDocument;
 use App\Models\PropertyVerificationEvent;
 use App\Notifications\Owner\PropertyInformationRequestedNotification;
+use App\Services\Notifications\NotificationDispatcher;
 use App\Services\PropertyMediaProcessor;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class RequestPropertyInformation
@@ -162,7 +165,33 @@ class RequestPropertyInformation
 
                 $app = PropertyVerificationApplication::query()->with('property.owner')->find($appId);
                 if ($app?->property?->owner !== null) {
+                    $owner = $app->property->owner;
                     $app->property->owner->notify(new PropertyInformationRequestedNotification($app));
+
+                    try {
+                        $notesText = is_string($app->requested_information) && $app->requested_information !== ''
+                            ? $app->requested_information
+                            : 'Please review and update the flagged property verification items.';
+
+                        app(NotificationDispatcher::class)->dispatch(
+                            eventType: 'partner.property.changes_requested',
+                            recipients: $owner,
+                            variables: [
+                                'owner_name' => $owner->name,
+                                'property_name' => $app->property->name,
+                                'review_reason' => 'Clarifications or updates requested by verification team',
+                                'requested_changes' => Str::limit($notesText, 240),
+                                'action_url' => route('owner.properties.verification.show', $app->property_id),
+                            ],
+                            related: $app,
+                            relatedReference: $app->application_number,
+                            idempotencySeed: 'partner_property_info_requested_'.$app->id.'_'.($app->reviewed_at !== null ? $app->reviewed_at->timestamp : 0)
+                        );
+                    } catch (\Throwable $e) {
+                        Log::warning('Failed to dispatch partner.property.changes_requested notification: '.$e->getMessage(), [
+                            'application_id' => $app->id,
+                        ]);
+                    }
                 }
             });
 

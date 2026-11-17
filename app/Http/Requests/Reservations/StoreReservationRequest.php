@@ -52,18 +52,34 @@ class StoreReservationRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        if ($this->input('booking_for') === 'self' && $this->user() instanceof User) {
+        $bookingFor = $this->input('booking_for');
+        $noContactProvided = ! $this->filled('contact_name') && ! $this->filled('contact_email') && ! $this->filled('contact_phone');
+
+        if (($bookingFor === 'self' || ($bookingFor === null && $noContactProvided)) && $this->user() instanceof User) {
             $user = $this->user();
             $this->merge([
+                'booking_for' => $bookingFor ?? 'self',
                 'contact_name' => $user->name,
                 'contact_email' => $user->email,
                 'contact_phone' => $user->phone ?: '9876543210',
             ]);
-        } elseif ($this->input('booking_for') === 'other' && $this->has('contact_phone')) {
+        } elseif ($bookingFor === 'other' && $this->has('contact_phone')) {
             $digits = preg_replace('/\D+/', '', (string) $this->input('contact_phone')) ?? '';
+            if (strlen($digits) === 12 && str_starts_with($digits, '91')) {
+                $digits = substr($digits, 2);
+            }
             $this->merge([
                 'contact_phone' => $digits,
             ]);
+        }
+
+        if ($this->is('api/*')) {
+            if (! $this->has('guest_count') && $this->has('quantity')) {
+                $this->merge(['guest_count' => $this->input('quantity')]);
+            }
+            if (! $this->has('guest_composition')) {
+                $this->merge(['guest_composition' => PropertyGuestComposition::Individuals->value]);
+            }
         }
     }
 

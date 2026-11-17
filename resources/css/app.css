@@ -621,4 +621,21 @@
     }
 }
 
+/* PWA Standalone & Safe-Area Support */
+.tijum-safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+@media (display-mode: standalone) {
+    html,
+    body {
+        overscroll-behavior-y: contain;
+        padding-top: env(safe-area-inset-top);
+    }
+
+    body {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+}
+
 

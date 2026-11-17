@@ -7,6 +7,7 @@ import {
     ShieldCheck,
 } from 'lucide-react';
 import type { FormEventHandler } from 'react';
+import { WebPushToggle } from '@/components/pwa/WebPushToggle';
 import { PageHeader } from '@/components/shared/page-header';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -274,6 +275,8 @@ export default function NotificationSettings({ preferences, user }: Props) {
                         </Button>
                     </div>
                 </form>
+
+                <WebPushToggle />
             </div>
         </>
     );

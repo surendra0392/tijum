@@ -29,9 +29,13 @@ class PropertyCardResource extends JsonResource
             $meals[] = 'Dinner';
         }
 
-        $minMonthlyPrice = ($this->relationLoaded('roomTypes')
-            ? $this->roomTypes->min('monthly_rate_minor')
-            : null) ?: 600000;
+        $activeRoomTypes = $this->relationLoaded('roomTypes')
+            ? $this->roomTypes->where('is_active', true)
+            : collect();
+
+        $minMonthlyPrice = ($activeRoomTypes->where('monthly_rate_minor', '>', 0)->min('monthly_rate_minor')) ?: 600000;
+        $minDailyPrice = $activeRoomTypes->where('daily_rate_minor', '>', 0)->min('daily_rate_minor');
+        $minWeeklyPrice = $activeRoomTypes->where('weekly_rate_minor', '>', 0)->min('weekly_rate_minor');
         $coverImage = $this->coverImageUrl() ?? '/images/public/hero-stay.jpg';
 
         return [
@@ -52,6 +56,14 @@ class PropertyCardResource extends JsonResource
             ] : null,
             'locality' => $this->locality ?: $this->city?->name,
             'address_line' => $this->address_line_1,
+            'latitude' => $this->latitude !== null ? (float) $this->latitude : null,
+            'longitude' => $this->longitude !== null ? (float) $this->longitude : null,
+            'distance_km' => isset($this->distance_km) ? (float) $this->distance_km : null,
+            'distance_label' => $this->distance_label ?? null,
+            'is_locality_match' => isset($this->is_locality_match) ? (bool) $this->is_locality_match : null,
+            'gender_eligibility' => $this->relationLoaded('roomTypes') ? $this->gender_eligibility : 'All Genders',
+            'starting_price_daily_paise' => $minDailyPrice !== null ? (int) $minDailyPrice : null,
+            'starting_price_weekly_paise' => $minWeeklyPrice !== null ? (int) $minWeeklyPrice : null,
             'starting_price_monthly_paise' => (int) $minMonthlyPrice,
             'rating_average' => $this->ratingSummary?->average_rating ? (float) $this->ratingSummary->average_rating : 4.8,
             'reviews_count' => (int) ($this->ratingSummary?->published_review_count ?? 0),

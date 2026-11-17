@@ -11,6 +11,7 @@ use App\Models\Admin;
 use App\Models\ReservationPayment;
 use App\Models\ReservationRefund;
 use App\Services\Financial\FinancialLedgerService;
+use App\Services\Notifications\NotificationDispatcher;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -130,6 +131,68 @@ class InitiateAdminRefund
                     }
                 }
             });
+
+            try {
+                $updatedRefund = $refund->fresh(['payment.reservation.user']);
+                $reservation = $updatedRefund?->payment?->reservation;
+                $dispatcher = app(NotificationDispatcher::class);
+
+                if ($updatedRefund !== null && $reservation !== null && $reservation->user !== null) {
+                    $refundRef = $updatedRefund->gateway_refund_id ?: ('REF-'.$updatedRefund->id);
+                    $formattedAmount = '₹'.number_format($updatedRefund->amount_minor / 100, 2);
+
+                    if ($finalStatus === RefundStatus::Processing->value) {
+                        $dispatcher->dispatch(
+                            eventType: 'refund.initiated',
+                            recipients: $reservation->user,
+                            variables: [
+                                'customer_name' => $reservation->user->name,
+                                'booking_reference' => $reservation->booking_reference,
+                                'amount' => $formattedAmount,
+                                'refund_reference' => $refundRef,
+                                'initiated_at' => now()->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
+                                'action_url' => url("/reservations/{$reservation->id}"),
+                            ],
+                            related: $reservation,
+                            relatedReference: $reservation->booking_reference,
+                            idempotencySeed: 'refund_initiated_'.$updatedRefund->id
+                        );
+                    } elseif ($finalStatus === RefundStatus::Processed->value) {
+                        $dispatcher->dispatch(
+                            eventType: 'refund.completed',
+                            recipients: $reservation->user,
+                            variables: [
+                                'customer_name' => $reservation->user->name,
+                                'booking_reference' => $reservation->booking_reference,
+                                'amount' => $formattedAmount,
+                                'refund_reference' => $refundRef,
+                                'completed_at' => ($updatedRefund->gateway_processed_at ?? now())->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
+                                'action_url' => url("/reservations/{$reservation->id}"),
+                            ],
+                            related: $reservation,
+                            relatedReference: $reservation->booking_reference,
+                            idempotencySeed: 'refund_complete_'.$updatedRefund->id
+                        );
+                    } elseif ($finalStatus === RefundStatus::Failed->value) {
+                        $dispatcher->dispatchToAdmins(
+                            eventType: 'admin.refund_exception',
+                            variables: [
+                                'booking_reference' => $reservation->booking_reference,
+                                'refund_reference' => $refundRef,
+                                'amount' => $formattedAmount,
+                                'error_description' => 'Gateway immediately marked refund as failed.',
+                                'created_at' => now()->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
+                                'action_url' => url("/admin/reservations/{$reservation->id}"),
+                            ],
+                            related: $updatedRefund,
+                            relatedReference: $refundRef,
+                            idempotencySeed: 'refund_failed_'.$updatedRefund->id
+                        );
+                    }
+                }
+            } catch (\Throwable $notifyError) {
+                Log::warning('Failed to dispatch refund notification: '.$notifyError->getMessage());
+            }
         } catch (\Throwable $e) {
             $refund->forceFill([
                 'status' => RefundStatus::Failed->value,
@@ -140,6 +203,27 @@ class InitiateAdminRefund
                 'refund_id' => $refund->id,
                 'payment_id' => $payment->id,
             ]);
+
+            try {
+                $payment->loadMissing('reservation');
+                $reservation = $payment->reservation;
+                app(NotificationDispatcher::class)->dispatchToAdmins(
+                    eventType: 'admin.refund_exception',
+                    variables: [
+                        'booking_reference' => $reservation->booking_reference,
+                        'refund_reference' => $refund->gateway_refund_id ?: ('REF-'.$refund->id),
+                        'amount' => '₹'.number_format($amountMinor / 100, 2),
+                        'error_description' => Str::limit($e->getMessage(), 200),
+                        'created_at' => now()->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
+                        'action_url' => url("/admin/reservations/{$reservation->id}"),
+                    ],
+                    related: $refund,
+                    relatedReference: $reservation->booking_reference,
+                    idempotencySeed: 'refund_failed_'.$refund->id
+                );
+            } catch (\Throwable) {
+                // Never mask gateway failure exception
+            }
 
             throw new RuntimeException("Refund processing failed: {$e->getMessage()}", 0, $e);
         }

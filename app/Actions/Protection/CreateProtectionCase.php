@@ -7,7 +7,6 @@ namespace App\Actions\Protection;
 use App\Enums\CaseCategory;
 use App\Enums\CasePriority;
 use App\Enums\CaseStatus;
-use App\Models\Admin;
 use App\Models\CustomerProtectionCase;
 use App\Models\CustomerProtectionCaseMessage;
 use App\Models\Reservation;
@@ -16,6 +15,7 @@ use App\Services\Notifications\NotificationDispatcher;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -124,25 +124,55 @@ class CreateProtectionCase
             return $case->fresh() ?? $case;
         }, 3);
 
+        $createdCase->loadMissing(['reservation.property']);
+        $propertyName = $reservation->snapshot_property_name
+            ?: $createdCase->reservation->property->name;
+        $dispatcher = app(NotificationDispatcher::class);
+
+        try {
+            $dispatcher->dispatch(
+                eventType: 'grievance.acknowledged',
+                recipients: $user,
+                variables: [
+                    'customer_name' => $user->name,
+                    'case_reference' => $createdCase->case_reference,
+                    'booking_reference' => $reservation->booking_reference,
+                    'property_name' => $propertyName,
+                    'created_at' => $createdCase->created_at->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
+                    'expected_response_time' => $createdCase->priority === CasePriority::Urgent
+                        ? 'Within 2 hours (Priority Desk)'
+                        : 'Within 24 hours',
+                    'action_url' => url("/my-support/{$createdCase->case_reference}"),
+                ],
+                related: $createdCase,
+                relatedReference: $createdCase->case_reference,
+                idempotencySeed: 'grievance_ack_'.$createdCase->id
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Failed to dispatch grievance.acknowledged notification: '.$e->getMessage(), [
+                'case_id' => $createdCase->id,
+            ]);
+        }
+
         if ($createdCase->priority === CasePriority::Urgent) {
             try {
-                $admins = Admin::query()->where('is_active', true)->get();
-                $dispatcher = app(NotificationDispatcher::class);
-                foreach ($admins as $admin) {
-                    $dispatcher->dispatch(
-                        eventType: 'admin.customer_protection_urgent',
-                        recipients: $admin,
-                        variables: [
-                            'case_reference' => $createdCase->case_reference,
-                            'category' => $createdCase->category->value,
-                            'reservation_code' => $reservation->booking_reference,
-                            'booking_reference' => $reservation->booking_reference,
-                            'customer_name' => $user->name,
-                        ],
-                        idempotencySeed: 'urgent_case_'.$createdCase->id.'_'.$admin->id
-                    );
-                }
-            } catch (\Throwable) {
+                $dispatcher->dispatchToAdmins(
+                    eventType: 'admin.customer_protection_urgent',
+                    variables: [
+                        'case_reference' => $createdCase->case_reference,
+                        'property_name' => $propertyName,
+                        'booking_reference' => $reservation->booking_reference,
+                        'priority' => $createdCase->priority->label(),
+                        'action_url' => route('admin.customer-cases.show', $createdCase->case_reference),
+                    ],
+                    related: $createdCase,
+                    relatedReference: $createdCase->case_reference,
+                    idempotencySeed: 'urgent_case_'.$createdCase->id
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Failed to dispatch admin.customer_protection_urgent notification: '.$e->getMessage(), [
+                    'case_id' => $createdCase->id,
+                ]);
             }
         }
 

@@ -6,9 +6,14 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="{{ $isDarkInitial ? 'dark' : '' }}" style="{{ $isDarkInitial ? 'color-scheme: dark;' : '' }}">
     <head>
         <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
         <meta name="csrf-token" content="{{ csrf_token() }}">
-        <meta name="theme-color" content="{{ $isDarkInitial ? '#1E131D' : '#FFF4EE' }}">
+        <meta name="theme-color" content="{{ $isDarkInitial ? '#1E131D' : '#442F41' }}">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
+        <meta name="apple-mobile-web-app-title" content="TIJUM">
+        <link rel="manifest" href="/manifest.webmanifest">
 
         <script>
             (function() {
@@ -28,7 +33,7 @@
                     }
                     var meta = document.querySelector('meta[name="theme-color"]');
                     if (meta) {
-                        meta.setAttribute('content', isDark ? '#1E131D' : '#FFF4EE');
+                        meta.setAttribute('content', isDark ? '#1E131D' : '#442F41');
                     }
                 } catch (e) {}
             })();

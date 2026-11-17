@@ -45,6 +45,11 @@ class HandleInertiaRequests extends Middleware
             'auth' => $this->resolvePortalAuth($request),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'googleMapsApiKey' => config('services.google.maps_api_key'),
+            'pwa' => [
+                'webPushEnabled' => (bool) config('tijum.notifications.channels.web_push.enabled', true)
+                    && (string) config('tijum.notifications.channels.web_push.vapid_public_key', '') !== '',
+                'webPushPublicKey' => (string) config('tijum.notifications.channels.web_push.vapid_public_key', ''),
+            ],
         ];
     }
 

@@ -19,9 +19,11 @@ use App\Models\PropertyVerificationApplication;
 use App\Models\PropertyVerificationDocument;
 use App\Models\PropertyVerificationEvent;
 use App\Notifications\Owner\PropertyApplicationApprovedNotification;
+use App\Services\Notifications\NotificationDispatcher;
 use App\Services\PropertyMediaProcessor;
 use App\Services\PropertyVerificationChecklist;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -300,7 +302,28 @@ class ApprovePropertyApplication
 
                 $app = PropertyVerificationApplication::query()->with('property.owner')->find($appId);
                 if ($app?->property?->owner !== null) {
-                    $app->property->owner->notify(new PropertyApplicationApprovedNotification($app));
+                    $owner = $app->property->owner;
+                    $owner->notify(new PropertyApplicationApprovedNotification($app));
+
+                    try {
+                        app(NotificationDispatcher::class)->dispatch(
+                            eventType: 'partner.property.approved',
+                            recipients: $owner,
+                            variables: [
+                                'owner_name' => $owner->name,
+                                'property_name' => $app->property->name,
+                                'approved_at' => ($app->approved_at ?? now())->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
+                                'action_url' => route('owner.properties.show', $app->property_id),
+                            ],
+                            related: $app,
+                            relatedReference: $app->application_number,
+                            idempotencySeed: 'partner_property_approved_'.$app->id
+                        );
+                    } catch (\Throwable $e) {
+                        Log::warning('Failed to dispatch partner.property.approved notification: '.$e->getMessage(), [
+                            'application_id' => $app->id,
+                        ]);
+                    }
                 }
             });
 

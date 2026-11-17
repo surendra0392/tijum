@@ -20,19 +20,25 @@ class CustomerWishlistController extends Controller
         $user = $request->user();
 
         $properties = $user->wishlistedProperties()
-            ->with(['city', 'category', 'roomTypes'])
+            ->with(['city', 'category', 'roomTypes', 'media', 'ratingSummary'])
             ->latest('customer_wishlists.created_at')
             ->paginate((int) $request->input('per_page', 15));
 
+        $paginationMeta = [
+            'current_page' => $properties->currentPage(),
+            'last_page' => $properties->lastPage(),
+            'per_page' => $properties->perPage(),
+            'total' => $properties->total(),
+        ];
+
         return response()->json([
             'success' => true,
-            'data' => PropertyCardResource::collection($properties),
-            'pagination' => [
-                'current_page' => $properties->currentPage(),
-                'last_page' => $properties->lastPage(),
-                'per_page' => $properties->perPage(),
-                'total' => $properties->total(),
-            ],
+            'data' => PropertyCardResource::collection($properties->items()),
+            'meta' => array_merge([
+                'request_id' => $request->header('X-Request-ID') ?? (string) str()->uuid(),
+                'timestamp' => now()->toIso8601String(),
+            ], $paginationMeta),
+            'pagination' => $paginationMeta,
         ]);
     }
 

@@ -12,9 +12,11 @@ use App\Models\CustomerProtectionCase;
 use App\Models\Reservation;
 use App\Models\SupportTicket;
 use App\Models\User;
+use App\Services\Notifications\NotificationDispatcher;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -139,6 +141,27 @@ class CustomerSupportTicketController extends Controller
             'message' => $validated['message'],
             'is_internal_note' => false,
         ]);
+
+        try {
+            app(NotificationDispatcher::class)->dispatch(
+                eventType: 'support.request_received',
+                recipients: $user,
+                variables: [
+                    'customer_name' => $user->name,
+                    'ticket_reference' => $ticket->ticket_reference,
+                    'subject' => $ticket->subject,
+                    'created_at' => $ticket->created_at->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
+                    'action_url' => route('support.tickets.show', $ticket->ticket_reference),
+                ],
+                related: $ticket,
+                relatedReference: $ticket->ticket_reference,
+                idempotencySeed: 'support_received_'.$ticket->id
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Failed to dispatch support.request_received notification: '.$e->getMessage(), [
+                'ticket_id' => $ticket->id,
+            ]);
+        }
 
         return redirect()
             ->route('support.tickets.show', $ticket->ticket_reference)

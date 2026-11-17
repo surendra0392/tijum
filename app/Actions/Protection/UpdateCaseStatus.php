@@ -9,8 +9,11 @@ use App\Enums\CasePriority;
 use App\Enums\CaseStatus;
 use App\Models\Admin;
 use App\Models\CustomerProtectionCase;
+use App\Services\Notifications\NotificationDispatcher;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class UpdateCaseStatus
@@ -35,7 +38,10 @@ class UpdateCaseStatus
             ]);
         }
 
-        return DB::transaction(function () use ($case, $attributes): CustomerProtectionCase {
+        $previousStatus = $case->status;
+        $previousPriority = $case->priority;
+
+        $updated = DB::transaction(function () use ($case, $attributes): CustomerProtectionCase {
             $locked = CustomerProtectionCase::query()->whereKey($case->id)->lockForUpdate()->firstOrFail();
             $now = CarbonImmutable::now();
 
@@ -96,5 +102,83 @@ class UpdateCaseStatus
 
             return $locked->fresh() ?? $locked;
         }, 3);
+
+        try {
+            $updated->loadMissing(['user', 'property', 'reservation']);
+            $dispatcher = app(NotificationDispatcher::class);
+            $propertyName = $updated->reservation->snapshot_property_name
+                ?: $updated->property->name;
+            $actionUrl = url("/my-support/{$updated->case_reference}");
+
+            if ($updated->status === CaseStatus::Resolved && $previousStatus !== CaseStatus::Resolved) {
+                $dispatcher->dispatch(
+                    eventType: 'grievance.resolved',
+                    recipients: $updated->user,
+                    variables: [
+                        'customer_name' => $updated->user->name,
+                        'case_reference' => $updated->case_reference,
+                        'property_name' => $propertyName,
+                        'resolution_summary' => Str::limit((string) ($updated->resolution_summary ?: 'Case resolved by TIJUM Support.'), 240),
+                        'resolved_at' => ($updated->resolved_at ?? now())->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
+                        'action_url' => $actionUrl,
+                    ],
+                    related: $updated,
+                    relatedReference: $updated->case_reference,
+                    idempotencySeed: 'grievance_resolved_'.$updated->id
+                );
+            } elseif ($updated->priority === CasePriority::Urgent && $previousPriority !== CasePriority::Urgent) {
+                $dispatcher->dispatch(
+                    eventType: 'grievance.escalated',
+                    recipients: $updated->user,
+                    variables: [
+                        'customer_name' => $updated->user->name,
+                        'case_reference' => $updated->case_reference,
+                        'escalation_status' => 'Escalated to Priority Desk',
+                        'reason' => 'Your case has been escalated for urgent senior team review.',
+                        'action_url' => $actionUrl,
+                    ],
+                    related: $updated,
+                    relatedReference: $updated->case_reference,
+                    idempotencySeed: 'grievance_escalated_'.$updated->id.'_'.$updated->updated_at->timestamp
+                );
+
+                $dispatcher->dispatchToAdmins(
+                    eventType: 'admin.customer_protection_urgent',
+                    variables: [
+                        'case_reference' => $updated->case_reference,
+                        'property_name' => $propertyName,
+                        'booking_reference' => $updated->reservation->booking_reference,
+                        'priority' => $updated->priority->label(),
+                        'action_url' => route('admin.customer-cases.show', $updated->case_reference),
+                    ],
+                    related: $updated,
+                    relatedReference: $updated->case_reference,
+                    idempotencySeed: 'urgent_case_escalated_'.$updated->id.'_'.$updated->updated_at->timestamp
+                );
+            } elseif ($updated->status !== $previousStatus) {
+                $dispatcher->dispatch(
+                    eventType: 'grievance.status_updated',
+                    recipients: $updated->user,
+                    variables: [
+                        'customer_name' => $updated->user->name,
+                        'case_reference' => $updated->case_reference,
+                        'property_name' => $propertyName,
+                        'case_status' => $updated->status->label(),
+                        'reason' => 'Case status updated to '.$updated->status->label().'.',
+                        'updated_at' => $updated->updated_at->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
+                        'action_url' => $actionUrl,
+                    ],
+                    related: $updated,
+                    relatedReference: $updated->case_reference,
+                    idempotencySeed: 'grievance_status_'.$updated->id.'_'.$updated->status->value.'_'.$updated->updated_at->timestamp
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to dispatch grievance status notification: '.$e->getMessage(), [
+                'case_id' => $updated->id,
+            ]);
+        }
+
+        return $updated;
     }
 }

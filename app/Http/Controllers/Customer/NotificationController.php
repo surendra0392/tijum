@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
+use App\Models\NotificationDelivery;
 use App\Models\User;
 use App\Services\Notifications\NotificationPreferenceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -67,7 +69,21 @@ class NotificationController extends Controller
         /** @var DatabaseNotification|null $notification */
         $notification = $user->notifications()->where('id', $id)->first();
         if ($notification !== null) {
-            $notification->markAsRead();
+            DB::transaction(static function () use ($notification, $user): void {
+                $now = $notification->read_at ?? now();
+
+                if ($notification->read_at === null) {
+                    $notification->forceFill(['read_at' => $now])->save();
+                }
+
+                NotificationDelivery::query()
+                    ->where('notifiable_type', $user->getMorphClass())
+                    ->where('notifiable_id', $user->id)
+                    ->where('channel', 'in_app')
+                    ->where('provider_message_id', $notification->id)
+                    ->whereNull('read_at')
+                    ->update(['read_at' => $now]);
+            }, 3);
         }
 
         if ($request->wantsJson()) {
@@ -83,7 +99,18 @@ class NotificationController extends Controller
         $user = $request->user('web');
         abort_unless($user instanceof User, 403);
 
-        $user->unreadNotifications->markAsRead();
+        DB::transaction(static function () use ($user): void {
+            $now = now();
+
+            $user->unreadNotifications()->update(['read_at' => $now]);
+
+            NotificationDelivery::query()
+                ->where('notifiable_type', $user->getMorphClass())
+                ->where('notifiable_id', $user->id)
+                ->where('channel', 'in_app')
+                ->whereNull('read_at')
+                ->update(['read_at' => $now]);
+        }, 3);
 
         if ($request->wantsJson()) {
             return response()->json(['success' => true]);

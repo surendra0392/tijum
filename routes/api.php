@@ -38,6 +38,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('cities/{slug}', [PublicCityController::class, 'show'])->name('api.v1.public.cities.show');
         Route::get('properties', [PublicPropertyController::class, 'index'])->name('api.v1.public.properties.index');
         Route::get('properties/{slug}', [PublicPropertyController::class, 'show'])->name('api.v1.public.properties.show');
+        Route::get('properties/{slug}/reviews', [PublicPropertyController::class, 'reviews'])->name('api.v1.public.properties.reviews');
+        Route::post('properties/{property}/quote', [PublicPropertyController::class, 'quote'])->name('api.v1.public.properties.quote');
         Route::get('geocode/reverse', [PublicGeocodeController::class, 'reverse'])->name('api.v1.public.geocode.reverse');
         Route::match(['get', 'post'], 'validate-contact', PublicGuestContactValidationController::class)->name('api.v1.public.validate-contact');
         Route::get('locations/autocomplete', PublicLocationController::class)

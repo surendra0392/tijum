@@ -1,5 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { CheckCheck, ExternalLink, Inbox, Settings } from 'lucide-react';
+import { WebPushToggle } from '@/components/pwa/WebPushToggle';
 import { PageHeader } from '@/components/shared/page-header';
 import { Pagination } from '@/components/shared/pagination';
 import { ResponsiveContainer } from '@/components/shared/responsive-container';
@@ -65,6 +66,7 @@ export default function CustomerNotificationsIndex({
                         description="View important updates, reservation confirmations, payment reminders, and stay alerts."
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
+                                <WebPushToggle compact />
                                 {unreadCount > 0 && (
                                     <Button
                                         variant="outline"

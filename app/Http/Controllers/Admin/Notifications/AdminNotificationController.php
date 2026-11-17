@@ -130,6 +130,12 @@ class AdminNotificationController extends Controller
 
         $notifiable = $delivery->notifiable;
         $recipientName = $notifiable?->name ?? 'Unknown';
+        $safePayload = $delivery->payload ?? [];
+        foreach (['otp_code', 'password', 'secret', 'token'] as $sensitiveKey) {
+            if (array_key_exists($sensitiveKey, $safePayload)) {
+                $safePayload[$sensitiveKey] = '********';
+            }
+        }
 
         return Inertia::render('admin/notifications/show', [
             'delivery' => [
@@ -149,7 +155,7 @@ class AdminNotificationController extends Controller
                 'provider_message_id' => $delivery->provider_message_id,
                 'attempts' => $delivery->attempts,
                 'subject' => $delivery->subject,
-                'payload' => $delivery->payload,
+                'payload' => $safePayload,
                 'error_code' => $delivery->error_code,
                 'error_description' => $delivery->error_description,
                 'related_type' => $delivery->related_type ? class_basename($delivery->related_type) : null,

@@ -21,6 +21,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 class ProcessWebhookEvent
@@ -217,7 +218,7 @@ class ProcessWebhookEvent
             'metadata' => array_merge((array) $payment->metadata, ['webhook_payment_failed' => $paymentEntity]),
         ])->save();
 
-        $reservation = $payment->reservation()->first();
+        $reservation = $payment->reservation()->with(['user', 'property'])->first();
         if ($reservation !== null && $reservation->user !== null) {
             try {
                 $dispatcher = $this->notificationDispatcher ?? app(NotificationDispatcher::class);
@@ -225,10 +226,15 @@ class ProcessWebhookEvent
                     eventType: 'payment.failed',
                     recipients: $reservation->user,
                     variables: [
-                        'reservation_code' => $reservation->booking_reference,
+                        'customer_name' => $reservation->user->name,
                         'booking_reference' => $reservation->booking_reference,
-                        'failure_reason' => $errorDescription,
+                        'property_name' => $reservation->snapshot_property_name ?: $reservation->property->name,
+                        'amount' => '₹'.number_format(($payment->amount_minor ?: $reservation->total_amount_minor) / 100, 2),
+                        'failure_reason' => Str::limit($errorDescription, 180),
+                        'action_url' => url("/reservations/{$reservation->id}"),
                     ],
+                    related: $reservation,
+                    relatedReference: $reservation->booking_reference,
                     idempotencySeed: 'pay_fail_'.$payment->id.'_'.$payment->updated_at?->timestamp
                 );
             } catch (\Throwable $e) {
@@ -276,7 +282,7 @@ class ProcessWebhookEvent
 
             $payment->forceFill(['status' => $newStatus->value])->save();
 
-            $reservation = $payment->reservation()->first();
+            $reservation = $payment->reservation()->with('user')->first();
             if ($reservation !== null && $reservation->user !== null) {
                 try {
                     $dispatcher = $this->notificationDispatcher ?? app(NotificationDispatcher::class);
@@ -284,10 +290,15 @@ class ProcessWebhookEvent
                         eventType: 'refund.completed',
                         recipients: $reservation->user,
                         variables: [
-                            'reservation_code' => $reservation->booking_reference,
+                            'customer_name' => $reservation->user->name,
                             'booking_reference' => $reservation->booking_reference,
-                            'refund_amount' => '₹'.number_format($refund->amount_minor / 100, 2),
+                            'amount' => '₹'.number_format($refund->amount_minor / 100, 2),
+                            'refund_reference' => $refund->gateway_refund_id ?: ('REF-'.$refund->id),
+                            'completed_at' => ($refund->gateway_processed_at ?? now())->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
+                            'action_url' => url("/reservations/{$reservation->id}"),
                         ],
+                        related: $reservation,
+                        relatedReference: $reservation->booking_reference,
                         idempotencySeed: 'refund_complete_'.$refund->id
                     );
                 } catch (\Throwable $e) {
@@ -319,11 +330,34 @@ class ProcessWebhookEvent
             return;
         }
 
+        $errorDescription = (string) ($refundEntity['error_description'] ?? 'Gateway refund processing failed.');
         $refund->forceFill([
             'status' => RefundStatus::Failed->value,
-            'failure_reason' => (string) ($refundEntity['error_description'] ?? 'Gateway refund processing failed.'),
+            'failure_reason' => $errorDescription,
             'metadata' => array_merge((array) $refund->metadata, ['webhook_refund_failed' => $refundEntity]),
         ])->save();
+
+        try {
+            $refund->loadMissing(['payment.reservation']);
+            $reservation = $refund->payment->reservation;
+            $dispatcher = $this->notificationDispatcher ?? app(NotificationDispatcher::class);
+            $dispatcher->dispatchToAdmins(
+                eventType: 'admin.refund_exception',
+                variables: [
+                    'booking_reference' => $reservation->booking_reference,
+                    'refund_reference' => $refund->gateway_refund_id ?: ('REF-'.$refund->id),
+                    'amount' => '₹'.number_format($refund->amount_minor / 100, 2),
+                    'error_description' => Str::limit($errorDescription, 200),
+                    'created_at' => now()->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
+                    'action_url' => url("/admin/reservations/{$reservation->id}"),
+                ],
+                related: $refund,
+                relatedReference: $refund->gateway_refund_id ?: $reservation->booking_reference,
+                idempotencySeed: 'refund_failed_'.$refund->id
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Failed to dispatch admin.refund_exception notification: '.$e->getMessage());
+        }
     }
 
     /**
@@ -367,7 +401,8 @@ class ProcessWebhookEvent
         } catch (\Throwable) {
         }
 
-        $owner = $transfer->settlement?->owner;
+        $settlement = $transfer->settlement;
+        $owner = $settlement->owner;
         if ($owner !== null) {
             try {
                 $dispatcher = $this->notificationDispatcher ?? app(NotificationDispatcher::class);
@@ -375,9 +410,15 @@ class ProcessWebhookEvent
                     eventType: 'partner.transfer_completed',
                     recipients: $owner,
                     variables: [
-                        'settlement_reference' => $transfer->settlement?->settlement_reference ?? $transfer->gateway_transfer_id,
+                        'owner_name' => $owner->name,
                         'amount' => '₹'.number_format($transfer->amount_minor / 100, 2),
+                        'settlement_reference' => $settlement->settlement_reference,
+                        'transfer_reference' => $transfer->gateway_transfer_id ?: ('TRF-'.$transfer->id),
+                        'completed_at' => ($transfer->processed_at ?? now())->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
+                        'action_url' => url("/owner/settlements/{$settlement->id}"),
                     ],
+                    related: $settlement,
+                    relatedReference: $settlement->settlement_reference,
                     idempotencySeed: 'transfer_processed_'.$transfer->id
                 );
             } catch (\Throwable $e) {
@@ -422,6 +463,31 @@ class ProcessWebhookEvent
                 'failure_reason' => $errorDescription,
                 'provider_status' => 'failed',
             ])->save();
+        }
+
+        $transfer->loadMissing(['settlement.owner']);
+        $settlement = $transfer->settlement;
+        $owner = $settlement->owner;
+        if ($owner !== null) {
+            try {
+                $dispatcher = $this->notificationDispatcher ?? app(NotificationDispatcher::class);
+                $dispatcher->dispatch(
+                    eventType: 'partner.transfer_failed',
+                    recipients: $owner,
+                    variables: [
+                        'owner_name' => $owner->name,
+                        'amount' => '₹'.number_format($transfer->amount_minor / 100, 2),
+                        'settlement_reference' => $settlement->settlement_reference,
+                        'failure_reason' => Str::limit($errorDescription, 180),
+                        'action_url' => url("/owner/settlements/{$settlement->id}"),
+                    ],
+                    related: $settlement,
+                    relatedReference: $settlement->settlement_reference,
+                    idempotencySeed: 'transfer_failed_'.$transfer->id
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Failed to dispatch partner.transfer_failed notification: '.$e->getMessage());
+            }
         }
     }
 

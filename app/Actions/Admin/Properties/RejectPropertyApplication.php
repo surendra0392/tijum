@@ -12,8 +12,11 @@ use App\Models\PropertyMedia;
 use App\Models\PropertyVerificationApplication;
 use App\Models\PropertyVerificationEvent;
 use App\Notifications\Owner\PropertyApplicationRejectedNotification;
+use App\Services\Notifications\NotificationDispatcher;
 use App\Services\PropertyMediaProcessor;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class RejectPropertyApplication
@@ -113,7 +116,33 @@ class RejectPropertyApplication
 
                 $app = PropertyVerificationApplication::query()->with('property.owner')->find($appId);
                 if ($app?->property?->owner !== null) {
-                    $app->property->owner->notify(new PropertyApplicationRejectedNotification($app));
+                    $owner = $app->property->owner;
+                    $owner->notify(new PropertyApplicationRejectedNotification($app));
+
+                    try {
+                        $decisionText = is_string($app->decision_reason) && $app->decision_reason !== ''
+                            ? $app->decision_reason
+                            : 'Verification application could not be approved.';
+
+                        app(NotificationDispatcher::class)->dispatch(
+                            eventType: 'partner.property.changes_requested',
+                            recipients: $owner,
+                            variables: [
+                                'owner_name' => $owner->name,
+                                'property_name' => $app->property->name,
+                                'review_reason' => Str::limit($decisionText, 120),
+                                'requested_changes' => Str::limit($decisionText, 240),
+                                'action_url' => route('owner.properties.verification.show', $app->property_id),
+                            ],
+                            related: $app,
+                            relatedReference: $app->application_number,
+                            idempotencySeed: 'partner_property_rejected_'.$app->id.'_'.($app->reviewed_at !== null ? $app->reviewed_at->timestamp : 0)
+                        );
+                    } catch (\Throwable $e) {
+                        Log::warning('Failed to dispatch partner.property.changes_requested notification: '.$e->getMessage(), [
+                            'application_id' => $app->id,
+                        ]);
+                    }
                 }
             });
 

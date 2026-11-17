@@ -6,7 +6,23 @@ import {
     PaymentOrderPayload,
     PropertyCard,
     Reservation,
+    StayQuoteResponse,
 } from './types';
+
+function createSubmissionUuid(): string {
+    if (
+        typeof globalThis.crypto !== 'undefined' &&
+        typeof globalThis.crypto.randomUUID === 'function'
+    ) {
+        return globalThis.crypto.randomUUID();
+    }
+
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = Math.floor(Math.random() * 16);
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+    });
+}
 
 export const CustomerApi = {
     // Profile
@@ -35,30 +51,46 @@ export const CustomerApi = {
         data: {
             property_room_type_id: number;
             check_in_date: string;
-            duration_type: string;
+            duration_type: 'daily' | 'weekly' | 'monthly' | string;
             duration_quantity: number;
             quantity: number;
+            guest_count?: number;
+            early_check_in_requested?: boolean;
+            requested_arrival_time?: string;
         },
     ) =>
-        ApiClient.post<ApiResponse<any>>(
+        ApiClient.post<ApiResponse<StayQuoteResponse>>(
             `customer/reservations/quote/${propertyId}`,
             data,
         ),
 
     createReservation: (data: {
+        submission_token?: string;
         property_id: number;
         property_room_type_id: number;
         check_in_date: string;
-        duration_type: string;
+        duration_type: 'daily' | 'weekly' | 'monthly' | string;
         duration_quantity: number;
         quantity: number;
-        guest_gender: string;
-        guest_composition: string;
+        guest_count?: number;
+        guest_gender: 'male' | 'female' | 'mixed' | string;
+        guest_composition?: string;
+        booking_for?: 'self' | 'other';
+        contact_name?: string;
+        contact_email?: string;
+        contact_phone?: string;
+        early_check_in_requested?: boolean;
+        requested_arrival_time?: string;
         notes?: string;
         coupon_code?: string;
         points_to_redeem?: number;
     }) =>
-        ApiClient.post<ApiResponse<Reservation>>('customer/reservations', data),
+        ApiClient.post<ApiResponse<Reservation>>('customer/reservations', {
+            ...data,
+            submission_token: data.submission_token ?? createSubmissionUuid(),
+            guest_count: data.guest_count ?? data.quantity,
+            guest_composition: data.guest_composition ?? 'individuals',
+        }),
 
     getReservation: (reference: string) =>
         ApiClient.get<ApiResponse<Reservation>>(

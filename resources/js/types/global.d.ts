@@ -12,6 +12,10 @@ declare module '@inertiajs/core' {
             name: string;
             auth: Auth;
             sidebarOpen: boolean;
+            pwa?: {
+                webPushEnabled: boolean;
+                webPushPublicKey: string;
+            };
             [key: string]: unknown;
         };
     }

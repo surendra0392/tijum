@@ -121,6 +121,15 @@ export default function AdminNotificationTemplatesIndex({
                         WhatsApp
                     </Badge>
                 );
+            case 'push':
+                return (
+                    <Badge
+                        variant="outline"
+                        className="border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/35 dark:bg-amber-950/35 dark:text-amber-300"
+                    >
+                        Push
+                    </Badge>
+                );
             default:
                 return (
                     <Badge
