@@ -1,6 +1,6 @@
 # TIJUM — Stay Easy. Eat Well. Spend Less.
 
-[![PHP Version](https://img.shields.io/badge/PHP-8.4-777BB4?logo=php)](https://php.net)
+[![PHP Version](https://img.shields.io/badge/PHP-8.5-777BB4?logo=php)](https://php.net)
 [![Laravel Framework](https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel)](https://laravel.com)
 [![React Version](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev)
 [![Inertia.js](https://img.shields.io/badge/Inertia.js-v3-9553E9?logo=inertia)](https://inertiajs.com)
@@ -45,7 +45,7 @@ TIJUM operates on a non-gatekeeper instant booking architecture:
 
 | Layer                       | Technologies                                                                                         |
 | :-------------------------- | :--------------------------------------------------------------------------------------------------- |
-| **Backend Framework**       | Laravel 12, PHP 8.4 (Constructor Promotion, Enums, Strict Types)                                     |
+| **Backend Framework**       | Laravel 12, PHP 8.5 (Constructor Promotion, Enums, Strict Types)                                     |
 | **Database & Cache**        | MySQL 8.0 (InnoDB Row-Locking, Transactions), Redis / Database Cache                                 |
 | **Authentication**          | Laravel Fortify (Email & Phone dual-identifier login, 2FA/TOTP), Laravel Sanctum (Mobile API tokens) |
 | **Web Frontend**            | React 19, Inertia.js v3 (Standalone HTTP, Optimistic Rollback), Wayfinder                            |
