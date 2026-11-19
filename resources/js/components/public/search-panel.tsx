@@ -80,6 +80,7 @@ type SearchPanelProps = {
         genderPreference: string;
     }>;
     compact?: boolean;
+    autoLocate?: boolean;
     autoSubmitOnLocate?: boolean;
     onDurationChange?: (duration: string) => void;
     className?: string;
@@ -93,6 +94,7 @@ export function SearchPanel({
     defaults,
     initial,
     compact = false,
+    autoLocate = true,
     autoSubmitOnLocate = false,
     onDurationChange,
     className,
@@ -113,17 +115,24 @@ export function SearchPanel({
             return initial.locationLabel.trim();
         }
 
-        if (initial?.locality && initial?.city) {
-            const cityName =
-                cities.find(
-                    (c) =>
-                        String(c.id) === String(initial.city) ||
-                        c.name.toLowerCase() ===
-                            String(initial.city).toLowerCase(),
-                )?.name || initial.city;
-            return `${initial.locality}, ${cityName}`;
+        const matchedCityName = initial?.city
+            ? cities.find(
+                  (c) =>
+                      String(c.id) === String(initial.city) ||
+                      c.name.toLowerCase() ===
+                          String(initial.city).toLowerCase(),
+              )?.name || (isNaN(Number(initial.city)) ? initial.city : '')
+            : '';
+
+        if (initial?.locality && matchedCityName) {
+            return `${initial.locality}, ${matchedCityName}`;
         }
-        if (initial?.locality) return initial.locality;
+        if (initial?.locality) {
+            return initial.locality;
+        }
+        if (matchedCityName) {
+            return matchedCityName;
+        }
         return '';
     };
 
@@ -156,22 +165,15 @@ export function SearchPanel({
     );
 
     useEffect(() => {
-        const nextLabel = resolveInitialLocationInput();
-        if (nextLabel) {
-            setLocationInput(nextLabel);
+        if (!initial) {
+            return;
         }
-        if (initial?.city) {
-            setSelectedCity(resolveInitialCity());
-        }
-        if (initial?.locality !== undefined) {
-            setSelectedLocality(initial.locality || '');
-        }
-        if (initial?.lat !== undefined) {
-            setSelectedLat(initial.lat);
-        }
-        if (initial?.lng !== undefined) {
-            setSelectedLng(initial.lng);
-        }
+
+        setLocationInput(resolveInitialLocationInput());
+        setSelectedCity(resolveInitialCity());
+        setSelectedLocality(initial.locality || '');
+        setSelectedLat(initial.lat);
+        setSelectedLng(initial.lng);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         initial?.city,
@@ -324,10 +326,17 @@ export function SearchPanel({
             });
 
             if (matchingLocation) {
+                const isCityOnly = matchingLocation.type === 'city';
                 resolvedCity = matchingLocation.city;
-                resolvedLocality = matchingLocation.locality ?? '';
-                resolvedLat = matchingLocation.lat ?? undefined;
-                resolvedLng = matchingLocation.lng ?? undefined;
+                resolvedLocality = isCityOnly
+                    ? ''
+                    : (matchingLocation.locality ?? '');
+                resolvedLat = isCityOnly
+                    ? undefined
+                    : (matchingLocation.lat ?? undefined);
+                resolvedLng = isCityOnly
+                    ? undefined
+                    : (matchingLocation.lng ?? undefined);
             } else {
                 const matchingCity = cities.find((city) =>
                     lower.includes(city.name.toLowerCase()),
@@ -444,6 +453,7 @@ export function SearchPanel({
                         onChange={handleLocationInputChange}
                         onSelect={handleLocationSelect}
                         locations={locations}
+                        autoLocate={autoLocate}
                         placeholder="Search exact area, address or landmark..."
                     />
                 </div>

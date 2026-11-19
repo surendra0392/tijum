@@ -221,9 +221,7 @@ class PropertySearchService
             if ($card !== null) {
                 $distKm = $item['distance_km'];
                 $card['distance_km'] = $distKm;
-                $card['distance_label'] = $distKm !== null
-                    ? ($distKm < 1 ? ((int) ($distKm * 1000).' m away') : ($distKm.' km away'))
-                    : null;
+                $card['distance_label'] = $this->formatDistanceLabel($distKm, $refCoords);
                 $card['is_locality_match'] = $item['is_locality_match'];
                 $items[] = $card;
             }
@@ -312,32 +310,45 @@ class PropertySearchService
      * Resolve reference coordinates from filters (lat/lng, locality, or city).
      *
      * @param  array<string, mixed>  $filters
-     * @return array{lat: float, lng: float}|null
+     * @return array{lat: float, lng: float, source: 'coordinates'|'locality'|'city_center', label: ?string}|null
      */
     public function resolveReferenceCoordinates(array $filters): ?array
     {
+        $locality = isset($filters['locality']) && is_string($filters['locality']) ? trim($filters['locality']) : '';
+        $cityModel = $this->resolveCityModel($filters['city'] ?? null);
+        $cityCenter = $cityModel !== null ? $this->cityCenterForSlug($cityModel->slug) : null;
+
         if (isset($filters['lat'], $filters['lng']) && is_numeric($filters['lat']) && is_numeric($filters['lng'])) {
-            return [
-                'lat' => (float) $filters['lat'],
-                'lng' => (float) $filters['lng'],
-            ];
+            $lat = (float) $filters['lat'];
+            $lng = (float) $filters['lng'];
+
+            $belongsToCity = $cityCenter === null
+                || $this->calculateDistanceKm($lat, $lng, $cityCenter['lat'], $cityCenter['lng']) <= 80.0;
+
+            if ($belongsToCity) {
+                return [
+                    'lat' => $lat,
+                    'lng' => $lng,
+                    'source' => 'coordinates',
+                    'label' => $locality !== '' ? $locality : null,
+                ];
+            }
         }
 
-        $locality = isset($filters['locality']) && is_string($filters['locality']) ? trim($filters['locality']) : '';
-        $cityId = isset($filters['city']) ? (int) $filters['city'] : null;
-
-        if ($locality !== '' && $cityId) {
+        if ($locality !== '' && $cityModel !== null) {
             $matchedProp = Property::query()
-                ->where('city_id', $cityId)
+                ->where('city_id', $cityModel->id)
                 ->where('locality', 'like', '%'.$locality.'%')
                 ->whereNotNull('latitude')
                 ->whereNotNull('longitude')
                 ->first(['latitude', 'longitude']);
 
-            if ($matchedProp && $matchedProp->latitude && $matchedProp->longitude) {
+            if ($matchedProp && $matchedProp->latitude !== null && $matchedProp->longitude !== null) {
                 return [
                     'lat' => (float) $matchedProp->latitude,
                     'lng' => (float) $matchedProp->longitude,
+                    'source' => 'locality',
+                    'label' => $locality,
                 ];
             }
         }
@@ -380,46 +391,110 @@ class PropertySearchService
             $locLower = strtolower($locality);
             foreach ($knownLocalities as $key => $coords) {
                 if (str_contains($locLower, $key)) {
-                    return $coords;
+                    $matchesCity = $cityCenter === null
+                        || $this->calculateDistanceKm($coords['lat'], $coords['lng'], $cityCenter['lat'], $cityCenter['lng']) <= 80.0;
+
+                    if ($matchesCity) {
+                        return [
+                            'lat' => $coords['lat'],
+                            'lng' => $coords['lng'],
+                            'source' => 'locality',
+                            'label' => $locality,
+                        ];
+                    }
                 }
             }
         }
 
-        // Default city centers
-        $cityCenters = [
-            1 => ['lat' => 17.3850, 'lng' => 78.4867], // Hyderabad
-            2 => ['lat' => 16.3067, 'lng' => 80.4365], // Guntur
-            3 => ['lat' => 16.5062, 'lng' => 80.6480], // Vijayawada
-            4 => ['lat' => 17.6868, 'lng' => 83.2185], // Visakhapatnam
-        ];
-
-        if ($cityId && isset($cityCenters[$cityId])) {
-            return $cityCenters[$cityId];
-        }
-
-        if (isset($filters['city']) && $filters['city'] !== '') {
-            $cityParam = $filters['city'];
-            $city = is_numeric($cityParam)
-                ? City::query()->find((int) $cityParam)
-                : City::query()->where('slug', (string) $cityParam)->orWhereRaw('LOWER(name) = ?', [strtolower((string) $cityParam)])->first();
-            if ($city) {
-                $slug = $city->slug;
-                if ($slug === 'hyderabad') {
-                    return ['lat' => 17.3850, 'lng' => 78.4867];
-                }
-                if ($slug === 'visakhapatnam') {
-                    return ['lat' => 17.6868, 'lng' => 83.2185];
-                }
-                if ($slug === 'vijayawada') {
-                    return ['lat' => 16.5062, 'lng' => 80.6480];
-                }
-                if ($slug === 'guntur') {
-                    return ['lat' => 16.3067, 'lng' => 80.4365];
-                }
-            }
+        if ($cityModel !== null && $cityCenter !== null) {
+            return [
+                'lat' => $cityCenter['lat'],
+                'lng' => $cityCenter['lng'],
+                'source' => 'city_center',
+                'label' => $cityModel->name,
+            ];
         }
 
         return null;
+    }
+
+    /**
+     * Format a human-readable distance label that clarifies the reference origin.
+     *
+     * @param  array{lat: float, lng: float, source?: string, label?: ?string}|null  $refCoords
+     */
+    public function formatDistanceLabel(?float $distKm, ?array $refCoords): ?string
+    {
+        if ($distKm === null) {
+            return null;
+        }
+
+        $source = $refCoords['source'] ?? 'coordinates';
+        $rawLabel = $refCoords['label'] ?? null;
+        $label = $rawLabel !== null && trim($rawLabel) !== ''
+            ? trim($rawLabel)
+            : null;
+
+        if ($distKm <= 0.0) {
+            if ($source === 'locality' && $label !== null) {
+                return 'In '.$label;
+            }
+
+            if ($source === 'city_center' && $label !== null) {
+                return 'Central '.$label;
+            }
+
+            return '< 100 m away';
+        }
+
+        $distanceText = $distKm < 1
+            ? ((int) round($distKm * 1000)).' m'
+            : $distKm.' km';
+
+        if ($source === 'city_center' && $label !== null) {
+            return $distanceText.' from '.$label.' center';
+        }
+
+        if ($source === 'locality' && $label !== null) {
+            return $distanceText.' from '.$label;
+        }
+
+        return $distanceText.' away';
+    }
+
+    private function resolveCityModel(mixed $cityParam): ?City
+    {
+        if ($cityParam === null || $cityParam === '') {
+            return null;
+        }
+
+        if (is_numeric($cityParam)) {
+            return City::query()->find((int) $cityParam, ['id', 'name', 'slug']);
+        }
+
+        $clean = strtolower(trim((string) $cityParam));
+        if ($clean === '') {
+            return null;
+        }
+
+        return City::query()
+            ->where('slug', $clean)
+            ->orWhereRaw('LOWER(name) = ?', [$clean])
+            ->first(['id', 'name', 'slug']);
+    }
+
+    /**
+     * @return array{lat: float, lng: float}|null
+     */
+    private function cityCenterForSlug(string $slug): ?array
+    {
+        return match (strtolower($slug)) {
+            'hyderabad' => ['lat' => 17.3850, 'lng' => 78.4867],
+            'guntur' => ['lat' => 16.3067, 'lng' => 80.4365],
+            'vijayawada' => ['lat' => 16.5062, 'lng' => 80.6480],
+            'visakhapatnam' => ['lat' => 17.6868, 'lng' => 83.2185],
+            default => null,
+        };
     }
 
     /**

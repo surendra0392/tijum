@@ -198,9 +198,7 @@ class PublicPropertyController extends ApiController
             }
 
             $property->setAttribute('distance_km', $distKm);
-            $property->setAttribute('distance_label', $distKm !== null
-                ? ($distKm < 1 ? ((int) ($distKm * 1000).' m away') : ($distKm.' km away'))
-                : null);
+            $property->setAttribute('distance_label', $searchService->formatDistanceLabel($distKm, $refCoords));
             $property->setAttribute('is_locality_match', $searchedLocality !== null ? $isExactLocality : null);
         });
 

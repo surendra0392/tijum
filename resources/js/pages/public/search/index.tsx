@@ -126,6 +126,7 @@ export default function SearchPage(props: SearchPageProps) {
     } = props;
 
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [skipAutoLocate, setSkipAutoLocate] = useState(false);
     // Feature flag: Map view is preserved ready for future activation per user request
     const ENABLE_MAP_VIEW = false;
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('list');
@@ -386,12 +387,43 @@ export default function SearchPage(props: SearchPageProps) {
     };
 
     const handleQuickCitySelect = (targetCityId?: number) => {
+        setSkipAutoLocate(true);
         setLocality('');
         setSearchLocationLabel('');
+
+        if (!targetCityId) {
+            const nonIntentParams: Record<string, unknown> = {
+                category: selectedCategories.length
+                    ? selectedCategories
+                    : undefined,
+                gender_preference:
+                    genderPref !== 'all' ? genderPref : undefined,
+                sharing_capacity: sharing.length ? sharing : undefined,
+                ac: ac.length ? ac : undefined,
+                min_price:
+                    minPrice !== '' ? rupeesInputToMinor(minPrice) : undefined,
+                max_price:
+                    maxPrice !== '' ? rupeesInputToMinor(maxPrice) : undefined,
+                min_rating: minRating !== '' ? Number(minRating) : undefined,
+                early_check_in: earlyCheckIn ? true : undefined,
+                sort: sort !== 'relevant' ? sort : undefined,
+            };
+            Object.keys(nonIntentParams).forEach(
+                (k) =>
+                    nonIntentParams[k] === undefined &&
+                    delete nonIntentParams[k],
+            );
+
+            router.get(publicSearch.url(), nonIntentParams as any, {
+                preserveScroll: false,
+            });
+            return;
+        }
+
         router.get(
             publicSearch.url(),
             buildParams({
-                city: targetCityId ? String(targetCityId) : undefined,
+                city: String(targetCityId),
                 locality: undefined,
                 location_label: undefined,
                 lat: undefined,
@@ -417,6 +449,7 @@ export default function SearchPage(props: SearchPageProps) {
     };
 
     const clearFilters = () => {
+        setSkipAutoLocate(true);
         setSelectedCategories([]);
         setGenderPref('all');
         setSharing([]);
@@ -429,14 +462,16 @@ export default function SearchPage(props: SearchPageProps) {
         setMobileOpen(false);
         router.get(
             publicSearch.url(),
-            {
-                city: city || undefined,
-                locality: locality || undefined,
-                check_in: checkIn || undefined,
-                duration_type: durationType,
-                duration_count: Number(durationCount || 1),
-                guests: Number(guests || 1),
-            },
+            city
+                ? {
+                      city,
+                      locality: locality || undefined,
+                      check_in: checkIn || undefined,
+                      duration_type: durationType,
+                      duration_count: Number(durationCount || 1),
+                      guests: Number(guests || 1),
+                  }
+                : {},
             { preserveScroll: false, preserveState: false },
         );
     };
@@ -1003,8 +1038,18 @@ export default function SearchPage(props: SearchPageProps) {
                     <SearchPanel
                         compact
                         className="border-tijum-surface/90 bg-tijum-cream/45 shadow-2xs"
+                        autoLocate={
+                            !skipAutoLocate &&
+                            !hasSearchIntent &&
+                            !city &&
+                            !locality &&
+                            !searchLocationLabel
+                        }
                         autoSubmitOnLocate={
-                            !city && !locality && !searchLocationLabel
+                            !skipAutoLocate &&
+                            !city &&
+                            !locality &&
+                            !searchLocationLabel
                         }
                         onDurationChange={handleDurationChange}
                         locations={locations}
@@ -1133,8 +1178,8 @@ export default function SearchPage(props: SearchPageProps) {
                                             </SheetContent>
                                         </Sheet>
 
-                                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                                            <p className="text-sm text-tijum-plum">
+                                        <div className="flex min-w-0 items-baseline gap-x-2">
+                                            <p className="shrink-0 text-sm text-tijum-plum">
                                                 <span className="font-heading text-base font-bold tabular-nums">
                                                     {resultTotal}
                                                 </span>{' '}
@@ -1143,7 +1188,13 @@ export default function SearchPage(props: SearchPageProps) {
                                             </p>
                                             {(searchLocationLabel ||
                                                 cityName) && (
-                                                <span className="text-xs text-tijum-lavender">
+                                                <span
+                                                    title={
+                                                        searchLocationLabel ||
+                                                        cityName
+                                                    }
+                                                    className="max-w-[210px] truncate text-xs text-tijum-lavender sm:max-w-[290px] xl:max-w-[340px]"
+                                                >
                                                     in{' '}
                                                     <strong className="font-semibold text-tijum-plum">
                                                         {searchLocationLabel ||

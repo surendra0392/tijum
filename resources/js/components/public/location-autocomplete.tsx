@@ -464,6 +464,7 @@ export function LocationAutocomplete({
 
     const handleSelect = (suggestion: Suggestion) => {
         const address = suggestionAddress(suggestion);
+        const isCityOnly = suggestion.type === 'city';
 
         if (suggestion.lat !== undefined && suggestion.lng !== undefined) {
             biasRef.current = { lat: suggestion.lat, lng: suggestion.lng };
@@ -473,9 +474,9 @@ export function LocationAutocomplete({
         onSelect({
             address,
             city: suggestion.city,
-            locality: suggestion.locality,
-            lat: suggestion.lat,
-            lng: suggestion.lng,
+            locality: isCityOnly ? '' : suggestion.locality,
+            lat: isCityOnly ? undefined : suggestion.lat,
+            lng: isCityOnly ? undefined : suggestion.lng,
         });
         setOpen(false);
         setHighlightedIndex(-1);
