@@ -11,12 +11,13 @@ import {
     PlayCircle,
     PlusCircle,
     PowerOff,
+    RotateCcw,
     Search,
     ShieldCheck,
     Utensils,
     X,
 } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import {
     propertyOperationalStatusMap,
     propertyVerificationStatusMap,
@@ -38,7 +39,6 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -120,6 +120,20 @@ export default function OwnerPropertiesIndex({
     } | null>(null);
     const [statusBusy, setStatusBusy] = useState(false);
 
+    useEffect(() => {
+        setSearch(filters.search);
+        setStatus(filters.status);
+        setVerificationStatus(filters.verification_status);
+        setCity(filters.city);
+        setCategory(filters.category);
+    }, [
+        filters.search,
+        filters.status,
+        filters.verification_status,
+        filters.city,
+        filters.category,
+    ]);
+
     const handleOperationalStatusConfirm = () => {
         if (!pendingStatusChange) {
             return;
@@ -142,20 +156,49 @@ export default function OwnerPropertiesIndex({
         );
     };
 
-    const handleFilter = (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
+    const applyFilters = (
+        overrides: {
+            search?: string;
+            status?: string;
+            verificationStatus?: string;
+            city?: string;
+            category?: string;
+        } = {},
+        page = 1,
+    ) => {
+        const nextSearch = (overrides.search ?? search).trim();
+        const nextStatus = overrides.status ?? status;
+        const nextVerif = overrides.verificationStatus ?? verificationStatus;
+        const nextCity = overrides.city ?? city;
+        const nextCategory = overrides.category ?? category;
+
         router.get(
             propertiesIndexRoute.url(),
             {
-                search: search || undefined,
-                status: status || undefined,
-                verification_status: verificationStatus || undefined,
-                city: city || undefined,
-                category: category || undefined,
+                search: nextSearch || undefined,
+                status: nextStatus || undefined,
+                verification_status: nextVerif || undefined,
+                city: nextCity || undefined,
+                category: nextCategory || undefined,
+                page: page > 1 ? page : undefined,
             },
             { preserveState: true, preserveScroll: true },
         );
     };
+
+    const handleFilter = (e: FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        applyFilters();
+    };
+
+    const clearSearch = () => {
+        setSearch('');
+        applyFilters({ search: '' });
+    };
+
+    const hasActiveFilters = Boolean(
+        search.trim() || status || verificationStatus || city || category,
+    );
 
     const clearFilters = () => {
         setSearch('');
@@ -163,7 +206,11 @@ export default function OwnerPropertiesIndex({
         setVerificationStatus('');
         setCity('');
         setCategory('');
-        router.get(propertiesIndexRoute.url());
+        router.get(
+            propertiesIndexRoute.url(),
+            {},
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     return (
@@ -236,188 +283,192 @@ export default function OwnerPropertiesIndex({
                     />
                 </div>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Search &amp; Filter Properties</CardTitle>
-                        <CardDescription>
-                            Filter across launch cities, accommodation
-                            categories, operational states, and verification
-                            statuses.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <search>
-                            <form
-                                onSubmit={handleFilter}
-                                className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
-                            >
-                                <div className="min-w-0 space-y-1 sm:col-span-2">
-                                    <Label htmlFor="owner-prop-search">
-                                        Search name, ref, or locality
-                                    </Label>
-                                    <div className="relative">
-                                        <Search
-                                            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-tijum-plum-muted dark:text-muted-foreground"
-                                            aria-hidden="true"
-                                        />
-                                        <Input
-                                            id="owner-prop-search"
-                                            type="search"
-                                            value={search}
-                                            className="w-full min-w-0 pl-9"
-                                            placeholder="TJP-2026-000001, hostel..."
-                                            onChange={(e) =>
-                                                setSearch(e.target.value)
-                                            }
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="min-w-0 space-y-1">
-                                    <Label htmlFor="owner-prop-city">
-                                        City
-                                    </Label>
-                                    <Select
-                                        value={city || 'all'}
-                                        onValueChange={(v) =>
-                                            setCity(v === 'all' ? '' : v)
-                                        }
+                <section
+                    aria-label="Search and filter properties"
+                    className="rounded-2xl border border-tijum-surface/85 bg-card p-3 shadow-tijum-card dark:border-border"
+                >
+                    <search>
+                        <form
+                            onSubmit={handleFilter}
+                            className="flex flex-col gap-2.5 lg:flex-row lg:items-center"
+                        >
+                            <div className="relative min-w-0 flex-1">
+                                <Search
+                                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-tijum-plum-muted dark:text-muted-foreground"
+                                    aria-hidden="true"
+                                />
+                                <Input
+                                    id="owner-prop-search"
+                                    type="text"
+                                    value={search}
+                                    aria-label="Search properties by name, reference, or locality"
+                                    className="h-9 pr-16 pl-9 text-xs"
+                                    placeholder="Search name, ref (TJP-...), or locality..."
+                                    onChange={(e) => setSearch(e.target.value)}
+                                />
+                                {search && (
+                                    <button
+                                        type="button"
+                                        onClick={clearSearch}
+                                        aria-label="Clear search"
+                                        className="absolute top-1/2 right-12 -translate-y-1/2 cursor-pointer rounded-md p-1 text-muted-foreground hover:text-foreground"
                                     >
-                                        <SelectTrigger
-                                            id="owner-prop-city"
-                                            className="w-full min-w-0"
-                                        >
-                                            <SelectValue placeholder="All cities" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">
-                                                All launch cities
-                                            </SelectItem>
-                                            {cities.map((c) => (
-                                                <SelectItem
-                                                    key={c.slug}
-                                                    value={c.slug}
-                                                >
-                                                    {c.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                        <X className="size-3.5" />
+                                    </button>
+                                )}
+                                <button
+                                    type="submit"
+                                    className="absolute top-1/2 right-1.5 -translate-y-1/2 cursor-pointer rounded-md bg-tijum-cream px-2 py-1 text-[11px] font-semibold text-tijum-plum transition-colors hover:bg-tijum-coral hover:text-white dark:bg-muted dark:text-foreground dark:hover:bg-tijum-coral"
+                                >
+                                    Find
+                                </button>
+                            </div>
 
-                                <div className="min-w-0 space-y-1">
-                                    <Label htmlFor="owner-prop-category">
-                                        Category
-                                    </Label>
-                                    <Select
-                                        value={category || 'all'}
-                                        onValueChange={(v) =>
-                                            setCategory(v === 'all' ? '' : v)
-                                        }
+                            <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
+                                <Select
+                                    value={city || 'all'}
+                                    onValueChange={(v) => {
+                                        const nextCity = v === 'all' ? '' : v;
+                                        setCity(nextCity);
+                                        applyFilters({ city: nextCity });
+                                    }}
+                                >
+                                    <SelectTrigger
+                                        id="owner-prop-city"
+                                        aria-label="Filter by city"
+                                        className="h-9 w-full text-xs sm:w-[140px]"
                                     >
-                                        <SelectTrigger
-                                            id="owner-prop-category"
-                                            className="w-full min-w-0"
-                                        >
-                                            <SelectValue placeholder="All categories" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">
-                                                All categories
+                                        <SelectValue placeholder="All cities" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">
+                                            All launch cities
+                                        </SelectItem>
+                                        {cities.map((c) => (
+                                            <SelectItem
+                                                key={c.slug}
+                                                value={c.slug}
+                                            >
+                                                {c.name}
                                             </SelectItem>
-                                            {categories.map((cat) => (
-                                                <SelectItem
-                                                    key={cat.slug}
-                                                    value={cat.slug}
-                                                >
-                                                    {cat.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
 
-                                <div className="min-w-0 space-y-1">
-                                    <Label htmlFor="owner-prop-verif">
-                                        Verification
-                                    </Label>
-                                    <Select
-                                        value={verificationStatus || 'all'}
-                                        onValueChange={(v) =>
-                                            setVerificationStatus(
-                                                v === 'all' ? '' : v,
-                                            )
-                                        }
+                                <Select
+                                    value={category || 'all'}
+                                    onValueChange={(v) => {
+                                        const nextCategory =
+                                            v === 'all' ? '' : v;
+                                        setCategory(nextCategory);
+                                        applyFilters({
+                                            category: nextCategory,
+                                        });
+                                    }}
+                                >
+                                    <SelectTrigger
+                                        id="owner-prop-category"
+                                        aria-label="Filter by category"
+                                        className="h-9 w-full text-xs sm:w-[145px]"
                                     >
-                                        <SelectTrigger
-                                            id="owner-prop-verif"
-                                            className="w-full min-w-0"
-                                        >
-                                            <SelectValue placeholder="All statuses" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">
-                                                All verification states
+                                        <SelectValue placeholder="All categories" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">
+                                            All categories
+                                        </SelectItem>
+                                        {categories.map((cat) => (
+                                            <SelectItem
+                                                key={cat.slug}
+                                                value={cat.slug}
+                                            >
+                                                {cat.name}
                                             </SelectItem>
-                                            {verificationStatuses.map((s) => (
-                                                <SelectItem
-                                                    key={s.value}
-                                                    value={s.value}
-                                                >
-                                                    {s.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
 
-                                <div className="min-w-0 space-y-1">
-                                    <Label htmlFor="owner-prop-status">
-                                        Operational Status
-                                    </Label>
-                                    <Select
-                                        value={status || 'all'}
-                                        onValueChange={(v) =>
-                                            setStatus(v === 'all' ? '' : v)
-                                        }
+                                <Select
+                                    value={verificationStatus || 'all'}
+                                    onValueChange={(v) => {
+                                        const nextVerif = v === 'all' ? '' : v;
+                                        setVerificationStatus(nextVerif);
+                                        applyFilters({
+                                            verificationStatus: nextVerif,
+                                        });
+                                    }}
+                                >
+                                    <SelectTrigger
+                                        id="owner-prop-verif"
+                                        aria-label="Filter by verification status"
+                                        className="h-9 w-full text-xs sm:w-[165px]"
                                     >
-                                        <SelectTrigger
-                                            id="owner-prop-status"
-                                            className="w-full min-w-0"
-                                        >
-                                            <SelectValue placeholder="All states" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">
-                                                All operational states
+                                        <SelectValue placeholder="All verification" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">
+                                            All verification states
+                                        </SelectItem>
+                                        {verificationStatuses.map((s) => (
+                                            <SelectItem
+                                                key={s.value}
+                                                value={s.value}
+                                            >
+                                                {s.label}
                                             </SelectItem>
-                                            {operationalStatuses.map((s) => (
-                                                <SelectItem
-                                                    key={s.value}
-                                                    value={s.value}
-                                                >
-                                                    {s.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
 
-                                <div className="flex flex-wrap items-end gap-2 sm:col-span-2 lg:col-span-4">
-                                    <Button type="submit">Apply Filters</Button>
+                                <Select
+                                    value={status || 'all'}
+                                    onValueChange={(v) => {
+                                        const nextStatus = v === 'all' ? '' : v;
+                                        setStatus(nextStatus);
+                                        applyFilters({ status: nextStatus });
+                                    }}
+                                >
+                                    <SelectTrigger
+                                        id="owner-prop-status"
+                                        aria-label="Filter by operational status"
+                                        className="h-9 w-full text-xs sm:w-[165px]"
+                                    >
+                                        <SelectValue placeholder="All operational" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">
+                                            All operational states
+                                        </SelectItem>
+                                        {operationalStatuses.map((s) => (
+                                            <SelectItem
+                                                key={s.value}
+                                                value={s.value}
+                                            >
+                                                {s.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                {hasActiveFilters && (
                                     <Button
                                         type="button"
-                                        variant="outline"
+                                        variant="ghost"
+                                        size="sm"
                                         onClick={clearFilters}
+                                        className="h-9 shrink-0 px-2.5 text-xs text-tijum-plum-muted hover:text-tijum-plum dark:text-muted-foreground dark:hover:text-foreground"
                                     >
-                                        <X aria-hidden="true" />
-                                        <span>Clear</span>
+                                        <RotateCcw
+                                            className="mr-1 size-3.5"
+                                            aria-hidden="true"
+                                        />
+                                        <span>Reset</span>
                                     </Button>
-                                </div>
-                            </form>
-                        </search>
-                    </CardContent>
-                </Card>
+                                )}
+                            </div>
+                        </form>
+                    </search>
+                </section>
 
                 {properties.data.length === 0 ? (
                     <EmptyState
