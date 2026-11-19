@@ -207,4 +207,29 @@ return [
         'queue' => env('TIJUM_NOTIFICATION_QUEUE', 'notifications'),
         'high_priority_queue' => env('TIJUM_NOTIFICATION_HIGH_PRIORITY_QUEUE', 'notifications_high'),
     ],
+
+    'contact' => [
+        'phone' => env('TIJUM_CONTACT_PHONE', '+91 8142334033'),
+        'whatsapp' => env('TIJUM_WHATSAPP_NUMBER', '+91 8142334033'),
+        'whatsapp_raw' => env('TIJUM_WHATSAPP_RAW', '918142334033'),
+        'email' => env('TIJUM_SUPPORT_EMAIL', 'support@tijum.com'),
+        'partners_email' => env('TIJUM_PARTNERS_EMAIL', 'partners@tijum.com'),
+        'hours' => 'Monday – Saturday: 9:00 AM – 8:00 PM IST',
+        'address' => 'TIJUM Marketplace Pvt. Ltd., Level 4, Cyber Gateway, HITEC City, Hyderabad, Telangana 500081, India',
+    ],
+
+    'social' => [
+        'facebook' => [
+            'username' => 'tijum.official',
+            'url' => 'https://facebook.com/tijum.official',
+        ],
+        'instagram' => [
+            'username' => 'tijum.official',
+            'url' => 'https://instagram.com/tijum.official',
+        ],
+        'whatsapp' => [
+            'number' => '+91 8142334033',
+            'url' => 'https://wa.me/918142334033',
+        ],
+    ],
 ];

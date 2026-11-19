@@ -39,6 +39,7 @@ Route::get('/properties/{property:slug}', PropertyDetailController::class)->name
 Route::get('/properties/{property:slug}/reserve', [ReservationController::class, 'create'])->name('reservations.create');
 Route::get('/how-it-works', [PublicPageController::class, 'howItWorks'])->name('public.how-it-works');
 Route::get('/about', [PublicPageController::class, 'about'])->name('public.about');
+Route::get('/contact', [PublicPageController::class, 'contact'])->name('public.contact');
 Route::get('/become-a-partner', [PublicPageController::class, 'becomeAPartner'])->name('public.become-a-partner');
 Route::get('/faqs', [PublicPageController::class, 'faqs'])->name('public.faqs');
 Route::get('/terms', [PublicPageController::class, 'terms'])->name('public.terms');

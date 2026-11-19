@@ -143,6 +143,58 @@ class PublicPageController extends Controller
         ]);
     }
 
+    public function contact(): Response
+    {
+        /** @var array<string, string> $contactConfig */
+        $contactConfig = config('tijum.contact', [
+            'phone' => '+91 8142334033',
+            'whatsapp' => '+91 8142334033',
+            'email' => 'support@tijum.com',
+            'partners_email' => 'partners@tijum.com',
+            'hours' => 'Monday – Saturday: 9:00 AM – 8:00 PM IST',
+            'address' => 'TIJUM Marketplace Pvt. Ltd., Level 4, Cyber Gateway, HITEC City, Hyderabad, Telangana 500081, India',
+        ]);
+
+        /** @var array<string, array{username?: string, number?: string, url: string}> $socialConfig */
+        $socialConfig = config('tijum.social', [
+            'facebook' => [
+                'username' => 'tijum.official',
+                'url' => 'https://facebook.com/tijum.official',
+            ],
+            'instagram' => [
+                'username' => 'tijum.official',
+                'url' => 'https://instagram.com/tijum.official',
+            ],
+            'whatsapp' => [
+                'number' => '+91 8142334033',
+                'url' => 'https://wa.me/918142334033',
+            ],
+        ]);
+
+        return Inertia::render('public/contact', [
+            'contact' => $contactConfig,
+            'social' => $socialConfig,
+            'seo' => $this->buildSeoPayload(
+                title: 'Contact Us — Customer Support, Partner Desk & WhatsApp | TIJUM',
+                description: 'Contact TIJUM via WhatsApp (+91 8142334033), call, or email support@tijum.com. Connect with us on Instagram and Facebook (@tijum.official) for accommodations across Hyderabad, Vijayawada, Guntur, and Visakhapatnam.',
+                canonical: route('public.contact'),
+                structuredData: [
+                    '@context' => 'https://schema.org',
+                    '@graph' => [
+                        $this->organizationSchema(),
+                        $this->breadcrumbSchema('Contact Us', route('public.contact')),
+                        [
+                            '@type' => 'ContactPage',
+                            'name' => 'TIJUM Contact & Customer Support',
+                            'url' => route('public.contact'),
+                            'description' => 'Contact channel and support desk for TIJUM accommodation marketplace.',
+                        ],
+                    ],
+                ],
+            ),
+        ]);
+    }
+
     public function grievanceRedressal(): Response
     {
         /** @var array<string, string> $officer */
@@ -374,6 +426,18 @@ class PublicPageController extends Controller
                 ['@type' => 'City', 'name' => 'Guntur'],
                 ['@type' => 'City', 'name' => 'Vijayawada'],
                 ['@type' => 'City', 'name' => 'Visakhapatnam'],
+            ],
+            'sameAs' => [
+                'https://facebook.com/tijum.official',
+                'https://instagram.com/tijum.official',
+                'https://wa.me/918142334033',
+            ],
+            'contactPoint' => [
+                '@type' => 'ContactPoint',
+                'telephone' => '+91-8142334033',
+                'contactType' => 'customer service',
+                'areaServed' => 'IN',
+                'availableLanguage' => ['English', 'Telugu', 'Hindi'],
             ],
         ];
     }

@@ -94,7 +94,8 @@ export const PUBLIC_IMAGES: Record<
         width: 1200,
         height: 900,
         alt: 'Bright, tidy twin-bed shared room with natural teak frames, warm cream bedding, study desk, and sunlit window',
-        caption: 'Illustrative stay atmosphere · Verified stays open for booking',
+        caption:
+            'Illustrative stay atmosphere · Verified stays open for booking',
     },
     heroMeal: {
         webpSrcSet:
@@ -735,5 +736,68 @@ export function createFullFaqGroups(timing: StayTimingData): FaqGroup[] {
         },
     ];
 }
+
+export type SocialLinkItem = {
+    name: 'Facebook' | 'Instagram' | 'WhatsApp';
+    handle: string;
+    display: string;
+    href: string;
+    ariaLabel: string;
+    description: string;
+};
+
+export const SOCIAL_LINKS: readonly SocialLinkItem[] = [
+    {
+        name: 'WhatsApp',
+        handle: '+91 8142334033',
+        display: '+91 8142334033',
+        href: 'https://wa.me/918142334033',
+        ariaLabel: 'Chat with TIJUM on WhatsApp at +91 8142334033',
+        description:
+            'Instant booking inquiries, room availability, and guest support.',
+    },
+    {
+        name: 'Instagram',
+        handle: 'tijum.official',
+        display: '@tijum.official',
+        href: 'https://instagram.com/tijum.official',
+        ariaLabel: 'Follow TIJUM on Instagram @tijum.official',
+        description:
+            'Hostel tours, student living tips, city guides, and campus updates.',
+    },
+    {
+        name: 'Facebook',
+        handle: 'tijum.official',
+        display: '@tijum.official',
+        href: 'https://facebook.com/tijum.official',
+        ariaLabel: 'Follow TIJUM on Facebook @tijum.official',
+        description:
+            'Community news, partner spotlights, and accommodation offers.',
+    },
+] as const;
+
+export const CONTACT_INFO = {
+    phone: {
+        display: '+91 8142334033',
+        href: 'tel:+918142334033',
+    },
+    whatsapp: {
+        number: '+91 8142334033',
+        raw: '918142334033',
+        href: 'https://wa.me/918142334033',
+        inquiryHref:
+            'https://wa.me/918142334033?text=Hi%20TIJUM%2C%20I%20have%20an%20inquiry%20regarding%20accommodations.',
+    },
+    emails: {
+        support: 'support@tijum.com',
+        partners: 'partners@tijum.com',
+        grievance: 'grievance@tijum.com',
+    },
+    hours: 'Monday – Saturday: 9:00 AM – 8:00 PM IST',
+    officeAddress:
+        'TIJUM Marketplace Pvt. Ltd., Level 4, Cyber Gateway, HITEC City, Hyderabad, Telangana 500081, India',
+    cities: ['Hyderabad', 'Vijayawada', 'Guntur', 'Visakhapatnam'],
+} as const;
+
 import { formatStayTime } from '@/lib/stay-timing';
 import type { StayTimingData } from '@/types/public-search';

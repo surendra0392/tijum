@@ -7,8 +7,15 @@ import { SectionHeading } from '@/components/public/section-heading';
 import { ResponsiveContainer } from '@/components/shared/responsive-container';
 import { PublicSeoHead } from '@/components/public/public-seo-head';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { SocialLinks } from '@/components/public/social-links';
 import { LAUNCH_CITIES, PUBLIC_IMAGES } from '@/data/public-content';
-import { becomeAPartner, howItWorks, search as publicSearch } from '@/routes/public';
+import {
+    becomeAPartner,
+    contact as publicContact,
+    howItWorks,
+    search as publicSearch,
+} from '@/routes/public';
 import { show as cityShow } from '@/routes/public/cities';
 import type { SeoMetadata } from '@/types';
 
@@ -30,7 +37,9 @@ export default function About({ seo }: AboutProps) {
                 title="Making affordable, food-inclusive accommodation simple to find."
                 description="TIJUM connects guests looking for transparent stays with independent Hostels/PG, Homestay, and Co-Living operators through one platform — keeping room pricing and meal inclusions visible upfront."
                 breadcrumbs={[{ label: 'About TIJUM', current: true }]}
-                badges={<Badge variant="peach">Our Mission &amp; Philosophy</Badge>}
+                badges={
+                    <Badge variant="peach">Our Mission &amp; Philosophy</Badge>
+                }
             />
 
             {/* Editorial Visual Split */}
@@ -119,7 +128,7 @@ export default function About({ seo }: AboutProps) {
                                         aria-hidden="true"
                                     />
                                 </span>
-                                <span className="font-heading text-xs font-bold tabular-nums text-tijum-lavender">
+                                <span className="font-heading text-xs font-bold text-tijum-lavender tabular-nums">
                                     01
                                 </span>
                             </div>
@@ -135,9 +144,9 @@ export default function About({ seo }: AboutProps) {
                                 </p>
                                 <p>
                                     Independent Hostels/PG, Homestay, and
-                                    Co-Living operators manage their own inventory
-                                    and meal options transparently across daily,
-                                    weekly, and monthly bookings.
+                                    Co-Living operators manage their own
+                                    inventory and meal options transparently
+                                    across daily, weekly, and monthly bookings.
                                 </p>
                             </div>
                         </article>
@@ -150,7 +159,7 @@ export default function About({ seo }: AboutProps) {
                                         aria-hidden="true"
                                     />
                                 </span>
-                                <span className="font-heading text-xs font-bold tabular-nums text-tijum-lavender">
+                                <span className="font-heading text-xs font-bold text-tijum-lavender tabular-nums">
                                     02
                                 </span>
                             </div>
@@ -174,6 +183,34 @@ export default function About({ seo }: AboutProps) {
                                 ))}
                             </div>
                         </article>
+                    </div>
+
+                    {/* Community & Social Connection */}
+                    <div className="rounded-[28px] border border-tijum-surface bg-tijum-cream/50 p-6 shadow-tijum-soft sm:p-8 lg:p-10">
+                        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="max-w-xl space-y-2">
+                                <Badge variant="peach">Official Channels</Badge>
+                                <h3 className="font-heading text-xl font-bold text-tijum-plum sm:text-2xl">
+                                    Connect with the TIJUM community
+                                </h3>
+                                <p className="text-sm leading-relaxed text-tijum-lavender">
+                                    Follow our verified social accounts for
+                                    hostel tours, meal schedule guides, and stay
+                                    discounts. Reach our helpdesk directly on
+                                    WhatsApp for quick inquiries.
+                                </p>
+                            </div>
+                            <div className="flex shrink-0 flex-wrap items-center gap-3">
+                                <Button asChild variant="default">
+                                    <Link href={publicContact()}>
+                                        Contact Support Team →
+                                    </Link>
+                                </Button>
+                            </div>
+                        </div>
+                        <div className="mt-8 border-t border-tijum-surface/80 pt-6">
+                            <SocialLinks variant="card" showDescription />
+                        </div>
                     </div>
 
                     <PublicCtaBand

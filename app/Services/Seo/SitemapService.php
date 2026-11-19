@@ -62,6 +62,7 @@ class SitemapService
             ['loc' => route('public.search'), 'changefreq' => 'daily', 'priority' => '0.9'],
             ['loc' => route('public.how-it-works'), 'changefreq' => 'weekly', 'priority' => '0.8'],
             ['loc' => route('public.about'), 'changefreq' => 'monthly', 'priority' => '0.7'],
+            ['loc' => route('public.contact'), 'changefreq' => 'monthly', 'priority' => '0.7'],
             ['loc' => route('public.become-a-partner'), 'changefreq' => 'weekly', 'priority' => '0.8'],
             ['loc' => route('public.faqs'), 'changefreq' => 'weekly', 'priority' => '0.8'],
             ['loc' => route('public.terms'), 'changefreq' => 'monthly', 'priority' => '0.5'],
