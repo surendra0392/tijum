@@ -12,7 +12,6 @@ import {
 import { type FormEvent, useState } from 'react';
 import { PublicPageHero } from '@/components/public/public-page-hero';
 import { PublicSeoHead } from '@/components/public/public-seo-head';
-import { SectionHeading } from '@/components/public/section-heading';
 import { SocialIcon, WhatsAppIcon } from '@/components/public/social-links';
 import { ResponsiveContainer } from '@/components/shared/responsive-container';
 import { Badge } from '@/components/ui/badge';
@@ -27,11 +26,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-    CONTACT_INFO,
-    LAUNCH_CITIES,
-    SOCIAL_LINKS,
-} from '@/data/public-content';
+import { CONTACT_INFO, LAUNCH_CITIES } from '@/data/public-content';
 import { faqs, grievanceRedressal } from '@/routes/public';
 import { show as cityShow } from '@/routes/public/cities';
 import type { SeoMetadata } from '@/types';
@@ -625,57 +620,6 @@ export default function Contact({ contact, social, seo }: ContactProps) {
                                     </Button>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </ResponsiveContainer>
-            </section>
-
-            {/* Social Network Highlights Strip */}
-            <section className="border-t border-tijum-surface bg-tijum-cream/50 py-12">
-                <ResponsiveContainer
-                    width="wide"
-                    className="space-y-6 text-center"
-                >
-                    <SectionHeading
-                        eyebrow="Community &amp; Social"
-                        title="Connect with TIJUM on your favourite platform"
-                        description="Stay tuned for property walkthroughs, student hostel reviews, launch announcements, and discount vouchers."
-                    />
-                    <div className="mx-auto max-w-4xl pt-4">
-                        <div className="grid gap-4 sm:grid-cols-3">
-                            {SOCIAL_LINKS.map((item) => (
-                                <a
-                                    key={item.name}
-                                    href={item.href}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    aria-label={item.ariaLabel}
-                                    className="group flex items-center gap-4 rounded-2xl border border-tijum-surface bg-white p-5 shadow-tijum-card transition-all duration-300 hover:-translate-y-0.5 hover:border-tijum-coral/50 hover:shadow-tijum-soft focus-visible:ring-2 focus-visible:ring-tijum-coral focus-visible:outline-none"
-                                >
-                                    <span
-                                        className={
-                                            item.name === 'Instagram'
-                                                ? 'flex size-12 shrink-0 items-center justify-center rounded-xl bg-pink-50 text-pink-600 transition-colors group-hover:bg-pink-600 group-hover:text-white'
-                                                : item.name === 'Facebook'
-                                                  ? 'flex size-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white'
-                                                  : 'flex size-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 transition-colors group-hover:bg-emerald-600 group-hover:text-white'
-                                        }
-                                    >
-                                        <SocialIcon
-                                            name={item.name}
-                                            className="size-6"
-                                        />
-                                    </span>
-                                    <div className="text-left">
-                                        <p className="font-heading text-xs font-semibold tracking-wider text-tijum-plum-muted uppercase">
-                                            {item.name}
-                                        </p>
-                                        <p className="font-heading text-sm font-bold text-tijum-plum group-hover:text-tijum-coral">
-                                            {item.display}
-                                        </p>
-                                    </div>
-                                </a>
-                            ))}
                         </div>
                     </div>
                 </ResponsiveContainer>
