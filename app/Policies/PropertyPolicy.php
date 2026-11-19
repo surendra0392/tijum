@@ -62,9 +62,17 @@ class PropertyPolicy
             return false;
         }
 
+        if ($property->hasApprovedBaseline() || $property->is_verified) {
+            return true;
+        }
+
         $activeApplication = $property->activeVerificationApplication()->first();
 
-        if ($activeApplication instanceof PropertyVerificationApplication && ! $activeApplication->is_amendment) {
+        if (
+            $activeApplication instanceof PropertyVerificationApplication
+            && ! $activeApplication->is_amendment
+            && $activeApplication->status->isActive()
+        ) {
             return $activeApplication->status->isEditableByOwner();
         }
 

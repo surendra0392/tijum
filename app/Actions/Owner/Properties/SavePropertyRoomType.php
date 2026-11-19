@@ -123,7 +123,12 @@ class SavePropertyRoomType
                 && $activeApp->is_amendment
                 && $activeApp->status->isEditableByOwner();
 
-            if (! $hasApproved && $activeApp instanceof PropertyVerificationApplication && ! $activeApp->status->isEditableByOwner()) {
+            if (
+                ! $hasApproved
+                && $activeApp instanceof PropertyVerificationApplication
+                && $activeApp->status->isActive()
+                && ! $activeApp->status->isEditableByOwner()
+            ) {
                 throw ValidationException::withMessages([
                     'room_type' => 'Room types cannot be modified while verification is currently in review.',
                 ]);

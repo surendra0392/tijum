@@ -130,9 +130,9 @@ export default function RoomTypesIndex({
                         <Lock aria-hidden="true" />
                         <AlertTitle>Room Types Locked</AlertTitle>
                         <AlertDescription>
-                            Adding or editing room types requires a Draft or
-                            Needs Information revision (or starting a
-                            Re-Verification Amendment for approved properties).
+                            Room types cannot be modified while initial
+                            verification is under review or if the property is
+                            suspended.
                         </AlertDescription>
                     </Alert>
                 )}

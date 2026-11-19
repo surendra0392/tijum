@@ -111,7 +111,12 @@ class SavePropertyRoom
                 && $activeApp->is_amendment
                 && $activeApp->status->isEditableByOwner();
 
-            if (! $hasApproved && $activeApp instanceof PropertyVerificationApplication && ! $activeApp->status->isEditableByOwner()) {
+            if (
+                ! $hasApproved
+                && $activeApp instanceof PropertyVerificationApplication
+                && $activeApp->status->isActive()
+                && ! $activeApp->status->isEditableByOwner()
+            ) {
                 throw ValidationException::withMessages([
                     'room' => 'Rooms cannot be added or modified while property verification is locked for review.',
                 ]);

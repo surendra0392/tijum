@@ -1260,7 +1260,7 @@ class PropertySeeder extends Seeder
                 $app = PropertyVerificationApplication::query()->firstOrNew(['property_id' => $property->id]);
                 $app->forceFill([
                     'property_id' => $property->id,
-                    'active_property_id' => $property->id,
+                    'active_property_id' => null,
                     'application_number' => sprintf('TJPV-%s-%06d', now()->format('Y'), $property->id),
                     'status' => PropertyVerificationStatus::Approved,
                     'revision_number' => 1,
