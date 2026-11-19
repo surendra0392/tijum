@@ -43,109 +43,116 @@ export function NewsletterSection() {
     return (
         <section
             aria-labelledby="newsletter-heading"
-            className="border-y border-tijum-surface bg-tijum-cream py-12 sm:py-16"
+            className="border-t border-tijum-surface/80 bg-white pt-14 pb-6 sm:pt-16 sm:pb-8"
         >
             <ResponsiveContainer width="wide">
-                <div className="grid gap-8 lg:grid-cols-12 lg:items-center">
-                    <div className="space-y-3.5 lg:col-span-5">
-                        <span className="flex size-11 items-center justify-center rounded-xl bg-tijum-plum text-tijum-cream">
-                            <Mail className="size-5" aria-hidden="true" />
-                        </span>
-                        <p className="font-heading text-xs font-semibold uppercase tracking-wider text-tijum-lavender sm:text-sm">
-                            Stay Updated
-                        </p>
-                        <h2
-                            id="newsletter-heading"
-                            className="font-heading text-2xl font-bold tracking-tight text-tijum-plum sm:text-3xl leading-tight text-balance"
-                        >
-                            Practical guides for finding your next stay
-                        </h2>
-                        <p className="max-w-[55ch] text-sm leading-relaxed text-tijum-lavender sm:text-base text-pretty">
-                            Receive optional TIJUM emails about accommodation
-                            discovery, city living, and food-inclusive stays.
-                        </p>
-                    </div>
-
-                    <div className="lg:col-span-7">
-                        {subscribed ? (
-                            <div
-                                role="status"
-                                className="flex items-start gap-3 rounded-[20px] border border-tijum-peach bg-white p-6 text-tijum-plum shadow-tijum-card"
-                            >
-                                <MailCheck
-                                    className="mt-0.5 size-5 shrink-0 text-tijum-coral"
-                                    aria-hidden="true"
-                                />
-                                <div>
-                                    <p className="font-heading text-sm font-semibold">
-                                        Subscription received
-                                    </p>
-                                    <p className="mt-1 text-sm text-tijum-lavender">
-                                        Check your email for the next step.
-                                    </p>
-                                </div>
-                            </div>
-                        ) : (
-                            <form
-                                onSubmit={submit}
-                                className="space-y-4 rounded-[24px] border border-tijum-surface bg-white p-6 shadow-tijum-card sm:p-7"
-                            >
-                                <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="newsletter-email">
-                                            Email address
-                                        </Label>
-                                        <Input
-                                            id="newsletter-email"
-                                            name="email"
-                                            type="email"
-                                            value={email}
-                                            onChange={(event) =>
-                                                setEmail(event.target.value)
-                                            }
-                                            placeholder="you@example.com"
-                                            autoComplete="email"
-                                            spellCheck={false}
-                                            required
-                                        />
-                                    </div>
-                                    <Button
-                                        type="submit"
-                                        size="lg"
-                                        disabled={
-                                            processing || !marketingConsent
-                                        }
-                                    >
-                                        {processing
-                                            ? 'Subscribing'
-                                            : 'Subscribe'}
-                                        {!processing && (
-                                            <ArrowRight aria-hidden="true" />
-                                        )}
-                                    </Button>
-                                </div>
-
-                                <label className="flex cursor-pointer items-start gap-3 text-sm leading-relaxed text-tijum-lavender">
-                                    <input
-                                        id="homepage-marketing-consent"
-                                        name="marketing_consent"
-                                        type="checkbox"
-                                        checked={marketingConsent}
-                                        onChange={(event) =>
-                                            setMarketingConsent(
-                                                event.target.checked,
-                                            )
-                                        }
-                                        className="mt-1 size-4 shrink-0 accent-tijum-coral"
+                <div className="rounded-[26px] border border-tijum-surface/90 bg-tijum-cream/45 p-6 sm:p-8 lg:p-10">
+                    <div className="grid gap-6 lg:grid-cols-12 lg:items-center lg:gap-10">
+                        <div className="space-y-2.5 lg:col-span-5">
+                            <div className="flex items-center gap-2.5">
+                                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-tijum-plum shadow-2xs">
+                                    <Mail
+                                        className="size-4"
+                                        aria-hidden="true"
                                     />
-                                    <span>
-                                        I explicitly agree to receive optional
-                                        TIJUM marketing emails. Transactional
-                                        reservation messages are separate.
-                                    </span>
-                                </label>
-                            </form>
-                        )}
+                                </span>
+                                <h2
+                                    id="newsletter-heading"
+                                    className="font-heading text-xl font-bold tracking-tight text-tijum-plum sm:text-2xl"
+                                >
+                                    City living guides &amp; new stays
+                                </h2>
+                            </div>
+                            <p className="max-w-[46ch] text-sm leading-relaxed text-tijum-lavender">
+                                Occasional updates on new verified stays, city
+                                guides, and seasonal offers. Unsubscribe
+                                anytime.
+                            </p>
+                        </div>
+
+                        <div className="lg:col-span-7">
+                            {subscribed ? (
+                                <div
+                                    role="status"
+                                    className="flex items-start gap-3 rounded-2xl border border-tijum-peach bg-white p-5 text-tijum-plum shadow-2xs"
+                                >
+                                    <MailCheck
+                                        className="mt-0.5 size-5 shrink-0 text-[#E05A47]"
+                                        aria-hidden="true"
+                                    />
+                                    <div>
+                                        <p className="font-heading text-sm font-semibold">
+                                            Subscription received
+                                        </p>
+                                        <p className="mt-0.5 text-xs text-tijum-lavender sm:text-sm">
+                                            Check your inbox for confirmation.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <form onSubmit={submit} className="space-y-3.5">
+                                    <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                                        <div className="space-y-1.5">
+                                            <Label
+                                                htmlFor="newsletter-email"
+                                                className="text-xs font-semibold text-tijum-plum"
+                                            >
+                                                Email address
+                                            </Label>
+                                            <Input
+                                                id="newsletter-email"
+                                                name="email"
+                                                type="email"
+                                                value={email}
+                                                onChange={(event) =>
+                                                    setEmail(event.target.value)
+                                                }
+                                                placeholder="you@example.com"
+                                                autoComplete="email"
+                                                spellCheck={false}
+                                                required
+                                                className="h-11 bg-white"
+                                            />
+                                        </div>
+                                        <Button
+                                            type="submit"
+                                            size="lg"
+                                            className="h-11"
+                                            disabled={
+                                                processing || !marketingConsent
+                                            }
+                                        >
+                                            {processing
+                                                ? 'Subscribing…'
+                                                : 'Subscribe'}
+                                            {!processing && (
+                                                <ArrowRight aria-hidden="true" />
+                                            )}
+                                        </Button>
+                                    </div>
+
+                                    <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-relaxed text-tijum-lavender">
+                                        <input
+                                            id="homepage-marketing-consent"
+                                            name="marketing_consent"
+                                            type="checkbox"
+                                            checked={marketingConsent}
+                                            onChange={(event) =>
+                                                setMarketingConsent(
+                                                    event.target.checked,
+                                                )
+                                            }
+                                            className="mt-0.5 size-4 shrink-0 accent-tijum-coral"
+                                        />
+                                        <span>
+                                            I agree to receive optional TIJUM
+                                            marketing emails. Transactional
+                                            booking updates are sent separately.
+                                        </span>
+                                    </label>
+                                </form>
+                            )}
+                        </div>
                     </div>
                 </div>
             </ResponsiveContainer>

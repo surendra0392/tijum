@@ -11,66 +11,69 @@ export function LaunchCitiesSection() {
         <section
             id="launch-cities"
             aria-labelledby="launch-cities-heading"
-            className="tijum-anchor-target tijum-section bg-tijum-cream"
+            className="tijum-anchor-target bg-tijum-cream py-16 sm:py-20"
         >
             <ResponsiveContainer
                 width="wide"
-                className="space-y-10 lg:space-y-12"
+                className="space-y-9 sm:space-y-10"
             >
-                <ScrollReveal direction="up" distance={20} duration={0.6}>
+                <ScrollReveal direction="up" distance={18} duration={0.6}>
                     <SectionHeading
                         id="launch-cities-heading"
-                        eyebrow="Explore Locations"
-                        title="Destinations across our first markets"
-                        description="Explore the cities currently represented by TIJUM data. Property availability depends on live eligibility for your dates and stay needs."
+                        title="Explore stays by city"
+                        description="Find verified stays near tech parks, universities, and transit corridors across our active cities."
                     />
                 </ScrollReveal>
 
-                <ScrollReveal direction="up" distance={24} stagger={0.12}>
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
-                        {LAUNCH_CITIES.map((city) => (
-                            <Link
-                                key={city.slug}
-                                href={cityShow(city.slug)}
-                                className="group flex flex-col overflow-hidden rounded-[24px] border border-tijum-surface bg-white shadow-tijum-card transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-1.5 hover:border-tijum-peach hover:shadow-tijum-soft focus-visible:ring-2 focus-visible:ring-tijum-coral focus-visible:outline-none"
-                            >
-                                <div className="relative aspect-[16/10] w-full overflow-hidden bg-tijum-surface">
-                                    <CityPicture city={city} />
-                                    <span className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-tijum-plum/90 px-2.5 py-1 text-[11px] font-semibold text-tijum-cream shadow-2xs backdrop-blur-xs transition-transform duration-300 group-hover:scale-105">
-                                        <MapPin
-                                            className="size-3.5 shrink-0 text-[#ff7a67]"
-                                            style={{ color: '#ff7a67' }}
-                                            aria-hidden="true"
-                                        />
-                                        <span>{city.state}</span>
-                                    </span>
-                                </div>
+                <ScrollReveal
+                    direction="up"
+                    distance={22}
+                    stagger={0.09}
+                    className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6"
+                >
+                    {LAUNCH_CITIES.map((city) => (
+                        <Link
+                            key={city.slug}
+                            href={cityShow(city.slug)}
+                            className="group relative flex aspect-[16/10] flex-col justify-between overflow-hidden rounded-[26px] bg-tijum-plum shadow-tijum-card transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-1 hover:shadow-tijum-soft focus-visible:ring-2 focus-visible:ring-tijum-coral focus-visible:outline-none sm:aspect-[4/5]"
+                        >
+                            <div className="absolute inset-0 h-full w-full">
+                                <CityPicture city={city} />
+                            </div>
 
-                                <div className="flex flex-1 flex-col justify-between p-5 sm:p-5.5">
-                                    <div>
-                                        <h3 className="font-heading text-xl font-bold text-tijum-plum transition-colors duration-300 group-hover:text-tijum-coral">
-                                            {city.name}
-                                        </h3>
-                                        <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-tijum-lavender sm:text-sm">
-                                            {city.context}
-                                        </p>
-                                    </div>
+                            <div
+                                aria-hidden="true"
+                                className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#241522]/92 via-[#241522]/32 to-[#241522]/10"
+                            />
 
-                                    <div className="mt-4 flex items-center justify-between border-t border-tijum-surface pt-3.5">
-                                        <span className="font-heading text-xs font-semibold text-tijum-coral">
-                                            Explore city
-                                        </span>
-                                        <span className="flex size-7.5 items-center justify-center rounded-lg bg-tijum-coral/15 text-tijum-coral transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:bg-tijum-coral group-hover:text-white">
-                                            <ArrowUpRight
-                                                className="size-4"
-                                                aria-hidden="true"
-                                            />
-                                        </span>
-                                    </div>
-                                </div>
-                            </Link>
-                        ))}
-                    </div>
+                            <div className="relative z-10 flex items-center justify-between p-4 sm:p-5">
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-[#241522]/55 px-3 py-1 text-[11px] font-semibold text-tijum-cream backdrop-blur-md">
+                                    <MapPin
+                                        className="size-3.5 shrink-0 text-[#ff7a67]"
+                                        style={{ color: '#ff7a67' }}
+                                        aria-hidden="true"
+                                    />
+                                    <span>{city.state}</span>
+                                </span>
+
+                                <span className="flex size-8.5 items-center justify-center rounded-full border border-white/25 bg-white/15 text-white backdrop-blur-md transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:border-tijum-coral group-hover:bg-tijum-coral">
+                                    <ArrowUpRight
+                                        className="size-4"
+                                        aria-hidden="true"
+                                    />
+                                </span>
+                            </div>
+
+                            <div className="relative z-10 space-y-1.5 p-4 pt-0 sm:p-5 sm:pt-0">
+                                <h3 className="font-heading text-2xl font-bold tracking-tight text-white">
+                                    {city.name}
+                                </h3>
+                                <p className="line-clamp-2 text-xs leading-relaxed text-tijum-cream/80 sm:text-[13px]">
+                                    {city.context}
+                                </p>
+                            </div>
+                        </Link>
+                    ))}
                 </ScrollReveal>
             </ResponsiveContainer>
         </section>
@@ -98,7 +101,7 @@ function CityPicture({ city }: { city: City }) {
                 width={city.image.width}
                 height={city.image.height}
                 loading="lazy"
-                className="tijum-image-zoom h-full w-full object-cover"
+                className="h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
             />
         </picture>
     );

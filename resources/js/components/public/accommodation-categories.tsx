@@ -7,7 +7,6 @@ import {
     ACCOMMODATION_CATEGORIES,
     type AccommodationCategoryItem,
 } from '@/data/public-content';
-import { cn } from '@/lib/utils';
 import { search } from '@/routes/public';
 
 const categoryIconMap: Record<
@@ -20,96 +19,107 @@ const categoryIconMap: Record<
     users: Users,
 };
 
+const categorySummaries: Record<AccommodationCategoryItem['id'], string> = {
+    'hostels-pg':
+        'Shared and private rooms with clear meal schedules and monthly or daily rates.',
+    homestays:
+        'Comfortable rooms in residential homes with direct host guidelines.',
+    'co-living':
+        'Modern furnished spaces with workspaces, amenities, and flexible stays.',
+};
+
 export function AccommodationCategoriesSection() {
     return (
         <section
             aria-labelledby="categories-heading"
-            className="tijum-section bg-tijum-cream"
+            className="border-y border-tijum-surface/80 bg-white py-16 sm:py-20"
         >
             <ResponsiveContainer
                 width="wide"
-                className="space-y-10 lg:space-y-12"
+                className="space-y-9 sm:space-y-10"
             >
-                <ScrollReveal direction="up" distance={20} duration={0.6}>
+                <ScrollReveal direction="up" distance={18} duration={0.6}>
                     <SectionHeading
                         id="categories-heading"
-                        eyebrow="Stay Formats"
-                        title="Discover your way to stay"
-                        description="Compare real accommodation formats without losing sight of the details that matter: room type, duration, meals, and price."
+                        title="Choose the way you want to live"
+                        description="Compare three distinct stay formats side by side with clear room options, meals, and pricing."
                     />
                 </ScrollReveal>
 
-                <ScrollReveal direction="up" distance={24} stagger={0.14}>
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                        {ACCOMMODATION_CATEGORIES.map((category) => {
-                            const Icon = categoryIconMap[category.icon];
+                <ScrollReveal
+                    direction="up"
+                    distance={22}
+                    stagger={0.1}
+                    className="grid grid-cols-1 gap-6 md:grid-cols-3"
+                >
+                    {ACCOMMODATION_CATEGORIES.map((category) => {
+                        const Icon = categoryIconMap[category.icon];
 
-                            return (
-                                <article
-                                    key={category.id}
-                                    className="group flex flex-col overflow-hidden rounded-[24px] border border-tijum-surface bg-white shadow-tijum-card transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-1.5 hover:border-tijum-peach hover:shadow-tijum-soft"
-                                >
-                                    <picture className="block aspect-[16/10] w-full overflow-hidden bg-tijum-surface">
-                                        <source
-                                            srcSet={category.image.webpSrcSet}
-                                            sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
-                                            type="image/webp"
-                                        />
-                                        <source
-                                            srcSet={category.image.jpgSrcSet}
-                                            sizes={category.image.sizes}
-                                            type="image/jpeg"
-                                        />
-                                        <img
-                                            src={category.image.fallbackSrc}
-                                            alt={category.image.alt}
-                                            width={category.image.width}
-                                            height={category.image.height}
-                                            loading="lazy"
-                                            className="tijum-image-zoom h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
-                                        />
-                                    </picture>
+                        return (
+                            <Link
+                                key={category.id}
+                                href={search.url({
+                                    query: {
+                                        category: category.slug,
+                                    },
+                                })}
+                                className="group relative flex min-h-[340px] flex-col justify-between overflow-hidden rounded-[26px] bg-tijum-plum shadow-tijum-card transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-1 hover:shadow-tijum-soft focus-visible:ring-2 focus-visible:ring-tijum-coral focus-visible:outline-none sm:min-h-[380px]"
+                            >
+                                <picture className="absolute inset-0 block h-full w-full">
+                                    <source
+                                        srcSet={category.image.webpSrcSet}
+                                        sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                                        type="image/webp"
+                                    />
+                                    <source
+                                        srcSet={category.image.jpgSrcSet}
+                                        sizes={category.image.sizes}
+                                        type="image/jpeg"
+                                    />
+                                    <img
+                                        src={category.image.fallbackSrc}
+                                        alt={category.image.alt}
+                                        width={category.image.width}
+                                        height={category.image.height}
+                                        loading="lazy"
+                                        className="h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
+                                    />
+                                </picture>
 
-                                    <div className="flex flex-1 flex-col justify-between gap-5 p-6 sm:p-7">
-                                        <div className="space-y-3">
-                                            <div className="flex items-center gap-2">
-                                                <span className="flex size-9 items-center justify-center rounded-xl bg-tijum-plum text-tijum-cream transition-all duration-300 group-hover:scale-105 group-hover:bg-tijum-coral">
-                                                    <Icon
-                                                        className="size-4"
-                                                        aria-hidden="true"
-                                                    />
-                                                </span>
-                                                <span className="font-heading text-xs font-semibold text-tijum-lavender">
-                                                    {category.subtitle}
-                                                </span>
-                                            </div>
-                                            <h3 className="font-heading text-xl font-bold text-tijum-plum transition-colors duration-300 group-hover:text-tijum-coral">
-                                                {category.title}
-                                            </h3>
-                                            <p className="text-sm leading-relaxed text-tijum-lavender">
-                                                {category.description}
-                                            </p>
-                                        </div>
+                                <div
+                                    aria-hidden="true"
+                                    className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#241522]/94 via-[#241522]/42 to-[#241522]/10 transition-opacity duration-300 group-hover:from-[#241522]/96"
+                                />
 
-                                        <Link
-                                            href={search.url({
-                                                query: {
-                                                    category: category.slug,
-                                                },
-                                            })}
-                                            className="group/link inline-flex min-h-11 items-center gap-2 self-start rounded-lg font-heading text-sm font-semibold text-tijum-plum hover:text-tijum-coral focus-visible:ring-2 focus-visible:ring-tijum-coral focus-visible:outline-none"
-                                        >
-                                            Explore {category.title}
-                                            <ArrowUpRight
-                                                className="transition-transform duration-300 group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5"
-                                                aria-hidden="true"
-                                            />
-                                        </Link>
-                                    </div>
-                                </article>
-                            );
-                        })}
-                    </div>
+                                <div className="relative z-10 flex items-center justify-between p-5 sm:p-6">
+                                    <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1 font-heading text-xs font-semibold text-white backdrop-blur-md">
+                                        <Icon
+                                            className="size-3.5 text-tijum-peach"
+                                            aria-hidden="true"
+                                        />
+                                        <span>{category.subtitle}</span>
+                                    </span>
+
+                                    <span className="flex size-9 items-center justify-center rounded-full border border-white/25 bg-white/15 text-white backdrop-blur-md transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:border-tijum-coral group-hover:bg-tijum-coral">
+                                        <ArrowUpRight
+                                            className="size-4"
+                                            aria-hidden="true"
+                                        />
+                                    </span>
+                                </div>
+
+                                <div className="relative z-10 space-y-2 p-5 pt-0 sm:p-6 sm:pt-0">
+                                    <h3 className="font-heading text-2xl font-bold tracking-tight text-white">
+                                        {category.title}
+                                    </h3>
+                                    <p className="text-sm leading-relaxed text-tijum-cream/85">
+                                        {categorySummaries[category.id] ??
+                                            category.description}
+                                    </p>
+                                </div>
+                            </Link>
+                        );
+                    })}
                 </ScrollReveal>
             </ResponsiveContainer>
         </section>

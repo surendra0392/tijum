@@ -12,9 +12,7 @@ import { NewsletterSection } from '@/components/public/newsletter-section';
 import { PartnerCtaSection } from '@/components/public/partner-cta-section';
 import { PublicSeoHead } from '@/components/public/public-seo-head';
 import { ReferralSection } from '@/components/public/referral-section';
-import { TrustSection } from '@/components/public/trust-section';
 import { ValuePropositionSection } from '@/components/public/value-proposition';
-import { WhyTijumSection } from '@/components/public/why-tijum-section';
 import type { MarketingBanner } from '@/types/marketing';
 import type {
     SearchLocationOption,
@@ -75,22 +73,20 @@ export default function Welcome({
 
             <HeroSection search={search} heroBanners={heroBanners} />
             <ValuePropositionSection />
-            <AccommodationCategoriesSection />
             <FeaturedPropertiesSection
                 properties={featuredProperties ?? properties ?? []}
             />
-            <HowItWorksSection />
+            <AccommodationCategoriesSection />
             <LaunchCitiesSection />
             <FoodStorySection />
-            <WhyTijumSection />
-            <ReferralSection />
+            <HowItWorksSection />
             {search?.timing && (
                 <CheckinFlexibilitySection timing={search.timing} />
             )}
+            <ReferralSection />
             <PartnerCtaSection />
-            <TrustSection />
-            <NewsletterSection />
             {search?.timing && <FaqPreviewSection timing={search.timing} />}
+            <NewsletterSection />
             <FinalCtaSection />
             <CompareDrawer />
         </>
