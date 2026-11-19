@@ -48,6 +48,7 @@ import {
 import { useInitials } from '@/hooks/use-initials';
 import { clearPwaUserCaches } from '@/lib/pwa';
 import { dashboard, logout } from '@/routes/owner';
+import { index as notificationsIndex } from '@/routes/owner/notifications';
 import {
     index as onboardingIndex,
     status as onboardingStatus,
@@ -136,6 +137,14 @@ export default function OwnerLayout({
                 page.url.startsWith('/owner/reviews') ||
                 page.url.startsWith('/owner/complaints') ||
                 page.url.startsWith('/owner/support'),
+        },
+        {
+            label: 'Notifications',
+            href: notificationsIndex.url(),
+            icon: Bell,
+            active:
+                page.url.startsWith(notificationsIndex.url()) ||
+                page.url.startsWith('/owner/settings/notifications'),
         },
     ];
 
