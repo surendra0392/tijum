@@ -2,6 +2,7 @@ import { Link, usePage } from '@inertiajs/react';
 import { ArrowUpRight, Heart, Layers, MapPin, Star } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import { useEffect, useState } from 'react';
+import { TIJUM_BRAND_ASSETS } from '@/components/brand/brand-logo';
 import { AmenityList } from '@/components/public/amenity-list';
 import {
     FoodInclusionStatus,
@@ -9,7 +10,6 @@ import {
 } from '@/components/public/food-inclusion-status';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { TIJUM_BRAND_ASSETS } from '@/components/brand/brand-logo';
 import { isComparing, subscribeToCompare, toggleCompare } from '@/lib/compare';
 import { cn } from '@/lib/utils';
 import {
@@ -128,7 +128,7 @@ function renderGenderBadge(genderEligibility?: string | null) {
 
     if (lower.includes('female') || lower.includes('women')) {
         return (
-            <span className="tijum-gender-badge-female inline-flex items-center gap-1 rounded-full border border-pink-200/90 bg-pink-50 px-2.5 py-0.5 text-[11px] font-semibold text-pink-700 shadow-2xs">
+            <span className="tijum-gender-badge-female inline-flex items-center gap-1 rounded-full border border-pink-200/90 bg-pink-50 px-2.5 py-0.5 text-[11px] font-semibold text-pink-700">
                 <FemaleGenderIcon className="size-3.5 shrink-0 text-pink-600" />
                 <span>Female Only</span>
             </span>
@@ -137,7 +137,7 @@ function renderGenderBadge(genderEligibility?: string | null) {
 
     if (lower.includes('male') || lower.includes('men')) {
         return (
-            <span className="tijum-gender-badge-male inline-flex items-center gap-1 rounded-full border border-sky-200/90 bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 shadow-2xs">
+            <span className="tijum-gender-badge-male inline-flex items-center gap-1 rounded-full border border-sky-200/90 bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700">
                 <MaleGenderIcon className="size-3.5 shrink-0 text-sky-600" />
                 <span>Male Only</span>
             </span>
@@ -145,9 +145,9 @@ function renderGenderBadge(genderEligibility?: string | null) {
     }
 
     return (
-        <span className="tijum-gender-badge-both inline-flex items-center gap-1 rounded-full border border-tijum-peach bg-tijum-peach/25 px-2.5 py-0.5 text-[11px] font-semibold text-tijum-plum shadow-2xs">
+        <span className="tijum-gender-badge-both inline-flex items-center gap-1 rounded-full border border-tijum-peach/80 bg-tijum-cream px-2.5 py-0.5 text-[11px] font-semibold text-tijum-plum">
             <BothGenderIcon className="size-3.5 shrink-0 text-tijum-plum" />
-            <span>{lower.includes('all') ? 'All Genders' : 'Both'}</span>
+            <span>{lower.includes('all') ? 'All Genders' : 'Co-Living'}</span>
         </span>
     );
 }
@@ -169,6 +169,14 @@ export function PropertyCard({
 
     const hasRating =
         property.rating != null && (property.reviewCount ?? 0) > 0;
+    const uniqueRoomTypes = property.roomTypes
+        ? Array.from(new Set(property.roomTypes))
+        : [];
+    const visibleRoomTypes = uniqueRoomTypes.slice(0, 3);
+    const extraRoomTypesCount = Math.max(
+        0,
+        uniqueRoomTypes.length - visibleRoomTypes.length,
+    );
 
     const [wishlisted, setWishlisted] = useState(initialWishlisted);
     const [justWishlisted, setJustWishlisted] = useState(false);
@@ -200,9 +208,9 @@ export function PropertyCard({
     return (
         <article
             className={cn(
-                'group overflow-hidden rounded-[22px] border border-tijum-surface bg-white shadow-tijum-card transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-1.5 hover:border-tijum-peach hover:shadow-tijum-soft',
+                'group overflow-hidden rounded-[22px] border border-tijum-surface/90 bg-white shadow-tijum-card transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-1 hover:border-tijum-peach/90 hover:shadow-tijum-soft',
                 layout === 'horizontal' &&
-                    'grid md:grid-cols-[minmax(16rem,0.82fr)_minmax(0,1.4fr)]',
+                    'grid md:grid-cols-[minmax(16.5rem,0.82fr)_minmax(0,1.45fr)]',
                 className,
             )}
         >
@@ -210,9 +218,9 @@ export function PropertyCard({
                 <Link
                     href={resolvedHref}
                     className={cn(
-                        'relative block overflow-hidden bg-tijum-surface/45 focus-visible:ring-2 focus-visible:ring-tijum-coral focus-visible:outline-none focus-visible:ring-inset',
+                        'relative block overflow-hidden bg-tijum-surface/40 focus-visible:ring-2 focus-visible:ring-tijum-coral focus-visible:outline-none focus-visible:ring-inset',
                         layout === 'horizontal'
-                            ? 'aspect-4/3 md:aspect-auto md:h-full md:min-h-72'
+                            ? 'aspect-4/3 md:aspect-auto md:h-full md:min-h-[16.5rem]'
                             : 'aspect-4/3',
                     )}
                     aria-label={`View ${property.name}`}
@@ -230,21 +238,21 @@ export function PropertyCard({
                             loading="lazy"
                         />
                     ) : (
-                        <div className="flex h-full min-h-56 flex-col items-center justify-center gap-2.5 bg-tijum-surface/30 p-4 text-center">
+                        <div className="flex h-full min-h-56 flex-col items-center justify-center gap-2.5 bg-tijum-cream/70 p-4 text-center">
                             <img
                                 src={TIJUM_BRAND_ASSETS.symbolPng}
                                 alt="TIJUM stay"
-                                width={56}
-                                height={56}
-                                className="tijum-fallback-icon-light size-14 object-contain opacity-50 transition-opacity duration-300 group-hover:opacity-75"
+                                width={52}
+                                height={52}
+                                className="tijum-fallback-icon-light size-13 object-contain opacity-50 transition-opacity duration-300 group-hover:opacity-75"
                             />
                             <img
                                 src={TIJUM_BRAND_ASSETS.symbolLightPng}
                                 alt=""
                                 aria-hidden="true"
-                                width={56}
-                                height={56}
-                                className="tijum-fallback-icon-dark hidden size-14 object-contain opacity-65 transition-opacity duration-300 group-hover:opacity-90"
+                                width={52}
+                                height={52}
+                                className="tijum-fallback-icon-dark hidden size-13 object-contain opacity-65 transition-opacity duration-300 group-hover:opacity-90"
                             />
                             <span className="font-heading text-xs font-semibold text-tijum-plum/60">
                                 Property image coming soon
@@ -252,7 +260,7 @@ export function PropertyCard({
                         </div>
                     )}
                     {property.category && (
-                        <Badge className="absolute top-4 left-4 border-tijum-cream/50 bg-tijum-plum/92 text-tijum-cream">
+                        <Badge className="absolute top-3.5 left-3.5 border border-white/25 bg-[#241522]/80 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
                             {property.category}
                         </Badge>
                     )}
@@ -287,16 +295,16 @@ export function PropertyCard({
                             : `Save ${property.name} to wishlist`
                     }
                     className={cn(
-                        'absolute top-4 right-4 z-10 flex size-9 items-center justify-center rounded-full border border-tijum-surface/60 bg-tijum-cream/90 shadow-sm backdrop-blur-xs transition-transform duration-200 hover:scale-110 focus-visible:ring-2 focus-visible:ring-tijum-coral focus-visible:outline-none active:scale-90',
+                        'absolute top-3.5 right-3.5 z-10 flex size-9 cursor-pointer items-center justify-center rounded-full border border-white/50 bg-white/90 shadow-xs backdrop-blur-md transition-transform duration-200 hover:scale-105 focus-visible:ring-2 focus-visible:ring-tijum-coral focus-visible:outline-none active:scale-95',
                         wishlisted
-                            ? 'text-tijum-coral'
-                            : 'text-tijum-plum/60 hover:text-tijum-coral',
+                            ? 'text-[#FF7A67]'
+                            : 'text-tijum-plum/65 hover:text-[#FF7A67]',
                     )}
                 >
                     <Heart
                         className={cn(
                             'size-4.5 transition-all duration-300',
-                            wishlisted && 'fill-tijum-coral text-tijum-coral',
+                            wishlisted && 'fill-[#FF7A67] text-[#FF7A67]',
                             justWishlisted && 'animate-heart-pop',
                         )}
                         aria-hidden="true"
@@ -306,22 +314,17 @@ export function PropertyCard({
 
             {layout === 'horizontal' ? (
                 /* List View Layout */
-                <div className="flex min-w-0 flex-col justify-between gap-6 p-5 sm:p-6 lg:p-7">
-                    <div className="space-y-4">
+                <div className="flex min-w-0 flex-col justify-between gap-5 p-5 sm:p-6">
+                    <div className="space-y-3.5">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div className="min-w-0 space-y-2">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    {property.category && (
-                                        <Badge className="border-tijum-surface bg-tijum-plum px-2.5 py-0.5 text-xs font-semibold text-tijum-cream">
-                                            {property.category}
-                                        </Badge>
-                                    )}
                                     {renderGenderBadge(
                                         property.genderEligibility,
                                     )}
-                                    <p className="flex items-center gap-1.5 text-sm text-tijum-lavender">
+                                    <p className="flex items-center gap-1.5 text-xs font-medium text-tijum-lavender sm:text-sm">
                                         <MapPin
-                                            className="size-3.5 shrink-0 text-tijum-coral"
+                                            className="size-3.5 shrink-0 text-[#E05A47]"
                                             aria-hidden="true"
                                         />
                                         <span>
@@ -329,17 +332,18 @@ export function PropertyCard({
                                                 .filter(Boolean)
                                                 .join(', ')}
                                             {property.distanceLabel && (
-                                                <span className="ml-1 font-semibold text-tijum-coral">
+                                                <span className="ml-1 font-semibold text-[#D9523F]">
                                                     · {property.distanceLabel}
                                                 </span>
                                             )}
                                         </span>
                                     </p>
                                 </div>
-                                <h3 className="tijum-card-title text-base font-bold text-tijum-plum sm:text-lg">
+
+                                <h3 className="font-heading text-lg leading-snug font-bold text-tijum-plum sm:text-xl">
                                     <Link
                                         href={href}
-                                        className="rounded-sm hover:text-tijum-coral focus-visible:ring-2 focus-visible:ring-tijum-coral focus-visible:outline-none"
+                                        className="rounded-sm transition-colors hover:text-[#D9523F] focus-visible:ring-2 focus-visible:ring-tijum-coral focus-visible:outline-none"
                                     >
                                         {property.name}
                                     </Link>
@@ -348,7 +352,7 @@ export function PropertyCard({
 
                             {property.price && (
                                 <div className="shrink-0 sm:text-right">
-                                    <p className="font-heading text-2xl font-bold text-tijum-plum">
+                                    <p className="font-heading text-2xl font-bold tabular-nums text-tijum-plum">
                                         {formatMoney(
                                             property.price.amountMinor,
                                             property.price.currency,
@@ -359,7 +363,7 @@ export function PropertyCard({
                                     </p>
                                     {property.price.totalMinor != null &&
                                         property.price.totalLabel && (
-                                            <p className="mt-1 text-xs font-semibold text-tijum-plum">
+                                            <p className="mt-1 text-xs font-semibold tabular-nums text-tijum-plum">
                                                 {property.price.totalLabel}{' '}
                                                 {formatMoney(
                                                     property.price.totalMinor,
@@ -370,6 +374,24 @@ export function PropertyCard({
                                 </div>
                             )}
                         </div>
+
+                        {visibleRoomTypes.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                {visibleRoomTypes.map((roomLabel) => (
+                                    <span
+                                        key={roomLabel}
+                                        className="rounded-lg border border-tijum-surface/85 bg-tijum-cream/55 px-2.5 py-0.5 text-[11px] font-semibold text-tijum-plum"
+                                    >
+                                        {roomLabel}
+                                    </span>
+                                ))}
+                                {extraRoomTypesCount > 0 && (
+                                    <span className="text-[11px] font-medium text-tijum-lavender">
+                                        +{extraRoomTypesCount} more
+                                    </span>
+                                )}
+                            </div>
+                        )}
 
                         <FoodInclusionStatus
                             food={property.food}
@@ -382,31 +404,32 @@ export function PropertyCard({
                             variant="compact"
                             limit={3}
                             moreCount={property.amenityMoreCount}
-                            emptyMessage="Amenities are not published for this stay yet."
+                            emptyMessage="Amenities not listed yet."
                         />
                     </div>
 
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-tijum-surface pt-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-tijum-surface/75 pt-4">
                         {hasRating ? (
                             <p className="flex items-center gap-1.5 text-xs text-tijum-lavender">
                                 <Star
-                                    className="size-4 fill-tijum-coral text-tijum-coral"
+                                    className="size-4 fill-[#FF7A67] text-[#FF7A67]"
                                     aria-hidden="true"
                                 />
-                                <strong className="font-heading text-tijum-plum">
+                                <strong className="font-heading text-sm font-bold tabular-nums text-tijum-plum">
                                     {Number(property.rating).toFixed(1)}
                                 </strong>
                                 <span>
-                                    {property.reviewCount} Verified Booking{' '}
+                                    ({property.reviewCount}{' '}
                                     {property.reviewCount === 1
                                         ? 'review'
                                         : 'reviews'}
+                                    )
                                 </span>
                             </p>
                         ) : (
-                            <p className="text-xs text-tijum-lavender">
-                                Review data appears after eligible bookings.
-                            </p>
+                            <span className="inline-flex items-center rounded-full bg-tijum-cream px-2.5 py-1 text-[11px] font-semibold text-tijum-plum-muted">
+                                New listing
+                            </span>
                         )}
 
                         <div className="flex items-center gap-2">
@@ -420,14 +443,14 @@ export function PropertyCard({
                                     const next = toggleCompare(property);
                                     setComparing(next);
                                 }}
-                                className="h-10 gap-1.5 rounded-xl px-3.5 text-xs font-semibold"
+                                className="h-9 gap-1.5 rounded-xl px-3.5 text-xs font-semibold"
                             >
                                 <Layers
                                     className="size-3.5"
                                     aria-hidden="true"
                                 />
                                 <span>
-                                    {comparing ? 'Added to Compare' : 'Compare'}
+                                    {comparing ? 'Comparing' : 'Compare'}
                                 </span>
                             </Button>
 
@@ -435,7 +458,7 @@ export function PropertyCard({
                                 variant="plum"
                                 size="sm"
                                 asChild
-                                className="h-10 gap-1.5 rounded-xl px-4 text-xs font-semibold"
+                                className="h-9 gap-1.5 rounded-xl px-4 text-xs font-semibold"
                             >
                                 <Link href={resolvedHref}>
                                     <span>View stay</span>
@@ -450,22 +473,22 @@ export function PropertyCard({
                 </div>
             ) : (
                 /* Grid View Layout */
-                <div className="flex min-w-0 flex-1 flex-col justify-between gap-5 p-5 sm:p-6">
-                    <div className="space-y-4">
+                <div className="flex min-w-0 flex-1 flex-col justify-between gap-4 p-5">
+                    <div className="space-y-3.5">
                         <div className="space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
                                 {renderGenderBadge(property.genderEligibility)}
-                                <p className="flex items-center gap-1 text-xs text-tijum-lavender">
+                                <p className="flex min-w-0 items-center gap-1 text-xs text-tijum-lavender">
                                     <MapPin
-                                        className="size-3.5 shrink-0 text-tijum-coral"
+                                        className="size-3.5 shrink-0 text-[#E05A47]"
                                         aria-hidden="true"
                                     />
-                                    <span className="font-medium text-tijum-lavender">
+                                    <span className="truncate font-medium text-tijum-lavender">
                                         {[property.locality, property.city]
                                             .filter(Boolean)
                                             .join(', ')}
                                         {property.distanceLabel && (
-                                            <span className="ml-1 font-semibold text-tijum-coral">
+                                            <span className="ml-1 font-semibold text-[#D9523F]">
                                                 · {property.distanceLabel}
                                             </span>
                                         )}
@@ -473,18 +496,18 @@ export function PropertyCard({
                                 </p>
                             </div>
 
-                            <h3 className="tijum-card-title text-base leading-snug font-bold text-tijum-plum sm:text-lg">
+                            <h3 className="font-heading text-base leading-snug font-bold text-tijum-plum sm:text-lg">
                                 <Link
                                     href={href}
-                                    className="rounded-sm hover:text-tijum-coral focus-visible:ring-2 focus-visible:ring-tijum-coral focus-visible:outline-none"
+                                    className="rounded-sm transition-colors hover:text-[#D9523F] focus-visible:ring-2 focus-visible:ring-tijum-coral focus-visible:outline-none"
                                 >
                                     {property.name}
                                 </Link>
                             </h3>
 
                             {property.price && (
-                                <div className="flex items-baseline gap-1.5 pt-0.5">
-                                    <span className="font-heading text-xl font-bold text-tijum-plum">
+                                <div className="flex flex-wrap items-baseline gap-1.5 pt-0.5">
+                                    <span className="font-heading text-xl font-bold tabular-nums text-tijum-plum">
                                         {formatMoney(
                                             property.price.amountMinor,
                                             property.price.currency,
@@ -512,14 +535,14 @@ export function PropertyCard({
                         />
                     </div>
 
-                    <div className="space-y-3 border-t border-tijum-surface pt-4">
+                    <div className="space-y-3 border-t border-tijum-surface/75 pt-3.5">
                         {hasRating ? (
                             <p className="flex items-center gap-1.5 text-xs text-tijum-lavender">
                                 <Star
-                                    className="size-3.5 fill-tijum-coral text-tijum-coral"
+                                    className="size-3.5 fill-[#FF7A67] text-[#FF7A67]"
                                     aria-hidden="true"
                                 />
-                                <strong className="font-heading font-semibold text-tijum-plum">
+                                <strong className="font-heading font-bold tabular-nums text-tijum-plum">
                                     {Number(property.rating).toFixed(1)}
                                 </strong>
                                 <span>
@@ -531,9 +554,9 @@ export function PropertyCard({
                                 </span>
                             </p>
                         ) : (
-                            <p className="text-[11px] text-tijum-lavender">
-                                Verified stay reviews appear after checkout
-                            </p>
+                            <span className="inline-flex items-center rounded-full bg-tijum-cream px-2.5 py-0.5 text-[11px] font-semibold text-tijum-plum-muted">
+                                New listing
+                            </span>
                         )}
 
                         <div className="grid grid-cols-2 gap-2">
@@ -547,7 +570,7 @@ export function PropertyCard({
                                     const next = toggleCompare(property);
                                     setComparing(next);
                                 }}
-                                className="h-10 w-full gap-1.5 rounded-xl text-xs font-semibold"
+                                className="h-9 w-full gap-1.5 rounded-xl text-xs font-semibold"
                             >
                                 <Layers
                                     className="size-3.5"
@@ -560,7 +583,7 @@ export function PropertyCard({
                                 variant="plum"
                                 size="sm"
                                 asChild
-                                className="h-10 w-full gap-1.5 rounded-xl text-xs font-semibold"
+                                className="h-9 w-full gap-1.5 rounded-xl text-xs font-semibold"
                             >
                                 <Link href={resolvedHref}>
                                     <span>View stay</span>

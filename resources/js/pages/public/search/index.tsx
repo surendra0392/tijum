@@ -1,6 +1,7 @@
 import { Link, router } from '@inertiajs/react';
 import {
     ArrowRight,
+    Clock3,
     Gift,
     LayoutGrid,
     LayoutList,
@@ -8,6 +9,8 @@ import {
     Map as MapIcon,
     MapPin,
     SlidersHorizontal,
+    Star,
+    X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CompareDrawer } from '@/components/public/compare-drawer';
@@ -15,9 +18,8 @@ import { PropertyCard } from '@/components/public/property-card';
 import { PublicSeoHead } from '@/components/public/public-seo-head';
 import { SearchMap } from '@/components/public/search-map';
 import { SearchPanel } from '@/components/public/search-panel';
-import { ResponsiveContainer } from '@/components/shared/responsive-container';
 import { Breadcrumbs } from '@/components/shared/breadcrumbs';
-import { ScrollReveal } from '@/components/shared/scroll-reveal';
+import { ResponsiveContainer } from '@/components/shared/responsive-container';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -86,6 +88,25 @@ function rupeesInputToMinor(value: string) {
     return wholeMinor + fractionMinor;
 }
 
+const GENDER_OPTIONS = [
+    { v: 'all', l: 'All stays' },
+    { v: 'male', l: 'Male only' },
+    { v: 'female', l: 'Female only' },
+    { v: 'both', l: 'Co-Living' },
+] as const;
+
+const SHARING_OPTIONS = [
+    { v: 1, l: 'Single' },
+    { v: 2, l: '2 Sharing' },
+    { v: 3, l: '3 Sharing' },
+    { v: 4, l: '4 Sharing' },
+] as const;
+
+const AC_OPTIONS = [
+    { v: 'ac', l: 'AC' },
+    { v: 'non_ac', l: 'Non-AC' },
+] as const;
+
 export default function SearchPage(props: SearchPageProps) {
     const {
         filters,
@@ -103,6 +124,7 @@ export default function SearchPage(props: SearchPageProps) {
         seo,
         errors,
     } = props;
+
     const [mobileOpen, setMobileOpen] = useState(false);
     // Feature flag: Map view is preserved ready for future activation per user request
     const ENABLE_MAP_VIEW = false;
@@ -168,7 +190,6 @@ export default function SearchPage(props: SearchPageProps) {
 
     const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-    // Sync when filters change or initial page 1 results arrive
     useEffect(() => {
         if (!results?.meta || results.meta.current_page === 1) {
             setDisplayedItems(results?.data ?? []);
@@ -319,6 +340,35 @@ export default function SearchPage(props: SearchPageProps) {
         return p;
     };
 
+    const navigateWithPartialReload = (overrides: Record<string, unknown>) => {
+        const currentScrollY =
+            window.pageYOffset || document.documentElement.scrollTop || 0;
+        router.get(
+            publicSearch.url(),
+            buildParams({ ...overrides, page: undefined }) as any,
+            {
+                preserveScroll: true,
+                preserveState: true,
+                only: [
+                    'results',
+                    'resultTotal',
+                    'filters',
+                    'timing',
+                    'checkoutDate',
+                    'localityFallback',
+                    'searchedLocality',
+                    'locationLabel',
+                ],
+                onFinish: () => {
+                    window.scrollTo({
+                        top: currentScrollY,
+                        behavior: 'instant' as ScrollBehavior,
+                    });
+                },
+            },
+        );
+    };
+
     const clearLocalityFilter = () => {
         setLocality('');
         setSearchLocationLabel('');
@@ -335,63 +385,35 @@ export default function SearchPage(props: SearchPageProps) {
         );
     };
 
-    const applyFilters = () => {
-        setMobileOpen(false);
-        const currentScrollY =
-            window.pageYOffset || document.documentElement.scrollTop || 0;
+    const handleQuickCitySelect = (targetCityId?: number) => {
+        setLocality('');
+        setSearchLocationLabel('');
         router.get(
             publicSearch.url(),
-            buildParams({ page: undefined }) as any,
-            {
-                preserveScroll: true,
-                preserveState: true,
-                only: [
-                    'results',
-                    'resultTotal',
-                    'filters',
-                    'timing',
-                    'checkoutDate',
-                ],
-                onFinish: () => {
-                    window.scrollTo({
-                        top: currentScrollY,
-                        behavior: 'instant' as ScrollBehavior,
-                    });
-                },
-            },
+            buildParams({
+                city: targetCityId ? String(targetCityId) : undefined,
+                locality: undefined,
+                location_label: undefined,
+                lat: undefined,
+                lng: undefined,
+                page: undefined,
+            }) as any,
+            { preserveScroll: false },
         );
+    };
+
+    const applyFilters = () => {
+        setMobileOpen(false);
+        navigateWithPartialReload({});
     };
 
     const handleDurationChange = (newType: string) => {
         if (newType === activeDuration) return;
         setActiveDuration(newType);
-        const currentScrollY =
-            window.pageYOffset || document.documentElement.scrollTop || 0;
-        router.get(
-            publicSearch.url(),
-            buildParams({
-                duration_type: newType,
-                duration_count: 1,
-                page: undefined,
-            }) as any,
-            {
-                preserveScroll: true,
-                preserveState: true,
-                only: [
-                    'results',
-                    'resultTotal',
-                    'filters',
-                    'timing',
-                    'checkoutDate',
-                ],
-                onFinish: () => {
-                    window.scrollTo({
-                        top: currentScrollY,
-                        behavior: 'instant' as ScrollBehavior,
-                    });
-                },
-            },
-        );
+        navigateWithPartialReload({
+            duration_type: newType,
+            duration_count: 1,
+        });
     };
 
     const clearFilters = () => {
@@ -404,6 +426,7 @@ export default function SearchPage(props: SearchPageProps) {
         setMinRating('');
         setEarlyCheckIn(false);
         setSort('relevant');
+        setMobileOpen(false);
         router.get(
             publicSearch.url(),
             {
@@ -421,205 +444,463 @@ export default function SearchPage(props: SearchPageProps) {
     const toggleIn = <T,>(arr: T[], v: T) =>
         arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
 
-    const cityName =
-        cities.find((c) => String(c.id) === String(city))?.name ??
-        'Selected city';
+    const matchedCity = cities.find((c) => String(c.id) === String(city));
+    const cityName = matchedCity?.name ?? '';
 
-    const FilterPanel = (
-        <div className="space-y-5">
-            <div className="flex items-center justify-between border-b border-tijum-surface pb-3">
-                <h2 className="font-heading text-base font-bold text-tijum-plum">
-                    Filters
-                </h2>
-                <button
+    const activeFilterCount =
+        selectedCategories.length +
+        (genderPref !== 'all' ? 1 : 0) +
+        sharing.length +
+        ac.length +
+        (minPrice !== '' || maxPrice !== '' ? 1 : 0) +
+        (minRating !== '' ? 1 : 0) +
+        (earlyCheckIn ? 1 : 0);
+
+    // Active removable filter chips derived from applied server filters
+    const activeChips: Array<{ key: string; label: string; onRemove: () => void }> =
+        [];
+
+    if (locality) {
+        activeChips.push({
+            key: 'locality',
+            label: `Area: ${locality}`,
+            onRemove: clearLocalityFilter,
+        });
+    }
+
+    for (const catId of filters.category ?? []) {
+        const cat = categories.find((c) => c.id === catId);
+        if (cat) {
+            activeChips.push({
+                key: `cat-${catId}`,
+                label: cat.name,
+                onRemove: () => {
+                    const next = selectedCategories.filter((x) => x !== catId);
+                    setSelectedCategories(next);
+                    navigateWithPartialReload({
+                        category: next.length ? next : undefined,
+                    });
+                },
+            });
+        }
+    }
+
+    if (filters.gender_preference && filters.gender_preference !== 'all') {
+        const label =
+            GENDER_OPTIONS.find((g) => g.v === filters.gender_preference)?.l ??
+            filters.gender_preference;
+        activeChips.push({
+            key: 'gender',
+            label,
+            onRemove: () => {
+                setGenderPref('all');
+                navigateWithPartialReload({ gender_preference: 'all' });
+            },
+        });
+    }
+
+    for (const cap of filters.sharing_capacity ?? []) {
+        const label =
+            SHARING_OPTIONS.find((s) => s.v === cap)?.l ?? `${cap} Sharing`;
+        activeChips.push({
+            key: `sharing-${cap}`,
+            label,
+            onRemove: () => {
+                const next = sharing.filter((x) => x !== cap);
+                setSharing(next);
+                navigateWithPartialReload({
+                    sharing_capacity: next.length ? next : undefined,
+                });
+            },
+        });
+    }
+
+    for (const acVal of filters.ac ?? []) {
+        const label = acVal === 'ac' ? 'AC' : 'Non-AC';
+        activeChips.push({
+            key: `ac-${acVal}`,
+            label,
+            onRemove: () => {
+                const next = ac.filter((x) => x !== acVal);
+                setAc(next);
+                navigateWithPartialReload({
+                    ac: next.length ? next : undefined,
+                });
+            },
+        });
+    }
+
+    if (filters.min_price != null || filters.max_price != null) {
+        const minLabel =
+            filters.min_price != null
+                ? `₹${minorToRupeesInput(filters.min_price)}`
+                : '₹0';
+        const maxLabel =
+            filters.max_price != null
+                ? `₹${minorToRupeesInput(filters.max_price)}`
+                : 'Any';
+        activeChips.push({
+            key: 'price',
+            label: `${minLabel} – ${maxLabel}`,
+            onRemove: () => {
+                setMinPrice('');
+                setMaxPrice('');
+                navigateWithPartialReload({
+                    min_price: undefined,
+                    max_price: undefined,
+                });
+            },
+        });
+    }
+
+    if (filters.min_rating != null) {
+        activeChips.push({
+            key: 'rating',
+            label: `${filters.min_rating}+ ★`,
+            onRemove: () => {
+                setMinRating('');
+                navigateWithPartialReload({ min_rating: undefined });
+            },
+        });
+    }
+
+    if (filters.early_check_in) {
+        activeChips.push({
+            key: 'early-checkin',
+            label: 'Early check-in',
+            onRemove: () => {
+                setEarlyCheckIn(false);
+                navigateWithPartialReload({ early_check_in: undefined });
+            },
+        });
+    }
+
+    const renderFilterPanel = (inSheet = false) => (
+        <div className="flex flex-col">
+            <div
+                className={`flex items-center justify-between border-b border-tijum-surface/80 px-5 py-4 ${
+                    inSheet ? 'pr-12' : ''
+                }`}
+            >
+                <div className="flex items-center gap-2">
+                    <h2 className="font-heading text-base font-bold text-tijum-plum">
+                        Filters
+                    </h2>
+                    {activeFilterCount > 0 && (
+                        <span className="inline-flex size-5 items-center justify-center rounded-full bg-tijum-coral font-heading text-[11px] font-bold text-white">
+                            {activeFilterCount}
+                        </span>
+                    )}
+                </div>
+                {activeFilterCount > 0 && (
+                    <button
+                        type="button"
+                        onClick={clearFilters}
+                        className="cursor-pointer font-heading text-xs font-semibold text-tijum-lavender underline underline-offset-4 transition-colors hover:text-[#D9523F]"
+                    >
+                        Reset
+                    </button>
+                )}
+            </div>
+
+            <div className="divide-y divide-tijum-surface/70 px-5 lg:max-h-[calc(100dvh-16.5rem)] lg:overflow-y-auto">
+                {/* Stay Format */}
+                <div className="space-y-2.5 py-4">
+                    <p className="font-heading text-xs font-semibold tracking-wide text-tijum-plum-muted uppercase">
+                        Stay format
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                        {categories.map((c) => {
+                            const active = selectedCategories.includes(c.id);
+                            return (
+                                <button
+                                    key={c.id}
+                                    type="button"
+                                    aria-pressed={active}
+                                    onClick={() =>
+                                        setSelectedCategories((s) =>
+                                            toggleIn(s, c.id),
+                                        )
+                                    }
+                                    className={`cursor-pointer rounded-xl border px-3 py-1.5 font-heading text-xs font-semibold transition-all ${
+                                        active
+                                            ? 'border-tijum-plum bg-tijum-plum text-tijum-cream shadow-2xs'
+                                            : 'border-tijum-surface bg-tijum-cream/40 text-tijum-plum hover:border-tijum-peach hover:bg-tijum-cream'
+                                    }`}
+                                >
+                                    {c.name}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Guest Eligibility */}
+                <div className="space-y-2.5 py-4">
+                    <p className="font-heading text-xs font-semibold tracking-wide text-tijum-plum-muted uppercase">
+                        Guest eligibility
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                        {GENDER_OPTIONS.map((o) => {
+                            const active = genderPref === o.v;
+                            return (
+                                <button
+                                    key={o.v}
+                                    type="button"
+                                    aria-pressed={active}
+                                    onClick={() => setGenderPref(o.v)}
+                                    className={`cursor-pointer rounded-xl border px-3 py-2 text-left font-heading text-xs font-semibold transition-all ${
+                                        active
+                                            ? 'border-tijum-plum bg-tijum-plum text-tijum-cream shadow-2xs'
+                                            : 'border-tijum-surface bg-tijum-cream/40 text-tijum-plum hover:border-tijum-peach hover:bg-tijum-cream'
+                                    }`}
+                                >
+                                    {o.l}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Sharing Configuration */}
+                <div className="space-y-2.5 py-4">
+                    <p className="font-heading text-xs font-semibold tracking-wide text-tijum-plum-muted uppercase">
+                        Room sharing
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                        {SHARING_OPTIONS.map((o) => {
+                            const active = sharing.includes(o.v);
+                            return (
+                                <button
+                                    key={o.v}
+                                    type="button"
+                                    aria-pressed={active}
+                                    onClick={() =>
+                                        setSharing((s) => toggleIn(s, o.v))
+                                    }
+                                    className={`cursor-pointer rounded-xl border px-3 py-2 text-left font-heading text-xs font-semibold transition-all ${
+                                        active
+                                            ? 'border-tijum-plum bg-tijum-plum text-tijum-cream shadow-2xs'
+                                            : 'border-tijum-surface bg-tijum-cream/40 text-tijum-plum hover:border-tijum-peach hover:bg-tijum-cream'
+                                    }`}
+                                >
+                                    {o.l}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* AC / Non-AC */}
+                <div className="space-y-2.5 py-4">
+                    <p className="font-heading text-xs font-semibold tracking-wide text-tijum-plum-muted uppercase">
+                        Room cooling
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                        {AC_OPTIONS.map((o) => {
+                            const active = ac.includes(o.v);
+                            return (
+                                <button
+                                    key={o.v}
+                                    type="button"
+                                    aria-pressed={active}
+                                    onClick={() =>
+                                        setAc((s) => toggleIn(s, o.v))
+                                    }
+                                    className={`cursor-pointer rounded-xl border px-3 py-2 text-center font-heading text-xs font-semibold transition-all ${
+                                        active
+                                            ? 'border-tijum-plum bg-tijum-plum text-tijum-cream shadow-2xs'
+                                            : 'border-tijum-surface bg-tijum-cream/40 text-tijum-plum hover:border-tijum-peach hover:bg-tijum-cream'
+                                    }`}
+                                >
+                                    {o.l}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Price Range */}
+                <div className="space-y-2.5 py-4">
+                    <p className="font-heading text-xs font-semibold tracking-wide text-tijum-plum-muted uppercase">
+                        Price range (₹)
+                    </p>
+                    <div className="grid grid-cols-2 gap-2.5">
+                        <div className="space-y-1">
+                            <Label
+                                htmlFor="min_price"
+                                className="text-[11px] font-medium text-tijum-lavender"
+                            >
+                                Min
+                            </Label>
+                            <div className="relative">
+                                <span
+                                    aria-hidden="true"
+                                    className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-xs font-semibold text-tijum-lavender"
+                                >
+                                    ₹
+                                </span>
+                                <Input
+                                    id="min_price"
+                                    type="number"
+                                    min={0}
+                                    step="1"
+                                    placeholder="0"
+                                    value={minPrice}
+                                    onChange={(e) =>
+                                        setMinPrice(e.target.value)
+                                    }
+                                    className="h-10 pl-7 text-sm tabular-nums"
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-1">
+                            <Label
+                                htmlFor="max_price"
+                                className="text-[11px] font-medium text-tijum-lavender"
+                            >
+                                Max
+                            </Label>
+                            <div className="relative">
+                                <span
+                                    aria-hidden="true"
+                                    className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-xs font-semibold text-tijum-lavender"
+                                >
+                                    ₹
+                                </span>
+                                <Input
+                                    id="max_price"
+                                    type="number"
+                                    min={0}
+                                    step="1"
+                                    placeholder="Any"
+                                    value={maxPrice}
+                                    onChange={(e) =>
+                                        setMaxPrice(e.target.value)
+                                    }
+                                    className="h-10 pl-7 text-sm tabular-nums"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-tijum-lavender">
+                        Matched against selected duration and guest count.
+                    </p>
+                </div>
+
+                {/* Minimum Rating */}
+                <div className="space-y-2.5 py-4">
+                    <p className="font-heading text-xs font-semibold tracking-wide text-tijum-plum-muted uppercase">
+                        Minimum rating
+                    </p>
+                    <div className="grid grid-cols-4 gap-1.5">
+                        {[
+                            { label: 'Any', value: '' },
+                            { label: '3.5+', value: '3.5' },
+                            { label: '4.0+', value: '4.0' },
+                            { label: '4.5+', value: '4.5' },
+                        ].map((r) => {
+                            const active = minRating === r.value;
+                            return (
+                                <button
+                                    key={r.label}
+                                    type="button"
+                                    aria-pressed={active}
+                                    onClick={() =>
+                                        setMinRating(
+                                            minRating === r.value
+                                                ? ''
+                                                : r.value,
+                                        )
+                                    }
+                                    className={`inline-flex cursor-pointer items-center justify-center gap-0.5 rounded-xl border px-2 py-2 font-heading text-xs font-semibold transition-all ${
+                                        active
+                                            ? 'border-tijum-plum bg-tijum-plum text-tijum-cream shadow-2xs'
+                                            : 'border-tijum-surface bg-tijum-cream/40 text-tijum-plum hover:border-tijum-peach hover:bg-tijum-cream'
+                                    }`}
+                                >
+                                    {r.value && (
+                                        <Star
+                                            className={`size-3 ${
+                                                active
+                                                    ? 'fill-tijum-peach text-tijum-peach'
+                                                    : 'fill-[#FF7A67] text-[#FF7A67]'
+                                            }`}
+                                            aria-hidden="true"
+                                        />
+                                    )}
+                                    <span>{r.label}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Early Check-in */}
+                <div className="py-4">
+                    <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-tijum-surface/80 bg-tijum-cream/35 p-3 transition-colors hover:border-tijum-peach">
+                        <Checkbox
+                            className="mt-0.5"
+                            checked={earlyCheckIn}
+                            onCheckedChange={(v) => setEarlyCheckIn(v === true)}
+                        />
+                        <span className="min-w-0 text-xs leading-relaxed text-tijum-plum">
+                            <span className="flex items-center gap-1 font-heading font-semibold">
+                                <Clock3
+                                    className="size-3.5 text-[#E05A47]"
+                                    aria-hidden="true"
+                                />
+                                Early check-in from{' '}
+                                {formatStayTime(
+                                    timing.earliest_early_check_in_time,
+                                )}
+                            </span>
+                            <span className="mt-0.5 block text-[11px] text-tijum-lavender">
+                                Requestable at ₹0 fee, subject to readiness.
+                            </span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <div className="border-t border-tijum-surface/80 bg-tijum-cream/35 p-4">
+                <Button
                     type="button"
-                    onClick={clearFilters}
-                    className="cursor-pointer font-heading text-xs font-semibold text-tijum-plum underline decoration-tijum-coral/60 underline-offset-4 hover:text-tijum-coral"
+                    size="default"
+                    className="w-full"
+                    onClick={applyFilters}
                 >
-                    Clear all
-                </button>
+                    {activeFilterCount > 0
+                        ? `Apply filters (${activeFilterCount})`
+                        : 'Apply filters'}
+                </Button>
             </div>
+        </div>
+    );
 
-            <div className="space-y-1.5">
-                <p className="text-xs font-semibold text-tijum-plum">
-                    Accommodation category
-                </p>
-                {categories.map((c) => (
-                    <label
-                        key={c.id}
-                        className="flex cursor-pointer items-center gap-2 text-sm text-tijum-plum"
+    const ReferralPerkCard = (
+        <div className="rounded-[22px] border border-tijum-peach/70 bg-white p-4 shadow-2xs">
+            <div className="flex items-start gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-tijum-cream text-[#E05A47]">
+                    <Gift className="size-4.5" aria-hidden="true" />
+                </span>
+                <div className="min-w-0 space-y-1">
+                    <p className="font-heading text-sm font-bold text-tijum-plum">
+                        Earn ₹500 stay credits
+                    </p>
+                    <p className="text-xs leading-relaxed text-tijum-lavender">
+                        Invite a friend: they get ₹250 on sign-up and you earn
+                        ₹500 after their first stay.
+                    </p>
+                    <Link
+                        href="/rewards/referrals"
+                        className="inline-flex items-center gap-1 pt-1 font-heading text-xs font-semibold text-tijum-plum underline decoration-tijum-coral/60 underline-offset-4 transition-colors hover:text-[#D9523F]"
                     >
-                        <Checkbox
-                            checked={selectedCategories.includes(c.id)}
-                            onCheckedChange={() =>
-                                setSelectedCategories((s) => toggleIn(s, c.id))
-                            }
-                        />
-                        <span>{c.name}</span>
-                    </label>
-                ))}
-            </div>
-
-            <div className="space-y-1.5">
-                <p className="text-xs font-semibold text-tijum-plum">
-                    Guest eligibility
-                </p>
-                {[
-                    { v: 'all', l: 'All (Any Gender / All Stays)' },
-                    { v: 'male', l: 'Male only' },
-                    { v: 'female', l: 'Female only' },
-                    { v: 'both', l: 'Both (Co-Living / Unisex)' },
-                ].map((o) => (
-                    <label
-                        key={o.v}
-                        className="flex cursor-pointer items-center gap-2 text-sm text-tijum-plum"
-                    >
-                        <input
-                            type="radio"
-                            name="gender"
-                            checked={genderPref === o.v}
-                            onChange={() => setGenderPref(o.v)}
-                            className="accent-tijum-plum"
-                        />
-                        <span>{o.l}</span>
-                    </label>
-                ))}
-            </div>
-
-            <div className="space-y-1.5">
-                <p className="text-xs font-semibold text-tijum-plum">
-                    Sharing configuration
-                </p>
-                {[
-                    { v: 4, l: '4 Sharing' },
-                    { v: 3, l: '3 Sharing' },
-                    { v: 2, l: '2 Sharing' },
-                    { v: 1, l: 'Single Room' },
-                ].map((o) => (
-                    <label
-                        key={o.v}
-                        className="flex cursor-pointer items-center gap-2 text-sm text-tijum-plum"
-                    >
-                        <Checkbox
-                            checked={sharing.includes(o.v)}
-                            onCheckedChange={() =>
-                                setSharing((s) => toggleIn(s, o.v))
-                            }
-                        />
-                        <span>{o.l}</span>
-                    </label>
-                ))}
-            </div>
-
-            <div className="space-y-1.5">
-                <p className="text-xs font-semibold text-tijum-plum">
-                    AC / Non-AC
-                </p>
-                {[
-                    { v: 'ac', l: 'AC' },
-                    { v: 'non_ac', l: 'Non-AC' },
-                ].map((o) => (
-                    <label
-                        key={o.v}
-                        className="flex cursor-pointer items-center gap-2 text-sm text-tijum-plum"
-                    >
-                        <Checkbox
-                            checked={ac.includes(o.v)}
-                            onCheckedChange={() =>
-                                setAc((s) => toggleIn(s, o.v))
-                            }
-                        />
-                        <span>{o.l}</span>
-                    </label>
-                ))}
-            </div>
-
-            <div className="space-y-2">
-                <p className="text-xs font-semibold text-tijum-plum">
-                    Total price range (₹)
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <Label htmlFor="min_price" className="text-[11px]">
-                            Min
-                        </Label>
-                        <Input
-                            id="min_price"
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            value={minPrice}
-                            onChange={(e) => setMinPrice(e.target.value)}
-                        />
-                    </div>
-                    <div>
-                        <Label htmlFor="max_price" className="text-[11px]">
-                            Max
-                        </Label>
-                        <Input
-                            id="max_price"
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            value={maxPrice}
-                            onChange={(e) => setMaxPrice(e.target.value)}
-                        />
-                    </div>
-                </div>
-                <p className="text-xs text-tijum-lavender">
-                    Compared using selected duration and guest quantity.
-                </p>
-            </div>
-
-            <div className="space-y-1.5">
-                <label className="flex cursor-pointer items-start gap-2 text-sm text-tijum-plum">
-                    <Checkbox
-                        className="mt-0.5"
-                        checked={earlyCheckIn}
-                        onCheckedChange={(v) => setEarlyCheckIn(v === true)}
-                    />
-                    <span>
-                        Room type allows early check-in from{' '}
-                        {formatStayTime(timing.earliest_early_check_in_time)}{' '}
-                        (subject to availability)
-                    </span>
-                </label>
-            </div>
-
-            <div className="space-y-2">
-                <Label className="text-xs font-semibold text-tijum-plum">
-                    Minimum Rating
-                </Label>
-                <div className="flex flex-wrap gap-1.5">
-                    {[
-                        { label: 'Any', value: '' },
-                        { label: '4.5+', value: '4.5' },
-                        { label: '4.0+', value: '4.0' },
-                        { label: '3.5+', value: '3.5' },
-                    ].map((r) => (
-                        <button
-                            key={r.label}
-                            type="button"
-                            onClick={() =>
-                                setMinRating(
-                                    minRating === r.value ? '' : r.value,
-                                )
-                            }
-                            className={`cursor-pointer rounded-xl border px-3 py-2 font-heading text-xs font-semibold transition-colors ${
-                                minRating === r.value
-                                    ? 'border-tijum-plum bg-tijum-plum text-tijum-cream'
-                                    : 'border-tijum-surface bg-tijum-cream/60 text-tijum-plum hover:border-tijum-peach hover:bg-tijum-peach/20'
-                            }`}
-                        >
-                            {r.label}
-                        </button>
-                    ))}
+                        <span>Refer &amp; earn</span>
+                        <ArrowRight className="size-3" aria-hidden="true" />
+                    </Link>
                 </div>
             </div>
-
-            <Button type="button" size="lg" className="w-full" onClick={applyFilters}>
-                Apply filters
-            </Button>
         </div>
     );
 
@@ -630,35 +911,10 @@ export default function SearchPage(props: SearchPageProps) {
                 fallbackTitle="Search Accommodation | TIJUM"
                 fallbackDescription="Search TIJUM stays with transparent room pricing and exact meal information."
             />
-            <section className="bg-tijum-plum py-10 text-tijum-cream sm:py-12">
-                <ResponsiveContainer width="wide" className="space-y-7">
-                    <div className="max-w-3xl space-y-3">
-                        <p className="font-heading text-xs font-semibold uppercase tracking-wider text-tijum-peach sm:text-sm">
-                            Find the right room type, meals, and duration
-                        </p>
-                        <h1 className="font-heading text-2xl font-bold tracking-tight text-tijum-cream sm:text-3xl lg:text-[40px] leading-tight">
-                            {hasSearchIntent
-                                ? `Stays in ${cityName}`
-                                : 'Search TIJUM stays'}
-                        </h1>
-                        <p className="max-w-2xl text-base leading-relaxed text-tijum-cream/72">
-                            Edit the essentials here, then refine real
-                            availability, amenities, meal inclusions, and price
-                            below.
-                        </p>
-                    </div>
 
-                    {errors && Object.keys(errors).length > 0 && (
-                        <div
-                            role="alert"
-                            className="rounded-xl border border-tijum-coral/55 bg-tijum-coral/12 px-4 py-3 text-sm font-semibold text-tijum-cream"
-                        >
-                            {Object.values(errors).map((message) => (
-                                <p key={message}>{message}</p>
-                            ))}
-                        </div>
-                    )}
-
+            {/* Clean Light Discovery Header */}
+            <section className="relative z-20 border-b border-tijum-surface/85 bg-white pt-5 pb-6 sm:pt-6 sm:pb-7">
+                <ResponsiveContainer width="wide" className="space-y-5">
                     <Breadcrumbs
                         items={[
                             {
@@ -675,12 +931,78 @@ export default function SearchPage(props: SearchPageProps) {
                                   ]
                                 : []),
                         ]}
-                        tone="light"
-                        className="mb-4"
                     />
+
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                        <div className="min-w-0 space-y-1.5">
+                            <h1 className="font-heading text-2xl font-bold tracking-tight text-tijum-plum sm:text-3xl">
+                                {hasSearchIntent && cityName
+                                    ? `Stays in ${cityName}`
+                                    : 'Explore verified stays'}
+                            </h1>
+                            <p className="text-sm text-tijum-lavender">
+                                Compare Hostels/PG, Homestays, and Co-Living
+                                with clear room pricing and meal inclusions.
+                            </p>
+                        </div>
+
+                        {/* Quick Launch City Switcher */}
+                        {cities.length > 0 && (
+                            <div
+                                aria-label="Filter by launch city"
+                                className="flex flex-wrap items-center gap-1.5"
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        handleQuickCitySelect(undefined)
+                                    }
+                                    className={`cursor-pointer rounded-full border px-3.5 py-1.5 font-heading text-xs font-semibold transition-all ${
+                                        !city
+                                            ? 'border-tijum-plum bg-tijum-plum text-tijum-cream'
+                                            : 'border-tijum-surface bg-tijum-cream/55 text-tijum-plum hover:border-tijum-peach hover:bg-tijum-cream'
+                                    }`}
+                                >
+                                    All cities
+                                </button>
+                                {cities.map((c) => {
+                                    const active =
+                                        String(c.id) === String(city);
+                                    return (
+                                        <button
+                                            key={c.id}
+                                            type="button"
+                                            onClick={() =>
+                                                handleQuickCitySelect(c.id)
+                                            }
+                                            className={`cursor-pointer rounded-full border px-3.5 py-1.5 font-heading text-xs font-semibold transition-all ${
+                                                active
+                                                    ? 'border-tijum-plum bg-tijum-plum text-tijum-cream'
+                                                    : 'border-tijum-surface bg-tijum-cream/55 text-tijum-plum hover:border-tijum-peach hover:bg-tijum-cream'
+                                            }`}
+                                        >
+                                            {c.name}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {errors && Object.keys(errors).length > 0 && (
+                        <div
+                            role="alert"
+                            className="rounded-xl border border-status-error-border bg-status-error-bg px-4 py-3 text-sm font-medium text-status-error-fg"
+                        >
+                            {Object.values(errors).map((message) => (
+                                <p key={message}>{message}</p>
+                            ))}
+                        </div>
+                    )}
 
                     <SearchPanel
                         compact
+                        className="border-tijum-surface/90 bg-tijum-cream/45 shadow-2xs"
                         autoSubmitOnLocate={
                             !city && !locality && !searchLocationLabel
                         }
@@ -724,27 +1046,16 @@ export default function SearchPage(props: SearchPageProps) {
                             genderPreference: genderPref,
                         }}
                     />
-
-                    {hasSearchIntent && (
-                        <p className="rounded-xl border border-tijum-cream/15 bg-tijum-cream/8 px-4 py-2.5 text-sm text-tijum-cream/85">
-                            <strong className="font-heading text-white">
-                                Active search:
-                            </strong>{' '}
-                            {searchLocationLabel || cityName}
-                            {!searchLocationLabel && locality
-                                ? ` · ${locality}`
-                                : ''}
-                        </p>
-                    )}
                 </ResponsiveContainer>
             </section>
 
-            <section className="bg-tijum-cream py-10 sm:py-12">
+            {/* Main Discovery Workspace */}
+            <section className="bg-tijum-cream py-8 sm:py-10">
                 <ResponsiveContainer width="wide">
                     {!results ? (
                         <Card className="rounded-[24px] border-tijum-surface bg-white shadow-tijum-card">
-                            <CardContent className="py-12 text-center">
-                                <span className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-tijum-peach/25 text-tijum-plum">
+                            <CardContent className="py-14 text-center">
+                                <span className="mx-auto mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-tijum-cream text-[#E05A47]">
                                     <MapPin
                                         className="size-6"
                                         aria-hidden="true"
@@ -754,8 +1065,8 @@ export default function SearchPage(props: SearchPageProps) {
                                     Start your search
                                 </p>
                                 <p className="mt-1 text-sm text-tijum-lavender">
-                                    Select a city, check-in date, duration, and
-                                    guests to find food-inclusive stays.
+                                    Choose a city, check-in date, stay duration,
+                                    and guests to browse verified stays.
                                 </p>
                             </CardContent>
                         </Card>
@@ -764,19 +1075,24 @@ export default function SearchPage(props: SearchPageProps) {
                             className={
                                 ENABLE_MAP_VIEW && viewMode === 'map'
                                     ? 'space-y-6'
-                                    : 'grid gap-7 lg:grid-cols-[290px_minmax(0,1fr)]'
+                                    : 'grid items-start gap-7 lg:grid-cols-[296px_minmax(0,1fr)]'
                             }
                         >
+                            {/* Left Sticky Filter Sidebar */}
                             {(viewMode !== 'map' || !ENABLE_MAP_VIEW) && (
-                                <aside className="hidden lg:block">
-                                    <div className="rounded-[24px] border border-tijum-surface bg-white p-5 shadow-tijum-card">
-                                        {FilterPanel}
+                                <aside className="hidden space-y-4 lg:sticky lg:top-24 lg:block">
+                                    <div className="overflow-hidden rounded-[24px] border border-tijum-surface/90 bg-white shadow-tijum-card">
+                                        {renderFilterPanel(false)}
                                     </div>
+                                    {ReferralPerkCard}
                                 </aside>
                             )}
+
+                            {/* Right Results Column */}
                             <div className="min-w-0 space-y-5">
-                                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-tijum-surface pb-4">
-                                    <div className="flex items-center gap-2.5">
+                                {/* Results Control Bar */}
+                                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-tijum-surface/85 bg-white px-4 py-3 shadow-2xs sm:px-5">
+                                    <div className="flex flex-wrap items-center gap-3">
                                         <Sheet
                                             open={mobileOpen}
                                             onOpenChange={setMobileOpen}
@@ -788,39 +1104,63 @@ export default function SearchPage(props: SearchPageProps) {
                                                     className={
                                                         ENABLE_MAP_VIEW &&
                                                         viewMode === 'map'
-                                                            ? 'h-10'
-                                                            : 'h-10 lg:hidden'
+                                                            ? 'h-9 gap-1.5'
+                                                            : 'h-9 gap-1.5 lg:hidden'
                                                     }
                                                 >
-                                                    <SlidersHorizontal className="size-4" />{' '}
-                                                    Filters
+                                                    <SlidersHorizontal
+                                                        className="size-4"
+                                                        aria-hidden="true"
+                                                    />
+                                                    <span>Filters</span>
+                                                    {activeFilterCount > 0 && (
+                                                        <span className="inline-flex size-4.5 items-center justify-center rounded-full bg-tijum-coral text-[10px] font-bold text-white">
+                                                            {activeFilterCount}
+                                                        </span>
+                                                    )}
                                                 </Button>
                                             </SheetTrigger>
                                             <SheetContent
                                                 side="left"
-                                                className="tijum-public w-[min(24rem,calc(100vw-1.5rem))] overflow-y-auto border-r border-tijum-surface bg-white"
+                                                className="tijum-public w-[min(24rem,calc(100vw-1.5rem))] overflow-y-auto border-r border-tijum-surface bg-white p-0"
                                             >
-                                                <SheetHeader>
+                                                <SheetHeader className="sr-only">
                                                     <SheetTitle>
                                                         Filters
                                                     </SheetTitle>
                                                 </SheetHeader>
-                                                <div className="mt-4">
-                                                    {FilterPanel}
-                                                </div>
+                                                {renderFilterPanel(true)}
                                             </SheetContent>
                                         </Sheet>
-                                        <p className="text-sm text-tijum-plum">
-                                            <span className="font-heading text-base font-bold tabular-nums">
-                                                {resultTotal}
-                                            </span>{' '}
-                                            stay{resultTotal === 1 ? '' : 's'}{' '}
-                                            found
-                                        </p>
+
+                                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                            <p className="text-sm text-tijum-plum">
+                                                <span className="font-heading text-base font-bold tabular-nums">
+                                                    {resultTotal}
+                                                </span>{' '}
+                                                stay
+                                                {resultTotal === 1 ? '' : 's'}
+                                            </p>
+                                            {(searchLocationLabel ||
+                                                cityName) && (
+                                                <span className="text-xs text-tijum-lavender">
+                                                    in{' '}
+                                                    <strong className="font-semibold text-tijum-plum">
+                                                        {searchLocationLabel ||
+                                                            cityName}
+                                                    </strong>
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="flex flex-wrap items-center gap-2.5">
-                                        {/* Duration / Rate Basis Switcher (Daily / Weekly / Monthly) */}
-                                        <div className="flex items-center rounded-xl border border-tijum-surface bg-white p-1 shadow-2xs">
+
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {/* Rate Basis Switcher */}
+                                        <div
+                                            role="group"
+                                            aria-label="Rate basis"
+                                            className="flex items-center rounded-xl border border-tijum-surface/80 bg-tijum-cream/55 p-0.5"
+                                        >
                                             {[
                                                 {
                                                     value: 'daily',
@@ -845,10 +1185,10 @@ export default function SearchPage(props: SearchPageProps) {
                                                             d.value,
                                                         );
                                                     }}
-                                                    className={`cursor-pointer rounded-lg px-3 py-1.5 font-heading text-xs font-semibold transition-colors ${
+                                                    className={`cursor-pointer rounded-lg px-2.5 py-1.5 font-heading text-xs font-semibold transition-colors ${
                                                         activeDuration ===
                                                         d.value
-                                                            ? 'bg-tijum-plum text-tijum-cream'
+                                                            ? 'bg-tijum-plum text-tijum-cream shadow-2xs'
                                                             : 'text-tijum-lavender hover:text-tijum-plum'
                                                     }`}
                                                 >
@@ -858,36 +1198,56 @@ export default function SearchPage(props: SearchPageProps) {
                                         </div>
 
                                         {/* View Mode Toggle */}
-                                        <div className="flex items-center rounded-xl border border-tijum-surface bg-white p-1 shadow-2xs">
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setViewMode('grid')
-                                                }
-                                                aria-label="Grid view"
-                                                className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 font-heading text-xs font-semibold transition-colors ${
-                                                    viewMode === 'grid'
-                                                        ? 'bg-tijum-plum text-tijum-cream'
-                                                        : 'text-tijum-lavender hover:text-tijum-plum'
-                                                }`}
-                                            >
-                                                <LayoutGrid className="size-3.5" />
-                                                <span>Grid</span>
-                                            </button>
+                                        <div
+                                            role="group"
+                                            aria-label="Layout view"
+                                            className="flex items-center rounded-xl border border-tijum-surface/80 bg-tijum-cream/55 p-0.5"
+                                        >
                                             <button
                                                 type="button"
                                                 onClick={() =>
                                                     setViewMode('list')
                                                 }
                                                 aria-label="List view"
-                                                className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 font-heading text-xs font-semibold transition-colors ${
+                                                aria-pressed={
                                                     viewMode === 'list'
-                                                        ? 'bg-tijum-plum text-tijum-cream'
+                                                }
+                                                className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-heading text-xs font-semibold transition-colors ${
+                                                    viewMode === 'list'
+                                                        ? 'bg-tijum-plum text-tijum-cream shadow-2xs'
                                                         : 'text-tijum-lavender hover:text-tijum-plum'
                                                 }`}
                                             >
-                                                <LayoutList className="size-3.5" />
-                                                <span>List</span>
+                                                <LayoutList
+                                                    className="size-3.5"
+                                                    aria-hidden="true"
+                                                />
+                                                <span className="hidden sm:inline">
+                                                    List
+                                                </span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setViewMode('grid')
+                                                }
+                                                aria-label="Grid view"
+                                                aria-pressed={
+                                                    viewMode === 'grid'
+                                                }
+                                                className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-heading text-xs font-semibold transition-colors ${
+                                                    viewMode === 'grid'
+                                                        ? 'bg-tijum-plum text-tijum-cream shadow-2xs'
+                                                        : 'text-tijum-lavender hover:text-tijum-plum'
+                                                }`}
+                                            >
+                                                <LayoutGrid
+                                                    className="size-3.5"
+                                                    aria-hidden="true"
+                                                />
+                                                <span className="hidden sm:inline">
+                                                    Grid
+                                                </span>
                                             </button>
                                             {ENABLE_MAP_VIEW && (
                                                 <button
@@ -896,83 +1256,59 @@ export default function SearchPage(props: SearchPageProps) {
                                                         setViewMode('map')
                                                     }
                                                     aria-label="Map view"
-                                                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                                                    aria-pressed={
                                                         viewMode === 'map'
-                                                            ? 'bg-tijum-plum text-tijum-cream shadow-xs'
+                                                    }
+                                                    className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-heading text-xs font-semibold transition-colors ${
+                                                        viewMode === 'map'
+                                                            ? 'bg-tijum-plum text-tijum-cream shadow-2xs'
                                                             : 'text-tijum-lavender hover:text-tijum-plum'
                                                     }`}
                                                 >
-                                                    <MapIcon className="size-3.5" />
+                                                    <MapIcon
+                                                        className="size-3.5"
+                                                        aria-hidden="true"
+                                                    />
                                                     <span>Map</span>
                                                 </button>
                                             )}
                                         </div>
 
-                                        <div className="flex items-center gap-2">
+                                        {/* Sort Select */}
+                                        <div className="flex items-center gap-1.5">
                                             <Label
                                                 htmlFor="sort"
-                                                className="text-xs text-tijum-lavender"
+                                                className="sr-only"
                                             >
-                                                Sort
+                                                Sort stays
                                             </Label>
                                             <Select
                                                 value={sort}
                                                 onValueChange={(v) => {
                                                     setSort(v);
-                                                    const currentScrollY =
-                                                        window.pageYOffset ||
-                                                        document.documentElement
-                                                            .scrollTop ||
-                                                        0;
-                                                    router.get(
-                                                        publicSearch.url(),
-                                                        buildParams({
-                                                            sort:
-                                                                v !== 'relevant'
-                                                                    ? v
-                                                                    : undefined,
-                                                            page: undefined,
-                                                        }) as any,
-                                                        {
-                                                            preserveScroll: true,
-                                                            preserveState: true,
-                                                            only: [
-                                                                'results',
-                                                                'resultTotal',
-                                                                'filters',
-                                                                'timing',
-                                                                'checkoutDate',
-                                                            ],
-                                                            onFinish: () => {
-                                                                window.scrollTo(
-                                                                    {
-                                                                        top: currentScrollY,
-                                                                        behavior:
-                                                                            'instant' as ScrollBehavior,
-                                                                    },
-                                                                );
-                                                            },
-                                                        },
-                                                    );
+                                                    navigateWithPartialReload({
+                                                        sort:
+                                                            v !== 'relevant'
+                                                                ? v
+                                                                : undefined,
+                                                    });
                                                 }}
                                             >
                                                 <SelectTrigger
                                                     id="sort"
-                                                    className="h-10 w-[190px] rounded-xl bg-white"
+                                                    className="h-9 w-[178px] rounded-xl border-tijum-surface/90 bg-white text-xs font-semibold text-tijum-plum"
                                                 >
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="relevant">
-                                                        Relevant
+                                                        Sort: Relevant
                                                     </SelectItem>
                                                     <SelectItem value="distance_asc">
-                                                        Nearest First (Nearby to
-                                                        Farthest)
+                                                        Nearest First
                                                     </SelectItem>
                                                     <SelectItem value="distance_desc">
-                                                        Farthest First (Farthest
-                                                        to Nearby)
+                                                        Farthest First
                                                     </SelectItem>
                                                     <SelectItem value="price_asc">
                                                         Price: Low to High
@@ -992,55 +1328,46 @@ export default function SearchPage(props: SearchPageProps) {
                                     </div>
                                 </div>
 
-                                {/* Refer & Earn Banner for Customer Search */}
-                                {displayedItems.length > 0 && (
-                                    <div className="mb-6 flex flex-col justify-between gap-4 rounded-[20px] border border-tijum-peach bg-white p-5 shadow-tijum-card sm:flex-row sm:items-center sm:px-6">
-                                        <div className="flex items-center gap-3.5">
-                                            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-tijum-peach/30 text-tijum-plum">
-                                                <Gift
-                                                    className="size-5"
+                                {/* Active Removable Filter Chips */}
+                                {activeChips.length > 0 && (
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {activeChips.map((chip) => (
+                                            <button
+                                                key={chip.key}
+                                                type="button"
+                                                onClick={chip.onRemove}
+                                                className="group inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-tijum-surface bg-white px-3 py-1 font-heading text-xs font-semibold text-tijum-plum shadow-2xs transition-colors hover:border-tijum-coral/60 hover:bg-tijum-cream"
+                                            >
+                                                <span>{chip.label}</span>
+                                                <X
+                                                    className="size-3.5 text-tijum-lavender transition-colors group-hover:text-[#D9523F]"
                                                     aria-hidden="true"
                                                 />
-                                            </div>
-                                            <div>
-                                                <p className="font-heading text-sm font-bold text-tijum-plum">
-                                                    Invite friends to TIJUM
-                                                    &amp; earn ₹500 stay
-                                                    credits!
-                                                </p>
-                                                <p className="text-xs leading-relaxed text-tijum-lavender">
-                                                    Your friend receives 250
-                                                    welcome points. You earn 500
-                                                    points (₹500 value) when
-                                                    they complete their first
-                                                    stay.
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <Button
-                                            size="sm"
-                                            variant="plum"
-                                            className="shrink-0"
-                                            asChild
-                                        >
-                                            <Link href="/rewards/referrals">
-                                                <span>Refer &amp; Earn Now</span>
-                                                <ArrowRight
-                                                    className="size-3.5"
-                                                    aria-hidden="true"
-                                                />
-                                            </Link>
-                                        </Button>
+                                            </button>
+                                        ))}
+                                        {activeChips.length > 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={clearFilters}
+                                                className="cursor-pointer px-1.5 font-heading text-xs font-semibold text-tijum-lavender underline underline-offset-4 hover:text-tijum-plum"
+                                            >
+                                                Clear all
+                                            </button>
+                                        )}
                                     </div>
                                 )}
 
+                                {/* Locality Fallback Notice */}
                                 {localityFallback && searchedLocality && (
-                                    <div className="mb-4 flex flex-col justify-between gap-3 rounded-[20px] border border-tijum-peach bg-tijum-peach/15 p-4 text-xs text-tijum-plum sm:flex-row sm:items-center sm:px-5">
+                                    <div className="flex flex-col justify-between gap-3 rounded-[20px] border border-tijum-peach bg-white px-5 py-4 text-xs text-tijum-plum shadow-2xs sm:flex-row sm:items-center">
                                         <div className="flex items-center gap-2.5">
-                                            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-tijum-peach/45 text-tijum-plum">
-                                                <MapPin className="size-4" />
-                                            </div>
-                                            <span>
+                                            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-tijum-cream text-[#E05A47]">
+                                                <MapPin
+                                                    className="size-4"
+                                                    aria-hidden="true"
+                                                />
+                                            </span>
+                                            <span className="leading-relaxed">
                                                 No stays found directly in{' '}
                                                 <strong>
                                                     {searchedLocality}
@@ -1048,22 +1375,27 @@ export default function SearchPage(props: SearchPageProps) {
                                                 . Showing all{' '}
                                                 <strong>{resultTotal}</strong>{' '}
                                                 available stays in{' '}
-                                                <strong>{cityName}</strong>.
+                                                <strong>
+                                                    {cityName ||
+                                                        'selected city'}
+                                                </strong>
+                                                .
                                             </span>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={clearLocalityFilter}
-                                            className="shrink-0 cursor-pointer self-start font-heading font-semibold text-tijum-plum underline decoration-tijum-coral underline-offset-4 hover:text-tijum-coral sm:self-auto"
+                                            className="shrink-0 cursor-pointer self-start font-heading font-semibold text-tijum-plum underline decoration-tijum-coral underline-offset-4 hover:text-[#D9523F] sm:self-auto"
                                         >
                                             Clear area filter
                                         </button>
                                     </div>
                                 )}
 
+                                {/* Empty State */}
                                 {results && displayedItems.length === 0 && (
                                     <div className="rounded-[24px] border border-tijum-surface bg-white p-8 text-center shadow-tijum-card sm:p-12">
-                                        <span className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl bg-tijum-peach/25 text-tijum-plum">
+                                        <span className="mx-auto mb-3.5 flex size-12 items-center justify-center rounded-2xl bg-tijum-cream text-[#E05A47]">
                                             <MapPin
                                                 className="size-6"
                                                 aria-hidden="true"
@@ -1071,15 +1403,15 @@ export default function SearchPage(props: SearchPageProps) {
                                         </span>
                                         <h3 className="font-heading text-xl font-bold text-tijum-plum sm:text-2xl">
                                             {cityName
-                                                ? `No available stays currently found in ${cityName}`
-                                                : 'No stays match your search filters'}
+                                                ? `No available stays found in ${cityName}`
+                                                : 'No stays match these filters'}
                                         </h3>
                                         <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-tijum-lavender">
                                             {cityName === 'Guntur'
-                                                ? 'We are currently onboarding verified partner stays in Guntur. In the meantime, you can explore verified stays in nearby Vijayawada (35 km away) or browse all launch cities.'
+                                                ? 'We are onboarding verified partner stays in Guntur. Meanwhile, explore verified stays in nearby Vijayawada (35 km away) or browse all launch cities.'
                                                 : cityName
-                                                  ? `We are expanding in ${cityName} and verifying more properties. Try clearing your filters or exploring another launch city.`
-                                                  : 'Try adjusting your dates, removing category or sharing filters, or selecting another launch city.'}
+                                                  ? `Try clearing a few filters or exploring another launch city while we onboard more stays in ${cityName}.`
+                                                  : 'Try adjusting your dates, clearing sharing or price filters, or switching cities.'}
                                         </p>
                                         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                                             {cityName === 'Guntur' && (
@@ -1093,29 +1425,8 @@ export default function SearchPage(props: SearchPageProps) {
                                                                     'vijayawada',
                                                             );
                                                         if (vijayawadaCity) {
-                                                            setLocality('');
-                                                            setSearchLocationLabel(
-                                                                '',
-                                                            );
-                                                            router.get(
-                                                                publicSearch.url(),
-                                                                buildParams({
-                                                                    city: String(
-                                                                        vijayawadaCity.id,
-                                                                    ),
-                                                                    locality:
-                                                                        undefined,
-                                                                    location_label:
-                                                                        undefined,
-                                                                }) as Record<
-                                                                    string,
-                                                                    | string
-                                                                    | number
-                                                                    | boolean
-                                                                >,
-                                                                {
-                                                                    preserveScroll: true,
-                                                                },
+                                                            handleQuickCitySelect(
+                                                                vijayawadaCity.id,
                                                             );
                                                         }
                                                     }}
@@ -1131,19 +1442,20 @@ export default function SearchPage(props: SearchPageProps) {
                                                         clearLocalityFilter
                                                     }
                                                 >
-                                                    Clear locality ({locality})
+                                                    Clear area ({locality})
                                                 </Button>
                                             )}
                                             <Button
                                                 variant="outline"
                                                 onClick={clearFilters}
                                             >
-                                                View all launch cities
+                                                Reset all filters
                                             </Button>
                                         </div>
                                     </div>
                                 )}
 
+                                {/* Results Grid / List / Map */}
                                 {ENABLE_MAP_VIEW && viewMode === 'map' ? (
                                     <div className="grid items-start gap-6 lg:grid-cols-2">
                                         <div className="max-h-[calc(100dvh-12rem)] space-y-4 overflow-y-auto pr-1">
@@ -1182,65 +1494,59 @@ export default function SearchPage(props: SearchPageProps) {
                                                 onSelectProperty={
                                                     setSelectedMapSlug
                                                 }
-                                                cityName={cityName}
+                                                cityName={
+                                                    cityName || 'All Cities'
+                                                }
                                             />
                                         </div>
                                     </div>
                                 ) : viewMode === 'grid' ? (
-                                    <ScrollReveal
-                                        direction="up"
-                                        distance={20}
-                                        stagger={0.07}
-                                    >
-                                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 2xl:grid-cols-3">
-                                            {displayedItems.map((item) => (
-                                                <PropertyCard
-                                                    key={item.slug}
-                                                    layout="vertical"
-                                                    property={cardPropertyProps(
-                                                        item,
-                                                    )}
-                                                    href={itemLinkHref(
-                                                        item.slug,
-                                                    )}
-                                                />
-                                            ))}
-                                        </div>
-                                    </ScrollReveal>
+                                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 2xl:grid-cols-3">
+                                        {displayedItems.map((item) => (
+                                            <PropertyCard
+                                                key={item.slug}
+                                                layout="vertical"
+                                                property={cardPropertyProps(
+                                                    item,
+                                                )}
+                                                href={itemLinkHref(item.slug)}
+                                            />
+                                        ))}
+                                    </div>
                                 ) : (
-                                    <ScrollReveal
-                                        direction="up"
-                                        distance={20}
-                                        stagger={0.07}
-                                    >
-                                        <div className="space-y-4">
-                                            {displayedItems.map((item) => (
-                                                <PropertyCard
-                                                    key={item.slug}
-                                                    layout="horizontal"
-                                                    property={cardPropertyProps(
-                                                        item,
-                                                    )}
-                                                    href={itemLinkHref(
-                                                        item.slug,
-                                                    )}
-                                                />
-                                            ))}
-                                        </div>
-                                    </ScrollReveal>
+                                    <div className="space-y-4">
+                                        {displayedItems.map((item) => (
+                                            <PropertyCard
+                                                key={item.slug}
+                                                layout="horizontal"
+                                                property={cardPropertyProps(
+                                                    item,
+                                                )}
+                                                href={itemLinkHref(item.slug)}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Mobile Refer & Earn Card */}
+                                {displayedItems.length > 0 && (
+                                    <div className="pt-2 lg:hidden">
+                                        {ReferralPerkCard}
+                                    </div>
                                 )}
 
                                 {/* Continuous Infinite Scrolling Sentinel & Status */}
                                 <div
                                     ref={sentinelRef}
-                                    className="flex flex-col items-center justify-center py-8"
+                                    className="flex flex-col items-center justify-center py-6"
                                 >
                                     {isLoadingMore && (
-                                        <div className="flex items-center gap-2.5 rounded-full border border-tijum-surface bg-tijum-cream px-5 py-2.5 text-xs font-semibold text-tijum-plum shadow-md">
-                                            <Loader2 className="size-4 animate-spin text-tijum-coral" />
-                                            <span>
-                                                Loading more nearby stays...
-                                            </span>
+                                        <div className="flex items-center gap-2.5 rounded-full border border-tijum-surface bg-white px-5 py-2.5 text-xs font-semibold text-tijum-plum shadow-tijum-card">
+                                            <Loader2
+                                                className="size-4 animate-spin text-[#E05A47]"
+                                                aria-hidden="true"
+                                            />
+                                            <span>Loading more stays…</span>
                                         </div>
                                     )}
                                     {!hasMore && displayedItems.length > 0 && (
@@ -1248,7 +1554,12 @@ export default function SearchPage(props: SearchPageProps) {
                                             Showing all{' '}
                                             {resultTotal ||
                                                 displayedItems.length}{' '}
-                                            available stays in this area.
+                                            available stay
+                                            {(resultTotal ||
+                                                displayedItems.length) === 1
+                                                ? ''
+                                                : 's'}
+                                            .
                                         </p>
                                     )}
                                 </div>
