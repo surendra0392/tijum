@@ -14,6 +14,8 @@ const buttonVariants = cva(
                 plum: 'bg-tijum-plum text-tijum-cream shadow-tijum-card hover:bg-tijum-plum/92 hover:-translate-y-0.5 dark:bg-card dark:text-foreground dark:border dark:border-border dark:hover:bg-muted',
                 destructive:
                     'bg-destructive text-destructive-foreground shadow-2xs hover:bg-destructive/90 focus-visible:ring-destructive/30',
+                success:
+                    'bg-emerald-600 text-white shadow-2xs hover:bg-emerald-700 focus-visible:ring-emerald-500/30 dark:bg-emerald-600 dark:hover:bg-emerald-500',
                 outline:
                     'border border-tijum-surface/80 dark:border-border bg-white dark:bg-card text-tijum-plum dark:text-foreground hover:border-tijum-coral/50 hover:bg-tijum-cream/60 dark:hover:bg-accent',
                 secondary:
@@ -23,7 +25,7 @@ const buttonVariants = cva(
             },
             size: {
                 default: 'h-10 px-4 py-2 has-[>svg]:px-3.5',
-                sm: "h-8 gap-1.5 rounded-lg px-3 text-xs has-[>svg]:px-2.5 [&_svg:not([class*='size-'])]:size-3.5",
+                sm: "h-8 gap-1.5 rounded-lg px-3 text-xs [&_svg:not([class*='size-'])]:size-3.5",
                 lg: 'h-12 rounded-xl px-6 text-base has-[>svg]:px-5',
                 icon: 'size-10',
             },

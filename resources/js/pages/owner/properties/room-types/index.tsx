@@ -5,6 +5,7 @@ import {
     Edit3,
     Layers,
     Lock,
+    PauseCircle,
     PlusCircle,
     Snowflake,
     Trash2,
@@ -272,7 +273,7 @@ export default function RoomTypesIndex({
                                                 size="sm"
                                                 variant="outline"
                                                 asChild
-                                                className="h-8 gap-1.5 rounded-lg px-3 text-xs"
+                                                className="h-8 w-28 justify-center"
                                             >
                                                 <Link
                                                     href={editRoomTypeRoute([
@@ -299,21 +300,26 @@ export default function RoomTypesIndex({
                                                             mode: 'deactivate',
                                                         })
                                                     }
-                                                    className="h-8 gap-1.5 rounded-lg px-3 text-xs"
+                                                    className="h-8 w-28 justify-center"
                                                 >
-                                                    Deactivate
+                                                    <PauseCircle
+                                                        className="size-3.5"
+                                                        aria-hidden="true"
+                                                    />
+                                                    <span>Deactivate</span>
                                                 </Button>
                                             ) : (
                                                 <Button
                                                     type="button"
                                                     size="sm"
+                                                    variant="success"
                                                     onClick={() =>
                                                         setPendingAction({
                                                             roomType: rt,
                                                             mode: 'activate',
                                                         })
                                                     }
-                                                    className="h-8 gap-1.5 rounded-lg border border-emerald-600 bg-emerald-600 px-3 text-xs text-white shadow-2xs hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                                                    className="h-8 w-28 justify-center"
                                                 >
                                                     <CheckCircle2
                                                         className="size-3.5"
@@ -335,7 +341,7 @@ export default function RoomTypesIndex({
                                                             rt.rooms_count > 0,
                                                     })
                                                 }
-                                                className="h-8 gap-1.5 rounded-lg px-3 text-xs"
+                                                className="h-8 w-28 justify-center"
                                             >
                                                 <Trash2
                                                     className="size-3.5"
