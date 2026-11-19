@@ -25,6 +25,13 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { CONTACT_INFO, LAUNCH_CITIES } from '@/data/public-content';
 import { faqs, grievanceRedressal } from '@/routes/public';
@@ -457,33 +464,36 @@ export default function Contact({ contact, social, seo }: ContactProps) {
                                                     <Label htmlFor="contact-subject">
                                                         Topic / Purpose *
                                                     </Label>
-                                                    <select
-                                                        id="contact-subject"
+                                                    <Select
                                                         value={subject}
-                                                        onChange={(e) =>
-                                                            setSubject(
-                                                                e.target
-                                                                    .value as
-                                                                    | 'booking'
-                                                                    | 'partner'
-                                                                    | 'general',
-                                                            )
-                                                        }
-                                                        className="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-tijum-coral focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                                        onValueChange={(
+                                                            value:
+                                                                | 'booking'
+                                                                | 'partner'
+                                                                | 'general',
+                                                        ) => setSubject(value)}
                                                     >
-                                                        <option value="booking">
-                                                            Stay / Booking
-                                                            Assistance
-                                                        </option>
-                                                        <option value="partner">
-                                                            List a Hostel, PG or
-                                                            Homestay
-                                                        </option>
-                                                        <option value="general">
-                                                            General Inquiry or
-                                                            Feedback
-                                                        </option>
-                                                    </select>
+                                                        <SelectTrigger
+                                                            id="contact-subject"
+                                                            className="h-12 w-full text-base md:text-sm"
+                                                        >
+                                                            <SelectValue placeholder="Select topic / purpose" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="booking">
+                                                                Stay / Booking
+                                                                Assistance
+                                                            </SelectItem>
+                                                            <SelectItem value="partner">
+                                                                List a Hostel,
+                                                                PG or Homestay
+                                                            </SelectItem>
+                                                            <SelectItem value="general">
+                                                                General Inquiry
+                                                                or Feedback
+                                                            </SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
                                                 </div>
                                             </div>
 
