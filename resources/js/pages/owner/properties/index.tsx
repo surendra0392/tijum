@@ -1,6 +1,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
+    ArrowRight,
     Building2,
     Camera,
     DoorClosed,
@@ -14,6 +15,7 @@ import {
     RotateCcw,
     Search,
     ShieldCheck,
+    Sparkles,
     Utensils,
     X,
 } from 'lucide-react';
@@ -29,15 +31,8 @@ import { PageHeader } from '@/components/shared/page-header';
 import { Pagination } from '@/components/shared/pagination';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -487,19 +482,59 @@ export default function OwnerPropertiesIndex({
                     />
                 ) : (
                     <>
-                        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                             {properties.data.map((property) => {
                                 const thumbSrc =
                                     property.cover_media
                                         ?.public_thumbnail_url ??
                                     property.cover_media?.thumbnail_preview_url;
 
+                                const quickLinks = [
+                                    {
+                                        label: 'Room Types',
+                                        href: roomTypesIndexRoute(property.id),
+                                        icon: Layers,
+                                    },
+                                    {
+                                        label: 'Rooms',
+                                        href: roomsIndexRoute(property.id),
+                                        icon: DoorClosed,
+                                    },
+                                    {
+                                        label: 'Amenities',
+                                        href: `/owner/properties/${property.id}/amenities`,
+                                        icon: Sparkles,
+                                    },
+                                    {
+                                        label: 'Rates & Meals',
+                                        href: `/owner/properties/${property.id}/pricing`,
+                                        icon: Utensils,
+                                    },
+                                    {
+                                        label: 'Photos',
+                                        href: mediaIndexRoute(property.id),
+                                        icon: Camera,
+                                    },
+                                    {
+                                        label: 'Verification',
+                                        href: verificationShowRoute(
+                                            property.id,
+                                        ),
+                                        icon: ShieldCheck,
+                                    },
+                                ];
+
                                 return (
                                     <Card
                                         key={property.id}
-                                        className="flex min-w-0 flex-col overflow-hidden py-0 transition-all hover:border-tijum-coral/40 hover:shadow-md"
+                                        className="group flex min-w-0 flex-col gap-0 overflow-hidden rounded-2xl border-tijum-surface/90 bg-white py-0 shadow-xs transition-all duration-300 hover:-translate-y-0.5 hover:border-tijum-coral/35 hover:shadow-lg dark:border-border dark:bg-card"
                                     >
-                                        <div className="relative aspect-[16/9] w-full bg-tijum-cream dark:bg-muted">
+                                        <Link
+                                            href={showPropertyRoute(
+                                                property.id,
+                                            )}
+                                            className="relative block aspect-[16/9] w-full overflow-hidden bg-tijum-cream dark:bg-muted"
+                                        >
                                             {thumbSrc ? (
                                                 <img
                                                     src={thumbSrc}
@@ -508,61 +543,78 @@ export default function OwnerPropertiesIndex({
                                                             ?.alt_text ??
                                                         property.name
                                                     }
-                                                    className="size-full object-cover"
+                                                    className="size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
                                                 />
                                             ) : (
-                                                <div className="flex size-full flex-col items-center justify-center gap-1 text-tijum-plum-muted dark:text-muted-foreground">
+                                                <div className="flex size-full flex-col items-center justify-center gap-1.5 text-tijum-plum-muted dark:text-muted-foreground">
                                                     <Camera
-                                                        className="size-6"
+                                                        className="size-7 opacity-70"
                                                         aria-hidden="true"
                                                     />
-                                                    <span className="text-xs">
+                                                    <span className="text-xs font-medium">
                                                         No cover photo yet
                                                     </span>
                                                 </div>
                                             )}
-                                            <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
-                                                <Badge variant="plum">
+                                            <div
+                                                className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-black/20"
+                                                aria-hidden="true"
+                                            />
+                                            <div className="absolute top-3.5 left-3.5 flex flex-wrap items-center gap-1.5">
+                                                <span className="inline-flex items-center rounded-full bg-tijum-plum/85 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-white shadow-xs backdrop-blur-md">
                                                     {
                                                         property.property_reference
                                                     }
-                                                </Badge>
+                                                </span>
                                                 {property.is_amendment_active && (
-                                                    <Badge variant="default">
+                                                    <span className="inline-flex items-center rounded-full bg-tijum-coral px-2.5 py-1 text-[11px] font-semibold text-white shadow-xs">
                                                         Amendment Active
-                                                    </Badge>
+                                                    </span>
                                                 )}
                                             </div>
-                                        </div>
-
-                                        <CardHeader className="pt-4 pb-2">
-                                            <div className="flex flex-wrap items-start justify-between gap-2">
-                                                <CardTitle className="min-w-0 text-lg wrap-break-word">
-                                                    {property.name}
-                                                </CardTitle>
-                                            </div>
-                                            <CardDescription className="flex flex-wrap items-center gap-1.5 text-xs">
-                                                <span>
-                                                    {property.category?.name ??
-                                                        'Category'}
-                                                </span>
-                                                <span aria-hidden="true">
-                                                    ·
-                                                </span>
-                                                <span className="inline-flex items-center gap-1">
-                                                    <MapPin
-                                                        className="size-3"
+                                            <div className="absolute bottom-3.5 left-3.5">
+                                                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-semibold text-tijum-plum shadow-xs backdrop-blur-md dark:bg-card/90 dark:text-foreground">
+                                                    <Building2
+                                                        className="size-3 text-tijum-coral"
                                                         aria-hidden="true"
                                                     />
-                                                    {property.locality},{' '}
-                                                    {property.city?.name ?? ''}
+                                                    <span>
+                                                        {property.category
+                                                            ?.name ??
+                                                            'Property'}
+                                                    </span>
                                                 </span>
-                                            </CardDescription>
-                                        </CardHeader>
+                                            </div>
+                                        </Link>
 
-                                        <CardContent className="flex flex-1 flex-col justify-between gap-4 pb-5">
-                                            <div className="space-y-3">
-                                                <div className="flex flex-wrap gap-1.5">
+                                        <div className="flex flex-1 flex-col gap-4 p-5">
+                                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                                <div className="min-w-0 flex-1 space-y-1">
+                                                    <h3 className="font-heading text-lg leading-snug font-bold tracking-tight text-tijum-plum wrap-break-word dark:text-foreground">
+                                                        <Link
+                                                            href={showPropertyRoute(
+                                                                property.id,
+                                                            )}
+                                                            className="transition-colors hover:text-tijum-coral"
+                                                        >
+                                                            {property.name}
+                                                        </Link>
+                                                    </h3>
+                                                    <p className="flex items-center gap-1.5 text-xs text-tijum-plum-muted dark:text-muted-foreground">
+                                                        <MapPin
+                                                            className="size-3.5 shrink-0 text-tijum-coral/80"
+                                                            aria-hidden="true"
+                                                        />
+                                                        <span className="truncate">
+                                                            {property.locality}
+                                                            {property.city?.name
+                                                                ? `, ${property.city.name}`
+                                                                : ''}
+                                                        </span>
+                                                    </p>
+                                                </div>
+
+                                                <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                                                     <StatusBadge
                                                         status={
                                                             propertyVerificationStatusMap[
@@ -585,122 +637,82 @@ export default function OwnerPropertiesIndex({
                                                         }
                                                     />
                                                 </div>
-
-                                                <dl className="grid grid-cols-3 gap-2 rounded-xl border border-tijum-surface bg-tijum-cream/35 p-2.5 text-center text-xs tabular-nums dark:border-border dark:bg-muted/45">
-                                                    <div>
-                                                        <dt className="text-tijum-plum-muted dark:text-muted-foreground">
-                                                            Room Types
-                                                        </dt>
-                                                        <dd className="font-heading text-sm font-bold text-tijum-plum dark:text-foreground">
-                                                            {
-                                                                property.room_types_count
-                                                            }
-                                                        </dd>
-                                                    </div>
-                                                    <div>
-                                                        <dt className="text-tijum-plum-muted dark:text-muted-foreground">
-                                                            Rooms
-                                                        </dt>
-                                                        <dd className="font-heading text-sm font-bold text-tijum-plum dark:text-foreground">
-                                                            {
-                                                                property.rooms_count
-                                                            }
-                                                        </dd>
-                                                    </div>
-                                                    <div>
-                                                        <dt className="text-tijum-plum-muted dark:text-muted-foreground">
-                                                            Active Cap.
-                                                        </dt>
-                                                        <dd className="font-heading text-sm font-bold text-tijum-plum dark:text-foreground">
-                                                            {
-                                                                property.nominal_active_capacity
-                                                            }
-                                                        </dd>
-                                                    </div>
-                                                </dl>
                                             </div>
 
-                                            <div className="flex flex-wrap gap-2 border-t border-tijum-surface pt-3 dark:border-border">
-                                                <Button size="sm" asChild>
-                                                    <Link
-                                                        href={showPropertyRoute(
-                                                            property.id,
-                                                        )}
-                                                    >
-                                                        Manage Property
-                                                    </Link>
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    asChild
-                                                >
-                                                    <Link
-                                                        href={roomTypesIndexRoute(
-                                                            property.id,
-                                                        )}
-                                                    >
+                                            <dl className="grid grid-cols-3 divide-x divide-tijum-surface/80 rounded-xl border border-tijum-surface/80 bg-tijum-cream/35 py-2.5 text-center tabular-nums dark:divide-border dark:border-border dark:bg-muted/35">
+                                                <div className="px-2">
+                                                    <dd className="font-heading text-base leading-tight font-bold text-tijum-plum dark:text-foreground">
+                                                        {
+                                                            property.room_types_count
+                                                        }
+                                                    </dd>
+                                                    <dt className="mt-0.5 text-[11px] font-medium text-tijum-plum-muted dark:text-muted-foreground">
                                                         Room Types
-                                                    </Link>
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    asChild
+                                                    </dt>
+                                                </div>
+                                                <div className="px-2">
+                                                    <dd className="font-heading text-base leading-tight font-bold text-tijum-plum dark:text-foreground">
+                                                        {property.rooms_count}
+                                                    </dd>
+                                                    <dt className="mt-0.5 text-[11px] font-medium text-tijum-plum-muted dark:text-muted-foreground">
+                                                        Physical Rooms
+                                                    </dt>
+                                                </div>
+                                                <div className="px-2">
+                                                    <dd className="font-heading text-base leading-tight font-bold text-tijum-plum dark:text-foreground">
+                                                        {
+                                                            property.nominal_active_capacity
+                                                        }
+                                                    </dd>
+                                                    <dt className="mt-0.5 text-[11px] font-medium text-tijum-plum-muted dark:text-muted-foreground">
+                                                        Active Capacity
+                                                    </dt>
+                                                </div>
+                                            </dl>
+
+                                            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                                                {quickLinks.map((item) => {
+                                                    const Icon = item.icon;
+
+                                                    return (
+                                                        <Link
+                                                            key={item.label}
+                                                            href={item.href}
+                                                            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-tijum-surface/90 bg-white px-2.5 py-2 text-xs font-medium text-tijum-plum transition-colors hover:border-tijum-coral/40 hover:bg-tijum-cream/55 hover:text-tijum-coral dark:border-border dark:bg-background/60 dark:text-foreground dark:hover:border-tijum-coral/50 dark:hover:bg-muted"
+                                                        >
+                                                            <Icon
+                                                                className="size-3.5 shrink-0 opacity-75"
+                                                                aria-hidden="true"
+                                                            />
+                                                            <span className="truncate">
+                                                                {item.label}
+                                                            </span>
+                                                        </Link>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-auto flex flex-wrap items-center justify-between gap-2.5 border-t border-tijum-surface/80 bg-tijum-cream/25 px-5 py-3.5 dark:border-border dark:bg-muted/25">
+                                            <Button
+                                                size="sm"
+                                                asChild
+                                                className="shadow-xs"
+                                            >
+                                                <Link
+                                                    href={showPropertyRoute(
+                                                        property.id,
+                                                    )}
                                                 >
-                                                    <Link
-                                                        href={`/owner/properties/${property.id}/pricing`}
-                                                    >
-                                                        <Utensils
-                                                            className="size-3.5"
-                                                            aria-hidden="true"
-                                                        />
-                                                        <span>Food &amp; Pricing</span>
-                                                    </Link>
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    asChild
-                                                >
-                                                    <Link
-                                                        href={roomsIndexRoute(
-                                                            property.id,
-                                                        )}
-                                                    >
-                                                        <DoorClosed
-                                                            className="size-3.5"
-                                                            aria-hidden="true"
-                                                        />
-                                                        <span>Rooms</span>
-                                                    </Link>
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    asChild
-                                                >
-                                                    <Link
-                                                        href={mediaIndexRoute(
-                                                            property.id,
-                                                        )}
-                                                    >
-                                                        Photos
-                                                    </Link>
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="plum"
-                                                    asChild
-                                                >
-                                                    <Link
-                                                        href={verificationShowRoute(
-                                                            property.id,
-                                                        )}
-                                                    >
-                                                        Verification
-                                                    </Link>
-                                                </Button>
+                                                    <span>Manage Property</span>
+                                                    <ArrowRight
+                                                        className="size-3.5"
+                                                        aria-hidden="true"
+                                                    />
+                                                </Link>
+                                            </Button>
+
+                                            <div className="flex flex-wrap items-center gap-2">
                                                 {property.can_toggle_operational_status &&
                                                     property.status ===
                                                         'active' && (
@@ -764,7 +776,7 @@ export default function OwnerPropertiesIndex({
                                                                 },
                                                             )
                                                         }
-                                                        className="border-rose-300 text-rose-700 hover:bg-rose-600 hover:text-white dark:border-rose-500/50 dark:text-rose-300 dark:hover:bg-rose-600 dark:hover:text-white"
+                                                        className="border-rose-200 bg-white text-rose-700 hover:border-rose-600 hover:bg-rose-600 hover:text-white dark:border-rose-500/40 dark:bg-transparent dark:text-rose-300 dark:hover:bg-rose-600 dark:hover:text-white"
                                                         data-test={`close-property-${property.id}`}
                                                     >
                                                         <PowerOff
@@ -777,7 +789,7 @@ export default function OwnerPropertiesIndex({
                                                     </Button>
                                                 )}
                                             </div>
-                                        </CardContent>
+                                        </div>
                                     </Card>
                                 );
                             })}
