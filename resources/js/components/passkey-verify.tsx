@@ -39,13 +39,13 @@ export default function PasskeyVerify({
     }
 
     return (
-        <div className="mb-5 space-y-5">
+        <div className="mb-5 space-y-4">
             <div className="grid gap-2">
                 <Button
                     type="button"
                     variant="outline"
                     size="lg"
-                    className="w-full border-tijum-surface bg-white text-sm font-semibold text-tijum-plum hover:border-tijum-coral/60 hover:bg-tijum-cream/70"
+                    className="h-12 w-full rounded-xl border-tijum-surface bg-white text-sm font-semibold text-tijum-plum shadow-2xs hover:border-tijum-plum/35 hover:bg-tijum-cream/55"
                     onClick={verify}
                     disabled={isLoading}
                 >
@@ -60,7 +60,7 @@ export default function PasskeyVerify({
                     <span>
                         {isLoading
                             ? (loadingLabel ?? 'Authenticating...')
-                            : (label ?? 'Sign in with a passkey')}
+                            : (label ?? 'Continue with passkey')}
                     </span>
                 </Button>
                 {error && <InputError message={error} className="text-center" />}
@@ -68,14 +68,14 @@ export default function PasskeyVerify({
 
             <div className="relative flex items-center gap-3">
                 <span
-                    className="h-px flex-1 bg-tijum-surface"
+                    className="h-px flex-1 bg-tijum-surface/85"
                     aria-hidden="true"
                 />
-                <span className="font-heading text-[11px] font-semibold tracking-[0.14em] text-tijum-plum-muted uppercase">
-                    {separator ?? 'Or continue with email'}
+                <span className="text-xs font-medium text-tijum-plum-muted">
+                    {separator ?? 'or sign in with password'}
                 </span>
                 <span
-                    className="h-px flex-1 bg-tijum-surface"
+                    className="h-px flex-1 bg-tijum-surface/85"
                     aria-hidden="true"
                 />
             </div>

@@ -1,5 +1,5 @@
 import { Form, Head } from '@inertiajs/react';
-import { ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Lock, Mail, ShieldCheck } from 'lucide-react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
@@ -30,19 +30,33 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
                     <>
                         <div className="grid gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    name="email"
-                                    autoComplete="email"
-                                    value={email}
-                                    readOnly
-                                    aria-invalid={Boolean(errors.email)}
-                                    aria-describedby={
-                                        errors.email ? 'email-error' : undefined
-                                    }
-                                />
+                                <Label
+                                    htmlFor="email"
+                                    className="text-[13px] font-semibold text-tijum-plum"
+                                >
+                                    Account email
+                                </Label>
+                                <div className="relative">
+                                    <Mail
+                                        className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-tijum-plum-muted/75"
+                                        aria-hidden="true"
+                                    />
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        name="email"
+                                        autoComplete="email"
+                                        value={email}
+                                        readOnly
+                                        className="bg-tijum-cream/60 pl-10"
+                                        aria-invalid={Boolean(errors.email)}
+                                        aria-describedby={
+                                            errors.email
+                                                ? 'email-error'
+                                                : undefined
+                                        }
+                                    />
+                                </div>
                                 <InputError
                                     id="email-error"
                                     message={errors.email}
@@ -50,22 +64,34 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="password">New password</Label>
-                                <PasswordInput
-                                    id="password"
-                                    name="password"
-                                    required
-                                    autoComplete="new-password"
-                                    autoFocus
-                                    placeholder="Choose a strong password"
-                                    passwordrules={passwordRules}
-                                    aria-invalid={Boolean(errors.password)}
-                                    aria-describedby={
-                                        errors.password
-                                            ? 'password-error'
-                                            : undefined
-                                    }
-                                />
+                                <Label
+                                    htmlFor="password"
+                                    className="text-[13px] font-semibold text-tijum-plum"
+                                >
+                                    New password
+                                </Label>
+                                <div className="relative">
+                                    <Lock
+                                        className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-tijum-plum-muted/80"
+                                        aria-hidden="true"
+                                    />
+                                    <PasswordInput
+                                        id="password"
+                                        name="password"
+                                        required
+                                        autoComplete="new-password"
+                                        autoFocus
+                                        placeholder="Choose a strong password"
+                                        passwordrules={passwordRules}
+                                        className="bg-white pl-10 shadow-2xs"
+                                        aria-invalid={Boolean(errors.password)}
+                                        aria-describedby={
+                                            errors.password
+                                                ? 'password-error'
+                                                : undefined
+                                        }
+                                    />
+                                </div>
                                 <InputError
                                     id="password-error"
                                     message={errors.password}
@@ -73,25 +99,35 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="password_confirmation">
+                                <Label
+                                    htmlFor="password_confirmation"
+                                    className="text-[13px] font-semibold text-tijum-plum"
+                                >
                                     Confirm new password
                                 </Label>
-                                <PasswordInput
-                                    id="password_confirmation"
-                                    name="password_confirmation"
-                                    required
-                                    autoComplete="new-password"
-                                    placeholder="Re-enter your new password"
-                                    passwordrules={passwordRules}
-                                    aria-invalid={Boolean(
-                                        errors.password_confirmation,
-                                    )}
-                                    aria-describedby={
-                                        errors.password_confirmation
-                                            ? 'password-confirmation-error'
-                                            : undefined
-                                    }
-                                />
+                                <div className="relative">
+                                    <Lock
+                                        className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-tijum-plum-muted/80"
+                                        aria-hidden="true"
+                                    />
+                                    <PasswordInput
+                                        id="password_confirmation"
+                                        name="password_confirmation"
+                                        required
+                                        autoComplete="new-password"
+                                        placeholder="Re-enter your new password"
+                                        passwordrules={passwordRules}
+                                        className="bg-white pl-10 shadow-2xs"
+                                        aria-invalid={Boolean(
+                                            errors.password_confirmation,
+                                        )}
+                                        aria-describedby={
+                                            errors.password_confirmation
+                                                ? 'password-confirmation-error'
+                                                : undefined
+                                        }
+                                    />
+                                </div>
                                 <InputError
                                     id="password-confirmation-error"
                                     message={errors.password_confirmation}
@@ -102,7 +138,7 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
                         <Button
                             type="submit"
                             size="lg"
-                            className="w-full"
+                            className="h-12 w-full rounded-xl"
                             loading={processing}
                             data-test="reset-password-button"
                         >
@@ -110,15 +146,19 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
                                 className="size-4"
                                 aria-hidden="true"
                             />
-                            <span>Reset password</span>
+                            <span>Update password</span>
                         </Button>
 
-                        <div className="border-t border-tijum-surface/80 pt-5 text-center">
+                        <div className="pt-1 text-center">
                             <TextLink
                                 href={login()}
-                                className="text-sm font-semibold text-tijum-plum"
+                                className="inline-flex items-center gap-1.5 text-sm font-semibold text-tijum-plum no-underline hover:text-tijum-coral"
                             >
-                                Back to log in
+                                <ArrowLeft
+                                    className="size-3.5"
+                                    aria-hidden="true"
+                                />
+                                <span>Back to log in</span>
                             </TextLink>
                         </div>
                     </>
@@ -131,7 +171,7 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
 ResetPassword.authMeta = {
     title: 'Choose a new password',
     description:
-        'Create a fresh password for your TIJUM customer account below.',
+        'Set a fresh password to secure your TIJUM customer account.',
 };
 
 ResetPassword.layout = ResetPassword.authMeta;

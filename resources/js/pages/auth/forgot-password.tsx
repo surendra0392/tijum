@@ -1,5 +1,5 @@
 import { Form, Head } from '@inertiajs/react';
-import { ArrowRight, KeyRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, KeyRound, Mail, MailCheck } from 'lucide-react';
 import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -14,8 +14,19 @@ export default function ForgotPassword({ status }: { status?: string }) {
         <>
             <Head title="Forgot password" />
 
+            <div className="mb-6 flex items-center gap-3 rounded-2xl border border-tijum-surface/85 bg-tijum-cream/55 p-3.5">
+                <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-tijum-coral shadow-2xs ring-1 ring-tijum-surface/70">
+                    <KeyRound className="size-4" aria-hidden="true" />
+                </span>
+                <p className="text-xs leading-relaxed text-tijum-plum-muted">
+                    We will send a secure reset link to your registered email
+                    address or mobile number.
+                </p>
+            </div>
+
             {status && (
-                <Alert variant="info" className="mb-5">
+                <Alert variant="success" className="mb-5">
+                    <MailCheck aria-hidden="true" />
                     <AlertDescription>{status}</AlertDescription>
                 </Alert>
             )}
@@ -23,36 +34,33 @@ export default function ForgotPassword({ status }: { status?: string }) {
             <Form {...email.form()} className="flex flex-col gap-5">
                 {({ processing, errors }) => (
                     <>
-                        <div className="flex items-start gap-3 rounded-xl border border-tijum-surface bg-tijum-cream/55 p-3.5 text-xs leading-relaxed text-tijum-plum-muted">
-                            <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-tijum-peach/30 text-tijum-plum">
-                                <KeyRound
-                                    className="size-4"
+                        <div className="grid gap-2">
+                            <Label
+                                htmlFor="email"
+                                className="text-[13px] font-semibold text-tijum-plum"
+                            >
+                                Email or mobile number
+                            </Label>
+                            <div className="relative">
+                                <Mail
+                                    className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-tijum-plum-muted/80"
                                     aria-hidden="true"
                                 />
-                            </span>
-                            <p>
-                                We will send a secure password reset link to
-                                your registered email address or mobile number.
-                            </p>
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label htmlFor="email">
-                                Email or Mobile Number
-                            </Label>
-                            <Input
-                                id="email"
-                                type="text"
-                                name="email"
-                                required
-                                autoComplete="username"
-                                autoFocus
-                                placeholder="you@example.com or 10-digit mobile"
-                                aria-invalid={Boolean(errors.email)}
-                                aria-describedby={
-                                    errors.email ? 'email-error' : undefined
-                                }
-                            />
+                                <Input
+                                    id="email"
+                                    type="text"
+                                    name="email"
+                                    required
+                                    autoComplete="username"
+                                    autoFocus
+                                    placeholder="you@example.com or 10-digit mobile"
+                                    className="bg-white pl-10 shadow-2xs"
+                                    aria-invalid={Boolean(errors.email)}
+                                    aria-describedby={
+                                        errors.email ? 'email-error' : undefined
+                                    }
+                                />
+                            </div>
                             <InputError
                                 id="email-error"
                                 message={errors.email}
@@ -62,27 +70,28 @@ export default function ForgotPassword({ status }: { status?: string }) {
                         <Button
                             type="submit"
                             size="lg"
-                            className="w-full"
+                            className="h-12 w-full rounded-xl"
                             loading={processing}
                             data-test="email-password-reset-link-button"
                         >
-                            <span>Send password reset instructions</span>
+                            <span>Send reset instructions</span>
                             <ArrowRight
                                 className="size-4"
                                 aria-hidden="true"
                             />
                         </Button>
 
-                        <div className="border-t border-tijum-surface/80 pt-5 text-center">
-                            <p className="text-sm text-tijum-plum-muted">
-                                Remembered your password?{' '}
-                                <TextLink
-                                    href={login()}
-                                    className="font-semibold text-tijum-plum"
-                                >
-                                    Back to log in
-                                </TextLink>
-                            </p>
+                        <div className="pt-1 text-center">
+                            <TextLink
+                                href={login()}
+                                className="inline-flex items-center gap-1.5 text-sm font-semibold text-tijum-plum no-underline hover:text-tijum-coral"
+                            >
+                                <ArrowLeft
+                                    className="size-3.5"
+                                    aria-hidden="true"
+                                />
+                                <span>Back to log in</span>
+                            </TextLink>
                         </div>
                     </>
                 )}
@@ -92,9 +101,9 @@ export default function ForgotPassword({ status }: { status?: string }) {
 }
 
 ForgotPassword.authMeta = {
-    title: 'Reset your password',
+    title: 'Forgot password?',
     description:
-        'Enter your registered email address or mobile number to receive password reset instructions.',
+        'Enter your registered email or mobile number and we will send password reset instructions.',
 };
 
 ForgotPassword.layout = ForgotPassword.authMeta;

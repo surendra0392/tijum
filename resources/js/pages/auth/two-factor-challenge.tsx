@@ -1,6 +1,6 @@
 import { Form, Head, setLayoutProps } from '@inertiajs/react';
 import { REGEXP_ONLY_DIGITS } from 'input-otp';
-import { KeyRound, ShieldCheck } from 'lucide-react';
+import { ArrowRight, KeyRound, ShieldCheck } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -25,18 +25,18 @@ export default function TwoFactorChallenge() {
     }>(() => {
         if (showRecoveryInput) {
             return {
-                title: 'Recovery code',
+                title: 'Use a recovery code',
                 description:
-                    'Please confirm access to your account by entering one of your emergency recovery codes.',
-                toggleText: 'Sign in with an authenticator code',
+                    'Enter one of your single-use emergency recovery codes to access your account.',
+                toggleText: 'Sign in with an authenticator code instead',
             };
         }
 
         return {
             title: 'Two-factor verification',
             description:
-                'Enter the 6-digit authentication code from your authenticator application.',
-            toggleText: 'Use an emergency recovery code',
+                'Enter the 6-digit code from your authenticator app to finish signing in.',
+            toggleText: 'Use an emergency recovery code instead',
         };
     }, [showRecoveryInput]);
 
@@ -46,7 +46,7 @@ export default function TwoFactorChallenge() {
     });
 
     const toggleRecoveryMode = (clearErrors: () => void): void => {
-        setShowRecoveryInput(!showRecoveryInput);
+        setShowRecoveryInput((prev) => !prev);
         clearErrors();
         setCode('');
     };
@@ -65,39 +65,50 @@ export default function TwoFactorChallenge() {
                     <>
                         {showRecoveryInput ? (
                             <div className="space-y-4">
-                                <div className="flex items-start gap-3 rounded-xl border border-tijum-surface bg-tijum-cream/55 p-3.5 text-xs leading-relaxed text-tijum-plum-muted">
-                                    <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-tijum-peach/30 text-tijum-plum">
+                                <div className="flex items-center gap-3 rounded-2xl border border-tijum-surface/85 bg-tijum-cream/55 p-3.5">
+                                    <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-tijum-coral shadow-2xs ring-1 ring-tijum-surface/70">
                                         <KeyRound
                                             className="size-4"
                                             aria-hidden="true"
                                         />
                                     </span>
-                                    <p>
-                                        Enter one of the single-use emergency
-                                        recovery codes saved during setup.
+                                    <p className="text-xs leading-relaxed text-tijum-plum-muted">
+                                        Enter one of the single-use recovery
+                                        codes you saved when enabling two-factor
+                                        authentication.
                                     </p>
                                 </div>
+
                                 <div className="grid gap-2">
-                                    <Label htmlFor="recovery_code">
+                                    <Label
+                                        htmlFor="recovery_code"
+                                        className="text-[13px] font-semibold text-tijum-plum"
+                                    >
                                         Emergency recovery code
                                     </Label>
-                                    <Input
-                                        id="recovery_code"
-                                        name="recovery_code"
-                                        type="text"
-                                        placeholder="xxxxxxxxxx-xxxxxxxxxx"
-                                        autoFocus={showRecoveryInput}
-                                        required
-                                        className="font-mono"
-                                        aria-invalid={Boolean(
-                                            errors.recovery_code,
-                                        )}
-                                        aria-describedby={
-                                            errors.recovery_code
-                                                ? 'recovery-code-error'
-                                                : undefined
-                                        }
-                                    />
+                                    <div className="relative">
+                                        <KeyRound
+                                            className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-tijum-plum-muted/80"
+                                            aria-hidden="true"
+                                        />
+                                        <Input
+                                            id="recovery_code"
+                                            name="recovery_code"
+                                            type="text"
+                                            placeholder="xxxxxxxxxx-xxxxxxxxxx"
+                                            autoFocus={showRecoveryInput}
+                                            required
+                                            className="bg-white pl-10 font-mono shadow-2xs"
+                                            aria-invalid={Boolean(
+                                                errors.recovery_code,
+                                            )}
+                                            aria-describedby={
+                                                errors.recovery_code
+                                                    ? 'recovery-code-error'
+                                                    : undefined
+                                            }
+                                        />
+                                    </div>
                                     <InputError
                                         id="recovery-code-error"
                                         message={errors.recovery_code}
@@ -105,14 +116,25 @@ export default function TwoFactorChallenge() {
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex flex-col items-center justify-center space-y-4 rounded-2xl border border-tijum-surface bg-tijum-cream/50 px-4 py-6 text-center">
-                                <span className="inline-flex size-10 items-center justify-center rounded-xl bg-tijum-peach/35 text-tijum-plum">
+                            <div className="flex flex-col items-center justify-center space-y-4 rounded-2xl border border-tijum-surface/85 bg-tijum-cream/50 px-4 py-6 text-center">
+                                <span className="inline-flex size-11 items-center justify-center rounded-2xl bg-white text-tijum-coral shadow-2xs ring-1 ring-tijum-surface/70">
                                     <ShieldCheck
                                         className="size-5"
                                         aria-hidden="true"
                                     />
                                 </span>
-                                <div className="flex w-full items-center justify-center">
+
+                                <div className="space-y-1">
+                                    <p className="font-heading text-xs font-semibold text-tijum-plum">
+                                        6-digit authenticator code
+                                    </p>
+                                    <p className="text-xs text-tijum-plum-muted">
+                                        Refreshes every 30 seconds in your
+                                        authenticator app
+                                    </p>
+                                </div>
+
+                                <div className="flex w-full items-center justify-center pt-1">
                                     <InputOTP
                                         name="code"
                                         maxLength={OTP_MAX_LENGTH}
@@ -122,13 +144,14 @@ export default function TwoFactorChallenge() {
                                         pattern={REGEXP_ONLY_DIGITS}
                                         autoFocus
                                     >
-                                        <InputOTPGroup>
+                                        <InputOTPGroup className="gap-2 sm:gap-2.5">
                                             {Array.from(
                                                 { length: OTP_MAX_LENGTH },
                                                 (_, index) => (
                                                     <InputOTPSlot
                                                         key={index}
                                                         index={index}
+                                                        className="h-12 w-10 rounded-xl border border-tijum-surface bg-white text-base font-bold text-tijum-plum shadow-2xs first:rounded-xl last:rounded-xl sm:h-13 sm:w-11 sm:text-lg"
                                                     />
                                                 ),
                                             )}
@@ -142,16 +165,20 @@ export default function TwoFactorChallenge() {
                         <Button
                             type="submit"
                             size="lg"
-                            className="w-full"
+                            className="h-12 w-full rounded-xl"
                             loading={processing}
                         >
-                            Continue
+                            <span>Verify &amp; continue</span>
+                            <ArrowRight
+                                className="size-4"
+                                aria-hidden="true"
+                            />
                         </Button>
 
-                        <div className="border-t border-tijum-surface/80 pt-5 text-center text-sm text-tijum-plum-muted">
+                        <div className="pt-1 text-center">
                             <button
                                 type="button"
-                                className="cursor-pointer font-heading text-xs font-semibold text-tijum-plum underline decoration-tijum-coral/60 underline-offset-4 transition-colors hover:text-tijum-coral"
+                                className="cursor-pointer font-heading text-xs font-semibold text-tijum-plum-muted underline decoration-tijum-surface underline-offset-4 transition-colors hover:text-tijum-plum hover:decoration-tijum-coral"
                                 onClick={() => toggleRecoveryMode(clearErrors)}
                             >
                                 {authConfigContent.toggleText}
@@ -165,9 +192,9 @@ export default function TwoFactorChallenge() {
 }
 
 TwoFactorChallenge.authMeta = {
-    title: 'Two-factor confirmation',
+    title: 'Two-factor verification',
     description:
-        'Please confirm access to your account by entering the authentication code provided by your authenticator application.',
+        'Enter the 6-digit code from your authenticator app to finish signing in.',
 };
 
 TwoFactorChallenge.layout = TwoFactorChallenge.authMeta;

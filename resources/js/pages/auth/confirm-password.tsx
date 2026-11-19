@@ -1,5 +1,5 @@
 import { Form, Head } from '@inertiajs/react';
-import { ShieldCheck } from 'lucide-react';
+import { Lock, ShieldCheck } from 'lucide-react';
 import {
     index as confirmOptions,
     store as confirmStore,
@@ -16,13 +16,13 @@ export default function ConfirmPassword() {
         <>
             <Head title="Confirm password" />
 
-            <div className="mb-5 flex items-start gap-3 rounded-xl border border-tijum-surface bg-tijum-cream/55 p-3.5 text-xs leading-relaxed text-tijum-plum-muted">
-                <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-tijum-peach/30 text-tijum-plum">
+            <div className="mb-6 flex items-center gap-3 rounded-2xl border border-tijum-surface/85 bg-tijum-cream/55 p-3.5">
+                <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-tijum-coral shadow-2xs ring-1 ring-tijum-surface/70">
                     <ShieldCheck className="size-4" aria-hidden="true" />
                 </span>
-                <p>
-                    Security checkpoint required before modifying sensitive
-                    account or authentication preferences.
+                <p className="text-xs leading-relaxed text-tijum-plum-muted">
+                    Quick security check before updating sensitive account or
+                    authentication settings.
                 </p>
             </div>
 
@@ -33,7 +33,7 @@ export default function ConfirmPassword() {
                 }}
                 label="Confirm with passkey"
                 loadingLabel="Confirming..."
-                separator="Or confirm with password"
+                separator="or confirm with password"
             />
 
             <Form
@@ -44,21 +44,33 @@ export default function ConfirmPassword() {
                 {({ processing, errors }) => (
                     <>
                         <div className="grid gap-2">
-                            <Label htmlFor="password">Password</Label>
-                            <PasswordInput
-                                id="password"
-                                name="password"
-                                required
-                                placeholder="Enter your current password"
-                                autoComplete="current-password"
-                                autoFocus
-                                aria-invalid={Boolean(errors.password)}
-                                aria-describedby={
-                                    errors.password
-                                        ? 'password-error'
-                                        : undefined
-                                }
-                            />
+                            <Label
+                                htmlFor="password"
+                                className="text-[13px] font-semibold text-tijum-plum"
+                            >
+                                Current password
+                            </Label>
+                            <div className="relative">
+                                <Lock
+                                    className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-tijum-plum-muted/80"
+                                    aria-hidden="true"
+                                />
+                                <PasswordInput
+                                    id="password"
+                                    name="password"
+                                    required
+                                    placeholder="Enter your current password"
+                                    autoComplete="current-password"
+                                    autoFocus
+                                    className="bg-white pl-10 shadow-2xs"
+                                    aria-invalid={Boolean(errors.password)}
+                                    aria-describedby={
+                                        errors.password
+                                            ? 'password-error'
+                                            : undefined
+                                    }
+                                />
+                            </div>
                             <InputError
                                 id="password-error"
                                 message={errors.password}
@@ -68,11 +80,15 @@ export default function ConfirmPassword() {
                         <Button
                             type="submit"
                             size="lg"
-                            className="w-full"
+                            className="h-12 w-full rounded-xl"
                             loading={processing}
                             data-test="confirm-password-button"
                         >
-                            Confirm password
+                            <ShieldCheck
+                                className="size-4"
+                                aria-hidden="true"
+                            />
+                            <span>Confirm password</span>
                         </Button>
                     </>
                 )}
@@ -82,9 +98,9 @@ export default function ConfirmPassword() {
 }
 
 ConfirmPassword.authMeta = {
-    title: 'Confirm password',
+    title: 'Confirm your password',
     description:
-        'This is a protected security area. Confirm your password before continuing.',
+        'This is a protected security area. Verify your identity before continuing.',
 };
 
 ConfirmPassword.layout = ConfirmPassword.authMeta;

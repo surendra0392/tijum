@@ -30,7 +30,6 @@ export default function CustomerAuthLayout({
 
     return (
         <AuthSplitLayout
-            portal="customer"
             title={resolvedTitle}
             description={resolvedDescription}
             maxWidth={resolvedMaxWidth}

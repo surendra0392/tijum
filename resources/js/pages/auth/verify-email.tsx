@@ -1,5 +1,5 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import { MailCheck, Send } from 'lucide-react';
+import { CheckCircle2, LogOut, MailCheck, Send } from 'lucide-react';
 import TextLink from '@/components/text-link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ export default function VerifyEmail({ status }: { status?: string }) {
 
             {status === 'verification-link-sent' && (
                 <Alert variant="success" className="mb-5 text-left">
-                    <MailCheck aria-hidden="true" />
+                    <CheckCircle2 aria-hidden="true" />
                     <AlertTitle>Verification link sent</AlertTitle>
                     <AlertDescription>
                         A fresh verification link has been sent to the email
@@ -24,19 +24,45 @@ export default function VerifyEmail({ status }: { status?: string }) {
             )}
 
             <div className="space-y-5">
-                <div className="flex items-start gap-3.5 rounded-2xl border border-tijum-surface bg-tijum-cream/55 p-4 text-sm text-tijum-plum">
-                    <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-tijum-peach/35 text-tijum-plum">
-                        <MailCheck className="size-5" aria-hidden="true" />
-                    </span>
-                    <div className="space-y-1">
-                        <p className="font-heading text-sm font-semibold text-tijum-plum">
-                            Check your email inbox
-                        </p>
-                        <p className="text-xs leading-relaxed text-tijum-plum-muted">
-                            Open the verification link sent to your email
-                            address to activate full customer portal access.
-                        </p>
+                <div className="rounded-2xl border border-tijum-surface/85 bg-tijum-cream/55 p-5">
+                    <div className="flex items-start gap-3.5">
+                        <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-2xl bg-white text-tijum-coral shadow-2xs ring-1 ring-tijum-surface/70">
+                            <MailCheck className="size-5" aria-hidden="true" />
+                        </span>
+                        <div className="space-y-1">
+                            <p className="font-heading text-sm font-semibold text-tijum-plum">
+                                Check your email inbox
+                            </p>
+                            <p className="text-xs leading-relaxed text-tijum-plum-muted">
+                                Open the verification link we sent to activate
+                                full customer access for bookings, wishlists,
+                                and receipts.
+                            </p>
+                        </div>
                     </div>
+
+                    <ul className="mt-4 space-y-1.5 border-t border-tijum-surface/75 pt-3.5 text-xs text-tijum-plum-muted">
+                        <li className="flex items-center gap-2">
+                            <span
+                                className="size-1.5 shrink-0 rounded-full bg-tijum-coral"
+                                aria-hidden="true"
+                            />
+                            <span>
+                                Check Spam or Promotions if it hasn&apos;t
+                                arrived within a minute.
+                            </span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                            <span
+                                className="size-1.5 shrink-0 rounded-full bg-tijum-coral"
+                                aria-hidden="true"
+                            />
+                            <span>
+                                Used the wrong address? Update it directly from
+                                your profile settings.
+                            </span>
+                        </li>
+                    </ul>
                 </div>
 
                 <Form {...send.form()} className="flex flex-col gap-5">
@@ -45,17 +71,17 @@ export default function VerifyEmail({ status }: { status?: string }) {
                             <Button
                                 type="submit"
                                 size="lg"
-                                className="w-full"
+                                className="h-12 w-full rounded-xl"
                                 loading={processing}
                             >
                                 <Send className="size-4" aria-hidden="true" />
                                 <span>Resend verification email</span>
                             </Button>
 
-                            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-tijum-surface/80 pt-5 text-sm">
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-tijum-surface/75 pt-4 text-sm">
                                 <TextLink
                                     href={profileEdit()}
-                                    className="font-semibold"
+                                    className="font-semibold text-tijum-plum"
                                 >
                                     Update email in Profile
                                 </TextLink>
@@ -64,9 +90,13 @@ export default function VerifyEmail({ status }: { status?: string }) {
                                     href={logout()}
                                     method="post"
                                     as="button"
-                                    className="cursor-pointer font-heading text-xs font-semibold text-tijum-plum-muted underline underline-offset-4 transition-colors hover:text-tijum-plum"
+                                    className="inline-flex cursor-pointer items-center gap-1.5 font-heading text-xs font-semibold text-tijum-plum-muted transition-colors hover:text-tijum-plum"
                                 >
-                                    Log out
+                                    <LogOut
+                                        className="size-3.5"
+                                        aria-hidden="true"
+                                    />
+                                    <span>Log out</span>
                                 </Link>
                             </div>
                         </>
@@ -78,9 +108,9 @@ export default function VerifyEmail({ status }: { status?: string }) {
 }
 
 VerifyEmail.authMeta = {
-    title: 'Verify your customer email',
+    title: 'Verify your email',
     description:
-        'Please verify your email address using the link we emailed to you before accessing protected customer pages.',
+        'Confirm your email address using the link we sent before accessing protected customer pages.',
 };
 
 VerifyEmail.layout = VerifyEmail.authMeta;
