@@ -38,6 +38,7 @@ class ReservationData
             'roomType',
             'successfulPayment',
             'review',
+            'user',
         ]);
 
         return [
@@ -52,6 +53,11 @@ class ReservationData
             'review_status' => $reservation->review?->status?->value,
             'property_name' => $reservation->snapshot_property_name ?? $reservation->property?->name,
             'room_type_name' => $reservation->snapshot_room_type_name ?? $reservation->roomType?->name,
+            'contact_name' => $reservation->contact_name ?: $reservation->user?->name,
+            'contact_email' => $reservation->contact_email ?: $reservation->user?->email,
+            'contact_phone' => $reservation->contact_phone ?: $reservation->user?->phone,
+            'guest_gender' => $reservation->guest_gender,
+            'guest_composition' => $reservation->guest_composition,
             'quantity' => $reservation->quantity,
             'quantity_basis' => $reservation->quantity_basis->value,
             'quantity_basis_label' => $reservation->quantityBasisLabel(),
@@ -65,8 +71,10 @@ class ReservationData
             'requested_arrival_time' => $this->timeValue($reservation->requested_arrival_time),
             'is_checked_in' => $reservation->checked_in_at !== null,
             'checked_in_at' => $reservation->checked_in_at?->toISOString(),
+            'check_in_notes' => $reservation->check_in_notes,
             'is_checked_out' => $reservation->checked_out_at !== null,
             'checked_out_at' => $reservation->checked_out_at?->toISOString(),
+            'checkout_notes' => $reservation->checkout_notes,
             'created_at' => $reservation->created_at?->toISOString(),
         ];
     }
@@ -150,10 +158,13 @@ class ReservationData
             }
         }
 
+        if ($viewer === 'owner' || $viewer === 'admin') {
+            $data['customer_name'] = $reservation->user?->name ?: $reservation->contact_name;
+            $data['customer_email'] = $reservation->user?->email ?: $reservation->contact_email;
+            $data['customer_phone'] = $reservation->user?->phone ?: $reservation->contact_phone;
+        }
+
         if ($viewer === 'admin') {
-            $data['customer_name'] = $reservation->user?->name;
-            $data['customer_email'] = $reservation->user?->email;
-            $data['customer_phone'] = $reservation->user?->phone;
             $data['owner_name'] = $reservation->property?->owner?->name;
         }
 

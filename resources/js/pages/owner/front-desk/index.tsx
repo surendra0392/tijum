@@ -15,6 +15,7 @@ import {
     KeyRound,
     LogIn,
     LogOut,
+    Mail,
     Phone,
     Search,
     UserCheck,
@@ -66,6 +67,8 @@ type FrontDeskReservation = {
     guest_name: string;
     guest_phone?: string | null;
     guest_email?: string | null;
+    guest_gender?: string | null;
+    guest_composition?: string | null;
     guests_count: number;
     check_in_date: string;
     checkout_date: string;
@@ -102,6 +105,7 @@ type Props = {
         departures_count: number;
         in_house_count: number;
         upcoming_count: number;
+        checked_out_count?: number;
         unallocated_count: number;
     };
     arrivals: FrontDeskReservation[];
@@ -329,10 +333,22 @@ export default function OwnerFrontDeskIndex({
                                 {res.stay_nights === 1 ? '' : 's'})
                             </span>
                             {res.guest_phone && (
-                                <span className="flex items-center gap-1">
-                                    <Phone className="size-3.5" />
-                                    {res.guest_phone}
-                                </span>
+                                <a
+                                    href={`tel:${res.guest_phone}`}
+                                    className="flex items-center gap-1 font-medium text-tijum-plum hover:text-tijum-coral dark:text-foreground"
+                                >
+                                    <Phone className="size-3.5 text-tijum-coral" />
+                                    <span>{res.guest_phone}</span>
+                                </a>
+                            )}
+                            {res.guest_email && (
+                                <a
+                                    href={`mailto:${res.guest_email}`}
+                                    className="flex items-center gap-1 text-tijum-plum-muted hover:text-tijum-plum dark:text-muted-foreground dark:hover:text-foreground"
+                                >
+                                    <Mail className="size-3.5 text-tijum-coral" />
+                                    <span>{res.guest_email}</span>
+                                </a>
                             )}
                             <span>Total: ₹{res.total_amount_rupees}</span>
                         </div>
@@ -511,7 +527,7 @@ export default function OwnerFrontDeskIndex({
             )}
 
             {/* KPI Summary Cards */}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
                 <Card
                     onClick={() => setSelectedTab('arrivals')}
                     className={`cursor-pointer border-tijum-surface/80 transition-all hover:border-tijum-coral hover:shadow-md dark:border-border ${
@@ -615,6 +631,32 @@ export default function OwnerFrontDeskIndex({
                         </span>
                     </CardContent>
                 </Card>
+
+                <Card
+                    onClick={() => setSelectedTab('history')}
+                    className={`cursor-pointer border-tijum-surface/80 transition-all hover:border-tijum-coral hover:shadow-md dark:border-border ${
+                        selectedTab === 'history'
+                            ? 'border-tijum-coral ring-2 ring-tijum-coral/25 dark:border-tijum-coral'
+                            : ''
+                    }`}
+                >
+                    <CardHeader className="p-4 pb-1">
+                        <div className="flex items-center justify-between">
+                            <CardDescription className="text-xs font-medium">
+                                Checked-Out Guests
+                            </CardDescription>
+                            <DoorClosed className="size-4 text-tijum-coral" />
+                        </div>
+                        <CardTitle className="font-heading text-2xl font-bold tabular-nums text-tijum-plum dark:text-foreground">
+                            {stats.checked_out_count ?? history.length}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-1">
+                        <span className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
+                            Completed stays &amp; records
+                        </span>
+                    </CardContent>
+                </Card>
             </div>
 
             {/* Unallocated alert banner if any */}
@@ -670,8 +712,11 @@ export default function OwnerFrontDeskIndex({
                             <span>Upcoming ({stats.upcoming_count})</span>
                         </TabsTrigger>
                         <TabsTrigger value="history" className="gap-2">
-                            <Clock className="size-4" />
-                            <span>Recent Logs</span>
+                            <DoorClosed className="size-4" />
+                            <span>
+                                Checked-Out Guests (
+                                {stats.checked_out_count ?? history.length})
+                            </span>
                         </TabsTrigger>
                     </TabsList>
 

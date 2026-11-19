@@ -44,6 +44,9 @@ class OwnerFrontDeskController extends Controller
         if ($search !== '') {
             $baseQuery->where(function ($q) use ($search): void {
                 $q->where('booking_reference', 'like', "%{$search}%")
+                    ->orWhere('contact_name', 'like', "%{$search}%")
+                    ->orWhere('contact_phone', 'like', "%{$search}%")
+                    ->orWhere('contact_email', 'like', "%{$search}%")
                     ->orWhereHas('user', function ($uq) use ($search): void {
                         $uq->where('name', 'like', "%{$search}%")
                             ->orWhere('phone', 'like', "%{$search}%")
@@ -92,11 +95,11 @@ class OwnerFrontDeskController extends Controller
 
         $upcoming = $upcomingQuery->get()->map(fn (Reservation $res): array => $this->formatReservation($res));
 
-        // 5. Recent Departures / History
+        // 5. Checked-Out Guests / Recent Departures History
         $historyQuery = (clone $baseQuery)
             ->whereNotNull('checked_out_at')
             ->latest('checked_out_at')
-            ->limit(20);
+            ->limit(50);
 
         $history = $historyQuery->get()->map(fn (Reservation $res): array => $this->formatReservation($res));
 
@@ -112,6 +115,7 @@ class OwnerFrontDeskController extends Controller
             'departures_count' => $departures->count(),
             'in_house_count' => $inHouse->count(),
             'upcoming_count' => $upcoming->count(),
+            'checked_out_count' => $history->count(),
             'unallocated_count' => $unallocatedCount,
         ];
 
@@ -155,10 +159,12 @@ class OwnerFrontDeskController extends Controller
             'property_id' => $res->property_id,
             'property_name' => $res->property?->name,
             'room_type_name' => $res->snapshot_room_type_name ?? $res->roomType?->name,
-            'guest_name' => $res->user->name,
-            'guest_phone' => $res->user->phone,
-            'guest_email' => $res->user->email,
-            'guests_count' => $res->quantity,
+            'guest_name' => $res->contact_name ?: $res->user?->name ?: 'Guest',
+            'guest_phone' => $res->contact_phone ?: $res->user?->phone,
+            'guest_email' => $res->contact_email ?: $res->user?->email,
+            'guest_gender' => $res->guest_gender,
+            'guest_composition' => $res->guest_composition,
+            'guests_count' => $res->guest_count ?: $res->quantity,
             'check_in_date' => $res->check_in_date->toDateString(),
             'checkout_date' => $res->checkout_date->toDateString(),
             'stay_nights' => max(1, (int) $checkIn->diffInDays($checkOut)),

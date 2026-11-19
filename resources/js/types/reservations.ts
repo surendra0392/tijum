@@ -33,6 +33,11 @@ export type ReservationSummary = {
     requires_refund_review?: boolean;
     property_name: string;
     room_type_name: string;
+    contact_name?: string | null;
+    contact_email?: string | null;
+    contact_phone?: string | null;
+    guest_gender?: string | null;
+    guest_composition?: string | null;
     quantity: number;
     quantity_basis: 'guest_places' | 'private_rooms';
     quantity_basis_label: string;

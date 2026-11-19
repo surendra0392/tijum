@@ -23,9 +23,11 @@ class ReservationController extends Controller
     {
         $owner = $this->owner($request->user('owner'));
         $filters = $request->validated();
-        $query = Reservation::query()
-            ->whereHas('property', fn ($property) => $property->where('owner_id', $owner->id))
-            ->with(['property', 'roomType', 'successfulPayment', 'review'])
+        $baseOwnerQuery = Reservation::query()
+            ->whereHas('property', fn ($property) => $property->where('owner_id', $owner->id));
+
+        $query = (clone $baseOwnerQuery)
+            ->with(['property', 'roomType', 'successfulPayment', 'review', 'user'])
             ->latest('created_at')
             ->latest('id');
 
@@ -34,6 +36,34 @@ class ReservationController extends Controller
         }
         if (isset($filters['property_id'])) {
             $query->where('property_id', $filters['property_id']);
+        }
+        if (isset($filters['stay_stage'])) {
+            match ($filters['stay_stage']) {
+                'awaiting_arrival' => $query
+                    ->where('status', ReservationStatus::Confirmed)
+                    ->whereNull('checked_in_at')
+                    ->whereNull('checked_out_at'),
+                'checked_in' => $query
+                    ->whereNotNull('checked_in_at')
+                    ->whereNull('checked_out_at'),
+                'checked_out' => $query
+                    ->whereNotNull('checked_out_at'),
+                default => null,
+            };
+        }
+        if (! empty($filters['search'])) {
+            $search = trim((string) $filters['search']);
+            $query->where(function ($q) use ($search): void {
+                $q->where('booking_reference', 'like', "%{$search}%")
+                    ->orWhere('contact_name', 'like', "%{$search}%")
+                    ->orWhere('contact_phone', 'like', "%{$search}%")
+                    ->orWhere('contact_email', 'like', "%{$search}%")
+                    ->orWhereHas('user', function ($uq) use ($search): void {
+                        $uq->where('name', 'like', "%{$search}%")
+                            ->orWhere('phone', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    });
+            });
         }
         if (isset($filters['from'])) {
             $query->whereDate('check_in_date', '>=', $filters['from']);
@@ -44,14 +74,33 @@ class ReservationController extends Controller
 
         $reservations = $query->paginate((int) ($filters['per_page'] ?? 15))->withQueryString();
 
+        $stageCounts = [
+            'all' => (clone $baseOwnerQuery)->count(),
+            'awaiting_arrival' => (clone $baseOwnerQuery)
+                ->where('status', ReservationStatus::Confirmed)
+                ->whereNull('checked_in_at')
+                ->whereNull('checked_out_at')
+                ->count(),
+            'checked_in' => (clone $baseOwnerQuery)
+                ->whereNotNull('checked_in_at')
+                ->whereNull('checked_out_at')
+                ->count(),
+            'checked_out' => (clone $baseOwnerQuery)
+                ->whereNotNull('checked_out_at')
+                ->count(),
+        ];
+
         return Inertia::render('owner/reservations/index', [
             'reservations' => $this->pagination($reservations),
             'filters' => [
                 'status' => $filters['status'] ?? null,
+                'stay_stage' => $filters['stay_stage'] ?? null,
+                'search' => $filters['search'] ?? null,
                 'property_id' => $filters['property_id'] ?? null,
                 'from' => $filters['from'] ?? null,
                 'to' => $filters['to'] ?? null,
             ],
+            'stageCounts' => $stageCounts,
             'statusOptions' => $this->statusOptions(),
             'properties' => Property::query()
                 ->where('owner_id', $owner->id)

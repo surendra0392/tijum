@@ -24,6 +24,8 @@ class ReservationFilterRequest extends FormRequest
             'user_id' => ['sometimes', 'integer', 'exists:users,id'],
             'property_id' => ['sometimes', 'integer', 'exists:properties,id'],
             'status' => ['sometimes', Rule::in(ReservationStatus::values())],
+            'stay_stage' => ['sometimes', 'string', Rule::in(['awaiting_arrival', 'checked_in', 'checked_out'])],
+            'search' => ['sometimes', 'string', 'max:120'],
             'from' => ['sometimes', 'date'],
             'to' => ['sometimes', 'date', 'after_or_equal:from'],
             'page' => ['sometimes', 'integer', 'min:1'],

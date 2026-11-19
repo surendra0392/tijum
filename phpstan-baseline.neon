@@ -367,12 +367,6 @@ parameters:
 			path: app/Http/Controllers/Customer/NotificationController.php
 
 		-
-			message: '#^Parameter \#3 \$data of method App\\Actions\\Protection\\AddCaseMessage\:\:execute\(\) expects array\{message\: string, attachment\?\: Illuminate\\Http\\UploadedFile\|null, is_internal_note\?\: bool, status\?\: string\|null\}, array\<string, mixed\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Owner/CustomerCases/OwnerCustomerCaseController.php
-
-		-
 			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1

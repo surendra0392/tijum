@@ -1,4 +1,16 @@
-import { CalendarDays, Clock3, MapPin, Utensils, Users } from 'lucide-react';
+import {
+    CalendarDays,
+    Clock3,
+    DoorClosed,
+    DoorOpen,
+    KeyRound,
+    Mail,
+    MapPin,
+    Phone,
+    User,
+    Users,
+    Utensils,
+} from 'lucide-react';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -120,15 +132,144 @@ export function ReservationDetailGrid({
 
                 {showContact && (
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Primary guest contact</CardTitle>
+                        <CardHeader className="pb-3">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <User
+                                    className="size-4 text-tijum-coral"
+                                    aria-hidden="true"
+                                />
+                                <span>Customer &amp; Guest Details</span>
+                            </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-1 text-sm">
-                            <p className="font-semibold text-tijum-plum dark:text-foreground">
-                                {reservation.contact_name}
-                            </p>
-                            <p>{reservation.contact_email}</p>
-                            <p>{reservation.contact_phone}</p>
+                        <CardContent className="space-y-3 text-sm">
+                            <div className="space-y-2 rounded-xl border border-tijum-surface/80 bg-tijum-cream/45 p-3.5 dark:border-border dark:bg-muted/40">
+                                <div className="flex items-center gap-2 font-semibold text-tijum-plum dark:text-foreground">
+                                    <User
+                                        className="size-4 shrink-0 text-tijum-coral"
+                                        aria-hidden="true"
+                                    />
+                                    <span>{reservation.contact_name}</span>
+                                </div>
+                                {reservation.contact_phone && (
+                                    <div className="flex items-center gap-2 text-xs text-tijum-plum-muted dark:text-muted-foreground">
+                                        <Phone
+                                            className="size-3.5 shrink-0 text-tijum-coral"
+                                            aria-hidden="true"
+                                        />
+                                        <a
+                                            href={`tel:${reservation.contact_phone}`}
+                                            className="font-medium text-tijum-plum hover:text-tijum-coral dark:text-foreground"
+                                        >
+                                            {reservation.contact_phone}
+                                        </a>
+                                    </div>
+                                )}
+                                {reservation.contact_email && (
+                                    <div className="flex items-center gap-2 text-xs text-tijum-plum-muted dark:text-muted-foreground">
+                                        <Mail
+                                            className="size-3.5 shrink-0 text-tijum-coral"
+                                            aria-hidden="true"
+                                        />
+                                        <a
+                                            href={`mailto:${reservation.contact_email}`}
+                                            className="truncate hover:text-tijum-plum dark:hover:text-foreground"
+                                        >
+                                            {reservation.contact_email}
+                                        </a>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2.5 text-xs">
+                                <div className="rounded-lg border border-tijum-surface/70 px-3 py-2 dark:border-border">
+                                    <span className="block text-[11px] text-muted-foreground">
+                                        Guests &amp; Gender
+                                    </span>
+                                    <span className="font-semibold text-tijum-plum dark:text-foreground">
+                                        {reservation.guest_count} guest
+                                        {reservation.guest_count === 1
+                                            ? ''
+                                            : 's'}{' '}
+                                        ·{' '}
+                                        {formatPolicyValue(
+                                            reservation.guest_gender,
+                                        )}
+                                    </span>
+                                </div>
+                                <div className="rounded-lg border border-tijum-surface/70 px-3 py-2 dark:border-border">
+                                    <span className="block text-[11px] text-muted-foreground">
+                                        Group Type
+                                    </span>
+                                    <span className="font-semibold text-tijum-plum dark:text-foreground">
+                                        {formatPolicyValue(
+                                            reservation.guest_composition,
+                                        )}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {reservation.allocations &&
+                                reservation.allocations.length > 0 && (
+                                    <div className="flex items-center gap-2 rounded-lg border border-tijum-surface/70 bg-tijum-cream/30 px-3 py-2 text-xs dark:border-border dark:bg-muted/30">
+                                        <KeyRound
+                                            className="size-3.5 shrink-0 text-tijum-coral"
+                                            aria-hidden="true"
+                                        />
+                                        <span className="text-muted-foreground">
+                                            Assigned Room:
+                                        </span>
+                                        <span className="font-semibold text-tijum-plum dark:text-foreground">
+                                            Room{' '}
+                                            {reservation.allocations
+                                                .map((a) => a.room_number)
+                                                .join(', ')}
+                                        </span>
+                                    </div>
+                                )}
+
+                            {(reservation.checked_in_at ||
+                                reservation.checked_out_at) && (
+                                <div className="space-y-1.5 border-t border-tijum-surface/75 pt-2.5 text-xs dark:border-border">
+                                    {reservation.checked_in_at && (
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                                                <DoorOpen className="size-3.5 text-status-success-fg" />
+                                                <span>Checked in</span>
+                                            </span>
+                                            <span className="font-medium text-tijum-plum dark:text-foreground">
+                                                {new Date(
+                                                    reservation.checked_in_at,
+                                                ).toLocaleString('en-IN', {
+                                                    day: 'numeric',
+                                                    month: 'short',
+                                                    year: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                })}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {reservation.checked_out_at && (
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                                                <DoorClosed className="size-3.5 text-tijum-coral" />
+                                                <span>Checked out</span>
+                                            </span>
+                                            <span className="font-medium text-tijum-plum dark:text-foreground">
+                                                {new Date(
+                                                    reservation.checked_out_at,
+                                                ).toLocaleString('en-IN', {
+                                                    day: 'numeric',
+                                                    month: 'short',
+                                                    year: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                })}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 )}

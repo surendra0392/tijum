@@ -1,5 +1,12 @@
 import { Head, router } from '@inertiajs/react';
-import { CalendarClock, Search } from 'lucide-react';
+import {
+    CalendarClock,
+    Clock,
+    DoorClosed,
+    DoorOpen,
+    Layers,
+    Search,
+} from 'lucide-react';
 import { useState } from 'react';
 import {
     OWNER_BOOKINGS_TABS,
@@ -19,6 +26,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 import { index, show } from '@/routes/owner/reservations';
 import type {
     ReservationListPayload,
@@ -26,13 +34,23 @@ import type {
     ReservationStatusOption,
 } from '@/types';
 
+type StayStage = 'all' | 'awaiting_arrival' | 'checked_in' | 'checked_out';
+
 type OwnerReservationIndexProps = {
     reservations: ReservationListPayload;
     filters: {
         status?: string | null;
+        stay_stage?: string | null;
+        search?: string | null;
         property_id?: number | null;
         from?: string | null;
         to?: string | null;
+    };
+    stageCounts?: {
+        all: number;
+        awaiting_arrival: number;
+        checked_in: number;
+        checked_out: number;
     };
     statusOptions: ReservationStatusOption[];
     properties: ReservationPropertyOption[];
@@ -41,18 +59,25 @@ type OwnerReservationIndexProps = {
 export default function OwnerReservationIndex({
     reservations,
     filters,
+    stageCounts,
     statusOptions,
     properties,
 }: OwnerReservationIndexProps) {
     const [status, setStatus] = useState(filters.status ?? 'all');
+    const [stayStage, setStayStage] = useState<StayStage>(
+        (filters.stay_stage as StayStage) || 'all',
+    );
+    const [searchText, setSearchText] = useState(filters.search ?? '');
     const [propertyId, setPropertyId] = useState(
         filters.property_id ? String(filters.property_id) : 'all',
     );
     const [from, setFrom] = useState(filters.from ?? '');
     const [to, setTo] = useState(filters.to ?? '');
 
-    const query = (page = 1) => ({
+    const query = (page = 1, nextStage: StayStage = stayStage) => ({
         status: status === 'all' ? undefined : status,
+        stay_stage: nextStage === 'all' ? undefined : nextStage,
+        search: searchText.trim() || undefined,
         property_id: propertyId === 'all' ? undefined : propertyId,
         from: from || undefined,
         to: to || undefined,
@@ -60,10 +85,50 @@ export default function OwnerReservationIndex({
     });
 
     const applyFilters = () =>
-        router.get(index().url, query(), {
+        router.get(index().url, query(1), {
             preserveState: true,
             preserveScroll: true,
         });
+
+    const selectStage = (nextStage: StayStage) => {
+        setStayStage(nextStage);
+        router.get(index().url, query(1, nextStage), {
+            preserveState: true,
+            preserveScroll: true,
+        });
+    };
+
+    const stageTabs: Array<{
+        key: StayStage;
+        label: string;
+        icon: typeof Layers;
+        count?: number;
+    }> = [
+        {
+            key: 'all',
+            label: 'All Bookings',
+            icon: Layers,
+            count: stageCounts?.all,
+        },
+        {
+            key: 'awaiting_arrival',
+            label: 'Awaiting Check-In',
+            icon: Clock,
+            count: stageCounts?.awaiting_arrival,
+        },
+        {
+            key: 'checked_in',
+            label: 'In-House Guests',
+            icon: DoorOpen,
+            count: stageCounts?.checked_in,
+        },
+        {
+            key: 'checked_out',
+            label: 'Checked-Out Customers',
+            icon: DoorClosed,
+            count: stageCounts?.checked_out,
+        },
+    ];
 
     return (
         <div className="space-y-6">
@@ -76,14 +141,74 @@ export default function OwnerReservationIndex({
 
             <PageHeader
                 eyebrow="Partner Portal"
-                title="Reservations"
-                description="Monitor confirmed guest reservations, view stay details, and manage physical room allocations for your properties."
+                title="Reservations & Customer Records"
+                description="View guest contact details, check-in and check-out history, and manage physical room allocations across your properties."
             />
 
-            <section className="grid gap-4 rounded-2xl border border-tijum-surface bg-card p-4 shadow-tijum-card md:grid-cols-2 xl:grid-cols-5 dark:border-border">
+            {/* Quick Guest Stay Stage Switcher (Including Checked-Out Customers) */}
+            <div
+                role="tablist"
+                aria-label="Filter bookings by guest stay stage"
+                className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-tijum-surface/80 bg-card p-1.5 shadow-2xs dark:border-border"
+            >
+                {stageTabs.map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = stayStage === tab.key;
+
+                    return (
+                        <button
+                            key={tab.key}
+                            type="button"
+                            role="tab"
+                            aria-selected={isActive}
+                            onClick={() => selectStage(tab.key)}
+                            className={cn(
+                                'inline-flex cursor-pointer items-center gap-2 rounded-xl px-3.5 py-2 font-heading text-xs font-semibold transition-all',
+                                isActive
+                                    ? 'bg-tijum-plum text-tijum-cream shadow-xs dark:bg-tijum-coral dark:text-white'
+                                    : 'text-tijum-plum-muted hover:bg-tijum-cream/65 hover:text-tijum-plum dark:text-muted-foreground dark:hover:bg-accent dark:hover:text-foreground',
+                            )}
+                        >
+                            <Icon className="size-3.5" aria-hidden="true" />
+                            <span>{tab.label}</span>
+                            {typeof tab.count === 'number' && (
+                                <span
+                                    className={cn(
+                                        'rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums',
+                                        isActive
+                                            ? 'bg-white/20 text-white'
+                                            : 'bg-tijum-surface text-tijum-plum-muted dark:bg-muted dark:text-muted-foreground',
+                                    )}
+                                >
+                                    {tab.count}
+                                </span>
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
+
+            <section className="grid gap-4 rounded-2xl border border-tijum-surface bg-card p-4 shadow-tijum-card md:grid-cols-2 xl:grid-cols-6 dark:border-border">
+                <div className="grid gap-2 md:col-span-2 xl:col-span-1">
+                    <Label htmlFor="owner-reservation-search">
+                        Customer / Booking #
+                    </Label>
+                    <Input
+                        id="owner-reservation-search"
+                        type="search"
+                        value={searchText}
+                        placeholder="Name, phone, email, ref..."
+                        onChange={(e) => setSearchText(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                applyFilters();
+                            }
+                        }}
+                    />
+                </div>
                 <FilterSelect
                     id="owner-reservation-status"
-                    label="Status"
+                    label="Booking status"
                     value={status}
                     onChange={setStatus}
                     options={[
@@ -142,7 +267,7 @@ export default function OwnerReservationIndex({
                 <EmptyState
                     icon={CalendarClock}
                     title="No reservations match"
-                    description="New customer reservation requests for your properties will appear here."
+                    description="Try clearing a filter or switching guest stay stages above."
                 />
             ) : (
                 <div className="grid gap-4">
