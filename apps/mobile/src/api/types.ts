@@ -162,7 +162,9 @@ export interface Reservation {
         | 'cancelled'
         | 'expired'
         | 'completed'
-        | 'payment_pending';
+        | 'payment_pending'
+        | 'checked_in'
+        | 'checked_out';
     status_label: string;
     status_semantic?: string;
     is_cancellable: boolean;
@@ -170,6 +172,8 @@ export interface Reservation {
     is_confirmed?: boolean;
     is_cancelled?: boolean;
     is_expired?: boolean;
+    checked_in_at?: string | null;
+    checked_out_at?: string | null;
     check_in_date: string;
     check_out_date: string;
     duration_type: 'daily' | 'weekly' | 'monthly';

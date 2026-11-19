@@ -24,6 +24,8 @@ import {
     UtensilsCrossed,
     Receipt,
     Zap,
+    UserCheck,
+    CheckCircle2,
 } from 'lucide-react-native';
 
 export default function PartnerReservationDetailScreen() {
@@ -32,6 +34,9 @@ export default function PartnerReservationDetailScreen() {
 
     const [reservation, setReservation] = useState<Reservation | null>(null);
     const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [checkInNotes, setCheckInNotes] = useState('');
+    const [checkOutNotes, setCheckOutNotes] = useState('');
 
     useEffect(() => {
         if (reference) {
@@ -53,6 +58,62 @@ export default function PartnerReservationDetailScreen() {
             );
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleCheckIn = async () => {
+        if (!reservation) return;
+        try {
+            setActionLoading(true);
+            const res = await OwnerApi.checkInReservation(
+                reservation.reference || reservation.booking_reference,
+                checkInNotes.trim() || undefined,
+            );
+            if (res.data) {
+                setReservation(res.data);
+            } else {
+                await loadReservation();
+            }
+            Alert.alert(
+                'Guest Checked In',
+                `Check-in recorded for guest ${reservation.customer_name || 'Guest'}. Room is marked occupied.`,
+            );
+            setCheckInNotes('');
+        } catch (e: any) {
+            Alert.alert(
+                'Check-In Failed',
+                e.message || 'Could not record check-in at this time.',
+            );
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleCheckOut = async () => {
+        if (!reservation) return;
+        try {
+            setActionLoading(true);
+            const res = await OwnerApi.checkOutReservation(
+                reservation.reference || reservation.booking_reference,
+                checkOutNotes.trim() || undefined,
+            );
+            if (res.data) {
+                setReservation(res.data);
+            } else {
+                await loadReservation();
+            }
+            Alert.alert(
+                'Guest Checked Out',
+                `Checkout recorded for reservation ${reservation.reference || reservation.booking_reference}. Room is now marked vacant for turnover.`,
+            );
+            setCheckOutNotes('');
+        } catch (e: any) {
+            Alert.alert(
+                'Checkout Failed',
+                e.message || 'Could not record checkout at this time.',
+            );
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -168,6 +229,42 @@ export default function PartnerReservationDetailScreen() {
                                     {reservation.duration_type}
                                 </Text>
                             </View>
+                            {reservation.checked_in_at ? (
+                                <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>
+                                        Checked-In Time:
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.infoValue,
+                                            {
+                                                color: '#059669',
+                                                fontWeight: '700',
+                                            },
+                                        ]}
+                                    >
+                                        {reservation.checked_in_at}
+                                    </Text>
+                                </View>
+                            ) : null}
+                            {reservation.checked_out_at ? (
+                                <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>
+                                        Checked-Out Time:
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.infoValue,
+                                            {
+                                                color: Colors.deepPlum,
+                                                fontWeight: '700',
+                                            },
+                                        ]}
+                                    >
+                                        {reservation.checked_out_at}
+                                    </Text>
+                                </View>
+                            ) : null}
                         </View>
                     </View>
 
@@ -289,6 +386,87 @@ export default function PartnerReservationDetailScreen() {
                             </Text>
                         </View>
                     ) : null}
+
+                    {/* Front-Desk Operations Panel */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionTitleRow}>
+                            <UserCheck
+                                size={18}
+                                color={Colors.deepPlum}
+                                style={{ marginRight: 6 }}
+                            />
+                            <Text style={styles.sectionTitle}>
+                                Front-Desk Actions
+                            </Text>
+                        </View>
+
+                        {reservation.status === 'confirmed' ? (
+                            <View style={styles.frontDeskCard}>
+                                <Text style={styles.frontDeskHeading}>
+                                    Guest Arrival & Key Handover
+                                </Text>
+                                <Text style={styles.frontDeskDesc}>
+                                    When the guest arrives, verify identity and record check-in to mark the room occupied.
+                                </Text>
+                                <Input
+                                    label="Check-In Notes (Optional)"
+                                    value={checkInNotes}
+                                    onChangeText={setCheckInNotes}
+                                    placeholder="e.g. Room 204 allocated, keys handed over"
+                                />
+                                <Button
+                                    title="Check In Guest"
+                                    loading={actionLoading}
+                                    onPress={handleCheckIn}
+                                    style={styles.checkInBtn}
+                                />
+                            </View>
+                        ) : reservation.status === 'checked_in' ? (
+                            <View style={styles.frontDeskCard}>
+                                <Text style={styles.frontDeskHeading}>
+                                    Guest Departure & Room Turnover
+                                </Text>
+                                <Text style={styles.frontDeskDesc}>
+                                    When the guest vacates the room, inspect premises, retrieve keys, and finalize checkout.
+                                </Text>
+                                <Input
+                                    label="Checkout Notes (Optional)"
+                                    value={checkOutNotes}
+                                    onChangeText={setCheckOutNotes}
+                                    placeholder="e.g. Keys returned, room inspected and cleared"
+                                />
+                                <Button
+                                    title="Check Out Guest"
+                                    loading={actionLoading}
+                                    onPress={handleCheckOut}
+                                    style={styles.checkOutBtn}
+                                />
+                            </View>
+                        ) : reservation.status === 'checked_out' ||
+                          reservation.status === 'completed' ? (
+                            <View style={styles.completedNoticeCard}>
+                                <CheckCircle2
+                                    size={18}
+                                    color="#059669"
+                                    style={{ marginRight: 8 }}
+                                />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.completedNoticeHeading}>
+                                        Stay Finalized & Checked Out
+                                    </Text>
+                                    <Text style={styles.completedNoticeText}>
+                                        Guest departure is recorded. Room is released for housekeeping and turnover.
+                                    </Text>
+                                </View>
+                            </View>
+                        ) : (
+                            <View style={styles.infoCard}>
+                                <Text style={styles.infoLabel}>
+                                    Front-desk check-in/out is enabled once booking is confirmed. Current status: {reservation.status_label || reservation.status}.
+                                </Text>
+                            </View>
+                        )}
+                    </View>
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -402,6 +580,53 @@ const styles = StyleSheet.create({
         ...Typography.bodySmall,
         color: Colors.gray700,
         flex: 1,
+        lineHeight: 18,
+    },
+    frontDeskCard: {
+        backgroundColor: Colors.warmOffWhite,
+        borderRadius: 10,
+        padding: Spacing.md,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+    },
+    frontDeskHeading: {
+        ...Typography.labelMedium,
+        color: Colors.deepPlum,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    frontDeskDesc: {
+        ...Typography.bodySmall,
+        color: Colors.gray600,
+        lineHeight: 18,
+        marginBottom: Spacing.sm,
+    },
+    checkInBtn: {
+        marginTop: Spacing.xs,
+        backgroundColor: '#059669',
+    },
+    checkOutBtn: {
+        marginTop: Spacing.xs,
+        backgroundColor: Colors.deepPlum,
+    },
+    completedNoticeCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F0FDF4',
+        borderRadius: 8,
+        padding: Spacing.md,
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+    },
+    completedNoticeHeading: {
+        ...Typography.labelMedium,
+        color: '#166534',
+        fontWeight: '700',
+        marginBottom: 2,
+    },
+    completedNoticeText: {
+        ...Typography.bodySmall,
+        color: '#15803D',
         lineHeight: 18,
     },
     center: {

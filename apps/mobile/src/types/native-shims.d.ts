@@ -106,6 +106,19 @@ declare module 'react-native' {
             fontScale: number;
         };
     };
+
+    export const Linking: {
+        openURL: (url: string) => Promise<any>;
+        canOpenURL: (url: string) => Promise<boolean>;
+    };
+
+    export const Share: {
+        share: (content: {
+            message: string;
+            title?: string;
+            url?: string;
+        }) => Promise<any>;
+    };
 }
 
 declare module 'expo-router' {

@@ -1,13 +1,21 @@
 import React, { useEffect } from 'react';
 import {
     Image,
+    Linking,
     SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
+    TouchableOpacity,
     View,
 } from 'react-native';
-import { UtensilsCrossed, MapPin } from 'lucide-react-native';
+import {
+    UtensilsCrossed,
+    MapPin,
+    MessageCircle,
+    Instagram,
+    Facebook,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/auth/AuthContext';
 import { Button } from '../src/components/Button';
@@ -109,6 +117,70 @@ export default function WelcomeScreen() {
                             onPress={() => router.push('/(customer)/explore')}
                             style={styles.ghostButton}
                         />
+                    </View>
+
+                    {/* Official Channels & Social Touchpoints */}
+                    <View style={styles.channelsCard}>
+                        <Text style={styles.channelsTitle}>Official Channels</Text>
+                        <Text style={styles.channelsSubtitle}>
+                            Helpline & Chat: 9:00 AM – 9:00 PM IST (Mon–Sat)
+                        </Text>
+                        <View style={styles.channelsRow}>
+                            <TouchableOpacity
+                                style={[styles.channelChip, styles.whatsappChip]}
+                                onPress={() =>
+                                    Linking.openURL('https://wa.me/918142334033')
+                                }
+                                activeOpacity={0.8}
+                            >
+                                <MessageCircle
+                                    size={15}
+                                    color="#25D366"
+                                    style={{ marginRight: 6 }}
+                                />
+                                <Text style={styles.whatsappChipText}>
+                                    WhatsApp
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.channelChip, styles.instagramChip]}
+                                onPress={() =>
+                                    Linking.openURL(
+                                        'https://instagram.com/tijum.official',
+                                    )
+                                }
+                                activeOpacity={0.8}
+                            >
+                                <Instagram
+                                    size={15}
+                                    color="#E1306C"
+                                    style={{ marginRight: 6 }}
+                                />
+                                <Text style={styles.instagramChipText}>
+                                    Instagram
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.channelChip, styles.facebookChip]}
+                                onPress={() =>
+                                    Linking.openURL(
+                                        'https://facebook.com/tijum.official',
+                                    )
+                                }
+                                activeOpacity={0.8}
+                            >
+                                <Facebook
+                                    size={15}
+                                    color="#1877F2"
+                                    style={{ marginRight: 6 }}
+                                />
+                                <Text style={styles.facebookChipText}>
+                                    Facebook
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
 
@@ -234,6 +306,70 @@ const styles = StyleSheet.create({
     },
     ghostButton: {
         marginTop: Spacing.xs,
+    },
+    channelsCard: {
+        marginTop: Spacing.lg,
+        padding: Spacing.md,
+        backgroundColor: Colors.white,
+        borderRadius: BorderRadius.lg,
+        borderWidth: 1,
+        borderColor: Colors.neutralSurface,
+        alignItems: 'center',
+    },
+    channelsTitle: {
+        fontSize: Typography.fontSize.xs,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        color: Colors.deepPlum,
+        marginBottom: 2,
+    },
+    channelsSubtitle: {
+        fontSize: 11,
+        color: Colors.gray500,
+        marginBottom: Spacing.sm,
+        textAlign: 'center',
+    },
+    channelsRow: {
+        flexDirection: 'row',
+        gap: Spacing.xs,
+        justifyContent: 'center',
+        flexWrap: 'wrap',
+    },
+    channelChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: Spacing.sm,
+        paddingVertical: 6,
+        borderRadius: BorderRadius.full,
+        borderWidth: 1,
+    },
+    whatsappChip: {
+        backgroundColor: '#F0FDF4',
+        borderColor: '#BBF7D0',
+    },
+    whatsappChipText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#166534',
+    },
+    instagramChip: {
+        backgroundColor: '#FDF2F8',
+        borderColor: '#FBCFE8',
+    },
+    instagramChipText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#9D174D',
+    },
+    facebookChip: {
+        backgroundColor: '#EFF6FF',
+        borderColor: '#BFDBFE',
+    },
+    facebookChipText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#1E40AF',
     },
     footer: {
         alignItems: 'center',
