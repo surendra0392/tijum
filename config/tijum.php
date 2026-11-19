@@ -209,8 +209,8 @@ return [
     ],
 
     'contact' => [
-        'phone' => env('TIJUM_CONTACT_PHONE', '+91 8142334033'),
-        'whatsapp' => env('TIJUM_WHATSAPP_NUMBER', '+91 8142334033'),
+        'phone' => env('TIJUM_CONTACT_PHONE', '8142334033'),
+        'whatsapp' => env('TIJUM_WHATSAPP_NUMBER', '8142334033'),
         'whatsapp_raw' => env('TIJUM_WHATSAPP_RAW', '918142334033'),
         'email' => env('TIJUM_SUPPORT_EMAIL', 'support@tijum.com'),
         'partners_email' => env('TIJUM_PARTNERS_EMAIL', 'partners@tijum.com'),
@@ -228,7 +228,7 @@ return [
             'url' => 'https://instagram.com/tijum.official',
         ],
         'whatsapp' => [
-            'number' => '+91 8142334033',
+            'number' => '8142334033',
             'url' => 'https://wa.me/918142334033',
         ],
     ],

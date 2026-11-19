@@ -147,8 +147,8 @@ class PublicPageController extends Controller
     {
         /** @var array<string, string> $contactConfig */
         $contactConfig = config('tijum.contact', [
-            'phone' => '+91 8142334033',
-            'whatsapp' => '+91 8142334033',
+            'phone' => '8142334033',
+            'whatsapp' => '8142334033',
             'email' => 'support@tijum.com',
             'partners_email' => 'partners@tijum.com',
             'hours' => 'Monday – Saturday: 9:00 AM – 8:00 PM IST',
@@ -166,7 +166,7 @@ class PublicPageController extends Controller
                 'url' => 'https://instagram.com/tijum.official',
             ],
             'whatsapp' => [
-                'number' => '+91 8142334033',
+                'number' => '8142334033',
                 'url' => 'https://wa.me/918142334033',
             ],
         ]);
@@ -176,7 +176,7 @@ class PublicPageController extends Controller
             'social' => $socialConfig,
             'seo' => $this->buildSeoPayload(
                 title: 'Contact Us — Customer Support, Partner Desk & WhatsApp | TIJUM',
-                description: 'Contact TIJUM via WhatsApp (+91 8142334033), call, or email support@tijum.com. Connect with us on Instagram and Facebook (@tijum.official) for accommodations across Hyderabad, Vijayawada, Guntur, and Visakhapatnam.',
+                description: 'Contact TIJUM via WhatsApp (8142334033), call, or email support@tijum.com. Connect with us on Instagram and Facebook (tijum.official) for accommodations across Hyderabad, Vijayawada, Guntur, and Visakhapatnam.',
                 canonical: route('public.contact'),
                 structuredData: [
                     '@context' => 'https://schema.org',

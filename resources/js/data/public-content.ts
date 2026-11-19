@@ -750,7 +750,7 @@ export const SOCIAL_LINKS: readonly SocialLinkItem[] = [
     {
         name: 'Instagram',
         handle: 'tijum.official',
-        display: '@tijum.official',
+        display: 'tijum.official',
         href: 'https://instagram.com/tijum.official',
         ariaLabel: 'Follow TIJUM on Instagram @tijum.official',
         description:
@@ -759,18 +759,18 @@ export const SOCIAL_LINKS: readonly SocialLinkItem[] = [
     {
         name: 'Facebook',
         handle: 'tijum.official',
-        display: '@tijum.official',
+        display: 'tijum.official',
         href: 'https://facebook.com/tijum.official',
-        ariaLabel: 'Follow TIJUM on Facebook @tijum.official',
+        ariaLabel: 'Follow TIJUM on Facebook tijum.official',
         description:
             'Community news, partner spotlights, and accommodation offers.',
     },
     {
         name: 'WhatsApp',
-        handle: '+91 8142334033',
-        display: '+91 8142334033',
+        handle: '8142334033',
+        display: '8142334033',
         href: 'https://wa.me/918142334033',
-        ariaLabel: 'Chat with TIJUM on WhatsApp at +91 8142334033',
+        ariaLabel: 'Chat with TIJUM on WhatsApp at 8142334033',
         description:
             'Instant booking inquiries, room availability, and guest support.',
     },
@@ -778,11 +778,11 @@ export const SOCIAL_LINKS: readonly SocialLinkItem[] = [
 
 export const CONTACT_INFO = {
     phone: {
-        display: '+91 8142334033',
-        href: 'tel:+918142334033',
+        display: '8142334033',
+        href: 'tel:8142334033',
     },
     whatsapp: {
-        number: '+91 8142334033',
+        number: '8142334033',
         raw: '918142334033',
         href: 'https://wa.me/918142334033',
         inquiryHref:

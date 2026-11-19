@@ -150,7 +150,7 @@ export default function Contact({ contact, social, seo }: ContactProps) {
                                     }
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    aria-label="Chat with TIJUM on WhatsApp at +91 8142334033"
+                                    aria-label="Chat with TIJUM on WhatsApp at 8142334033"
                                 >
                                     <WhatsAppIcon className="size-4" />
                                     Chat on WhatsApp
@@ -269,8 +269,8 @@ export default function Contact({ contact, social, seo }: ContactProps) {
                                     student living guides.
                                 </p>
                                 <div className="space-y-1 text-xs font-semibold text-tijum-plum">
-                                    <p>Instagram: @tijum.official</p>
-                                    <p>Facebook: @tijum.official</p>
+                                    <p>Instagram: tijum.official</p>
+                                    <p>Facebook: tijum.official</p>
                                 </div>
                             </div>
                             <div className="mt-5 flex gap-2">
@@ -650,9 +650,17 @@ export default function Contact({ contact, social, seo }: ContactProps) {
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     aria-label={item.ariaLabel}
-                                    className="group flex items-center gap-4 rounded-2xl border border-tijum-surface bg-white p-5 shadow-tijum-card transition-all duration-300 hover:-translate-y-0.5 hover:border-tijum-coral/50 hover:shadow-tijum-soft"
+                                    className="group flex items-center gap-4 rounded-2xl border border-tijum-surface bg-white p-5 shadow-tijum-card transition-all duration-300 hover:-translate-y-0.5 hover:border-tijum-coral/50 hover:shadow-tijum-soft focus-visible:ring-2 focus-visible:ring-tijum-coral focus-visible:outline-none"
                                 >
-                                    <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-tijum-cream text-tijum-plum transition-colors group-hover:bg-tijum-coral group-hover:text-white">
+                                    <span
+                                        className={
+                                            item.name === 'Instagram'
+                                                ? 'flex size-12 shrink-0 items-center justify-center rounded-xl bg-pink-50 text-pink-600 transition-colors group-hover:bg-pink-600 group-hover:text-white'
+                                                : item.name === 'Facebook'
+                                                  ? 'flex size-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white'
+                                                  : 'flex size-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 transition-colors group-hover:bg-emerald-600 group-hover:text-white'
+                                        }
+                                    >
                                         <SocialIcon
                                             name={item.name}
                                             className="size-6"
