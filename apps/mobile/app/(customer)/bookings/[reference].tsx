@@ -1,31 +1,37 @@
 import React, { useEffect, useState } from 'react';
 import {
-    View,
-    Text,
-    ScrollView,
-    StyleSheet,
     ActivityIndicator,
     Alert,
+    Modal,
     SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
-    Zap,
-    Clock,
     Calendar,
-    UtensilsCrossed,
+    CheckCircle,
+    Clock,
     Receipt,
     ShieldCheck,
+    Star,
+    UtensilsCrossed,
+    X,
+    Zap,
 } from 'lucide-react-native';
 import { CustomerApi } from '../../../src/api/customer';
 import { Reservation } from '../../../src/api/types';
 import { Colors } from '../../../src/theme/colors';
-import { Spacing } from '../../../src/theme/spacing';
+import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 import { ReservationStatusBadge } from '../../../src/components/ReservationStatusBadge';
 import { StayTimingBadge } from '../../../src/components/StayTimingBadge';
 import { MealBadge } from '../../../src/components/MealBadge';
 import { Button } from '../../../src/components/Button';
+import { Input } from '../../../src/components/Input';
 import { RazorpayService } from '../../../src/payments/RazorpayService';
 
 export default function ReservationDetailScreen() {
@@ -37,6 +43,18 @@ export default function ReservationDetailScreen() {
     const [paying, setPaying] = useState(false);
     const [cancelling, setCancelling] = useState(false);
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+    // Customer Review State
+    const [showReviewModal, setShowReviewModal] = useState(false);
+    const [submittingReview, setSubmittingReview] = useState(false);
+    const [overallRating, setOverallRating] = useState(5);
+    const [cleanlinessRating, setCleanlinessRating] = useState(5);
+    const [foodRating, setFoodRating] = useState(5);
+    const [communicationRating, setCommunicationRating] = useState(5);
+    const [valueRating, setValueRating] = useState(5);
+    const [reviewTitle, setReviewTitle] = useState('');
+    const [reviewContent, setReviewContent] = useState('');
+    const [reviewError, setReviewError] = useState('');
 
     useEffect(() => {
         if (reference) {
@@ -192,6 +210,94 @@ export default function ReservationDetailScreen() {
         );
     };
 
+    const handleSubmitReview = async () => {
+        if (!reservation) return;
+        if (!overallRating || overallRating < 1) {
+            setReviewError('Please select an overall rating.');
+            return;
+        }
+        if (
+            reviewContent.trim().length > 0 &&
+            reviewContent.trim().length < 10
+        ) {
+            setReviewError(
+                'Written review feedback must be at least 10 characters.',
+            );
+            return;
+        }
+
+        try {
+            setSubmittingReview(true);
+            setReviewError('');
+            await CustomerApi.submitReview(
+                reservation.reference || reservation.booking_reference,
+                {
+                    overall_rating: overallRating,
+                    cleanliness_rating: cleanlinessRating,
+                    food_quality_rating: foodRating,
+                    communication_rating: communicationRating,
+                    value_rating: valueRating,
+                    title: reviewTitle.trim() || undefined,
+                    content: reviewContent.trim() || undefined,
+                },
+            );
+
+            setReservation({
+                ...reservation,
+                is_reviewed: true,
+                review: {
+                    overall_rating: overallRating,
+                    rating: overallRating,
+                    title: reviewTitle.trim(),
+                    content: reviewContent.trim(),
+                    created_at: 'Just now',
+                },
+            });
+            setShowReviewModal(false);
+            Alert.alert(
+                'Review Submitted',
+                'Thank you for rating your stay! Your verified review helps future travelers.',
+            );
+        } catch (e: any) {
+            setReviewError(
+                e.message || 'Failed to submit review. Please try again.',
+            );
+        } finally {
+            setSubmittingReview(false);
+        }
+    };
+
+    const renderStarSelector = (
+        currentValue: number,
+        onChange: (val: number) => void,
+        size: number = 24,
+    ) => {
+        return (
+            <View style={styles.starRow}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                        key={star}
+                        onPress={() => onChange(star)}
+                        hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                        activeOpacity={0.7}
+                    >
+                        <Star
+                            size={size}
+                            color={
+                                star <= currentValue ? '#F59E0B' : Colors.gray300
+                            }
+                            fill={
+                                star <= currentValue
+                                    ? '#F59E0B'
+                                    : 'transparent'
+                            }
+                        />
+                    </TouchableOpacity>
+                ))}
+            </View>
+        );
+    };
+
     if (loading) {
         return (
             <View style={styles.center}>
@@ -217,6 +323,10 @@ export default function ReservationDetailScreen() {
     const isPayable =
         reservation.status === 'awaiting_payment' ||
         reservation.status === 'payment_pending';
+    const isCompletedStay =
+        reservation.status === 'completed' ||
+        reservation.status === 'checked_out' ||
+        Boolean((reservation as any).is_completed);
     const formatTimer = (secs: number) => {
         const mins = Math.floor(secs / 60);
         const remainder = secs % 60;
@@ -479,6 +589,93 @@ export default function ReservationDetailScreen() {
                         />
                     </View>
 
+                    {/* Customer Review Section for Completed Stays */}
+                    {isCompletedStay ? (
+                        <View style={styles.section}>
+                            <View style={styles.sectionHeaderRow}>
+                                <Star
+                                    size={18}
+                                    color={Colors.coral}
+                                    fill={Colors.coral}
+                                    style={{ marginRight: 6 }}
+                                />
+                                <Text style={styles.sectionTitle}>
+                                    Guest Review & Ratings
+                                </Text>
+                            </View>
+
+                            {reservation.is_reviewed || reservation.review ? (
+                                <View style={styles.reviewedCard}>
+                                    <View style={styles.reviewedHeader}>
+                                        <View style={styles.verifiedBadge}>
+                                            <CheckCircle
+                                                size={13}
+                                                color="#059669"
+                                                style={{ marginRight: 4 }}
+                                            />
+                                            <Text style={styles.verifiedBadgeText}>
+                                                Verified Review
+                                            </Text>
+                                        </View>
+                                        <View style={styles.ratingBadge}>
+                                            <Star
+                                                size={13}
+                                                color="#F59E0B"
+                                                fill="#F59E0B"
+                                                style={{ marginRight: 3 }}
+                                            />
+                                            <Text style={styles.ratingBadgeText}>
+                                                {(
+                                                    reservation.review
+                                                        ?.overall_rating ||
+                                                    reservation.review?.rating ||
+                                                    5
+                                                ).toFixed(1)}{' '}
+                                                / 5
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    {reservation.review?.title ? (
+                                        <Text style={styles.reviewedTitle}>
+                                            {reservation.review.title}
+                                        </Text>
+                                    ) : null}
+                                    {reservation.review?.content ? (
+                                        <Text style={styles.reviewedContent}>
+                                            "{reservation.review.content}"
+                                        </Text>
+                                    ) : null}
+                                    <Text style={styles.reviewedDate}>
+                                        Submitted{' '}
+                                        {reservation.review?.created_at ||
+                                            'for this stay'}
+                                    </Text>
+                                </View>
+                            ) : (
+                                <View style={styles.reviewPromptCard}>
+                                    <Text style={styles.reviewPromptTitle}>
+                                        How was your stay?
+                                    </Text>
+                                    <Text style={styles.reviewPromptDesc}>
+                                        Rate room cleanliness, food quality, host
+                                        communication, and value for money to help the
+                                        community.
+                                    </Text>
+                                    <Button
+                                        title="Rate & Review Your Stay"
+                                        variant="primary"
+                                        size="sm"
+                                        onPress={() => {
+                                            setReviewError('');
+                                            setShowReviewModal(true);
+                                        }}
+                                        style={{ marginTop: Spacing.sm }}
+                                    />
+                                </View>
+                            )}
+                        </View>
+                    ) : null}
+
                     {/* Cancellation Option */}
                     {[
                         'awaiting_payment',
@@ -518,6 +715,133 @@ export default function ReservationDetailScreen() {
                     />
                 </View>
             ) : null}
+
+            {/* Review Submission Modal */}
+            <Modal
+                visible={showReviewModal}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowReviewModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.reviewModalContent}>
+                        <View style={styles.modalHeader}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.modalTitle}>Rate Your Stay</Text>
+                                <Text style={styles.modalSubtitle} numberOfLines={1}>
+                                    {reservation.property_name}
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                onPress={() => setShowReviewModal(false)}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                                <X size={20} color={Colors.gray600} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ paddingBottom: Spacing.md }}
+                        >
+                            {reviewError ? (
+                                <View style={styles.reviewErrorBox}>
+                                    <Text style={styles.reviewErrorText}>
+                                        {reviewError}
+                                    </Text>
+                                </View>
+                            ) : null}
+
+                            {/* Overall Rating */}
+                            <View style={styles.ratingCategoryBlock}>
+                                <Text style={styles.ratingCategoryTitle}>
+                                    Overall Experience *
+                                </Text>
+                                {renderStarSelector(
+                                    overallRating,
+                                    setOverallRating,
+                                    28,
+                                )}
+                            </View>
+
+                            {/* Subcategories */}
+                            <View style={styles.subRatingsGrid}>
+                                <View style={styles.subRatingRow}>
+                                    <Text style={styles.subRatingLabel}>
+                                        Cleanliness
+                                    </Text>
+                                    {renderStarSelector(
+                                        cleanlinessRating,
+                                        setCleanlinessRating,
+                                        20,
+                                    )}
+                                </View>
+                                <View style={styles.subRatingRow}>
+                                    <Text style={styles.subRatingLabel}>
+                                        Food & Dining
+                                    </Text>
+                                    {renderStarSelector(
+                                        foodRating,
+                                        setFoodRating,
+                                        20,
+                                    )}
+                                </View>
+                                <View style={styles.subRatingRow}>
+                                    <Text style={styles.subRatingLabel}>
+                                        Host Communication
+                                    </Text>
+                                    {renderStarSelector(
+                                        communicationRating,
+                                        setCommunicationRating,
+                                        20,
+                                    )}
+                                </View>
+                                <View style={styles.subRatingRow}>
+                                    <Text style={styles.subRatingLabel}>
+                                        Value for Money
+                                    </Text>
+                                    {renderStarSelector(
+                                        valueRating,
+                                        setValueRating,
+                                        20,
+                                    )}
+                                </View>
+                            </View>
+
+                            {/* Title */}
+                            <Input
+                                label="Review Headline (Optional)"
+                                placeholder="e.g. Delicious meals & clean room"
+                                value={reviewTitle}
+                                onChangeText={setReviewTitle}
+                            />
+
+                            {/* Content */}
+                            <Input
+                                label="Written Feedback (Min 10 characters)"
+                                placeholder="Describe your stay, food quality, and amenities..."
+                                multiline
+                                numberOfLines={3}
+                                style={{
+                                    minHeight: 70,
+                                    textAlignVertical: 'top',
+                                }}
+                                value={reviewContent}
+                                onChangeText={setReviewContent}
+                            />
+
+                            <Button
+                                title="Submit Verified Review"
+                                variant="primary"
+                                size="md"
+                                loading={submittingReview}
+                                onPress={handleSubmitReview}
+                                style={{ marginTop: Spacing.sm }}
+                            />
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -689,5 +1013,161 @@ const styles = StyleSheet.create({
         ...Typography.bodyMedium,
         color: Colors.coral,
         textAlign: 'center',
+    },
+    starRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    reviewedCard: {
+        backgroundColor: Colors.warmOffWhite,
+        borderRadius: 10,
+        padding: Spacing.md,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+    },
+    reviewedHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: Spacing.xs,
+    },
+    verifiedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: Spacing.sm,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    verifiedBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#059669',
+    },
+    ratingBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: Spacing.sm,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    ratingBadgeText: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#D97706',
+    },
+    reviewedTitle: {
+        ...Typography.labelMedium,
+        color: Colors.deepPlum,
+        fontWeight: '700',
+        marginTop: 4,
+    },
+    reviewedContent: {
+        ...Typography.bodySmall,
+        color: Colors.gray700,
+        fontStyle: 'italic',
+        marginTop: 4,
+        lineHeight: 18,
+    },
+    reviewedDate: {
+        fontSize: 11,
+        color: Colors.gray400,
+        marginTop: 6,
+    },
+    reviewPromptCard: {
+        backgroundColor: '#FFF7ED',
+        borderRadius: 10,
+        padding: Spacing.md,
+        borderWidth: 1,
+        borderColor: '#FFEDD5',
+    },
+    reviewPromptTitle: {
+        ...Typography.labelMedium,
+        color: Colors.deepPlum,
+        fontWeight: '700',
+    },
+    reviewPromptDesc: {
+        ...Typography.bodySmall,
+        color: Colors.gray600,
+        marginTop: 2,
+        lineHeight: 18,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    reviewModalContent: {
+        backgroundColor: Colors.white,
+        borderTopLeftRadius: BorderRadius.xl,
+        borderTopRightRadius: BorderRadius.xl,
+        padding: Spacing.lg,
+        maxHeight: '90%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: Spacing.md,
+        paddingBottom: Spacing.sm,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.gray100,
+    },
+    modalTitle: {
+        ...Typography.titleMedium,
+        color: Colors.deepPlum,
+        fontWeight: '800',
+    },
+    modalSubtitle: {
+        ...Typography.bodySmall,
+        color: Colors.gray500,
+        marginTop: 2,
+    },
+    reviewErrorBox: {
+        backgroundColor: '#FFF1F2',
+        padding: Spacing.sm,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FFE4E6',
+        marginBottom: Spacing.sm,
+    },
+    reviewErrorText: {
+        fontSize: 12,
+        color: '#E11D48',
+        fontWeight: '600',
+    },
+    ratingCategoryBlock: {
+        alignItems: 'center',
+        paddingVertical: Spacing.sm,
+        marginBottom: Spacing.sm,
+        backgroundColor: Colors.warmOffWhite,
+        borderRadius: 8,
+    },
+    ratingCategoryTitle: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: Colors.deepPlum,
+        marginBottom: 6,
+    },
+    subRatingsGrid: {
+        backgroundColor: Colors.white,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+        padding: Spacing.md,
+        marginBottom: Spacing.md,
+        gap: Spacing.sm,
+    },
+    subRatingRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    subRatingLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: Colors.gray700,
     },
 });

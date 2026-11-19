@@ -75,6 +75,23 @@ class ReservationResource extends JsonResource
             'payment_deadline_at' => $this->payment_deadline_at?->toIso8601String(),
             'confirmed_at' => $this->confirmed_at?->toIso8601String(),
             'cancelled_at' => $this->cancelled_at?->toIso8601String(),
+            'checked_in_at' => $this->checked_in_at?->toIso8601String(),
+            'checked_out_at' => $this->checked_out_at?->toIso8601String(),
+            'is_allocated' => $this->relationLoaded('allocations')
+                ? $this->allocations->isNotEmpty()
+                : $this->allocatedQuantity() > 0,
+            'primary_room_number' => $this->relationLoaded('allocations')
+                ? $this->allocations->first()?->room->room_number
+                : null,
+            'allocations' => $this->relationLoaded('allocations')
+                ? $this->allocations->map(static fn ($a): array => [
+                    'id' => $a->id,
+                    'property_room_id' => $a->property_room_id,
+                    'room_number' => $a->room->room_number,
+                    'floor_number' => $a->room->floor_number,
+                    'allocated_quantity' => (int) $a->allocated_quantity,
+                ])->values()->all()
+                : [],
             'created_at' => $this->created_at?->toIso8601String(),
             'food_inclusions' => [
                 'provided' => (bool) ($this->snapshot_food_provided ?? ($this->property ? $this->property->food_provided : false)),

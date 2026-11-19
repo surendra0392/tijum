@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\Auth\CustomerAuthController;
+use App\Http\Controllers\Api\V1\Auth\ForgotPasswordController;
 use App\Http\Controllers\Api\V1\Auth\OwnerAuthController;
 use App\Http\Controllers\Api\V1\Customer\CustomerDeviceController;
 use App\Http\Controllers\Api\V1\Customer\CustomerNotificationController;
@@ -20,6 +21,8 @@ use App\Http\Controllers\Api\V1\Owner\OwnerNotificationController;
 use App\Http\Controllers\Api\V1\Owner\OwnerProfileController;
 use App\Http\Controllers\Api\V1\Owner\OwnerPropertyController;
 use App\Http\Controllers\Api\V1\Owner\OwnerReservationController;
+use App\Http\Controllers\Api\V1\Owner\OwnerReviewController;
+use App\Http\Controllers\Api\V1\Owner\OwnerRoomController;
 use App\Http\Controllers\Api\V1\Public\PublicCategoryController;
 use App\Http\Controllers\Api\V1\Public\PublicCityController;
 use App\Http\Controllers\Api\V1\Public\PublicConfigController;
@@ -64,6 +67,7 @@ Route::prefix('v1')->group(function (): void {
     Route::prefix('auth/customer')->group(function (): void {
         Route::post('register', [CustomerAuthController::class, 'register'])->middleware('throttle:api-auth')->name('api.v1.auth.customer.register');
         Route::post('login', [CustomerAuthController::class, 'login'])->middleware('throttle:api-auth')->name('api.v1.auth.customer.login');
+        Route::post('forgot-password', [ForgotPasswordController::class, 'customerForgotPassword'])->middleware('throttle:api-auth')->name('api.v1.auth.customer.forgot-password');
 
         Route::middleware(['auth:sanctum', 'auth.customer'])->group(function (): void {
             Route::post('logout', [CustomerAuthController::class, 'logout'])->name('api.v1.auth.customer.logout');
@@ -76,6 +80,7 @@ Route::prefix('v1')->group(function (): void {
     Route::prefix('auth/owner')->group(function (): void {
         Route::post('register', [OwnerAuthController::class, 'register'])->middleware('throttle:api-auth')->name('api.v1.auth.owner.register');
         Route::post('login', [OwnerAuthController::class, 'login'])->middleware('throttle:api-auth')->name('api.v1.auth.owner.login');
+        Route::post('forgot-password', [ForgotPasswordController::class, 'ownerForgotPassword'])->middleware('throttle:api-auth')->name('api.v1.auth.owner.forgot-password');
 
         Route::middleware(['auth:sanctum', 'auth.owner'])->group(function (): void {
             Route::post('logout', [OwnerAuthController::class, 'logout'])->name('api.v1.auth.owner.logout');
@@ -156,12 +161,18 @@ Route::prefix('v1')->group(function (): void {
         // Properties
         Route::get('properties', [OwnerPropertyController::class, 'index'])->name('api.v1.owner.properties.index');
         Route::get('properties/{id}', [OwnerPropertyController::class, 'show'])->name('api.v1.owner.properties.show');
+        Route::get('properties/{id}/rooms', [OwnerRoomController::class, 'rooms'])->name('api.v1.owner.properties.rooms');
 
         // Reservations
         Route::get('reservations', [OwnerReservationController::class, 'index'])->name('api.v1.owner.reservations.index');
         Route::get('reservations/{reference}', [OwnerReservationController::class, 'show'])->name('api.v1.owner.reservations.show');
         Route::post('reservations/{reference}/check-in', [OwnerReservationController::class, 'checkIn'])->name('api.v1.owner.reservations.check-in');
         Route::post('reservations/{reference}/check-out', [OwnerReservationController::class, 'checkOut'])->name('api.v1.owner.reservations.check-out');
+        Route::post('reservations/{reference}/allocate', [OwnerRoomController::class, 'allocate'])->name('api.v1.owner.reservations.allocate');
+
+        // Reviews
+        Route::get('reviews', [OwnerReviewController::class, 'index'])->name('api.v1.owner.reviews.index');
+        Route::post('reviews/{id}/response', [OwnerReviewController::class, 'respond'])->name('api.v1.owner.reviews.response');
 
         // Financial & Settlement statements (read-only)
         Route::get('financial/summary', [OwnerFinancialController::class, 'summary'])->name('api.v1.owner.financial.summary');

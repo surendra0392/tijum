@@ -25,12 +25,6 @@ parameters:
 			path: app/Actions/Owner/Properties/UpdatePropertyDetails.php
 
 		-
-			message: '#^Expression on left side of \?\? is not nullable\.$#'
-			identifier: nullCoalesce.expr
-			count: 1
-			path: app/Actions/Payments/ProcessWebhookEvent.php
-
-		-
 			message: '#^Using nullsafe property access on non\-nullable type Carbon\\CarbonImmutable\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
@@ -58,12 +52,6 @@ parameters:
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.expr
 			count: 1
-			path: app/Console/Commands/SendScheduledNotificationRemindersCommand.php
-
-		-
-			message: '#^Expression on left side of \?\? is not nullable\.$#'
-			identifier: nullCoalesce.expr
-			count: 1
 			path: app/Http/Controllers/Admin/AdminProfileController.php
 
 		-
@@ -85,8 +73,68 @@ parameters:
 			path: app/Http/Controllers/Admin/Financial/AdminFinancialProfileController.php
 
 		-
+			message: '#^Parameter \#1 \$stream of function fclose expects resource, resource\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Admin/Financial/AdminSettlementController.php
+
+		-
+			message: '#^Parameter \#1 \$stream of function fprintf expects resource, resource\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Admin/Financial/AdminSettlementController.php
+
+		-
+			message: '#^Parameter \#1 \$stream of function fputcsv expects resource, resource\|false given\.$#'
+			identifier: argument.type
+			count: 28
+			path: app/Http/Controllers/Admin/Financial/AdminSettlementController.php
+
+		-
 			message: '#^Parameter \$owner of method App\\Actions\\Financial\\CreatePartnerSettlement\:\:execute\(\) expects App\\Models\\Owner, App\\Models\\Owner\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Owner\> given\.$#'
 			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Admin/Financial/AdminSettlementController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>bank_account_number_masked" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Admin/Financial/AdminSettlementController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>bank_ifsc" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Admin/Financial/AdminSettlementController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>gstin" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Admin/Financial/AdminSettlementController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>legal_business_name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Admin/Financial/AdminSettlementController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Admin/Financial/AdminSettlementController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>pan_number" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Admin/Financial/AdminSettlementController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>razorpay_account_id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Http/Controllers/Admin/Financial/AdminSettlementController.php
 
@@ -123,13 +171,13 @@ parameters:
 		-
 			message: '#^Call to function abort_unless\(\) with true and 403 will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
-			count: 1
+			count: 3
 			path: app/Http/Controllers/Admin/Notifications/AdminNotificationProviderController.php
 
 		-
 			message: '#^Instanceof between App\\Models\\Admin and App\\Models\\Admin will always evaluate to true\.$#'
 			identifier: instanceof.alwaysTrue
-			count: 1
+			count: 3
 			path: app/Http/Controllers/Admin/Notifications/AdminNotificationProviderController.php
 
 		-
@@ -373,7 +421,55 @@ parameters:
 			path: app/Http/Controllers/Owner/Financial/OwnerCommissionAgreementController.php
 
 		-
+			message: '#^Parameter \#1 \$stream of function fclose expects resource, resource\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Owner/Financial/OwnerSettlementController.php
+
+		-
+			message: '#^Parameter \#1 \$stream of function fprintf expects resource, resource\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Owner/Financial/OwnerSettlementController.php
+
+		-
+			message: '#^Parameter \#1 \$stream of function fputcsv expects resource, resource\|false given\.$#'
+			identifier: argument.type
+			count: 23
+			path: app/Http/Controllers/Owner/Financial/OwnerSettlementController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>bank_account_number_masked" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Owner/Financial/OwnerSettlementController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>bank_ifsc" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Owner/Financial/OwnerSettlementController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>gstin" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Owner/Financial/OwnerSettlementController.php
+
+		-
 			message: '#^Using nullsafe property access "\?\-\>legal_business_name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Controllers/Owner/Financial/OwnerSettlementController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Owner/Financial/OwnerSettlementController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>pan_number" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Http/Controllers/Owner/Financial/OwnerSettlementController.php
@@ -479,6 +575,12 @@ parameters:
 			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Http/Requests/Owner/Properties/StoreOrUpdatePropertyRequest.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>display_business_name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Resources/Api/V1/OwnerProfileResource.php
 
 		-
 			message: '#^Using nullsafe property access "\?\-\>published_review_count" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
@@ -811,6 +913,12 @@ parameters:
 			path: app/Services/Notifications/Channels/InAppDatabaseChannel.php
 
 		-
+			message: '#^Method App\\Services\\Notifications\\Email\\SmtpConnectionVerifier\:\:sanitizeServerResponse\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: app/Services/Notifications/Email/SmtpConnectionVerifier.php
+
+		-
 			message: '#^Method App\\Services\\Notifications\\NotificationDispatcher\:\:dispatch\(\) has parameter \$notifiable with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -880,6 +988,12 @@ parameters:
 			message: '#^Using nullsafe property access "\?\-\>display_order" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 2
+			path: app/Services/PropertySearchCustomerData.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>published_review_count" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
 			path: app/Services/PropertySearchCustomerData.php
 
 		-

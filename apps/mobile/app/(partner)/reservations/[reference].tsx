@@ -1,18 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import {
-    View,
-    Text,
-    ScrollView,
-    StyleSheet,
     ActivityIndicator,
     Alert,
+    Modal,
     SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { OwnerApi } from '../../../src/api/owner';
-import { Reservation } from '../../../src/api/types';
+import { PhysicalRoom, Reservation } from '../../../src/api/types';
 import { Colors } from '../../../src/theme/colors';
-import { Spacing } from '../../../src/theme/spacing';
+import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 import { ReservationStatusBadge } from '../../../src/components/ReservationStatusBadge';
 import { StayTimingBadge } from '../../../src/components/StayTimingBadge';
@@ -20,12 +22,17 @@ import { MealBadge } from '../../../src/components/MealBadge';
 import { Button } from '../../../src/components/Button';
 import { Input } from '../../../src/components/Input';
 import {
-    ClipboardList,
-    UtensilsCrossed,
-    Receipt,
-    Zap,
-    UserCheck,
+    AlertCircle,
+    Check,
     CheckCircle2,
+    ClipboardList,
+    DoorClosed,
+    KeyRound,
+    Receipt,
+    UserCheck,
+    UtensilsCrossed,
+    X,
+    Zap,
 } from 'lucide-react-native';
 
 export default function PartnerReservationDetailScreen() {
@@ -37,6 +44,14 @@ export default function PartnerReservationDetailScreen() {
     const [actionLoading, setActionLoading] = useState(false);
     const [checkInNotes, setCheckInNotes] = useState('');
     const [checkOutNotes, setCheckOutNotes] = useState('');
+
+    // Physical Room Allocation State
+    const [showAllocateModal, setShowAllocateModal] = useState(false);
+    const [loadingRooms, setLoadingRooms] = useState(false);
+    const [allocatingRoom, setAllocatingRoom] = useState(false);
+    const [rooms, setRooms] = useState<PhysicalRoom[]>([]);
+    const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
+    const [allocateError, setAllocateError] = useState('');
 
     useEffect(() => {
         if (reference) {
@@ -114,6 +129,107 @@ export default function PartnerReservationDetailScreen() {
             );
         } finally {
             setActionLoading(false);
+        }
+    };
+
+    const openAllocateModal = async () => {
+        if (!reservation) return;
+        setShowAllocateModal(true);
+        setSelectedRoomId(reservation.physical_room_id || null);
+        setAllocateError('');
+
+        const propId =
+            reservation.property?.id ||
+            reservation.property_id ||
+            (reservation as any).propertyId;
+
+        if (!propId) {
+            setAllocateError(
+                'Property ID is missing from reservation details.',
+            );
+            return;
+        }
+
+        try {
+            setLoadingRooms(true);
+            const res = await OwnerApi.getPropertyRooms(propId);
+            if (res.data) {
+                // Prioritize active rooms matching the reservation room type
+                const targetRoomTypeId = reservation.property_room_type_id;
+                const sorted = [...res.data].sort((a, b) => {
+                    if (targetRoomTypeId) {
+                        const aMatch =
+                            a.property_room_type_id === targetRoomTypeId
+                                ? 1
+                                : 0;
+                        const bMatch =
+                            b.property_room_type_id === targetRoomTypeId
+                                ? 1
+                                : 0;
+                        if (aMatch !== bMatch) return bMatch - aMatch;
+                    }
+                    return String(a.room_number).localeCompare(
+                        String(b.room_number),
+                        undefined,
+                        { numeric: true },
+                    );
+                });
+                setRooms(sorted);
+            }
+        } catch (e: any) {
+            setAllocateError(
+                e.message || 'Failed to retrieve property room inventory.',
+            );
+        } finally {
+            setLoadingRooms(false);
+        }
+    };
+
+    const handleAllocateRoom = async () => {
+        if (!reservation || !selectedRoomId) {
+            Alert.alert(
+                'Selection Required',
+                'Please tap on an available room to allocate.',
+            );
+            return;
+        }
+
+        try {
+            setAllocatingRoom(true);
+            setAllocateError('');
+            const res = await OwnerApi.allocateRoom(
+                reservation.reference || reservation.booking_reference,
+                selectedRoomId,
+            );
+
+            const selectedRoom = rooms.find((r) => r.id === selectedRoomId);
+            if (res.data) {
+                setReservation(res.data);
+            } else {
+                setReservation({
+                    ...reservation,
+                    physical_room_id: selectedRoomId,
+                    allocated_room_number:
+                        selectedRoom?.room_number ||
+                        reservation.allocated_room_number,
+                    allocated_floor:
+                        selectedRoom?.floor ?? reservation.allocated_floor,
+                    physical_room: selectedRoom || reservation.physical_room,
+                });
+            }
+
+            setShowAllocateModal(false);
+            Alert.alert(
+                'Room Allocated Successfully',
+                `Room #${selectedRoom?.room_number || selectedRoomId} has been designated for this guest.`,
+            );
+        } catch (e: any) {
+            setAllocateError(
+                e.message ||
+                    'Unable to allocate room. It may be currently allocated or inactive.',
+            );
+        } finally {
+            setAllocatingRoom(false);
         }
     };
 
@@ -265,6 +381,26 @@ export default function PartnerReservationDetailScreen() {
                                     </Text>
                                 </View>
                             ) : null}
+                            {reservation.allocated_room_number ||
+                            reservation.physical_room ? (
+                                <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>
+                                        Assigned Room:
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.infoValue,
+                                            {
+                                                color: '#059669',
+                                                fontWeight: '700',
+                                            },
+                                        ]}
+                                    >
+                                        Room #{reservation.allocated_room_number ||
+                                            reservation.physical_room?.room_number} (Floor {reservation.allocated_floor ?? reservation.physical_room?.floor ?? 'Main'})
+                                    </Text>
+                                </View>
+                            ) : null}
                         </View>
                     </View>
 
@@ -387,6 +523,138 @@ export default function PartnerReservationDetailScreen() {
                         </View>
                     ) : null}
 
+                    {/* Physical Room Allocation Section */}
+                    {[
+                        'confirmed',
+                        'checked_in',
+                        'checked_out',
+                        'completed',
+                    ].includes(reservation.status) ? (
+                        <View style={styles.section}>
+                            <View style={styles.sectionTitleRow}>
+                                <DoorClosed
+                                    size={18}
+                                    color={Colors.deepPlum}
+                                    style={{ marginRight: 6 }}
+                                />
+                                <Text style={styles.sectionTitle}>
+                                    Physical Room Allocation
+                                </Text>
+                            </View>
+
+                            {reservation.allocated_room_number ||
+                            reservation.physical_room ||
+                            reservation.physical_room_id ? (
+                                <View style={styles.allocationCard}>
+                                    <View style={styles.allocationHeader}>
+                                        <View style={styles.allocatedBadge}>
+                                            <CheckCircle2
+                                                size={13}
+                                                color="#059669"
+                                                style={{ marginRight: 4 }}
+                                            />
+                                            <Text
+                                                style={
+                                                    styles.allocatedBadgeText
+                                                }
+                                            >
+                                                Allocated
+                                            </Text>
+                                        </View>
+                                        {[
+                                            'confirmed',
+                                            'checked_in',
+                                        ].includes(reservation.status) ? (
+                                            <TouchableOpacity
+                                                onPress={openAllocateModal}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text
+                                                    style={
+                                                        styles.reallocateText
+                                                    }
+                                                >
+                                                    Change Room
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ) : null}
+                                    </View>
+
+                                    <View style={styles.allocationDetails}>
+                                        <View style={styles.allocationItem}>
+                                            <Text
+                                                style={styles.allocationLabel}
+                                            >
+                                                Assigned Room
+                                            </Text>
+                                            <Text
+                                                style={styles.allocationValue}
+                                            >
+                                                Room #
+                                                {reservation.allocated_room_number ||
+                                                    reservation.physical_room
+                                                        ?.room_number ||
+                                                    reservation.physical_room_id}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.allocationItem}>
+                                            <Text
+                                                style={styles.allocationLabel}
+                                            >
+                                                Floor
+                                            </Text>
+                                            <Text
+                                                style={styles.allocationValue}
+                                            >
+                                                Floor{' '}
+                                                {reservation.allocated_floor ??
+                                                    reservation.physical_room
+                                                        ?.floor ??
+                                                    'Main / Ground'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            ) : (
+                                <View style={styles.unallocatedCard}>
+                                    <View style={styles.unallocatedHeader}>
+                                        <KeyRound
+                                            size={20}
+                                            color={Colors.coral}
+                                            style={{ marginRight: 8 }}
+                                        />
+                                        <View style={{ flex: 1 }}>
+                                            <Text
+                                                style={styles.unallocatedTitle}
+                                            >
+                                                Room Not Yet Allocated
+                                            </Text>
+                                            <Text
+                                                style={styles.unallocatedDesc}
+                                            >
+                                                Assign a physical room number
+                                                and floor before or during guest
+                                                check-in.
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    {[
+                                        'confirmed',
+                                        'checked_in',
+                                    ].includes(reservation.status) ? (
+                                        <Button
+                                            title="Assign Physical Room"
+                                            variant="primary"
+                                            size="sm"
+                                            onPress={openAllocateModal}
+                                            style={{ marginTop: Spacing.sm }}
+                                        />
+                                    ) : null}
+                                </View>
+                            )}
+                        </View>
+                    ) : null}
+
                     {/* Front-Desk Operations Panel */}
                     <View style={styles.section}>
                         <View style={styles.sectionTitleRow}>
@@ -469,6 +737,245 @@ export default function PartnerReservationDetailScreen() {
                     </View>
                 </View>
             </ScrollView>
+
+            {/* Physical Room Allocation Modal */}
+            <Modal
+                visible={showAllocateModal}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowAllocateModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.modalTitle}>
+                                    Assign Physical Room
+                                </Text>
+                                <Text style={styles.modalSubtitle}>
+                                    Category: {reservation.room_type_name}
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                onPress={() => setShowAllocateModal(false)}
+                                hitSlop={{
+                                    top: 10,
+                                    bottom: 10,
+                                    left: 10,
+                                    right: 10,
+                                }}
+                            >
+                                <X size={20} color={Colors.gray600} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {allocateError ? (
+                            <View style={styles.errorBox}>
+                                <AlertCircle
+                                    size={16}
+                                    color={Colors.rose}
+                                    style={{ marginRight: 6 }}
+                                />
+                                <Text style={styles.errorText}>
+                                    {allocateError}
+                                </Text>
+                            </View>
+                        ) : null}
+
+                        {loadingRooms ? (
+                            <View
+                                style={{
+                                    padding: Spacing.xl,
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <ActivityIndicator
+                                    size="small"
+                                    color={Colors.deepPlum}
+                                />
+                                <Text
+                                    style={[
+                                        styles.loadingText,
+                                        { marginTop: 8 },
+                                    ]}
+                                >
+                                    Loading room inventory...
+                                </Text>
+                            </View>
+                        ) : rooms.length === 0 ? (
+                            <View
+                                style={{
+                                    padding: Spacing.lg,
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Text style={styles.emptyRoomsText}>
+                                    No physical rooms configured for this
+                                    property.
+                                </Text>
+                            </View>
+                        ) : (
+                            <ScrollView
+                                style={{ maxHeight: 320 }}
+                                showsVerticalScrollIndicator={false}
+                            >
+                                <View
+                                    style={{
+                                        gap: Spacing.xs,
+                                        paddingVertical: Spacing.xs,
+                                    }}
+                                >
+                                    {rooms.map((room) => {
+                                        const isSelected =
+                                            selectedRoomId === room.id;
+                                        const isOccupied = room.is_occupied;
+                                        const isCurrent =
+                                            reservation.physical_room_id ===
+                                            room.id;
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={room.id}
+                                                style={[
+                                                    styles.roomChoiceCard,
+                                                    isSelected &&
+                                                        styles.roomChoiceCardSelected,
+                                                    isOccupied &&
+                                                        !isCurrent &&
+                                                        styles.roomChoiceCardDisabled,
+                                                ]}
+                                                onPress={() => {
+                                                    if (!isOccupied || isCurrent) {
+                                                        setSelectedRoomId(
+                                                            room.id,
+                                                        );
+                                                    }
+                                                }}
+                                                disabled={Boolean(
+                                                    isOccupied && !isCurrent,
+                                                )}
+                                                activeOpacity={0.7}
+                                            >
+                                                <View style={{ flex: 1 }}>
+                                                    <View
+                                                        style={{
+                                                            flexDirection: 'row',
+                                                            alignItems: 'center',
+                                                        }}
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.roomChoiceNumber
+                                                            }
+                                                        >
+                                                            Room {room.room_number}
+                                                        </Text>
+                                                        {room.floor !==
+                                                            undefined &&
+                                                        room.floor !== null ? (
+                                                            <Text
+                                                                style={
+                                                                    styles.roomChoiceFloor
+                                                                }
+                                                            >
+                                                                (Floor{' '}
+                                                                {room.floor})
+                                                            </Text>
+                                                        ) : null}
+                                                        {isCurrent ? (
+                                                            <View
+                                                                style={
+                                                                    styles.currentRoomTag
+                                                                }
+                                                            >
+                                                                <Text
+                                                                    style={
+                                                                        styles.currentRoomTagText
+                                                                    }
+                                                                >
+                                                                    Current
+                                                                </Text>
+                                                            </View>
+                                                        ) : null}
+                                                    </View>
+                                                    <Text
+                                                        style={
+                                                            styles.roomChoiceMeta
+                                                        }
+                                                    >
+                                                        {room.room_type_name ||
+                                                            reservation.room_type_name ||
+                                                            'Standard'}
+                                                    </Text>
+                                                </View>
+
+                                                <View
+                                                    style={{
+                                                        alignItems: 'flex-end',
+                                                    }}
+                                                >
+                                                    {isOccupied && !isCurrent ? (
+                                                        <View
+                                                            style={
+                                                                styles.occupiedTag
+                                                            }
+                                                        >
+                                                            <Text
+                                                                style={
+                                                                    styles.occupiedTagText
+                                                                }
+                                                            >
+                                                                Occupied
+                                                            </Text>
+                                                        </View>
+                                                    ) : isSelected ? (
+                                                        <View
+                                                            style={
+                                                                styles.selectedCircle
+                                                            }
+                                                        >
+                                                            <Check
+                                                                size={14}
+                                                                color={
+                                                                    Colors.white
+                                                                }
+                                                            />
+                                                        </View>
+                                                    ) : (
+                                                        <View
+                                                            style={
+                                                                styles.availableTag
+                                                            }
+                                                        >
+                                                            <Text
+                                                                style={
+                                                                    styles.availableTagText
+                                                                }
+                                                            >
+                                                                Available
+                                                            </Text>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            </ScrollView>
+                        )}
+
+                        <Button
+                            title="Confirm Room Allocation"
+                            variant="primary"
+                            size="md"
+                            loading={allocatingRoom}
+                            disabled={!selectedRoomId || loadingRooms}
+                            onPress={handleAllocateRoom}
+                            style={{ marginTop: Spacing.md }}
+                        />
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -643,5 +1150,196 @@ const styles = StyleSheet.create({
     errorText: {
         ...Typography.bodyMedium,
         color: Colors.coral,
+    },
+    allocationCard: {
+        backgroundColor: Colors.warmOffWhite,
+        borderRadius: 10,
+        padding: Spacing.md,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+    },
+    allocationHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: Spacing.sm,
+    },
+    allocatedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: Spacing.sm,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    allocatedBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#059669',
+    },
+    reallocateText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: Colors.deepPlum,
+        textDecorationLine: 'underline',
+    },
+    allocationDetails: {
+        flexDirection: 'row',
+        gap: Spacing.lg,
+    },
+    allocationItem: {
+        flex: 1,
+    },
+    allocationLabel: {
+        ...Typography.bodySmall,
+        color: Colors.gray500,
+        marginBottom: 2,
+    },
+    allocationValue: {
+        ...Typography.bodySmall,
+        color: Colors.deepPlum,
+        fontWeight: '700',
+    },
+    unallocatedCard: {
+        backgroundColor: '#FFF7ED',
+        borderRadius: 10,
+        padding: Spacing.md,
+        borderWidth: 1,
+        borderColor: '#FFEDD5',
+    },
+    unallocatedHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    unallocatedTitle: {
+        ...Typography.labelMedium,
+        color: Colors.deepPlum,
+        fontWeight: '700',
+    },
+    unallocatedDesc: {
+        ...Typography.bodySmall,
+        color: Colors.gray600,
+        marginTop: 2,
+        lineHeight: 18,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: Colors.white,
+        borderTopLeftRadius: BorderRadius.xl,
+        borderTopRightRadius: BorderRadius.xl,
+        padding: Spacing.lg,
+        maxHeight: '85%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: Spacing.md,
+        paddingBottom: Spacing.sm,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.gray100,
+    },
+    modalTitle: {
+        ...Typography.titleMedium,
+        color: Colors.deepPlum,
+        fontWeight: '800',
+    },
+    modalSubtitle: {
+        ...Typography.bodySmall,
+        color: Colors.gray500,
+        marginTop: 2,
+    },
+    errorBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFF1F2',
+        padding: Spacing.sm,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FFE4E6',
+        marginBottom: Spacing.sm,
+    },
+    emptyRoomsText: {
+        ...Typography.bodySmall,
+        color: Colors.gray500,
+    },
+    roomChoiceCard: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: Spacing.md,
+        borderRadius: 8,
+        backgroundColor: Colors.warmOffWhite,
+        borderWidth: 1.5,
+        borderColor: Colors.gray200,
+    },
+    roomChoiceCardSelected: {
+        borderColor: Colors.coral,
+        backgroundColor: '#FFF7F5',
+    },
+    roomChoiceCardDisabled: {
+        opacity: 0.5,
+        backgroundColor: Colors.gray100,
+    },
+    roomChoiceNumber: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: Colors.deepPlum,
+    },
+    roomChoiceFloor: {
+        fontSize: 12,
+        color: Colors.gray600,
+        marginLeft: 6,
+    },
+    roomChoiceMeta: {
+        fontSize: 12,
+        color: Colors.gray500,
+        marginTop: 2,
+    },
+    currentRoomTag: {
+        backgroundColor: '#EDE9FE',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        marginLeft: 6,
+    },
+    currentRoomTagText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#6D28D9',
+    },
+    occupiedTag: {
+        backgroundColor: '#FEE2E2',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    occupiedTagText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#DC2626',
+    },
+    availableTag: {
+        backgroundColor: '#DCFCE7',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    availableTagText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#15803D',
+    },
+    selectedCircle: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: Colors.coral,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });

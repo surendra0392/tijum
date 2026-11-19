@@ -4,6 +4,7 @@ import {
     NotificationItem,
     OwnerProfile,
     PartnerDashboardData,
+    PhysicalRoom,
     PropertyDetail,
     Reservation,
 } from './types';
@@ -31,6 +32,10 @@ export const OwnerApi = {
         }),
     getProperty: (id: number) =>
         ApiClient.get<ApiResponse<PropertyDetail>>(`owner/properties/${id}`),
+    getPropertyRooms: (propertyId: number) =>
+        ApiClient.get<ApiResponse<PhysicalRoom[]>>(
+            `owner/properties/${propertyId}/rooms`,
+        ),
 
     // Reservations
     getReservations: (status?: string, page: number = 1) =>
@@ -41,6 +46,11 @@ export const OwnerApi = {
     getReservation: (reference: string) =>
         ApiClient.get<ApiResponse<Reservation>>(
             `owner/reservations/${reference}`,
+        ),
+    allocateRoom: (reference: string, physicalRoomId: number) =>
+        ApiClient.post<ApiResponse<Reservation>>(
+            `owner/reservations/${reference}/allocate`,
+            { physical_room_id: physicalRoomId },
         ),
     checkInReservation: (reference: string, notes?: string) =>
         ApiClient.post<ApiResponse<Reservation>>(

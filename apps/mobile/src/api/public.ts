@@ -131,4 +131,12 @@ export const PublicApi = {
         subject: 'booking' | 'partner' | 'general' | string;
         message: string;
     }) => ApiClient.post<ApiResponse<any>>('public/contact', payload),
+
+    forgotPassword: (
+        email: string,
+        userType: 'customer' | 'owner' = 'customer',
+    ) =>
+        ApiClient.post<ApiResponse<any>>(`auth/${userType}/forgot-password`, {
+            email,
+        }),
 };

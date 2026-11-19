@@ -152,6 +152,22 @@ export interface PropertyDetail extends PropertyCard {
     };
 }
 
+export interface PhysicalRoom {
+    id: number;
+    property_id: number;
+    property_room_type_id: number;
+    room_number: string;
+    floor?: string | number | null;
+    is_active: boolean;
+    is_occupied?: boolean;
+    current_allocation?: {
+        reservation_id: number;
+        guest_name?: string;
+        check_out_date?: string;
+    } | null;
+    room_type_name?: string;
+}
+
 export interface Reservation {
     id: number;
     booking_reference: string;
@@ -212,6 +228,21 @@ export interface Reservation {
     guest_gender?: string;
     commission_amount_paise?: number;
     owner_payable_paise?: number;
+    property_id?: number;
+    property_room_type_id?: number;
+    physical_room_id?: number | null;
+    physical_room?: PhysicalRoom | null;
+    allocated_room_number?: string | null;
+    allocated_floor?: string | number | null;
+    is_reviewed?: boolean;
+    review?: {
+        id?: number;
+        overall_rating?: number;
+        rating?: number;
+        title?: string;
+        content?: string;
+        created_at?: string;
+    } | null;
     check_in_time?: string;
     check_out_time?: string;
     food_inclusions?: {
