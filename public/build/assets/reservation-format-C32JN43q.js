@@ -1,1 +1,0 @@
-function e(e,t=`INR`){return new Intl.NumberFormat(`en-IN`,{style:`currency`,currency:t,maximumFractionDigits:2}).format(e/100)}function t(e){return new Intl.DateTimeFormat(`en-IN`,{day:`numeric`,month:`short`,year:`numeric`,timeZone:`Asia/Kolkata`}).format(new Date(`${e}T00:00:00+05:30`))}export{e as n,t};

@@ -11,6 +11,7 @@ use App\Models\Owner;
 use App\Models\Property;
 use App\Models\Reservation;
 use App\Services\ReservationData;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -23,84 +24,134 @@ class ReservationController extends Controller
     {
         $owner = $this->owner($request->user('owner'));
         $filters = $request->validated();
-        $baseOwnerQuery = Reservation::query()
-            ->whereHas('property', fn ($property) => $property->where('owner_id', $owner->id));
 
-        $query = (clone $baseOwnerQuery)
-            ->with(['property', 'roomType', 'successfulPayment', 'review', 'user', 'allocations.room'])
-            ->latest('created_at')
-            ->latest('id');
+        $scopedBaseQuery = Reservation::query()
+            ->whereHas('property', fn (Builder $property) => $property->where('owner_id', $owner->id));
 
-        if (isset($filters['status'])) {
-            $query->where('status', $filters['status']);
+        if (! empty($filters['property_id'])) {
+            $scopedBaseQuery->where('property_id', $filters['property_id']);
         }
-        if (isset($filters['property_id'])) {
-            $query->where('property_id', $filters['property_id']);
+
+        if (! empty($filters['search'])) {
+            $search = trim((string) $filters['search']);
+            $scopedBaseQuery->where(function (Builder $q) use ($search): void {
+                $q->where('booking_reference', 'like', "%{$search}%")
+                    ->orWhere('contact_name', 'like', "%{$search}%")
+                    ->orWhere('contact_phone', 'like', "%{$search}%")
+                    ->orWhere('contact_email', 'like', "%{$search}%")
+                    ->orWhere('room_allocation_history', 'like', "%{$search}%")
+                    ->orWhereHas('user', function (Builder $uq) use ($search): void {
+                        $uq->where('name', 'like', "%{$search}%")
+                            ->orWhere('phone', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('allocations.room', function (Builder $rq) use ($search): void {
+                        $rq->where('room_number', 'like', "%{$search}%");
+                    });
+            });
         }
-        if (isset($filters['stay_stage'])) {
-            match ($filters['stay_stage']) {
+
+        if (! empty($filters['from'])) {
+            $scopedBaseQuery->whereDate('check_in_date', '>=', $filters['from']);
+        }
+
+        if (! empty($filters['to'])) {
+            $scopedBaseQuery->whereDate('check_in_date', '<=', $filters['to']);
+        }
+
+        $activeStayStage = ! empty($filters['stay_stage']) ? (string) $filters['stay_stage'] : null;
+        $activeStatus = ! empty($filters['status']) ? (string) $filters['status'] : null;
+
+        // Normalize legacy status query param into the unified stage pill when no explicit stay_stage is passed
+        if ($activeStayStage === null && $activeStatus !== null) {
+            $activeStayStage = match ($activeStatus) {
+                ReservationStatus::AwaitingPayment->value => 'awaiting_payment',
+                ReservationStatus::Cancelled->value, ReservationStatus::Expired->value => 'cancelled',
+                default => null,
+            };
+        }
+
+        $stageCounts = [
+            'all' => (clone $scopedBaseQuery)->count(),
+            'needs_room' => $this->applyNeedsRoomConstraint(clone $scopedBaseQuery)->count(),
+            'awaiting_arrival' => (clone $scopedBaseQuery)
+                ->where('status', ReservationStatus::Confirmed)
+                ->whereNull('checked_in_at')
+                ->whereNull('checked_out_at')
+                ->count(),
+            'checked_in' => (clone $scopedBaseQuery)
+                ->where('status', ReservationStatus::Confirmed)
+                ->whereNotNull('checked_in_at')
+                ->whereNull('checked_out_at')
+                ->count(),
+            'checked_out' => (clone $scopedBaseQuery)
+                ->whereNotNull('checked_out_at')
+                ->count(),
+            'awaiting_payment' => (clone $scopedBaseQuery)
+                ->where('status', ReservationStatus::AwaitingPayment)
+                ->count(),
+            'cancelled' => (clone $scopedBaseQuery)
+                ->whereIn('status', [ReservationStatus::Cancelled, ReservationStatus::Expired])
+                ->count(),
+        ];
+
+        $confirmedRevenueMinor = (int) (clone $scopedBaseQuery)
+            ->where('status', ReservationStatus::Confirmed)
+            ->sum('total_amount_minor');
+
+        $query = (clone $scopedBaseQuery)
+            ->with(['property', 'roomType', 'successfulPayment', 'review', 'user', 'allocations.room']);
+
+        if ($activeStayStage !== null) {
+            match ($activeStayStage) {
+                'needs_room' => $this->applyNeedsRoomConstraint($query),
                 'awaiting_arrival' => $query
                     ->where('status', ReservationStatus::Confirmed)
                     ->whereNull('checked_in_at')
                     ->whereNull('checked_out_at'),
                 'checked_in' => $query
+                    ->where('status', ReservationStatus::Confirmed)
                     ->whereNotNull('checked_in_at')
                     ->whereNull('checked_out_at'),
                 'checked_out' => $query
                     ->whereNotNull('checked_out_at'),
+                'awaiting_payment' => $query
+                    ->where('status', ReservationStatus::AwaitingPayment),
+                'cancelled' => $query
+                    ->whereIn('status', [ReservationStatus::Cancelled, ReservationStatus::Expired]),
                 default => null,
             };
+        } elseif ($activeStatus !== null) {
+            $query->where('status', $activeStatus);
         }
-        if (! empty($filters['search'])) {
-            $search = trim((string) $filters['search']);
-            $query->where(function ($q) use ($search): void {
-                $q->where('booking_reference', 'like', "%{$search}%")
-                    ->orWhere('contact_name', 'like', "%{$search}%")
-                    ->orWhere('contact_phone', 'like', "%{$search}%")
-                    ->orWhere('contact_email', 'like', "%{$search}%")
-                    ->orWhereHas('user', function ($uq) use ($search): void {
-                        $uq->where('name', 'like', "%{$search}%")
-                            ->orWhere('phone', 'like', "%{$search}%")
-                            ->orWhere('email', 'like', "%{$search}%");
-                    });
-            });
-        }
-        if (isset($filters['from'])) {
-            $query->whereDate('check_in_date', '>=', $filters['from']);
-        }
-        if (isset($filters['to'])) {
-            $query->whereDate('check_in_date', '<=', $filters['to']);
-        }
+
+        $sort = ! empty($filters['sort']) ? (string) $filters['sort'] : 'newest';
+
+        match ($sort) {
+            'check_in_asc' => $query->orderBy('check_in_date')->latest('id'),
+            'check_in_desc' => $query->orderByDesc('check_in_date')->latest('id'),
+            'amount_desc' => $query->orderByDesc('total_amount_minor')->latest('id'),
+            default => $query->latest('created_at')->latest('id'),
+        };
 
         $reservations = $query->paginate((int) ($filters['per_page'] ?? 15))->withQueryString();
-
-        $stageCounts = [
-            'all' => (clone $baseOwnerQuery)->count(),
-            'awaiting_arrival' => (clone $baseOwnerQuery)
-                ->where('status', ReservationStatus::Confirmed)
-                ->whereNull('checked_in_at')
-                ->whereNull('checked_out_at')
-                ->count(),
-            'checked_in' => (clone $baseOwnerQuery)
-                ->whereNotNull('checked_in_at')
-                ->whereNull('checked_out_at')
-                ->count(),
-            'checked_out' => (clone $baseOwnerQuery)
-                ->whereNotNull('checked_out_at')
-                ->count(),
-        ];
 
         return Inertia::render('owner/reservations/index', [
             'reservations' => $this->pagination($reservations),
             'filters' => [
-                'status' => $filters['status'] ?? null,
-                'stay_stage' => $filters['stay_stage'] ?? null,
-                'search' => $filters['search'] ?? null,
-                'property_id' => $filters['property_id'] ?? null,
-                'from' => $filters['from'] ?? null,
-                'to' => $filters['to'] ?? null,
+                'status' => $activeStatus,
+                'stay_stage' => $activeStayStage,
+                'search' => ! empty($filters['search']) ? trim((string) $filters['search']) : null,
+                'property_id' => ! empty($filters['property_id']) ? (int) $filters['property_id'] : null,
+                'from' => ! empty($filters['from']) ? (string) $filters['from'] : null,
+                'to' => ! empty($filters['to']) ? (string) $filters['to'] : null,
+                'sort' => $sort,
             ],
             'stageCounts' => $stageCounts,
+            'metrics' => [
+                'confirmed_revenue_minor' => $confirmedRevenueMinor,
+                'currency_code' => 'INR',
+            ],
             'statusOptions' => $this->statusOptions(),
             'properties' => Property::query()
                 ->where('owner_id', $owner->id)
@@ -122,6 +173,20 @@ class ReservationController extends Controller
             'reservation' => $this->data->detail($model, 'owner'),
             'status' => request()->session()->get('status'),
         ]);
+    }
+
+    /**
+     * @param  Builder<Reservation>  $query
+     * @return Builder<Reservation>
+     */
+    private function applyNeedsRoomConstraint(Builder $query): Builder
+    {
+        return $query
+            ->where('status', ReservationStatus::Confirmed)
+            ->whereNull('checked_out_at')
+            ->whereRaw(
+                '(SELECT COALESCE(SUM(allocated_quantity), 0) FROM reservation_room_allocations WHERE reservation_room_allocations.reservation_id = reservations.id) < reservations.quantity',
+            );
     }
 
     /**
@@ -168,7 +233,7 @@ class ReservationController extends Controller
     {
         return Reservation::query()
             ->where('booking_reference', $reference)
-            ->whereHas('property', fn ($property) => $property->where('owner_id', $owner->id))
+            ->whereHas('property', fn (Builder $property) => $property->where('owner_id', $owner->id))
             ->firstOrFail();
     }
 }

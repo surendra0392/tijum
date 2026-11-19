@@ -33,6 +33,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { dashboard } from '@/routes/owner';
 import {
     allocations as allocationsRoute,
     cancel,
@@ -1394,3 +1395,11 @@ function RoomStayHistoryPanel({
         </div>
     );
 }
+
+OwnerReservationShow.layout = {
+    breadcrumbs: [
+        { title: 'Partner Overview', href: dashboard() },
+        { title: 'Reservations & Customer Records', href: index() },
+        { title: 'Booking Details', href: '#' },
+    ],
+};

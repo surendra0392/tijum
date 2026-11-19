@@ -58,6 +58,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { dashboard } from '@/routes/owner';
 
 type FrontDeskReservation = {
     id: number;
@@ -1167,3 +1168,10 @@ export default function OwnerFrontDeskIndex({
         </div>
     );
 }
+
+OwnerFrontDeskIndex.layout = {
+    breadcrumbs: [
+        { title: 'Partner Overview', href: dashboard() },
+        { title: 'Front Desk Operations', href: '/owner/front-desk' },
+    ],
+};
