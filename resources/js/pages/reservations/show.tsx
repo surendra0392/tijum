@@ -1,30 +1,37 @@
-import { Form, Head, Link, router } from '@inertiajs/react';
+import { Form, Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
     ArrowLeft,
     ArrowRight,
     Ban,
     CalendarDays,
+    Check,
     CheckCircle2,
+    ChevronDown,
     Clock,
     Clock3,
+    Copy,
     CreditCard,
     DoorClosed,
     DoorOpen,
     FileText,
     Home,
     LifeBuoy,
+    Mail,
     MapPin,
+    Phone,
     RefreshCw,
     ShieldAlert,
     Star,
+    UserRound,
     Users,
     Utensils,
+    X,
     XCircle,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Breadcrumbs } from '@/components/breadcrumbs';
 import InputError from '@/components/input-error';
-import { PageHeader } from '@/components/shared/page-header';
 import { ResponsiveContainer } from '@/components/shared/responsive-container';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { Button } from '@/components/ui/button';
@@ -38,10 +45,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import {
-    formatReservationDate,
-    formatReservationMoney,
-} from '@/lib/reservation-format';
+import { formatReservationDate } from '@/lib/reservation-format';
 import { formatStayTime } from '@/lib/stay-timing';
 import { cancel, index } from '@/routes/reservations';
 import type { PaymentOrderResponse, ReservationDetail } from '@/types';
@@ -80,12 +84,102 @@ function loadRazorpayScript(): Promise<boolean> {
     });
 }
 
-function formatPrice(minor: number, currency = 'INR'): string {
+function formatAmount(minor: number, currency = 'INR'): string {
+    const hasSubunits = minor % 100 !== 0;
+
     return new Intl.NumberFormat('en-IN', {
         style: 'currency',
         currency,
-        maximumFractionDigits: 0,
+        minimumFractionDigits: hasSubunits ? 2 : 0,
+        maximumFractionDigits: 2,
     }).format(minor / 100);
+}
+
+function formatDateTime(isoString?: string | null): string | null {
+    if (!isoString) {
+        return null;
+    }
+
+    const parsed = new Date(isoString);
+    if (Number.isNaN(parsed.getTime())) {
+        return null;
+    }
+
+    return new Intl.DateTimeFormat('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZone: 'Asia/Kolkata',
+    }).format(parsed);
+}
+
+function formatPolicyValue(value: string): string {
+    return value
+        .split('_')
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+}
+
+function formatPaymentMethod(method?: string | null): string {
+    if (!method) {
+        return 'Online';
+    }
+
+    const normalized = method.toLowerCase();
+    if (normalized === 'upi' || normalized === 'emi') {
+        return normalized.toUpperCase();
+    }
+
+    return formatPolicyValue(normalized);
+}
+
+function formatQuantityLabel(
+    quantity: number,
+    basis: 'guest_places' | 'private_rooms',
+    fallbackLabel: string,
+): string {
+    if (basis === 'private_rooms') {
+        return `${quantity} Private Room${quantity === 1 ? '' : 's'}`;
+    }
+
+    if (basis === 'guest_places') {
+        return `${quantity} Guest Place${quantity === 1 ? '' : 's'}`;
+    }
+
+    return `${quantity} ${fallbackLabel}`;
+}
+
+function formatDurationDetail(reservation: ReservationDetail): string {
+    if (reservation.duration_type === 'daily') {
+        return `${reservation.total_stay_days} day${reservation.total_stay_days === 1 ? '' : 's'} stay`;
+    }
+
+    return `${reservation.duration_label} · ${reservation.total_stay_days} stay day${reservation.total_stay_days === 1 ? '' : 's'}`;
+}
+
+function formatRoomOccupancyDetail(reservation: ReservationDetail): string {
+    const parts: string[] = [];
+
+    if (reservation.quantity_basis !== 'private_rooms') {
+        parts.push(reservation.sharing_label);
+    }
+
+    parts.push(
+        formatQuantityLabel(
+            reservation.quantity,
+            reservation.quantity_basis,
+            reservation.quantity_basis_label,
+        ),
+    );
+    parts.push(
+        `${reservation.guest_count} guest${reservation.guest_count === 1 ? '' : 's'}`,
+    );
+    parts.push(formatPolicyValue(reservation.guest_gender));
+    parts.push(formatPolicyValue(reservation.guest_composition));
+
+    return parts.join(' · ');
 }
 
 function ReviewStars({ rating }: { rating: number }) {
@@ -113,8 +207,16 @@ export default function ReservationShow({
     reservation: ReservationDetail;
     status?: string;
 }) {
+    const page = usePage();
+    const pageErrors = page.props.errors as Record<string, string> | undefined;
+
     const [paying, setPaying] = useState(false);
     const [paymentError, setPaymentError] = useState<string | null>(null);
+    const [copiedRef, setCopiedRef] = useState(false);
+    const [statusDismissed, setStatusDismissed] = useState(false);
+    const [showCancelForm, setShowCancelForm] = useState(() =>
+        Boolean(pageErrors?.cancellation_reason),
+    );
     const [secondsLeft, setSecondsLeft] = useState<number | null>(() => {
         if (!reservation.payment_deadline_at) {
             return null;
@@ -147,6 +249,16 @@ export default function ReservationShow({
 
         return () => clearInterval(interval);
     }, [reservation.payment_deadline_at]);
+
+    const handleCopyReference = async () => {
+        try {
+            await navigator.clipboard.writeText(reservation.booking_reference);
+            setCopiedRef(true);
+            window.setTimeout(() => setCopiedRef(false), 2000);
+        } catch {
+            // Clipboard access may be unavailable in restricted contexts
+        }
+    };
 
     const handlePay = async () => {
         setPaying(true);
@@ -299,9 +411,9 @@ export default function ReservationShow({
     };
 
     const isAwaitingPayment = reservation.status === 'awaiting_payment';
+    const isConfirmed = reservation.status === 'confirmed';
     const isConfirmedOrCancelled =
-        reservation.status === 'confirmed' ||
-        reservation.status === 'cancelled';
+        isConfirmed || reservation.status === 'cancelled';
     const canPay = reservation.can_pay === true;
     const isCancelOrErrorStatus =
         reservation.status === 'cancelled' ||
@@ -311,60 +423,146 @@ export default function ReservationShow({
         reservation.breakfast_included && 'Breakfast',
         reservation.lunch_included && 'Lunch',
         reservation.dinner_included && 'Dinner',
-    ].filter(Boolean);
+    ].filter((meal): meal is string => Boolean(meal));
+
+    const paidTimestamp = formatDateTime(
+        reservation.payment_summary?.captured_at ?? reservation.confirmed_at,
+    );
+    const formattedCheckInDate = formatReservationDate(
+        reservation.check_in_date,
+    );
+    const formattedCheckoutDate = formatReservationDate(
+        reservation.checkout_date,
+    );
+    const formattedCheckInTime = formatStayTime(
+        reservation.standard_check_in_time,
+    );
+    const formattedCheckOutTime = formatStayTime(
+        reservation.standard_check_out_time,
+    );
 
     return (
-        <ResponsiveContainer width="wide" className="py-6 sm:py-8">
+        <ResponsiveContainer width="default" className="py-6 sm:py-8">
             <div className="space-y-6 pb-12">
-                <Head title={reservation.booking_reference} />
-                <PageHeader
-                    breadcrumbs={
-                        isConfirmedOrCancelled
-                            ? [
-                                  {
-                                      title: 'My Reservations',
-                                      href: '/reservations',
-                                  },
-                                  {
-                                      title: reservation.booking_reference,
-                                      href: `/reservations/${reservation.booking_reference}`,
-                                  },
-                              ]
-                            : [
-                                  {
-                                      title: reservation.property_name,
-                                      href: '#',
-                                  },
-                                  {
-                                      title: reservation.booking_reference,
-                                      href: `/reservations/${reservation.booking_reference}`,
-                                  },
-                              ]
-                    }
-                    eyebrow="Reservation details"
-                    title={reservation.booking_reference}
-                    description="Your submitted contact, stay, food, timing, and price snapshot."
-                    actions={
-                        isConfirmedOrCancelled ? (
+                <Head
+                    title={`${reservation.property_name} · ${reservation.booking_reference}`}
+                />
+
+                {/* Top Breadcrumb & Reservation Header */}
+                <header className="space-y-4">
+                    <Breadcrumbs
+                        breadcrumbs={
+                            isConfirmedOrCancelled
+                                ? [
+                                      {
+                                          title: 'My Reservations',
+                                          href: '/reservations',
+                                      },
+                                      {
+                                          title: 'Booking Details',
+                                          current: true,
+                                      },
+                                  ]
+                                : [
+                                      {
+                                          title: reservation.property_name,
+                                          href: '#',
+                                      },
+                                      {
+                                          title: 'Booking Details',
+                                          current: true,
+                                      },
+                                  ]
+                        }
+                    />
+
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between lg:gap-6">
+                        <div className="min-w-0 space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
-                                {reservation.status === 'confirmed' && (
+                                <StatusBadge
+                                    status={reservation.status_semantic}
+                                    label={reservation.status_label}
+                                />
+                                <div className="inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-full border border-tijum-surface/90 bg-white px-2.5 py-0.5 text-xs text-tijum-plum-muted shadow-2xs dark:border-border dark:bg-card dark:text-muted-foreground">
+                                    <span className="shrink-0 font-medium">
+                                        Ref:
+                                    </span>
+                                    <span className="truncate font-mono font-semibold text-tijum-plum dark:text-foreground">
+                                        {reservation.booking_reference}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={handleCopyReference}
+                                        aria-label="Copy booking reference"
+                                        title={
+                                            copiedRef
+                                                ? 'Copied'
+                                                : 'Copy booking reference'
+                                        }
+                                        className="ml-0.5 inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-tijum-plum-muted transition-colors hover:bg-tijum-cream hover:text-tijum-plum focus-visible:ring-2 focus-visible:ring-tijum-coral focus-visible:outline-none dark:hover:bg-muted dark:hover:text-foreground"
+                                    >
+                                        {copiedRef ? (
+                                            <Check
+                                                className="size-3 text-emerald-600 dark:text-emerald-400"
+                                                aria-hidden="true"
+                                            />
+                                        ) : (
+                                            <Copy
+                                                className="size-3"
+                                                aria-hidden="true"
+                                            />
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <h1 className="font-heading text-2xl font-bold tracking-tight text-balance text-tijum-plum sm:text-3xl dark:text-foreground">
+                                {reservation.property_name}
+                            </h1>
+
+                            <p className="flex flex-wrap items-center gap-1.5 text-sm text-tijum-plum-muted dark:text-muted-foreground">
+                                <MapPin
+                                    className="size-4 shrink-0 text-tijum-coral"
+                                    aria-hidden="true"
+                                />
+                                <span>{reservation.property_locality}</span>
+                                <span aria-hidden="true">·</span>
+                                <span>{reservation.property_category}</span>
+                            </p>
+                        </div>
+
+                        {isConfirmedOrCancelled && (
+                            <div className="flex shrink-0 flex-wrap items-center gap-2 lg:flex-nowrap lg:justify-end">
+                                <Button asChild variant="outline" size="sm">
+                                    <Link href={index().url}>
+                                        <ArrowLeft
+                                            className="size-4"
+                                            aria-hidden="true"
+                                        />
+                                        All reservations
+                                    </Link>
+                                </Button>
+
+                                {isConfirmed && (
                                     <Button
                                         type="button"
                                         variant="outline"
+                                        size="sm"
                                         onClick={() =>
                                             setShowReportModal(!showReportModal)
                                         }
-                                        className="border-tijum-coral/40 text-xs text-tijum-plum hover:bg-tijum-coral/10 dark:border-tijum-coral/40 dark:text-tijum-peach dark:hover:bg-tijum-coral/15"
+                                        className="border-tijum-coral/40 text-tijum-plum hover:bg-tijum-coral/10 dark:border-tijum-coral/40 dark:text-tijum-peach dark:hover:bg-tijum-coral/15"
                                     >
                                         <LifeBuoy
-                                            className="mr-1.5 size-4"
+                                            className="size-4 text-tijum-coral"
                                             aria-hidden="true"
                                         />
-                                        Report a Problem
+                                        Report a problem
                                     </Button>
                                 )}
-                                {reservation.can_view_receipt && (
-                                    <Button asChild variant="outline">
+
+                                {reservation.can_view_receipt ? (
+                                    <Button asChild variant="plum" size="sm">
                                         <a
                                             href={`/reservations/${reservation.booking_reference}/receipt`}
                                             target="_blank"
@@ -374,37 +572,30 @@ export default function ReservationShow({
                                                 className="size-4"
                                                 aria-hidden="true"
                                             />
-                                            Printable Receipt
+                                            Printable receipt
                                         </a>
                                     </Button>
+                                ) : (
+                                    <Button asChild variant="plum" size="sm">
+                                        <Link href="/">
+                                            <Home
+                                                className="size-4"
+                                                aria-hidden="true"
+                                            />
+                                            Return to home
+                                        </Link>
+                                    </Button>
                                 )}
-                                <Button asChild variant="outline">
-                                    <Link href={index().url}>
-                                        <ArrowLeft
-                                            className="size-4"
-                                            aria-hidden="true"
-                                        />
-                                        All reservations
-                                    </Link>
-                                </Button>
-                                <Button asChild variant="plum">
-                                    <Link href="/">
-                                        <Home
-                                            className="size-4"
-                                            aria-hidden="true"
-                                        />
-                                        Return to home
-                                    </Link>
-                                </Button>
                             </div>
-                        ) : undefined
-                    }
-                />
+                        )}
+                    </div>
+                </header>
 
-                {status && (
+                {/* Flash Status Notice */}
+                {status && !statusDismissed && (
                     <div
                         role="status"
-                        className={`flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium ${
+                        className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm font-medium ${
                             isCancelOrErrorStatus
                                 ? 'border-status-error-border bg-status-error-bg text-status-error-fg'
                                 : isAwaitingPayment
@@ -412,87 +603,50 @@ export default function ReservationShow({
                                   : 'border-status-success-border bg-status-success-bg text-status-success-fg'
                         }`}
                     >
-                        {isCancelOrErrorStatus ? (
-                            <XCircle
-                                className="size-4 shrink-0"
-                                aria-hidden="true"
-                            />
-                        ) : isAwaitingPayment ? (
-                            <Clock
-                                className="size-4 shrink-0"
-                                aria-hidden="true"
-                            />
-                        ) : (
-                            <CheckCircle2
-                                className="size-4 shrink-0"
-                                aria-hidden="true"
-                            />
-                        )}
-                        <span>{status}</span>
+                        <div className="flex items-center gap-2.5">
+                            {isCancelOrErrorStatus ? (
+                                <XCircle
+                                    className="size-4 shrink-0"
+                                    aria-hidden="true"
+                                />
+                            ) : isAwaitingPayment ? (
+                                <Clock
+                                    className="size-4 shrink-0"
+                                    aria-hidden="true"
+                                />
+                            ) : (
+                                <CheckCircle2
+                                    className="size-4 shrink-0"
+                                    aria-hidden="true"
+                                />
+                            )}
+                            <span>{status}</span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setStatusDismissed(true)}
+                            aria-label="Dismiss notification"
+                            className="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-lg opacity-70 transition-opacity hover:opacity-100 focus-visible:ring-2 focus-visible:ring-current focus-visible:outline-none"
+                        >
+                            <X className="size-4" aria-hidden="true" />
+                        </button>
                     </div>
                 )}
 
-                <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(22rem,0.8fr)]">
-                    <div className="grid gap-6 self-start">
-                        {/* Guest Stay Lifecycle Banner */}
-                        {reservation.status === 'confirmed' && (
-                            <div className="rounded-xl border border-tijum-surface bg-white p-4 shadow-2xs dark:border-border dark:bg-card">
-                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="flex items-start gap-3">
-                                        {reservation.is_checked_out ? (
-                                            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-                                                <DoorClosed className="size-5" />
-                                            </span>
-                                        ) : reservation.is_checked_in ? (
-                                            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-                                                <DoorOpen className="size-5" />
-                                            </span>
-                                        ) : (
-                                            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-tijum-plum/10 text-tijum-plum dark:bg-muted dark:text-foreground">
-                                                <Clock className="size-5" />
-                                            </span>
-                                        )}
-                                        <div>
-                                            <p className="font-heading text-sm font-semibold text-tijum-plum dark:text-foreground">
-                                                {reservation.is_checked_out
-                                                    ? 'Stay Completed · Checked Out'
-                                                    : reservation.is_checked_in
-                                                      ? 'Checked In · Welcome to Your Stay!'
-                                                      : `Confirmed · Check-in on ${reservation.check_in_date}`}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {reservation.is_checked_out
-                                                    ? `Departure finalized on ${reservation.checkout_date}. Thank you for staying with ${reservation.property_name}.`
-                                                    : reservation.is_checked_in
-                                                      ? `You checked in at reception. Scheduled departure is ${reservation.checkout_date} (standard checkout: ${reservation.standard_check_out_time}).`
-                                                      : `Standard check-in begins at ${reservation.standard_check_in_time}.${
-                                                            reservation.early_check_in_requested
-                                                                ? ` Early check-in requested (${reservation.requested_arrival_time || 'morning'}).`
-                                                                : ''
-                                                        }`}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {reservation.is_checked_in &&
-                                            !reservation.is_checked_out && (
-                                                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-                                                    <CheckCircle2 className="size-3.5" />
-                                                    Active Stay
-                                                </span>
-                                            )}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
+                {/* Main Two-Column Content */}
+                <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(20rem,0.9fr)]">
+                    {/* Left Column: Stay Itinerary, Guest Contact & Actions */}
+                    <div className="min-w-0 space-y-6">
                         {/* Active Relocation Offer Banner */}
                         {reservation.active_relocation && (
-                            <div className="rounded-2xl border-2 border-tijum-coral bg-white p-4 shadow-tijum-card sm:p-5 dark:border-tijum-coral/60 dark:bg-card">
+                            <div className="rounded-[20px] border-2 border-tijum-coral bg-white p-5 shadow-tijum-card dark:border-tijum-coral/60 dark:bg-card">
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                     <div className="flex items-start gap-3">
                                         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-tijum-coral text-white">
-                                            <Home className="size-5" />
+                                            <Home
+                                                className="size-5"
+                                                aria-hidden="true"
+                                            />
                                         </span>
                                         <div>
                                             <p className="font-heading text-sm font-bold text-tijum-plum dark:text-foreground">
@@ -528,7 +682,7 @@ export default function ReservationShow({
                                         >
                                             <span>Review &amp; Accept Stay</span>
                                             <ArrowRight
-                                                className="ml-1.5 size-3.5"
+                                                className="size-3.5"
                                                 aria-hidden="true"
                                             />
                                         </Link>
@@ -539,10 +693,13 @@ export default function ReservationShow({
 
                         {/* Active Support Cases Banner */}
                         {reservation.cases && reservation.cases.length > 0 && (
-                            <div className="rounded-2xl border border-tijum-peach bg-tijum-peach/15 p-4 shadow-2xs dark:border-tijum-coral/40 dark:bg-tijum-coral/10">
+                            <div className="rounded-[20px] border border-tijum-peach bg-tijum-peach/15 p-4 shadow-2xs dark:border-tijum-coral/40 dark:bg-tijum-coral/10">
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="flex items-center gap-2.5">
-                                        <ShieldAlert className="size-5 shrink-0 text-tijum-coral" />
+                                    <div className="flex items-center gap-3">
+                                        <ShieldAlert
+                                            className="size-5 shrink-0 text-tijum-coral"
+                                            aria-hidden="true"
+                                        />
                                         <div>
                                             <p className="font-heading text-xs font-semibold text-tijum-plum dark:text-foreground">
                                                 Active Support Ticket:{' '}
@@ -559,7 +716,7 @@ export default function ReservationShow({
                                                 }
                                                 )
                                             </p>
-                                            <p className="text-[11px] text-tijum-plum-muted dark:text-muted-foreground">
+                                            <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
                                                 Reported:{' '}
                                                 {
                                                     reservation.cases[0]
@@ -572,7 +729,7 @@ export default function ReservationShow({
                                     </div>
                                     <Link
                                         href={`/my-support/${reservation.cases[0].case_reference}`}
-                                        className="inline-flex items-center gap-1 self-end text-xs font-semibold text-tijum-plum underline hover:text-tijum-coral sm:self-auto dark:text-tijum-peach dark:hover:text-tijum-coral"
+                                        className="inline-flex items-center gap-1 self-end text-xs font-semibold text-tijum-plum underline underline-offset-4 hover:text-tijum-coral sm:self-auto dark:text-tijum-peach dark:hover:text-tijum-coral"
                                     >
                                         <span>View Support Progress</span>
                                         <ArrowRight
@@ -588,12 +745,15 @@ export default function ReservationShow({
                         {showReportModal && (
                             <Card className="border-2 border-tijum-coral/35 bg-white shadow-tijum-card dark:border-tijum-coral/40 dark:bg-card">
                                 <CardHeader className="pb-3">
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex items-center justify-between gap-3">
                                         <CardTitle className="flex items-center gap-2 font-heading text-base font-bold text-tijum-plum dark:text-foreground">
-                                            <LifeBuoy className="size-4 text-tijum-coral" />
+                                            <LifeBuoy
+                                                className="size-4 text-tijum-coral"
+                                                aria-hidden="true"
+                                            />
                                             <span>
-                                                Report a Stay Problem or Food
-                                                Issue
+                                                Report a stay problem or food
+                                                issue
                                             </span>
                                         </CardTitle>
                                         <Button
@@ -603,16 +763,16 @@ export default function ReservationShow({
                                             onClick={() =>
                                                 setShowReportModal(false)
                                             }
-                                            className="h-7 px-2 text-xs"
+                                            className="h-8 px-2.5 text-xs"
                                         >
-                                            Cancel
+                                            Close
                                         </Button>
                                     </div>
-                                    <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                        Experiencing an issue with your
-                                        accommodation, room amenities, or
-                                        promised meals? Submit a formal case and
-                                        get protected.
+                                    <p className="text-xs leading-relaxed text-tijum-plum-muted dark:text-muted-foreground">
+                                        Experiencing an issue with your room,
+                                        amenities, or promised meals? Submit a
+                                        case and our protection team will step
+                                        in.
                                     </p>
                                 </CardHeader>
                                 <CardContent>
@@ -628,7 +788,7 @@ export default function ReservationShow({
 
                                         <div className="space-y-1.5">
                                             <Label htmlFor="report_category">
-                                                Category of Problem
+                                                Category of problem
                                             </Label>
                                             <Select
                                                 value={reportCategory}
@@ -676,20 +836,20 @@ export default function ReservationShow({
 
                                         <div className="space-y-1.5">
                                             <Label htmlFor="report_description">
-                                                Describe What Happened
+                                                Describe what happened
                                             </Label>
                                             <Textarea
                                                 id="report_description"
                                                 rows={3}
                                                 required
-                                                placeholder="Please provide details of the room condition, missing meals, or communication with the host…"
+                                                placeholder="Provide details of the room condition, missing meals, or communication with the host…"
                                                 value={reportDescription}
                                                 onChange={(e) =>
                                                     setReportDescription(
                                                         e.target.value,
                                                     )
                                                 }
-                                                className="resize-none text-xs"
+                                                className="resize-none text-sm"
                                             />
                                         </div>
 
@@ -701,7 +861,6 @@ export default function ReservationShow({
                                                 onClick={() =>
                                                     setShowReportModal(false)
                                                 }
-                                                className="text-xs"
                                             >
                                                 Cancel
                                             </Button>
@@ -712,11 +871,10 @@ export default function ReservationShow({
                                                     reportingProblem ||
                                                     !reportDescription.trim()
                                                 }
-                                                className="text-xs"
                                             >
                                                 {reportingProblem
                                                     ? 'Submitting…'
-                                                    : 'Submit Support Ticket'}
+                                                    : 'Submit support ticket'}
                                             </Button>
                                         </div>
                                     </form>
@@ -724,75 +882,179 @@ export default function ReservationShow({
                             </Card>
                         )}
 
-                        {/* Property & Stay Details Card */}
-                        <Card>
-                            <CardHeader className="flex-row items-start justify-between gap-4">
-                                <div>
-                                    <p className="font-heading text-xs font-semibold tracking-wide text-tijum-plum-muted uppercase dark:text-muted-foreground">
-                                        {reservation.booking_reference}
-                                    </p>
-                                    <CardTitle className="mt-1 text-xl">
-                                        {reservation.property_name}
-                                    </CardTitle>
-                                    <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-                                        <MapPin
-                                            className="size-4"
-                                            aria-hidden="true"
-                                        />
-                                        {reservation.property_locality} ·{' '}
-                                        {reservation.property_category}
-                                    </p>
+                        {/* Unified Stay Itinerary & Guest Snapshot Card */}
+                        <Card className="gap-0 overflow-hidden py-0">
+                            {isConfirmed && (
+                                <div className="flex flex-col gap-3 border-b border-tijum-surface/75 bg-tijum-cream/55 px-6 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-border dark:bg-muted/35">
+                                    <div className="flex items-start gap-3">
+                                        {reservation.is_checked_out ? (
+                                            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                                <DoorClosed
+                                                    className="size-4.5"
+                                                    aria-hidden="true"
+                                                />
+                                            </span>
+                                        ) : reservation.is_checked_in ? (
+                                            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                                <DoorOpen
+                                                    className="size-4.5"
+                                                    aria-hidden="true"
+                                                />
+                                            </span>
+                                        ) : (
+                                            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-tijum-plum/10 text-tijum-plum dark:bg-muted dark:text-foreground">
+                                                <Clock
+                                                    className="size-4.5"
+                                                    aria-hidden="true"
+                                                />
+                                            </span>
+                                        )}
+
+                                        <div className="min-w-0">
+                                            <p className="font-heading text-sm font-semibold text-tijum-plum dark:text-foreground">
+                                                {reservation.is_checked_out
+                                                    ? 'Stay completed · Checked out'
+                                                    : reservation.is_checked_in
+                                                      ? 'Checked in · Welcome to your stay'
+                                                      : `Check-in on ${formattedCheckInDate}`}
+                                            </p>
+                                            <p className="mt-0.5 text-xs leading-relaxed text-tijum-plum-muted dark:text-muted-foreground">
+                                                {reservation.is_checked_out
+                                                    ? `Departure finalized on ${formattedCheckoutDate}. Thank you for staying with ${reservation.property_name}.`
+                                                    : reservation.is_checked_in
+                                                      ? `Checked in at reception. Scheduled checkout on ${formattedCheckoutDate} by ${formattedCheckOutTime}.`
+                                                      : `Standard check-in begins at ${formattedCheckInTime}.${
+                                                            reservation.early_check_in_requested
+                                                                ? ` Early arrival requested (${reservation.requested_arrival_time ? formatStayTime(reservation.requested_arrival_time) : 'morning'}).`
+                                                                : ''
+                                                        }`}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {reservation.is_checked_in &&
+                                        !reservation.is_checked_out && (
+                                            <span className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                                <CheckCircle2
+                                                    className="size-3.5"
+                                                    aria-hidden="true"
+                                                />
+                                                Active stay
+                                            </span>
+                                        )}
                                 </div>
-                                <StatusBadge
-                                    status={reservation.status_semantic}
-                                    label={reservation.status_label}
-                                />
-                            </CardHeader>
-                            <CardContent className="grid gap-5 sm:grid-cols-2">
-                                <DetailItem
-                                    icon={CalendarDays}
-                                    label="Stay dates"
-                                    value={`${formatReservationDate(reservation.check_in_date)} to ${formatReservationDate(reservation.checkout_date)}`}
-                                    detail={`${reservation.duration_label} · ${reservation.total_stay_days} stay day${reservation.total_stay_days === 1 ? '' : 's'}`}
-                                />
-                                <DetailItem
-                                    icon={Users}
-                                    label="Room category"
-                                    value={`${reservation.room_type_name} · ${reservation.room_type_ac_label}`}
-                                    detail={`${reservation.sharing_label} · ${reservation.quantity} ${reservation.quantity_basis_label} · ${reservation.guest_count} guest${reservation.guest_count === 1 ? '' : 's'} · ${formatPolicyValue(reservation.guest_gender)} · ${formatPolicyValue(reservation.guest_composition)}`}
-                                />
-                                <DetailItem
-                                    icon={Clock3}
-                                    label="Stay timing"
-                                    value={`${formatStayTime(reservation.standard_check_in_time)} check-in · ${formatStayTime(reservation.standard_check_out_time)} checkout`}
-                                    detail={
-                                        reservation.early_check_in_requested &&
-                                        reservation.requested_arrival_time
-                                            ? `Early arrival requested for ${formatStayTime(reservation.requested_arrival_time)}; subject to room availability and operational readiness.`
-                                            : 'Standard arrival timing applies.'
-                                    }
-                                />
-                                <DetailItem
-                                    icon={Utensils}
-                                    label="Included food"
-                                    value={
-                                        meals.join(', ') ||
-                                        'Included meal details unavailable'
-                                    }
-                                    detail="Food is included at property level; no meal package selection is required."
-                                />
-                            </CardContent>
+                            )}
+
+                            <div className="p-6">
+                                <h2 className="mb-4 font-heading text-base font-bold text-tijum-plum dark:text-foreground">
+                                    Stay itinerary
+                                </h2>
+
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <DetailTile
+                                        icon={CalendarDays}
+                                        label="Stay dates"
+                                        value={`${formattedCheckInDate} – ${formattedCheckoutDate}`}
+                                        detail={formatDurationDetail(
+                                            reservation,
+                                        )}
+                                    />
+                                    <DetailTile
+                                        icon={Users}
+                                        label="Room category"
+                                        value={`${reservation.room_type_name} · ${reservation.room_type_ac_label}`}
+                                        detail={formatRoomOccupancyDetail(
+                                            reservation,
+                                        )}
+                                    />
+                                    <DetailTile
+                                        icon={Clock3}
+                                        label="Stay timing"
+                                        value={`${formattedCheckInTime} check-in · ${formattedCheckOutTime} checkout`}
+                                        detail={
+                                            reservation.early_check_in_requested &&
+                                            reservation.requested_arrival_time
+                                                ? `Early arrival requested for ${formatStayTime(reservation.requested_arrival_time)}, subject to room readiness.`
+                                                : 'Standard check-in and checkout timing applies.'
+                                        }
+                                    />
+                                    <DetailTile
+                                        icon={Utensils}
+                                        label="Included food"
+                                        value={
+                                            meals.length > 0
+                                                ? meals.join(', ')
+                                                : 'Meal details unavailable'
+                                        }
+                                        detail="Included with your stay. No separate meal package needed."
+                                    />
+                                </div>
+                            </div>
+
+                            {(reservation.contact_name ||
+                                reservation.contact_email ||
+                                reservation.contact_phone) && (
+                                <div className="border-t border-tijum-surface/75 bg-tijum-cream/25 px-6 py-5 dark:border-border dark:bg-muted/20">
+                                    <p className="mb-3 font-heading text-xs font-semibold tracking-wider text-tijum-plum-muted uppercase dark:text-muted-foreground">
+                                        Primary guest contact
+                                    </p>
+                                    <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
+                                        {reservation.contact_name && (
+                                            <div className="flex min-w-0 items-center gap-2.5">
+                                                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white text-tijum-plum-muted shadow-2xs dark:bg-card dark:text-muted-foreground">
+                                                    <UserRound
+                                                        className="size-4"
+                                                        aria-hidden="true"
+                                                    />
+                                                </span>
+                                                <span className="font-semibold text-tijum-plum dark:text-foreground">
+                                                    {reservation.contact_name}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {reservation.contact_phone && (
+                                            <div className="flex min-w-0 items-center gap-2.5">
+                                                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white text-tijum-plum-muted shadow-2xs dark:bg-card dark:text-muted-foreground">
+                                                    <Phone
+                                                        className="size-4"
+                                                        aria-hidden="true"
+                                                    />
+                                                </span>
+                                                <span className="tabular-nums text-tijum-plum dark:text-foreground">
+                                                    {reservation.contact_phone}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {reservation.contact_email && (
+                                            <div className="flex min-w-0 items-center gap-2.5">
+                                                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white text-tijum-plum-muted shadow-2xs dark:bg-card dark:text-muted-foreground">
+                                                    <Mail
+                                                        className="size-4"
+                                                        aria-hidden="true"
+                                                    />
+                                                </span>
+                                                <span className="break-all text-tijum-plum dark:text-foreground">
+                                                    {reservation.contact_email}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </Card>
 
                         {/* Review Call-to-Action or Submitted Review Card */}
                         {reservation.review ? (
                             <Card className="border-tijum-coral/35 bg-white shadow-tijum-card dark:border-tijum-coral/35 dark:bg-card">
                                 <CardHeader className="pb-3">
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
                                         <div className="flex items-center gap-2">
-                                            <Star className="size-4 fill-tijum-coral text-tijum-coral" />
+                                            <Star
+                                                className="size-4 fill-tijum-coral text-tijum-coral"
+                                                aria-hidden="true"
+                                            />
                                             <CardTitle className="font-heading text-base font-bold text-tijum-plum dark:text-foreground">
-                                                Your Stay Review
+                                                Your stay review
                                             </CardTitle>
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -808,19 +1070,19 @@ export default function ReservationShow({
                                                     variant="outline"
                                                     size="sm"
                                                     asChild
-                                                    className="h-7 text-xs"
+                                                    className="h-8 text-xs"
                                                 >
                                                     <Link
                                                         href={`/reviews/${reservation.review.id}/edit`}
                                                     >
-                                                        Edit Review
+                                                        Edit review
                                                     </Link>
                                                 </Button>
                                             )}
                                         </div>
                                     </div>
                                 </CardHeader>
-                                <CardContent className="space-y-2 text-xs">
+                                <CardContent className="space-y-2 text-sm">
                                     <div className="flex items-center gap-2">
                                         <ReviewStars
                                             rating={
@@ -828,9 +1090,9 @@ export default function ReservationShow({
                                                     .overall_rating
                                             }
                                         />
-                                        <span className="font-semibold text-tijum-plum dark:text-foreground">
+                                        <span className="text-xs font-semibold text-tijum-plum dark:text-foreground">
                                             {reservation.review.overall_rating}{' '}
-                                            / 5 Stars
+                                            / 5 stars
                                         </span>
                                     </div>
                                     {reservation.review.title && (
@@ -839,28 +1101,30 @@ export default function ReservationShow({
                                         </p>
                                     )}
                                     {reservation.review.content && (
-                                        <p className="whitespace-pre-line text-tijum-plum-muted dark:text-muted-foreground">
+                                        <p className="text-xs leading-relaxed whitespace-pre-line text-tijum-plum-muted dark:text-muted-foreground">
                                             {reservation.review.content}
                                         </p>
                                     )}
                                 </CardContent>
                             </Card>
                         ) : reservation.review_eligibility?.is_eligible ? (
-                            <Card className="border-tijum-peach/70 bg-tijum-peach/15 dark:border-tijum-coral/40 dark:bg-tijum-coral/10">
-                                <CardContent className="flex flex-col justify-between gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
+                            <Card className="border-tijum-peach/70 bg-tijum-peach/15 py-5 dark:border-tijum-coral/40 dark:bg-tijum-coral/10">
+                                <CardContent className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                                     <div className="space-y-1">
                                         <div className="flex items-center gap-2 text-xs font-bold tracking-wide text-tijum-plum uppercase dark:text-tijum-peach">
-                                            <Star className="size-4 fill-tijum-coral text-tijum-coral" />
-                                            Share Your Feedback
+                                            <Star
+                                                className="size-4 fill-tijum-coral text-tijum-coral"
+                                                aria-hidden="true"
+                                            />
+                                            Share your feedback
                                         </div>
-                                        <h4 className="font-heading text-base font-bold text-tijum-plum dark:text-foreground">
+                                        <h3 className="font-heading text-base font-bold text-tijum-plum dark:text-foreground">
                                             How was your food-inclusive stay?
-                                        </h4>
-                                        <p className="max-w-lg text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                            You completed your stay! Share your
-                                            experience to help future students
-                                            and professionals find the right
-                                            accommodation.
+                                        </h3>
+                                        <p className="max-w-lg text-xs leading-relaxed text-tijum-plum-muted dark:text-muted-foreground">
+                                            Share your experience to help future
+                                            students and professionals pick the
+                                            right stay.
                                             {reservation.review_eligibility
                                                 .days_remaining != null && (
                                                 <span>
@@ -876,17 +1140,22 @@ export default function ReservationShow({
                                             )}
                                         </p>
                                     </div>
-                                    <Button asChild className="shrink-0">
+                                    <Button
+                                        asChild
+                                        size="sm"
+                                        className="shrink-0"
+                                    >
                                         <Link
                                             href={`/reservations/${reservation.booking_reference}/review`}
                                         >
-                                            Write a Review
+                                            Write a review
                                         </Link>
                                     </Button>
                                 </CardContent>
                             </Card>
                         ) : null}
 
+                        {/* Cancellation Reason (if cancelled) */}
                         {reservation.cancellation_reason && (
                             <NoticeCard
                                 title="Cancellation reason"
@@ -894,79 +1163,132 @@ export default function ReservationShow({
                             />
                         )}
 
+                        {/* Collapsible Cancel Reservation Control */}
                         {reservation.can_cancel && (
-                            <Card className="border-status-error-border">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Ban
-                                            className="size-4"
+                            <Card className="gap-0 overflow-hidden py-0">
+                                <div className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="flex items-start gap-3">
+                                        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-status-error-bg text-status-error-fg">
+                                            <Ban
+                                                className="size-4"
+                                                aria-hidden="true"
+                                            />
+                                        </span>
+                                        <div>
+                                            <p className="font-heading text-sm font-semibold text-tijum-plum dark:text-foreground">
+                                                Need to change your plans?
+                                            </p>
+                                            <p className="text-xs leading-relaxed text-tijum-plum-muted dark:text-muted-foreground">
+                                                Cancelling releases your
+                                                reserved room. Paid
+                                                cancellations are queued for
+                                                refund review.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                            setShowCancelForm(!showCancelForm)
+                                        }
+                                        aria-expanded={showCancelForm}
+                                        className="shrink-0 border-status-error-border text-status-error-fg hover:bg-status-error-bg"
+                                    >
+                                        <span>
+                                            {showCancelForm
+                                                ? 'Hide form'
+                                                : 'Cancel reservation'}
+                                        </span>
+                                        <ChevronDown
+                                            className={`size-4 transition-transform duration-200 ${
+                                                showCancelForm
+                                                    ? 'rotate-180'
+                                                    : ''
+                                            }`}
                                             aria-hidden="true"
                                         />
-                                        Cancel reservation
-                                    </CardTitle>
-                                    <p className="text-sm text-muted-foreground">
-                                        Cancellation releases the reserved
-                                        capacity. If you have already paid, the
-                                        cancellation will be flagged for admin
-                                        refund review.
-                                    </p>
-                                </CardHeader>
-                                <CardContent>
-                                    <Form
-                                        {...cancel.form(
-                                            reservation.booking_reference,
-                                        )}
-                                        disableWhileProcessing
-                                        className="grid gap-3 inert:pointer-events-none inert:opacity-60"
-                                    >
-                                        {({ errors, processing }) => (
-                                            <>
-                                                <label
-                                                    htmlFor="cancellation_reason"
-                                                    className="font-heading text-sm font-medium text-tijum-plum dark:text-foreground"
-                                                >
-                                                    Reason (optional)
-                                                </label>
-                                                <Textarea
-                                                    id="cancellation_reason"
-                                                    name="cancellation_reason"
-                                                    rows={3}
-                                                    placeholder="Tell the property why your plans changed."
-                                                    aria-invalid={
-                                                        errors.cancellation_reason
-                                                            ? true
-                                                            : undefined
-                                                    }
-                                                />
-                                                <InputError
-                                                    message={
-                                                        errors.cancellation_reason
-                                                    }
-                                                />
-                                                <Button
-                                                    type="submit"
-                                                    variant="destructive"
-                                                    className="w-fit"
-                                                    disabled={processing}
-                                                >
-                                                    {processing
-                                                        ? 'Cancelling…'
-                                                        : 'Cancel reservation'}
-                                                </Button>
-                                            </>
-                                        )}
-                                    </Form>
-                                </CardContent>
+                                    </Button>
+                                </div>
+
+                                {showCancelForm && (
+                                    <div className="border-t border-tijum-surface/75 bg-tijum-cream/30 px-6 py-5 dark:border-border dark:bg-muted/20">
+                                        <Form
+                                            {...cancel.form(
+                                                reservation.booking_reference,
+                                            )}
+                                            disableWhileProcessing
+                                            className="grid gap-3 inert:pointer-events-none inert:opacity-60"
+                                        >
+                                            {({ errors, processing }) => (
+                                                <>
+                                                    <label
+                                                        htmlFor="cancellation_reason"
+                                                        className="font-heading text-xs font-semibold text-tijum-plum dark:text-foreground"
+                                                    >
+                                                        Reason for cancelling
+                                                        (optional)
+                                                    </label>
+                                                    <Textarea
+                                                        id="cancellation_reason"
+                                                        name="cancellation_reason"
+                                                        rows={3}
+                                                        placeholder="Let the property know why your plans changed."
+                                                        aria-invalid={
+                                                            errors.cancellation_reason
+                                                                ? true
+                                                                : undefined
+                                                        }
+                                                    />
+                                                    <InputError
+                                                        message={
+                                                            errors.cancellation_reason
+                                                        }
+                                                    />
+                                                    <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                setShowCancelForm(
+                                                                    false,
+                                                                )
+                                                            }
+                                                        >
+                                                            Keep reservation
+                                                        </Button>
+                                                        <Button
+                                                            type="submit"
+                                                            variant="destructive"
+                                                            size="sm"
+                                                            disabled={
+                                                                processing
+                                                            }
+                                                        >
+                                                            {processing
+                                                                ? 'Cancelling…'
+                                                                : 'Confirm cancellation'}
+                                                        </Button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </Form>
+                                    </div>
+                                )}
                             </Card>
                         )}
                     </div>
 
-                    <aside className="space-y-6 xl:sticky xl:top-24 xl:self-start">
+                    {/* Right Column: Sticky Payment & Price Summary */}
+                    <aside className="min-w-0 space-y-5 lg:sticky lg:top-24">
                         {isAwaitingPayment && (
                             <Card className="border-tijum-coral/40 bg-white shadow-tijum-card dark:border-tijum-coral/40 dark:bg-card">
-                                <CardHeader className="pb-3">
-                                    <div className="flex flex-wrap items-center justify-between gap-3">
-                                        <div className="flex items-center gap-2.5">
+                                <CardHeader className="gap-3 pb-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex items-start gap-3">
                                             <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-tijum-coral/15 text-tijum-coral dark:bg-tijum-coral/20">
                                                 <Clock
                                                     className="size-5"
@@ -975,50 +1297,48 @@ export default function ReservationShow({
                                             </span>
                                             <div>
                                                 <CardTitle className="font-heading text-base font-bold text-tijum-plum dark:text-foreground">
-                                                    Inventory Held — Payment
-                                                    Required
+                                                    Complete payment
                                                 </CardTitle>
-                                                <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                                    Complete payment within 15
-                                                    minutes to confirm.
+                                                <p className="mt-0.5 text-xs text-tijum-plum-muted dark:text-muted-foreground">
+                                                    Your room is held for 15
+                                                    minutes while you pay.
                                                 </p>
                                             </div>
                                         </div>
-
-                                        {secondsLeft !== null && (
-                                            <div
-                                                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold tabular-nums ${
-                                                    secondsLeft > 0
-                                                        ? 'bg-tijum-peach/25 text-tijum-plum dark:bg-muted dark:text-foreground'
-                                                        : 'bg-tijum-coral/15 text-tijum-plum dark:bg-destructive/20 dark:text-destructive'
-                                                }`}
-                                            >
-                                                <Clock className="size-3.5" />
-                                                <span>
-                                                    {secondsLeft > 0
-                                                        ? `Expires in ${Math.floor(secondsLeft / 60)}:${(secondsLeft % 60).toString().padStart(2, '0')}`
-                                                        : 'Payment window expired'}
-                                                </span>
-                                            </div>
-                                        )}
                                     </div>
+
+                                    {secondsLeft !== null && (
+                                        <div
+                                            className={`inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold tabular-nums ${
+                                                secondsLeft > 0
+                                                    ? 'bg-tijum-peach/25 text-tijum-plum dark:bg-muted dark:text-foreground'
+                                                    : 'bg-tijum-coral/15 text-tijum-plum dark:bg-destructive/20 dark:text-destructive'
+                                            }`}
+                                        >
+                                            <Clock
+                                                className="size-3.5"
+                                                aria-hidden="true"
+                                            />
+                                            <span>
+                                                {secondsLeft > 0
+                                                    ? `Expires in ${Math.floor(secondsLeft / 60)}:${(secondsLeft % 60).toString().padStart(2, '0')}`
+                                                    : 'Payment window expired'}
+                                            </span>
+                                        </div>
+                                    )}
                                 </CardHeader>
 
                                 <CardContent className="space-y-4 pt-0">
-                                    <div className="space-y-3 rounded-xl border border-tijum-surface/80 bg-tijum-cream/65 p-4 dark:border-border dark:bg-muted/45">
+                                    <div className="space-y-3 rounded-2xl border border-tijum-surface/80 bg-tijum-cream/65 p-4 dark:border-border dark:bg-muted/45">
                                         <div>
-                                            <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                                Amount Due
+                                            <p className="text-xs font-medium text-tijum-plum-muted dark:text-muted-foreground">
+                                                Amount due
                                             </p>
-                                            <p className="font-heading text-2xl font-bold tabular-nums text-tijum-plum dark:text-foreground">
-                                                {formatPrice(
+                                            <p className="mt-0.5 font-heading text-2xl font-bold tabular-nums text-tijum-plum dark:text-foreground">
+                                                {formatAmount(
                                                     reservation.total_amount_minor,
                                                     reservation.currency_code,
                                                 )}
-                                            </p>
-                                            <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                                Backend price snapshot for this
-                                                room type and stay.
                                             </p>
                                         </div>
 
@@ -1031,28 +1351,40 @@ export default function ReservationShow({
                                             >
                                                 {paying ? (
                                                     <>
-                                                        <RefreshCw className="size-4 animate-spin" />
+                                                        <RefreshCw
+                                                            className="size-4 animate-spin"
+                                                            aria-hidden="true"
+                                                        />
                                                         Processing…
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <CreditCard className="size-4" />
-                                                        Pay Now with Razorpay
+                                                        <CreditCard
+                                                            className="size-4"
+                                                            aria-hidden="true"
+                                                        />
+                                                        Pay now with Razorpay
                                                     </>
                                                 )}
                                             </Button>
                                         ) : (
                                             <p className="text-xs font-medium text-destructive">
-                                                This payment window has closed.
-                                                The reservation will be
-                                                automatically expired.
+                                                This payment window has closed
+                                                and the reservation will expire
+                                                automatically.
                                             </p>
                                         )}
                                     </div>
 
                                     {paymentError && (
-                                        <div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive">
-                                            <AlertCircle className="size-4 shrink-0" />
+                                        <div
+                                            role="alert"
+                                            className="flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive"
+                                        >
+                                            <AlertCircle
+                                                className="mt-0.5 size-4 shrink-0"
+                                                aria-hidden="true"
+                                            />
                                             <span>{paymentError}</span>
                                         </div>
                                     )}
@@ -1060,57 +1392,49 @@ export default function ReservationShow({
                             </Card>
                         )}
 
-                        {reservation.status === 'confirmed' && (
-                            <Card className="border-emerald-200/90 bg-white dark:border-emerald-800/50 dark:bg-card">
-                                <CardHeader className="pb-3">
-                                    <div className="flex items-center gap-2.5">
+                        {isConfirmed && (
+                            <Card className="gap-4 border-emerald-200/90 bg-white py-5 dark:border-emerald-800/50 dark:bg-card">
+                                <CardHeader className="pb-0">
+                                    <div className="flex items-center gap-3">
                                         <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
                                             <CheckCircle2
                                                 className="size-5"
                                                 aria-hidden="true"
                                             />
                                         </span>
-                                        <div>
-                                            <CardTitle className="font-heading text-lg font-bold text-tijum-plum dark:text-foreground">
-                                                Verified Booking
+                                        <div className="min-w-0">
+                                            <CardTitle className="font-heading text-base font-bold text-tijum-plum dark:text-foreground">
+                                                Payment confirmed
                                             </CardTitle>
-                                            <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                                Your payment has been
-                                                backend-verified and the booking
-                                                is confirmed.
+                                            <p className="mt-0.5 text-xs text-tijum-plum-muted dark:text-muted-foreground">
+                                                Your stay is verified and locked
+                                                in.
                                             </p>
                                         </div>
                                     </div>
                                 </CardHeader>
+
                                 {reservation.payment_summary && (
                                     <CardContent className="pt-0">
-                                        <div className="grid grid-cols-2 gap-3 rounded-xl border border-tijum-surface/80 bg-tijum-cream/55 p-3.5 text-xs dark:border-border dark:bg-muted/40">
-                                            <div>
-                                                <p className="text-muted-foreground">
-                                                    Payment Method
-                                                </p>
-                                                <p className="font-medium text-tijum-plum capitalize dark:text-foreground">
-                                                    {reservation.payment_summary
-                                                        .payment_method ||
-                                                        'Online'}
-                                                </p>
+                                        <dl className="divide-y divide-tijum-surface/65 rounded-2xl border border-tijum-surface/75 bg-tijum-cream/50 px-4 text-xs dark:divide-border/70 dark:border-border dark:bg-muted/35">
+                                            <div className="flex items-center justify-between gap-4 py-2.5">
+                                                <dt className="text-tijum-plum-muted dark:text-muted-foreground">
+                                                    Payment method
+                                                </dt>
+                                                <dd className="font-semibold text-tijum-plum dark:text-foreground">
+                                                    {formatPaymentMethod(
+                                                        reservation
+                                                            .payment_summary
+                                                            .payment_method,
+                                                    )}
+                                                </dd>
                                             </div>
-                                            <div>
-                                                <p className="text-muted-foreground">
-                                                    Gateway Reference
-                                                </p>
-                                                <p className="font-mono font-medium text-tijum-plum dark:text-foreground">
-                                                    {reservation.payment_summary
-                                                        .gateway_payment_id ||
-                                                        '—'}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <p className="text-muted-foreground">
-                                                    Amount Paid
-                                                </p>
-                                                <p className="font-semibold tabular-nums text-tijum-plum dark:text-foreground">
-                                                    {formatPrice(
+                                            <div className="flex items-center justify-between gap-4 py-2.5">
+                                                <dt className="text-tijum-plum-muted dark:text-muted-foreground">
+                                                    Amount paid
+                                                </dt>
+                                                <dd className="font-heading text-sm font-bold tabular-nums text-tijum-plum dark:text-foreground">
+                                                    {formatAmount(
                                                         reservation
                                                             .payment_summary
                                                             .amount_minor,
@@ -1118,103 +1442,125 @@ export default function ReservationShow({
                                                             .payment_summary
                                                             .currency_code,
                                                     )}
-                                                </p>
+                                                </dd>
                                             </div>
-                                            <div>
-                                                <p className="text-muted-foreground">
-                                                    Receipt
-                                                </p>
-                                                <a
-                                                    href={`/reservations/${reservation.booking_reference}/receipt`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-1 font-semibold text-tijum-plum underline hover:text-tijum-coral dark:text-tijum-peach dark:hover:text-tijum-coral"
-                                                >
-                                                    <span>
-                                                        View / Print Receipt
-                                                    </span>
-                                                    <ArrowRight
-                                                        className="size-3.5"
-                                                        aria-hidden="true"
-                                                    />
-                                                </a>
+                                            <div className="flex items-center justify-between gap-4 py-2.5">
+                                                <dt className="shrink-0 text-tijum-plum-muted dark:text-muted-foreground">
+                                                    Transaction ID
+                                                </dt>
+                                                <dd className="text-right font-mono text-[11px] font-medium break-all select-all text-tijum-plum dark:text-foreground">
+                                                    {reservation.payment_summary
+                                                        .gateway_payment_id ||
+                                                        '—'}
+                                                </dd>
                                             </div>
-                                        </div>
+                                            {paidTimestamp && (
+                                                <div className="flex items-center justify-between gap-4 py-2.5">
+                                                    <dt className="shrink-0 text-tijum-plum-muted dark:text-muted-foreground">
+                                                        Paid on
+                                                    </dt>
+                                                    <dd className="text-right font-medium tabular-nums text-tijum-plum dark:text-foreground">
+                                                        {paidTimestamp}
+                                                    </dd>
+                                                </div>
+                                            )}
+                                        </dl>
                                     </CardContent>
                                 )}
                             </Card>
                         )}
 
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Price snapshot</CardTitle>
+                        {/* Price Breakdown Card */}
+                        <Card className="gap-4 py-5">
+                            <CardHeader className="flex-row items-center justify-between gap-3 pb-0">
+                                <CardTitle className="font-heading text-base font-bold">
+                                    Price breakdown
+                                </CardTitle>
+                                {isConfirmed && (
+                                    <span className="inline-flex items-center rounded-full bg-status-success-bg px-2.5 py-0.5 font-heading text-[11px] font-semibold text-status-success-fg">
+                                        Paid in full
+                                    </span>
+                                )}
                             </CardHeader>
-                            <CardContent className="space-y-3 text-sm">
+
+                            <CardContent className="space-y-3 pt-0 text-sm">
                                 <PriceRow
                                     label={reservation.rate_unit_label}
-                                    value={formatReservationMoney(
+                                    value={formatAmount(
                                         reservation.unit_rate_minor,
                                         reservation.currency_code,
                                     )}
                                 />
                                 <PriceRow
-                                    label="Quantity"
+                                    label={
+                                        reservation.quantity_basis ===
+                                        'private_rooms'
+                                            ? 'Rooms'
+                                            : 'Guest places'
+                                    }
                                     value={String(reservation.quantity)}
                                 />
                                 <PriceRow
-                                    label="Duration quantity"
-                                    value={String(
-                                        reservation.duration_quantity,
-                                    )}
+                                    label="Duration"
+                                    value={reservation.duration_label}
                                 />
-                                <div className="border-t border-tijum-surface pt-3 dark:border-border">
+                                <div className="border-t border-tijum-surface/80 pt-3.5 dark:border-border">
                                     <PriceRow
-                                        label="Reservation total"
-                                        value={formatReservationMoney(
+                                        label={
+                                            isConfirmed
+                                                ? 'Total paid'
+                                                : isAwaitingPayment
+                                                  ? 'Total payable'
+                                                  : 'Reservation total'
+                                        }
+                                        value={formatAmount(
                                             reservation.total_amount_minor,
                                             reservation.currency_code,
                                         )}
                                         strong
                                     />
                                 </div>
-                                <p className="text-xs text-muted-foreground">
-                                    This amount is the immutable rate snapshot
-                                    from submission. The 15-minute inventory
-                                    hold confirms automatically after
-                                    backend-verified payment.
+                                <p className="text-xs leading-relaxed text-tijum-plum-muted dark:text-muted-foreground">
+                                    {isConfirmed
+                                        ? 'Locked-in booking rate paid in full. All listed meals are included with no extra food charges.'
+                                        : isAwaitingPayment
+                                          ? 'Rate locked for your 15-minute payment window and confirmed immediately upon payment.'
+                                          : 'Locked-in rate snapshot recorded when this booking was submitted.'}
                                 </p>
                             </CardContent>
                         </Card>
 
                         {reservation.requires_refund_review && (
-                            <Card className="border-tijum-peach bg-tijum-peach/15 dark:border-tijum-coral/40 dark:bg-tijum-coral/10">
-                                <CardHeader className="pb-2">
+                            <Card className="gap-3 border-tijum-peach bg-tijum-peach/15 py-5 dark:border-tijum-coral/40 dark:bg-tijum-coral/10">
+                                <CardHeader className="pb-0">
                                     <div className="flex items-center gap-2">
-                                        <AlertCircle className="size-4 text-tijum-coral" />
+                                        <AlertCircle
+                                            className="size-4 text-tijum-coral"
+                                            aria-hidden="true"
+                                        />
                                         <CardTitle className="font-heading text-sm font-semibold text-tijum-plum dark:text-foreground">
-                                            Refund Review Underway
+                                            Refund review underway
                                         </CardTitle>
                                     </div>
                                 </CardHeader>
-                                <CardContent className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                    This reservation was cancelled after payment
-                                    was captured. TIJUM customer support is
-                                    reviewing the transaction for manual gateway
-                                    refund processing. You will receive updates
-                                    once processed.
+                                <CardContent className="pt-0 text-xs leading-relaxed text-tijum-plum-muted dark:text-muted-foreground">
+                                    This reservation was cancelled after
+                                    payment. TIJUM support is reviewing the
+                                    transaction for gateway refund processing
+                                    and will notify you once completed.
                                 </CardContent>
                             </Card>
                         )}
 
                         {reservation.refunds &&
                             reservation.refunds.length > 0 && (
-                                <Card>
-                                    <CardHeader>
+                                <Card className="gap-4 py-5">
+                                    <CardHeader className="pb-0">
                                         <CardTitle className="font-heading text-sm font-semibold text-tijum-plum dark:text-foreground">
-                                            Refund History
+                                            Refund history
                                         </CardTitle>
                                     </CardHeader>
-                                    <CardContent className="space-y-2">
+                                    <CardContent className="space-y-2 pt-0">
                                         {reservation.refunds.map((refund) => (
                                             <div
                                                 key={refund.id}
@@ -1222,7 +1568,7 @@ export default function ReservationShow({
                                             >
                                                 <div>
                                                     <p className="font-medium tabular-nums text-tijum-plum dark:text-foreground">
-                                                        {formatPrice(
+                                                        {formatAmount(
                                                             refund.amount_minor,
                                                             refund.currency_code,
                                                         )}{' '}
@@ -1245,10 +1591,10 @@ export default function ReservationShow({
                                                         {refund.gateway_refund_id ||
                                                             'Pending'}
                                                     </p>
-                                                    <p>
-                                                        {new Date(
+                                                    <p className="tabular-nums">
+                                                        {formatDateTime(
                                                             refund.created_at,
-                                                        ).toLocaleDateString()}
+                                                        ) ?? ''}
                                                     </p>
                                                 </div>
                                             </div>
@@ -1263,14 +1609,7 @@ export default function ReservationShow({
     );
 }
 
-function formatPolicyValue(value: string): string {
-    return value
-        .split('_')
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(' ');
-}
-
-function DetailItem({
+function DetailTile({
     icon: Icon,
     label,
     value,
@@ -1282,18 +1621,18 @@ function DetailItem({
     detail: string;
 }) {
     return (
-        <div className="flex gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-tijum-cream text-tijum-coral dark:bg-tijum-coral/15 dark:text-tijum-coral">
-                <Icon className="size-4" aria-hidden="true" />
+        <div className="flex gap-3.5 rounded-2xl border border-tijum-surface/70 bg-tijum-cream/35 p-4 dark:border-border/75 dark:bg-muted/25">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-tijum-coral shadow-2xs dark:bg-card dark:text-tijum-coral">
+                <Icon className="size-4.5" aria-hidden="true" />
             </span>
-            <div>
-                <p className="text-xs font-semibold tracking-wide text-tijum-plum-muted uppercase dark:text-muted-foreground">
+            <div className="min-w-0">
+                <p className="font-heading text-[11px] font-semibold tracking-wider text-tijum-plum-muted uppercase dark:text-muted-foreground">
                     {label}
                 </p>
-                <p className="mt-1 font-semibold text-tijum-plum dark:text-foreground">
+                <p className="mt-1 text-sm font-semibold text-tijum-plum dark:text-foreground">
                     {value}
                 </p>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                <p className="mt-1 text-xs leading-relaxed text-tijum-plum-muted dark:text-muted-foreground">
                     {detail}
                 </p>
             </div>
@@ -1312,11 +1651,19 @@ function PriceRow({
 }) {
     return (
         <div className="flex items-center justify-between gap-4">
-            <span className="text-muted-foreground">{label}</span>
             <span
                 className={
                     strong
-                        ? 'font-heading text-lg font-bold tabular-nums text-tijum-plum dark:text-foreground'
+                        ? 'font-heading font-semibold text-tijum-plum dark:text-foreground'
+                        : 'text-tijum-plum-muted dark:text-muted-foreground'
+                }
+            >
+                {label}
+            </span>
+            <span
+                className={
+                    strong
+                        ? 'font-heading text-xl font-bold tabular-nums text-tijum-plum dark:text-foreground'
                         : 'font-semibold tabular-nums text-tijum-plum dark:text-foreground'
                 }
             >
@@ -1328,11 +1675,11 @@ function PriceRow({
 
 function NoticeCard({ title, body }: { title: string; body: string }) {
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>{title}</CardTitle>
+        <Card className="gap-3 py-5">
+            <CardHeader className="pb-0">
+                <CardTitle className="text-base">{title}</CardTitle>
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
+            <CardContent className="pt-0 text-sm leading-relaxed text-tijum-plum-muted dark:text-muted-foreground">
                 {body}
             </CardContent>
         </Card>
