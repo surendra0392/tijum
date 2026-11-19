@@ -2,16 +2,16 @@ import { Head, Link, usePage } from '@inertiajs/react';
 import {
     ArrowRight,
     Building2,
-    CalendarCheck,
     CalendarDays,
     CheckCircle2,
     ClipboardCheck,
     Clock,
     DoorClosed,
     DoorOpen,
+    FileCheck2,
     MailCheck,
     MessageSquareWarning,
-    ShieldAlert,
+    PlusCircle,
     ShieldCheck,
     Star,
     Users,
@@ -20,7 +20,6 @@ import {
 import { CorrectionRequestPanel } from '@/components/owner/onboarding/correction-request-panel';
 import { VerificationStatusPanel } from '@/components/owner/onboarding/verification-status-panel';
 import { InfoPanel, StatCard } from '@/components/shared/info-card';
-import { PageHeader } from '@/components/shared/page-header';
 import {
     StatusBadge,
     type SemanticStatus,
@@ -36,13 +35,14 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { dashboard } from '@/routes/owner';
-import { index as onboardingIndex } from '@/routes/owner/onboarding';
-import { edit as profileEdit } from '@/routes/owner/profile';
+import {
+    index as onboardingIndex,
+    status as onboardingStatus,
+} from '@/routes/owner/onboarding';
 import {
     create as propertyCreate,
     index as propertiesIndex,
 } from '@/routes/owner/properties';
-import { notice as verificationNotice } from '@/routes/owner/verification';
 import type {
     CityOption,
     OwnerBusinessProfileData,
@@ -132,13 +132,16 @@ export default function OwnerDashboard({
             maximumFractionDigits: 0,
         }).format(minor / 100);
 
-    const isActivePartner =
-        onboarding.accountStatus === 'active' ||
-        propertySummary.propertiesTotal > 0;
+    const isVerifiedPartner =
+        onboarding.accountStatus === 'active' &&
+        onboarding.canPublishProperties;
+    const showOperationsOverview =
+        Boolean(operationsSummary) &&
+        (isVerifiedPartner || propertySummary.propertiesTotal > 0);
 
     return (
         <>
-            <Head title="Partner Onboarding Dashboard" />
+            <Head title="Partner Overview" />
 
             <div className="space-y-6">
                 {status === 'email-verified' && (
@@ -160,51 +163,45 @@ export default function OwnerDashboard({
                         aria-hidden="true"
                     />
                     <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="max-w-2xl space-y-3">
+                        <div className="max-w-2xl space-y-2.5">
                             <div className="flex flex-wrap items-center gap-2">
                                 <span className="font-heading text-xs font-semibold tracking-[0.16em] text-tijum-peach uppercase">
-                                    TIJUM Property Partner Portal
+                                    TIJUM Partner Portal
                                 </span>
                                 <StatusBadge
                                     status={statusBadgeType}
                                     label={onboarding.accountStatusLabel}
                                 />
-                                <StatusBadge
-                                    status={
-                                        onboarding.emailVerified
-                                            ? 'verified'
-                                            : 'pending'
-                                    }
-                                    label={
-                                        onboarding.emailVerified
-                                            ? 'Email Verified'
-                                            : 'Email Unverified'
-                                    }
-                                />
+                                {!onboarding.emailVerified && (
+                                    <StatusBadge
+                                        status="pending"
+                                        label="Email Unverified"
+                                    />
+                                )}
                             </div>
                             <h1 className="font-heading text-2xl font-bold tracking-tight text-tijum-cream sm:text-3xl">
                                 Welcome back, {owner?.name ?? 'Partner'}
                             </h1>
                             <p className="text-sm leading-relaxed text-tijum-cream/80">
-                                Complete your operator verification and manage
-                                Hostels/PG, Homestays, and Co-Living properties
-                                across Hyderabad, Guntur, Vijayawada, and
-                                Visakhapatnam.
+                                {isVerifiedPartner
+                                    ? 'Manage daily check-ins, room inventory, meal plans, and settlements across your verified properties.'
+                                    : 'Complete your partner verification steps below to start publishing properties and receiving guest bookings.'}
                             </p>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2.5 lg:shrink-0">
-                            <Button
-                                variant="outline"
-                                asChild
-                                className="border-white/25 bg-white/10 text-tijum-cream hover:bg-white/20 hover:text-white dark:border-white/20 dark:bg-white/10 dark:text-tijum-cream dark:hover:bg-white/20"
-                            >
-                                <Link href={profileEdit()}>
-                                    Partner Profile Settings
-                                </Link>
-                            </Button>
                             {onboarding.canPublishProperties ? (
                                 <>
+                                    <Button
+                                        variant="outline"
+                                        asChild
+                                        className="border-white/25 bg-white/10 text-tijum-cream hover:bg-white/20 hover:text-white dark:border-white/20 dark:bg-white/10 dark:text-tijum-cream dark:hover:bg-white/20"
+                                    >
+                                        <Link href="/owner/front-desk">
+                                            <DoorOpen aria-hidden="true" />
+                                            <span>Front Desk</span>
+                                        </Link>
+                                    </Button>
                                     <Button
                                         variant="outline"
                                         asChild
@@ -217,6 +214,7 @@ export default function OwnerDashboard({
                                     </Button>
                                     <Button asChild>
                                         <Link href={propertyCreate()}>
+                                            <PlusCircle aria-hidden="true" />
                                             <span>Add Property</span>
                                         </Link>
                                     </Button>
@@ -225,7 +223,7 @@ export default function OwnerDashboard({
                                 <Button asChild>
                                     <Link href={onboardingIndex()}>
                                         <ClipboardCheck aria-hidden="true" />
-                                        <span>Open Onboarding</span>
+                                        <span>Complete Verification</span>
                                     </Link>
                                 </Button>
                             )}
@@ -240,69 +238,57 @@ export default function OwnerDashboard({
                     />
                 )}
 
-                {/* Active Partner Operations Dashboard */}
-                {isActivePartner && operationsSummary && (
-                    <div className="space-y-4">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                                <h2 className="font-heading text-lg font-bold text-foreground">
-                                    Today's Front Desk &amp; Live Operations
-                                </h2>
-                                <p className="text-xs text-muted-foreground">
-                                    Daily reception arrivals, departures, guest occupancy, and financial balances across your properties.
-                                </p>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link href="/owner/front-desk">
-                                        <DoorOpen className="mr-1.5 size-4 text-tijum-coral" />
-                                        <span>Front Desk</span>
-                                    </Link>
-                                </Button>
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link href="/owner/availability">
-                                        <CalendarDays className="mr-1.5 size-4 text-tijum-coral" />
-                                        <span>Availability</span>
-                                    </Link>
-                                </Button>
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link href="/owner/settlements">
-                                        <Wallet className="mr-1.5 size-4 text-tijum-coral" />
-                                        <span>Settlements</span>
-                                    </Link>
-                                </Button>
-                            </div>
-                        </div>
-
+                {/* Stage 2: Active Partner Operations View */}
+                {showOperationsOverview && operationsSummary && (
+                    <div className="space-y-5">
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                             <StatCard
                                 label="Today's Arrivals"
                                 value={String(operationsSummary.todayArrivals)}
                                 helperText={
                                     operationsSummary.todayArrivals > 0
-                                        ? 'Scheduled check-ins at front desk today'
-                                        : 'No pending arrivals remaining today'
+                                        ? 'Scheduled check-ins today'
+                                        : 'No pending arrivals today'
                                 }
                                 icon={DoorOpen}
                                 badge={
-                                    <Badge variant={operationsSummary.todayArrivals > 0 ? 'default' : 'outline'}>
-                                        {operationsSummary.todayArrivals > 0 ? 'Check-ins' : 'Clear'}
+                                    <Badge
+                                        variant={
+                                            operationsSummary.todayArrivals > 0
+                                                ? 'default'
+                                                : 'outline'
+                                        }
+                                    >
+                                        {operationsSummary.todayArrivals > 0
+                                            ? 'Check-ins'
+                                            : 'Clear'}
                                     </Badge>
                                 }
                             />
 
                             <StatCard
                                 label="Today's Departures"
-                                value={String(operationsSummary.todayDepartures)}
+                                value={String(
+                                    operationsSummary.todayDepartures,
+                                )}
                                 helperText={
                                     operationsSummary.todayDepartures > 0
-                                        ? 'Guests scheduled to check out today'
-                                        : 'No checkout handovers remaining'
+                                        ? 'Guests checking out today'
+                                        : 'No checkouts remaining'
                                 }
                                 icon={DoorClosed}
                                 badge={
-                                    <Badge variant={operationsSummary.todayDepartures > 0 ? 'secondary' : 'outline'}>
-                                        {operationsSummary.todayDepartures > 0 ? 'Check-outs' : 'Done'}
+                                    <Badge
+                                        variant={
+                                            operationsSummary.todayDepartures >
+                                            0
+                                                ? 'secondary'
+                                                : 'outline'
+                                        }
+                                    >
+                                        {operationsSummary.todayDepartures > 0
+                                            ? 'Check-outs'
+                                            : 'Done'}
                                     </Badge>
                                 }
                             />
@@ -310,265 +296,292 @@ export default function OwnerDashboard({
                             <StatCard
                                 label="In-House Guests"
                                 value={String(operationsSummary.inHouseGuests)}
-                                helperText={`${operationsSummary.activeReservations} total active confirmed bookings`}
+                                helperText={`${operationsSummary.activeReservations} active confirmed bookings`}
                                 icon={Users}
-                                badge={
-                                    <Badge variant="plum">
-                                        Occupied
-                                    </Badge>
-                                }
+                                badge={<Badge variant="plum">Occupied</Badge>}
                             />
 
                             <StatCard
                                 label="Unsettled Payouts"
-                                value={formatInr(operationsSummary.unsettledPayoutMinor)}
-                                helperText="Pending / approved settlement balances"
+                                value={formatInr(
+                                    operationsSummary.unsettledPayoutMinor,
+                                )}
+                                helperText="Pending & approved settlements"
                                 icon={Wallet}
                                 badge={
-                                    <Badge variant="outline">
-                                        Gross to Net
-                                    </Badge>
+                                    <Badge variant="outline">Net Balance</Badge>
                                 }
                             />
                         </div>
 
-                        {/* Action Alerts Row */}
-                        {(operationsSummary.pendingReviews > 0 || operationsSummary.openComplaints > 0) && (
+                        {(operationsSummary.pendingReviews > 0 ||
+                            operationsSummary.openComplaints > 0) && (
                             <div className="grid gap-3 sm:grid-cols-2">
                                 {operationsSummary.pendingReviews > 0 && (
-                                    <Alert variant="warning" className="flex items-center justify-between">
+                                    <Alert
+                                        variant="warning"
+                                        className="flex items-center justify-between"
+                                    >
                                         <div className="flex items-center gap-2">
                                             <Star className="size-4 text-amber-500" />
                                             <div>
                                                 <AlertTitle className="text-xs font-bold">
-                                                    {operationsSummary.pendingReviews} Guest {operationsSummary.pendingReviews === 1 ? 'Review' : 'Reviews'} Awaiting Reply
+                                                    {
+                                                        operationsSummary.pendingReviews
+                                                    }{' '}
+                                                    Guest{' '}
+                                                    {operationsSummary.pendingReviews ===
+                                                    1
+                                                        ? 'Review'
+                                                        : 'Reviews'}{' '}
+                                                    Awaiting Reply
                                                 </AlertTitle>
                                                 <AlertDescription className="text-xs">
-                                                    Prompt responses improve your property ranking and guest trust.
+                                                    Prompt responses improve
+                                                    guest trust.
                                                 </AlertDescription>
                                             </div>
                                         </div>
-                                        <Button variant="outline" size="sm" asChild className="shrink-0 text-xs">
-                                            <Link href="/owner/reviews">Reply</Link>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            asChild
+                                            className="shrink-0 text-xs"
+                                        >
+                                            <Link href="/owner/reviews">
+                                                Reply
+                                            </Link>
                                         </Button>
                                     </Alert>
                                 )}
 
                                 {operationsSummary.openComplaints > 0 && (
-                                    <Alert variant="destructive" className="flex items-center justify-between">
+                                    <Alert
+                                        variant="destructive"
+                                        className="flex items-center justify-between"
+                                    >
                                         <div className="flex items-center gap-2">
                                             <MessageSquareWarning className="size-4" />
                                             <div>
                                                 <AlertTitle className="text-xs font-bold">
-                                                    {operationsSummary.openComplaints} Open Guest {operationsSummary.openComplaints === 1 ? 'Complaint' : 'Complaints'}
+                                                    {
+                                                        operationsSummary.openComplaints
+                                                    }{' '}
+                                                    Open Guest{' '}
+                                                    {operationsSummary.openComplaints ===
+                                                    1
+                                                        ? 'Issue'
+                                                        : 'Issues'}
                                                 </AlertTitle>
                                                 <AlertDescription className="text-xs">
-                                                    Review customer protection issues to maintain high partner ratings.
+                                                    Respond promptly to resolve
+                                                    stay issues.
                                                 </AlertDescription>
                                             </div>
                                         </div>
-                                        <Button variant="outline" size="sm" asChild className="shrink-0 text-xs">
-                                            <Link href="/owner/complaints">Resolve</Link>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            asChild
+                                            className="shrink-0 text-xs"
+                                        >
+                                            <Link href="/owner/complaints">
+                                                Resolve
+                                            </Link>
                                         </Button>
                                     </Alert>
                                 )}
                             </div>
                         )}
+
+                        {/* Compact Property & Quick Actions Summary for Verified Partners */}
+                        <div className="grid gap-4 lg:grid-cols-3">
+                            <StatCard
+                                label="Properties & Inventory"
+                                value={`${propertySummary.propertiesTotal} Properties (${propertySummary.verifiedProperties} Verified)`}
+                                helperText={`${propertySummary.roomTypesTotal} room types · ${propertySummary.roomsTotal} physical rooms`}
+                                icon={Building2}
+                                badge={
+                                    <Button variant="outline" size="sm" asChild>
+                                        <Link href={propertiesIndex()}>
+                                            Manage
+                                        </Link>
+                                    </Button>
+                                }
+                            />
+
+                            <StatCard
+                                label="Rates, Meals & Blocks"
+                                value="Daily · Weekly · Monthly"
+                                helperText="Update room rates, meal flags, or maintenance blocks"
+                                icon={CalendarDays}
+                                badge={
+                                    <Button variant="outline" size="sm" asChild>
+                                        <Link href="/owner/availability">
+                                            Open
+                                        </Link>
+                                    </Button>
+                                }
+                            />
+
+                            <StatCard
+                                label="Partner Verification"
+                                value={onboarding.accountStatusLabel}
+                                helperText={
+                                    businessProfile
+                                        ? `${businessProfile.display_business_name} · ${businessProfile.entity_type_label}`
+                                        : 'Operator profile verified'
+                                }
+                                icon={ShieldCheck}
+                                badge={
+                                    <Button variant="ghost" size="sm" asChild>
+                                        <Link href={onboardingStatus()}>
+                                            <FileCheck2 className="mr-1 size-3.5" />
+                                            <span>View Record</span>
+                                        </Link>
+                                    </Button>
+                                }
+                            />
+                        </div>
                     </div>
                 )}
 
-                <div className="grid gap-4 lg:grid-cols-3">
-                    <StatCard
-                        label="Partner account status"
-                        value={onboarding.accountStatusLabel}
-                        helperText={
-                            businessProfile
-                                ? `${businessProfile.display_business_name} (${businessProfile.entity_type_label})`
-                                : 'Operator business profile not saved yet'
-                        }
-                        icon={ShieldCheck}
-                        badge={
-                            <StatusBadge
-                                status={statusBadgeType}
-                                label={onboarding.accountStatusLabel}
-                            />
-                        }
-                    />
+                {/* Stage 1: Partner Verification & Onboarding View (shown only until verified) */}
+                {!isVerifiedPartner && (
+                    <>
+                        <VerificationStatusPanel
+                            application={application}
+                            evaluation={evaluation}
+                            canPublishProperties={
+                                onboarding.canPublishProperties
+                            }
+                        />
 
-                    <StatCard
-                        label="Email verification"
-                        value={
-                            onboarding.emailVerified
-                                ? 'Verified'
-                                : 'Verification Pending'
-                        }
-                        helperText={
-                            onboarding.emailVerified
-                                ? `Confirmed for ${owner?.email ?? 'partner email'}`
-                                : 'Required before partner application submission'
-                        }
-                        icon={
-                            onboarding.emailVerified ? MailCheck : ShieldAlert
-                        }
-                        badge={
-                            onboarding.emailVerified ? (
-                                <StatusBadge status="verified" />
-                            ) : (
-                                <Link
-                                    href={verificationNotice()}
-                                    className="font-heading font-semibold text-tijum-plum underline underline-offset-4 hover:text-tijum-coral dark:text-tijum-peach"
-                                >
-                                    Verify email now
-                                </Link>
-                            )
-                        }
-                    />
-
-                    <StatCard
-                        label="Properties & Inventory"
-                        value={
-                            onboarding.canPublishProperties
-                                ? `${propertySummary.propertiesTotal} Properties (${propertySummary.verifiedProperties} Verified)`
-                                : 'Partner Verification Pending'
-                        }
-                        helperText={
-                            onboarding.canPublishProperties
-                                ? `${propertySummary.roomTypesTotal} room types · ${propertySummary.roomsTotal} physical rooms`
-                                : onboarding.propertyApprovalStatus
-                        }
-                        icon={Building2}
-                        badge={
-                            <StatusBadge
-                                status={
-                                    onboarding.canPublishProperties
-                                        ? 'active'
-                                        : 'pending'
-                                }
-                                label={
-                                    onboarding.canPublishProperties
-                                        ? 'Active Partner'
-                                        : 'Locked'
-                                }
-                            />
-                        }
-                    />
-                </div>
-
-                <VerificationStatusPanel
-                    application={application}
-                    evaluation={evaluation}
-                    canPublishProperties={onboarding.canPublishProperties}
-                />
-
-                <div className="grid gap-6 lg:grid-cols-5">
-                    <Card className="lg:col-span-3">
-                        <CardHeader>
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                    <CardTitle>
-                                        5-Step Partner Verification Checklist
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Real readiness tracked directly from
-                                        your account, profile, cities, and
-                                        documents
-                                    </CardDescription>
-                                </div>
-                                <StatusBadge
-                                    status={
-                                        completedCount ===
-                                        evaluation.steps.length
-                                            ? 'completed'
-                                            : 'info'
-                                    }
-                                    label={`${completedCount} of ${evaluation.steps.length} complete`}
-                                />
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <ol className="space-y-3">
-                                {evaluation.steps.map((step) => (
-                                    <li
-                                        key={step.key}
-                                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-tijum-surface/80 bg-tijum-cream/50 px-4 py-3 dark:border-border dark:bg-muted/45"
-                                    >
-                                        <div className="flex min-w-0 items-center gap-3">
-                                            {step.completed ? (
-                                                <CheckCircle2
-                                                    className="size-5 shrink-0 text-status-success-fg"
-                                                    aria-hidden="true"
-                                                />
-                                            ) : (
-                                                <Clock
-                                                    className="size-5 shrink-0 text-status-warning-fg"
-                                                    aria-hidden="true"
-                                                />
-                                            )}
-                                            <div className="min-w-0">
-                                                <p className="font-heading text-sm font-semibold text-tijum-plum dark:text-foreground">
-                                                    Step {step.number}:{' '}
-                                                    {step.title}
-                                                </p>
-                                                <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                                    {step.description}
-                                                </p>
-                                            </div>
+                        <div className="grid gap-6 lg:grid-cols-5">
+                            <Card className="lg:col-span-3">
+                                <CardHeader>
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div>
+                                            <CardTitle>
+                                                5-Step Partner Verification
+                                                Checklist
+                                            </CardTitle>
+                                            <CardDescription>
+                                                Complete each step below to
+                                                unlock property publishing
+                                            </CardDescription>
                                         </div>
                                         <StatusBadge
                                             status={
-                                                step.completed
+                                                completedCount ===
+                                                evaluation.steps.length
                                                     ? 'completed'
-                                                    : 'pending'
+                                                    : 'info'
                                             }
-                                            label={
-                                                step.completed
-                                                    ? 'Complete'
-                                                    : 'Pending'
-                                            }
+                                            label={`${completedCount} of ${evaluation.steps.length} complete`}
                                         />
-                                    </li>
-                                ))}
-                            </ol>
-                        </CardContent>
-                    </Card>
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <ol className="space-y-3">
+                                        {evaluation.steps.map((step) => (
+                                            <li
+                                                key={step.key}
+                                                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-tijum-surface/80 bg-tijum-cream/50 px-4 py-3 dark:border-border dark:bg-muted/45"
+                                            >
+                                                <div className="flex min-w-0 items-center gap-3">
+                                                    {step.completed ? (
+                                                        <CheckCircle2
+                                                            className="size-5 shrink-0 text-status-success-fg"
+                                                            aria-hidden="true"
+                                                        />
+                                                    ) : (
+                                                        <Clock
+                                                            className="size-5 shrink-0 text-status-warning-fg"
+                                                            aria-hidden="true"
+                                                        />
+                                                    )}
+                                                    <div className="min-w-0">
+                                                        <p className="font-heading text-sm font-semibold text-tijum-plum dark:text-foreground">
+                                                            Step {step.number}:{' '}
+                                                            {step.title}
+                                                        </p>
+                                                        <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
+                                                            {step.description}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <StatusBadge
+                                                    status={
+                                                        step.completed
+                                                            ? 'completed'
+                                                            : 'pending'
+                                                    }
+                                                    label={
+                                                        step.completed
+                                                            ? 'Complete'
+                                                            : 'Pending'
+                                                    }
+                                                />
+                                            </li>
+                                        ))}
+                                    </ol>
+                                </CardContent>
+                            </Card>
 
-                    <div className="space-y-6 lg:col-span-2">
-                        <InfoPanel
-                            title={onboarding.nextAction.title}
-                            description={onboarding.nextAction.description}
-                            action={
-                                <Button className="w-full" asChild>
-                                    <Link
-                                        href={onboarding.nextAction.actionHref}
-                                    >
-                                        <span>
-                                            {onboarding.nextAction.actionLabel}
-                                        </span>
-                                        <ArrowRight aria-hidden="true" />
-                                    </Link>
-                                </Button>
-                            }
-                        >
-                            <div className="space-y-3 text-sm text-tijum-plum-muted dark:text-muted-foreground">
-                                <p>
-                                    Operating cities selected:{' '}
-                                    <strong className="text-tijum-plum dark:text-foreground">
-                                        {operatingCities.length > 0
-                                            ? operatingCities
-                                                  .map((c) => c.name)
-                                                  .join(', ')
-                                            : 'None selected yet'}
-                                    </strong>
-                                </p>
-                                <div className="flex flex-wrap gap-1.5">
-                                    <Badge variant="outline">Hostels/PG</Badge>
-                                    <Badge variant="outline">Homestays</Badge>
-                                    <Badge variant="outline">Co-Living</Badge>
-                                </div>
+                            <div className="space-y-6 lg:col-span-2">
+                                <InfoPanel
+                                    title={onboarding.nextAction.title}
+                                    description={
+                                        onboarding.nextAction.description
+                                    }
+                                    action={
+                                        <Button className="w-full" asChild>
+                                            <Link
+                                                href={
+                                                    onboarding.nextAction
+                                                        .actionHref
+                                                }
+                                            >
+                                                <span>
+                                                    {
+                                                        onboarding.nextAction
+                                                            .actionLabel
+                                                    }
+                                                </span>
+                                                <ArrowRight aria-hidden="true" />
+                                            </Link>
+                                        </Button>
+                                    }
+                                >
+                                    <div className="space-y-3 text-sm text-tijum-plum-muted dark:text-muted-foreground">
+                                        <p>
+                                            Operating cities selected:{' '}
+                                            <strong className="text-tijum-plum dark:text-foreground">
+                                                {operatingCities.length > 0
+                                                    ? operatingCities
+                                                          .map((c) => c.name)
+                                                          .join(', ')
+                                                    : 'None selected yet'}
+                                            </strong>
+                                        </p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            <Badge variant="outline">
+                                                Hostels/PG
+                                            </Badge>
+                                            <Badge variant="outline">
+                                                Homestays
+                                            </Badge>
+                                            <Badge variant="outline">
+                                                Co-Living
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                </InfoPanel>
                             </div>
-                        </InfoPanel>
-                    </div>
-                </div>
+                        </div>
+                    </>
+                )}
             </div>
         </>
     );

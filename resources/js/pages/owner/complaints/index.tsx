@@ -6,15 +6,15 @@ import {
     Calendar,
     CheckCircle2,
     Clock,
-    FileText,
-    Inbox,
     MessageSquare,
-    MessageSquareWarning,
     Search,
-    ShieldAlert,
     ShieldCheck,
     User,
 } from 'lucide-react';
+import {
+    OWNER_SUPPORT_TABS,
+    OwnerSectionTabs,
+} from '@/components/owner/owner-section-tabs';
 import { PageHeader } from '@/components/shared/page-header';
 import { Pagination } from '@/components/shared/pagination';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -154,6 +154,11 @@ export default function OwnerComplaintsIndex({
     return (
         <div className="space-y-6">
             <Head title="Guest Complaints & Disputes · Partner Portal" />
+
+            <OwnerSectionTabs
+                items={OWNER_SUPPORT_TABS}
+                ariaLabel="Reviews and support navigation"
+            />
 
             {/* Header */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

@@ -1,22 +1,19 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import {
-    AlertCircle,
     Building2,
     CheckCircle2,
-    Filter,
     Flag,
-    HelpCircle,
     MessageSquare,
     MessageSquareReply,
-    RefreshCw,
     RotateCcw,
     ShieldCheck,
-    Sparkles,
     Star,
-    Utensils,
-    Tag,
 } from 'lucide-react';
 import { useState } from 'react';
+import {
+    OWNER_SUPPORT_TABS,
+    OwnerSectionTabs,
+} from '@/components/owner/owner-section-tabs';
 import { ReportReviewDialog } from '@/components/reviews/report-review-dialog';
 import { StarRating } from '@/components/reviews/star-rating';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -185,6 +182,11 @@ export default function OwnerReviewIndex({
     return (
         <div className="space-y-6">
             <Head title="Guest Reviews — Partner Portal" />
+
+            <OwnerSectionTabs
+                items={OWNER_SUPPORT_TABS}
+                ariaLabel="Reviews and support navigation"
+            />
 
             <PageHeader
                 title="Guest Reviews & Ratings"

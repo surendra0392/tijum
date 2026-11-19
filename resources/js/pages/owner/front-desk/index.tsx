@@ -6,7 +6,6 @@ import {
     Building2,
     Calendar,
     CalendarCheck,
-    Check,
     CheckCircle2,
     Clock,
     DoorClosed,
@@ -18,11 +17,13 @@ import {
     LogOut,
     Phone,
     Search,
-    ShieldCheck,
     UserCheck,
-    Users,
 } from 'lucide-react';
 import { useState } from 'react';
+import {
+    OWNER_BOOKINGS_TABS,
+    OwnerSectionTabs,
+} from '@/components/owner/owner-section-tabs';
 import { PageHeader } from '@/components/shared/page-header';
 import { Pagination } from '@/components/shared/pagination';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -32,7 +33,6 @@ import {
     Card,
     CardContent,
     CardDescription,
-    CardFooter,
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
@@ -443,6 +443,11 @@ export default function OwnerFrontDeskIndex({
     return (
         <div className="space-y-6">
             <Head title="Check-ins & Check-outs · Front Desk" />
+
+            <OwnerSectionTabs
+                items={OWNER_BOOKINGS_TABS}
+                ariaLabel="Bookings and front desk navigation"
+            />
 
             {/* Header */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

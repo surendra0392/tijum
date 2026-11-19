@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { CheckCircle2, Circle } from 'lucide-react';
+import { CheckCircle2, Circle, ClipboardCheck, FileCheck2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
     businessProfile,
@@ -7,6 +7,7 @@ import {
     documents,
     index as onboardingIndex,
     review,
+    status as statusRoute,
 } from '@/routes/owner/onboarding';
 import type { OnboardingWorkflowStep } from '@/types';
 
@@ -29,11 +30,50 @@ export function OnboardingProgress({
     currentStepKey,
     isEditable = true,
 }: OnboardingProgressProps) {
+    const isStatusView = currentStepKey === 'status';
+
     return (
         <nav
             aria-label="Partner onboarding steps"
-            className="rounded-2xl border border-tijum-surface/80 bg-white p-3 shadow-tijum-card sm:p-4 dark:border-border dark:bg-card"
+            className="space-y-3 rounded-2xl border border-tijum-surface/80 bg-white p-3 shadow-tijum-card sm:p-4 dark:border-border dark:bg-card"
         >
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-tijum-surface/75 pb-3 dark:border-border">
+                <div className="inline-flex flex-wrap items-center gap-1.5 rounded-xl bg-tijum-cream/65 p-1 dark:bg-muted/50">
+                    <Link
+                        href={onboardingIndex.url()}
+                        className={cn(
+                            'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-heading text-xs font-semibold transition-colors',
+                            !isStatusView
+                                ? 'bg-tijum-plum text-tijum-cream shadow-2xs dark:bg-tijum-coral dark:text-white'
+                                : 'text-tijum-plum-muted hover:text-tijum-plum dark:text-muted-foreground dark:hover:text-foreground',
+                        )}
+                    >
+                        <ClipboardCheck
+                            className="size-3.5"
+                            aria-hidden="true"
+                        />
+                        <span>Application Setup</span>
+                    </Link>
+                    <Link
+                        href={statusRoute.url()}
+                        className={cn(
+                            'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-heading text-xs font-semibold transition-colors',
+                            isStatusView
+                                ? 'bg-tijum-plum text-tijum-cream shadow-2xs dark:bg-tijum-coral dark:text-white'
+                                : 'text-tijum-plum-muted hover:text-tijum-plum dark:text-muted-foreground dark:hover:text-foreground',
+                        )}
+                    >
+                        <FileCheck2 className="size-3.5" aria-hidden="true" />
+                        <span>Status &amp; Timeline</span>
+                    </Link>
+                </div>
+
+                <span className="font-heading text-xs font-semibold text-tijum-plum-muted dark:text-muted-foreground">
+                    {steps.filter((s) => s.completed).length} of {steps.length}{' '}
+                    steps completed
+                </span>
+            </div>
+
             <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
                 {steps.map((step) => {
                     const isCurrent = step.key === currentStepKey;

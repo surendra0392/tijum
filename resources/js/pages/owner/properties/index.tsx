@@ -149,33 +149,11 @@ export default function OwnerPropertiesIndex({
                     }
                 />
 
-                {filters.module === 'food' && (
-                    <Alert variant="info" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <AlertTitle className="flex items-center gap-2">
-                                <Utensils className="size-4 text-tijum-coral" />
-                                Food &amp; Meal Plans Active View
-                            </AlertTitle>
-                            <AlertDescription>
-                                Displaying properties that offer meal services. Configure meal inclusion, daily timing, and pricing directly in property settings.
-                            </AlertDescription>
-                        </div>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={clearFilters}
-                            className="shrink-0"
-                        >
-                            Show All Properties
-                        </Button>
-                    </Alert>
-                )}
-
                 {!canCreateProperty && (
                     <Alert variant="warning">
                         <AlertTitle>Partner Approval Required</AlertTitle>
                         <AlertDescription>
-                            Complete your Phase 05 Partner Verification before
+                            Complete your Partner Verification before
                             registering and submitting properties on TIJUM.
                         </AlertDescription>
                     </Alert>

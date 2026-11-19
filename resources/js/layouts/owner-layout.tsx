@@ -2,36 +2,28 @@ import { Link, usePage } from '@inertiajs/react';
 import {
     Bell,
     Building2,
-    CalendarCheck,
     CalendarDays,
     ClipboardCheck,
-    Coins,
     DoorOpen,
     FileCheck2,
     LayoutDashboard,
-    LifeBuoy,
     LogOut,
-    MessageSquareWarning,
-    PlusCircle,
     Star,
     UserRound,
-    Utensils,
     Wallet,
 } from 'lucide-react';
 import type { PropsWithChildren } from 'react';
 import { AppContent } from '@/components/app-content';
 import { AppShell } from '@/components/app-shell';
-import { clearPwaUserCaches } from '@/lib/pwa';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import BrandLogo from '@/components/brand/brand-logo';
 import { NotificationBell } from '@/components/notifications/notification-bell';
-import { ThemeToggle } from '@/components/theme-toggle';
 import {
     StatusBadge,
     type SemanticStatus,
 } from '@/components/shared/status-badge';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -54,16 +46,14 @@ import {
     SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { useInitials } from '@/hooks/use-initials';
+import { clearPwaUserCaches } from '@/lib/pwa';
 import { dashboard, logout } from '@/routes/owner';
 import {
     index as onboardingIndex,
     status as onboardingStatus,
 } from '@/routes/owner/onboarding';
 import { edit as profileEdit } from '@/routes/owner/profile';
-import {
-    create as propertyCreate,
-    index as propertiesIndex,
-} from '@/routes/owner/properties';
+import { index as propertiesIndex } from '@/routes/owner/properties';
 import { index as reservationsIndex } from '@/routes/owner/reservations';
 import type { BreadcrumbItem, OwnerStatus } from '@/types';
 
@@ -86,129 +76,66 @@ export default function OwnerLayout({
     const page = usePage();
     const owner = page.props.auth?.owner;
     const getInitials = useInitials();
-    const canPublishProperties = Boolean(owner?.can_publish_properties);
+    const isOnboardingActive = page.url.startsWith('/owner/onboarding');
+    const showVerificationInSidebar =
+        !owner?.can_publish_properties ||
+        owner?.status !== 'active' ||
+        isOnboardingActive;
 
-    const operationsNavItems = [
-        {
-            label: 'Availability & Pricing',
-            href: '/owner/availability',
-            icon: CalendarDays,
-            active:
-                page.url.startsWith('/owner/availability') ||
-                page.url.includes('/pricing'),
-        },
-        {
-            label: 'Check-ins & Check-outs',
-            href: '/owner/front-desk',
-            icon: DoorOpen,
-            active: page.url.startsWith('/owner/front-desk'),
-        },
-        {
-            label: 'Reservations',
-            href: reservationsIndex.url(),
-            icon: CalendarCheck,
-            active:
-                page.url.startsWith(reservationsIndex.url()) &&
-                !page.url.startsWith('/owner/front-desk'),
-        },
-        {
-            label: 'Complaints',
-            href: '/owner/complaints',
-            icon: MessageSquareWarning,
-            active:
-                page.url.startsWith('/owner/complaints') ||
-                page.url.startsWith('/owner/cases'),
-        },
-    ];
-
-    const activeNavItems = [
+    const primaryNavItems = [
         {
             label: 'Overview',
             href: dashboard.url(),
             icon: LayoutDashboard,
-            active:
-                page.url.startsWith(dashboard.url()) &&
-                page.url === dashboard.url(),
+            active: page.url.split('?')[0] === dashboard.url(),
         },
-        {
-            label: 'Partner Onboarding',
-            href: onboardingIndex.url(),
-            icon: ClipboardCheck,
-            active:
-                page.url.startsWith(onboardingIndex.url()) &&
-                !page.url.startsWith(onboardingStatus.url()),
-        },
-        {
-            label: 'Verification Status',
-            href: onboardingStatus.url(),
-            icon: FileCheck2,
-            active: page.url.startsWith(onboardingStatus.url()),
-        },
-        {
-            label: 'Guest Reviews',
-            href: '/owner/reviews',
-            icon: Star,
-            active: page.url.startsWith('/owner/reviews'),
-        },
-        {
-            label: 'Partner Support',
-            href: '/owner/support',
-            icon: LifeBuoy,
-            active: page.url.startsWith('/owner/support'),
-        },
-        {
-            label: 'Notifications',
-            href: '/owner/notifications',
-            icon: Bell,
-            active: page.url.startsWith('/owner/notifications'),
-        },
-    ];
-
-    const propertyNavItems = [
-        {
-            label: 'My Properties',
-            href: propertiesIndex.url(),
-            icon: Building2,
-            active:
-                page.url.startsWith(propertiesIndex.url()) &&
-                !page.url.startsWith(propertyCreate.url()),
-        },
-        ...(canPublishProperties
+        ...(showVerificationInSidebar
             ? [
                   {
-                      label: 'Add Property',
-                      href: propertyCreate.url(),
-                      icon: PlusCircle,
-                      active: page.url.startsWith(propertyCreate.url()),
+                      label: 'Partner Verification',
+                      href: onboardingIndex.url(),
+                      icon: ClipboardCheck,
+                      active: isOnboardingActive,
                   },
               ]
             : []),
         {
-            label: 'Food & Meal Plans',
-            href: propertiesIndex.url({ query: { module: 'food' } }),
-            icon: Utensils,
-            active: page.url.includes('module=food'),
+            label: 'Bookings & Front Desk',
+            href: '/owner/front-desk',
+            icon: DoorOpen,
+            active:
+                page.url.startsWith('/owner/front-desk') ||
+                page.url.startsWith(reservationsIndex.url()),
         },
-    ];
-
-    const financialNavItems = [
         {
-            label: 'Settlements',
+            label: 'My Properties',
+            href: propertiesIndex.url(),
+            icon: Building2,
+            active: page.url.startsWith(propertiesIndex.url()),
+        },
+        {
+            label: 'Rates, Meals & Blocks',
+            href: '/owner/availability',
+            icon: CalendarDays,
+            active: page.url.startsWith('/owner/availability'),
+        },
+        {
+            label: 'Earnings & Payouts',
             href: '/owner/settlements',
             icon: Wallet,
-            active: page.url.startsWith('/owner/settlements'),
+            active:
+                page.url.startsWith('/owner/settlements') ||
+                page.url.startsWith('/owner/financial-profile') ||
+                page.url.startsWith('/owner/commission-agreements'),
         },
         {
-            label: 'Bank & Payouts',
-            href: '/owner/financial-profile',
-            icon: Building2,
-            active: page.url.startsWith('/owner/financial-profile'),
-        },
-        {
-            label: 'Commission Terms',
-            href: '/owner/commission-agreements',
-            icon: Coins,
-            active: page.url.startsWith('/owner/commission-agreements'),
+            label: 'Reviews & Support',
+            href: '/owner/reviews',
+            icon: Star,
+            active:
+                page.url.startsWith('/owner/reviews') ||
+                page.url.startsWith('/owner/complaints') ||
+                page.url.startsWith('/owner/support'),
         },
     ];
 
@@ -228,10 +155,7 @@ export default function OwnerLayout({
                             <SidebarMenuButton size="lg" asChild>
                                 <Link href={dashboard.url()}>
                                     <div className="flex items-center gap-2.5 overflow-hidden">
-                                        <BrandLogo
-                                            variant="icon"
-                                            size="sm"
-                                        />
+                                        <BrandLogo variant="icon" size="sm" />
                                         <div className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
                                             <span className="truncate font-heading text-sm font-bold tracking-[0.2em] text-tijum-plum uppercase dark:text-foreground">
                                                 TIJUM
@@ -247,89 +171,11 @@ export default function OwnerLayout({
                     </SidebarMenu>
                 </SidebarHeader>
 
-                <SidebarContent className="space-y-1.5">
-                    <SidebarGroup className="px-2 py-1">
-                        <SidebarGroupLabel>
-                            Operations &amp; Stays
-                        </SidebarGroupLabel>
-                        <SidebarMenu>
-                            {operationsNavItems.map((item) => {
-                                const Icon = item.icon;
-
-                                return (
-                                    <SidebarMenuItem key={item.label}>
-                                        <SidebarMenuButton
-                                            asChild
-                                            isActive={item.active}
-                                            tooltip={{ children: item.label }}
-                                        >
-                                            <Link href={item.href}>
-                                                <Icon aria-hidden="true" />
-                                                <span>{item.label}</span>
-                                            </Link>
-                                        </SidebarMenuButton>
-                                    </SidebarMenuItem>
-                                );
-                            })}
-                        </SidebarMenu>
-                    </SidebarGroup>
-
-                    <SidebarGroup className="px-2 py-1">
-                        <SidebarGroupLabel>
-                            Property Management
-                        </SidebarGroupLabel>
-                        <SidebarMenu>
-                            {propertyNavItems.map((item) => {
-                                const Icon = item.icon;
-
-                                return (
-                                    <SidebarMenuItem key={item.label}>
-                                        <SidebarMenuButton
-                                            asChild
-                                            isActive={item.active}
-                                            tooltip={{ children: item.label }}
-                                        >
-                                            <Link href={item.href}>
-                                                <Icon aria-hidden="true" />
-                                                <span>{item.label}</span>
-                                            </Link>
-                                        </SidebarMenuButton>
-                                    </SidebarMenuItem>
-                                );
-                            })}
-                        </SidebarMenu>
-                    </SidebarGroup>
-
-                    <SidebarGroup className="px-2 py-1">
+                <SidebarContent>
+                    <SidebarGroup className="px-2 py-1.5">
                         <SidebarGroupLabel>Partner Workspace</SidebarGroupLabel>
-                        <SidebarMenu>
-                            {activeNavItems.map((item) => {
-                                const Icon = item.icon;
-
-                                return (
-                                    <SidebarMenuItem key={item.href}>
-                                        <SidebarMenuButton
-                                            asChild
-                                            isActive={item.active}
-                                            tooltip={{ children: item.label }}
-                                        >
-                                            <Link href={item.href}>
-                                                <Icon aria-hidden="true" />
-                                                <span>{item.label}</span>
-                                            </Link>
-                                        </SidebarMenuButton>
-                                    </SidebarMenuItem>
-                                );
-                            })}
-                        </SidebarMenu>
-                    </SidebarGroup>
-
-                    <SidebarGroup className="px-2 py-1">
-                        <SidebarGroupLabel>
-                            Earnings &amp; Settlements
-                        </SidebarGroupLabel>
-                        <SidebarMenu>
-                            {financialNavItems.map((item) => {
+                        <SidebarMenu className="space-y-0.5">
+                            {primaryNavItems.map((item) => {
                                 const Icon = item.icon;
 
                                 return (
@@ -418,6 +264,18 @@ export default function OwnerLayout({
                                                 aria-hidden="true"
                                             />
                                             Profile &amp; Settings
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                        <Link
+                                            href={onboardingStatus.url()}
+                                            className="cursor-pointer text-tijum-plum dark:text-foreground"
+                                        >
+                                            <FileCheck2
+                                                className="mr-2 size-4 text-tijum-plum-muted dark:text-muted-foreground"
+                                                aria-hidden="true"
+                                            />
+                                            Verification Record
                                         </Link>
                                     </DropdownMenuItem>
                                     <DropdownMenuItem asChild>

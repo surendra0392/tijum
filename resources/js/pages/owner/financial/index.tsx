@@ -1,20 +1,17 @@
 import { Head, useForm } from '@inertiajs/react';
 import {
     AlertCircle,
-    Building2,
     CheckCircle2,
     Clock,
-    CreditCard,
-    FileText,
-    HelpCircle,
-    Info,
     Lock,
     Save,
-    ShieldAlert,
     ShieldCheck,
 } from 'lucide-react';
-import { useState } from 'react';
 import InputError from '@/components/input-error';
+import {
+    OWNER_FINANCE_TABS,
+    OwnerSectionTabs,
+} from '@/components/owner/owner-section-tabs';
 import {
     StatusBadge,
     type SemanticStatus,
@@ -110,8 +107,13 @@ export default function FinancialProfileIndex({ profile }: Props) {
     };
 
     return (
-        <div className="space-y-8 p-6 lg:p-8">
+        <div className="space-y-6">
             <Head title="Bank & Financial Onboarding" />
+
+            <OwnerSectionTabs
+                items={OWNER_FINANCE_TABS}
+                ariaLabel="Earnings and payouts navigation"
+            />
 
             {/* Header */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

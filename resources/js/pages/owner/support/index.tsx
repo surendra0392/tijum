@@ -1,15 +1,14 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    CheckCircle2,
-    Clock,
-    FileQuestion,
     LifeBuoy,
     MessageSquare,
     Plus,
-    Search,
-    Shield,
 } from 'lucide-react';
 import { useState } from 'react';
+import {
+    OWNER_SUPPORT_TABS,
+    OwnerSectionTabs,
+} from '@/components/owner/owner-section-tabs';
 import { EmptyState } from '@/components/shared/empty-state';
 import { PageHeader } from '@/components/shared/page-header';
 import { Pagination } from '@/components/shared/pagination';
@@ -122,6 +121,11 @@ export default function OwnerSupportIndex({
     return (
         <div className="space-y-6">
             <Head title="Partner Support · TIJUM Partner Portal" />
+
+            <OwnerSectionTabs
+                items={OWNER_SUPPORT_TABS}
+                ariaLabel="Reviews and support navigation"
+            />
 
             <PageHeader
                 eyebrow="Partner Success Desk"

@@ -1,6 +1,10 @@
 import { Head, router } from '@inertiajs/react';
 import { CalendarClock, Search } from 'lucide-react';
 import { useState } from 'react';
+import {
+    OWNER_BOOKINGS_TABS,
+    OwnerSectionTabs,
+} from '@/components/owner/owner-section-tabs';
 import { ReservationSummaryCard } from '@/components/reservations/reservation-summary-card';
 import { EmptyState } from '@/components/shared/empty-state';
 import { PageHeader } from '@/components/shared/page-header';
@@ -64,6 +68,12 @@ export default function OwnerReservationIndex({
     return (
         <div className="space-y-6">
             <Head title="Reservations · Partner Portal" />
+
+            <OwnerSectionTabs
+                items={OWNER_BOOKINGS_TABS}
+                ariaLabel="Bookings and front desk navigation"
+            />
+
             <PageHeader
                 eyebrow="Partner Portal"
                 title="Reservations"

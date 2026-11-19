@@ -1,22 +1,19 @@
 import { Head, router } from '@inertiajs/react';
 import {
-    AlertCircle,
     CheckCircle2,
     Clock,
-    FileCheck,
     FileSignature,
-    FileText,
-    HelpCircle,
-    Percent,
-    ShieldCheck,
 } from 'lucide-react';
 import { useState } from 'react';
+import {
+    OWNER_FINANCE_TABS,
+    OwnerSectionTabs,
+} from '@/components/owner/owner-section-tabs';
 import { Pagination } from '@/components/shared/pagination';
 import {
     StatusBadge,
     type SemanticStatus,
 } from '@/components/shared/status-badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -97,8 +94,13 @@ export default function CommissionAgreementsIndex({
     };
 
     return (
-        <div className="space-y-8 p-6 lg:p-8">
+        <div className="space-y-6">
             <Head title="Commercial Agreements & Commission Terms" />
+
+            <OwnerSectionTabs
+                items={OWNER_FINANCE_TABS}
+                ariaLabel="Earnings and payouts navigation"
+            />
 
             {/* Header */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

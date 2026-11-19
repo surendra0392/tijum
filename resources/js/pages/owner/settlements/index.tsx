@@ -1,17 +1,17 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    CheckCircle2,
-    Clock,
     Download,
     Eye,
     FileSpreadsheet,
     FileText,
-    Filter,
-    HelpCircle,
     Info,
     Receipt,
     Wallet,
 } from 'lucide-react';
+import {
+    OWNER_FINANCE_TABS,
+    OwnerSectionTabs,
+} from '@/components/owner/owner-section-tabs';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -92,7 +92,12 @@ export default function OwnerSettlementsIndex({
         <>
             <Head title="Partner Settlements & Earnings" />
 
-            <div className="mx-auto max-w-7xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-7xl space-y-6">
+                <OwnerSectionTabs
+                    items={OWNER_FINANCE_TABS}
+                    ariaLabel="Earnings and payouts navigation"
+                />
+
                 {/* Header */}
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>

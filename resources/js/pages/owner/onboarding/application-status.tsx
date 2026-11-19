@@ -3,6 +3,7 @@ import { CheckCircle2, Clock, History, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { ApplicationSummary } from '@/components/owner/onboarding/application-summary';
 import { CorrectionRequestPanel } from '@/components/owner/onboarding/correction-request-panel';
+import { OnboardingProgress } from '@/components/owner/onboarding/onboarding-progress';
 import {
     applicationStatusBadgeMap,
     formatIsoDateTime,
@@ -130,6 +131,12 @@ export default function ApplicationStatusPage({
                             </Button>
                         </div>
                     }
+                />
+
+                <OnboardingProgress
+                    steps={evaluation.steps}
+                    currentStepKey="status"
+                    isEditable={application?.is_editable ?? false}
                 />
 
                 {application && (
