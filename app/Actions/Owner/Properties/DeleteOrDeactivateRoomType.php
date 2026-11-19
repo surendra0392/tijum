@@ -28,8 +28,9 @@ class DeleteOrDeactivateRoomType
         PropertyRoomType $roomType,
         bool $deactivateOnly = false,
         bool $deleteRooms = false,
+        bool $activateOnly = false,
     ): void {
-        DB::transaction(function () use ($owner, $property, $roomType, $deactivateOnly, $deleteRooms): void {
+        DB::transaction(function () use ($owner, $property, $roomType, $deactivateOnly, $deleteRooms, $activateOnly): void {
             $lockedProperty = Property::query()
                 ->whereKey($property->id)
                 ->lockForUpdate()
@@ -64,6 +65,31 @@ class DeleteOrDeactivateRoomType
                 ->whereKey($roomType->id)
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            if ($activateOnly) {
+                if ($hasActiveEditableAmendment && $lockedRoomType->is_approved_version) {
+                    $pending = $lockedRoomType->effectiveAttributes($activeApp);
+                    $pending['is_active'] = true;
+                    $lockedRoomType->forceFill([
+                        'pending_amendment_data' => $pending,
+                        'pending_changes_application_id' => $activeApp->id,
+                    ])->save();
+                } else {
+                    $lockedRoomType->forceFill(['is_active' => true])->save();
+                }
+
+                PropertyVerificationEvent::record(
+                    property: $lockedProperty,
+                    application: $activeApp,
+                    eventType: PropertyVerificationEventType::RoomTypeUpdated,
+                    actorType: 'owner',
+                    actorId: $owner->id,
+                    actorName: $owner->name,
+                    notes: sprintf('Activated room type "%s".', $lockedRoomType->name),
+                );
+
+                return;
+            }
 
             $today = CarbonImmutable::now($this->timing->timezone())->toDateString();
             $hasOccupancy = Reservation::query()->where('property_room_type_id', $lockedRoomType->id)

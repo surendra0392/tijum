@@ -1,6 +1,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
+    CheckCircle2,
     Edit3,
     Layers,
     Lock,
@@ -60,7 +61,7 @@ export default function RoomTypesIndex({
 
     const [pendingAction, setPendingAction] = useState<{
         roomType: PropertyRoomTypeData;
-        deactivate: boolean;
+        mode: 'activate' | 'deactivate' | 'delete';
         deleteRooms?: boolean;
     } | null>(null);
     const [processing, setProcessing] = useState(false);
@@ -71,11 +72,14 @@ export default function RoomTypesIndex({
         }
 
         setProcessing(true);
-        const query = pendingAction.deactivate
-            ? { deactivate: 1 }
-            : pendingAction.deleteRooms
-              ? { delete_rooms: 1 }
-              : undefined;
+        const query =
+            pendingAction.mode === 'activate'
+                ? { activate: 1 }
+                : pendingAction.mode === 'deactivate'
+                  ? { deactivate: 1 }
+                  : pendingAction.deleteRooms
+                    ? { delete_rooms: 1 }
+                    : undefined;
         const url = destroyRoomTypeRoute.url(
             [property.id, pendingAction.roomType.id],
             query ? { query } : undefined,
@@ -280,7 +284,7 @@ export default function RoomTypesIndex({
                                                 </Link>
                                             </Button>
 
-                                            {rt.is_active && (
+                                            {rt.is_active ? (
                                                 <Button
                                                     type="button"
                                                     size="sm"
@@ -288,11 +292,26 @@ export default function RoomTypesIndex({
                                                     onClick={() =>
                                                         setPendingAction({
                                                             roomType: rt,
-                                                            deactivate: true,
+                                                            mode: 'deactivate',
                                                         })
                                                     }
                                                 >
                                                     Deactivate
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="plum"
+                                                    onClick={() =>
+                                                        setPendingAction({
+                                                            roomType: rt,
+                                                            mode: 'activate',
+                                                        })
+                                                    }
+                                                >
+                                                    <CheckCircle2 aria-hidden="true" />
+                                                    <span>Activate</span>
                                                 </Button>
                                             )}
 
@@ -303,7 +322,7 @@ export default function RoomTypesIndex({
                                                 onClick={() =>
                                                     setPendingAction({
                                                         roomType: rt,
-                                                        deactivate: false,
+                                                        mode: 'delete',
                                                         deleteRooms:
                                                             rt.rooms_count > 0,
                                                     })
@@ -323,23 +342,33 @@ export default function RoomTypesIndex({
                 <ConfirmationDialog
                     open={pendingAction !== null}
                     onOpenChange={(open) => !open && setPendingAction(null)}
-                    tone={pendingAction?.deactivate ? 'default' : 'destructive'}
+                    tone={
+                        pendingAction?.mode === 'delete'
+                            ? 'destructive'
+                            : 'default'
+                    }
                     title={
-                        pendingAction?.deactivate
-                            ? `Deactivate "${pendingAction?.roomType.name}"?`
-                            : `Delete "${pendingAction?.roomType.name}"?`
+                        pendingAction?.mode === 'activate'
+                            ? `Activate "${pendingAction?.roomType.name}"?`
+                            : pendingAction?.mode === 'deactivate'
+                              ? `Deactivate "${pendingAction?.roomType.name}"?`
+                              : `Delete "${pendingAction?.roomType.name}"?`
                     }
                     description={
-                        pendingAction?.deactivate
-                            ? 'Deactivating keeps existing historical physical rooms intact while blocking adding new physical rooms to this type.'
-                            : pendingAction?.deleteRooms
-                              ? `This will permanently delete "${pendingAction.roomType.name}" and its ${pendingAction.roomType.rooms_count} unbooked physical room(s). Blocked automatically if any booking history exists.`
-                              : 'This room type configuration will be permanently removed.'
+                        pendingAction?.mode === 'activate'
+                            ? 'Activating restores this room type so you can assign physical rooms, configure pricing, and accept bookings.'
+                            : pendingAction?.mode === 'deactivate'
+                              ? 'Deactivating keeps existing historical physical rooms intact while blocking adding new physical rooms to this type.'
+                              : pendingAction?.deleteRooms
+                                ? `This will permanently delete "${pendingAction.roomType.name}" and its ${pendingAction.roomType.rooms_count} unbooked physical room(s). Blocked automatically if any booking history exists.`
+                                : 'This room type configuration will be permanently removed.'
                     }
                     confirmLabel={
-                        pendingAction?.deactivate
-                            ? 'Deactivate Room Type'
-                            : 'Delete Room Type'
+                        pendingAction?.mode === 'activate'
+                            ? 'Activate Room Type'
+                            : pendingAction?.mode === 'deactivate'
+                              ? 'Deactivate Room Type'
+                              : 'Delete Room Type'
                     }
                     loading={processing}
                     onConfirm={handleConfirmAction}
