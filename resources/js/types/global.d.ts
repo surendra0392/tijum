@@ -11,6 +11,7 @@ declare module '@inertiajs/core' {
         sharedPageProps: {
             name: string;
             auth: Auth;
+            wishlistIds?: number[];
             sidebarOpen: boolean;
             pwa?: {
                 webPushEnabled: boolean;

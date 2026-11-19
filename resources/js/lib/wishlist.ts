@@ -64,15 +64,31 @@ export function removeWishlistLocal(propertyId: number): void {
     dispatchWishlistUpdate(propertyId, false);
 }
 
-export function syncWishlistIds(ids: number[]): void {
+export function clearWishlistLocal(): void {
     if (typeof window === 'undefined') return;
-    const unique = Array.from(new Set(ids.filter((id) => typeof id === 'number')));
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(unique));
+        localStorage.removeItem(STORAGE_KEY);
     } catch {
         // LocalStorage fallback
     }
-    dispatchWishlistUpdate(unique[0] ?? 0, true);
+    dispatchWishlistUpdate(0, false);
+}
+
+export function syncWishlistIds(ids: number[]): void {
+    if (typeof window === 'undefined') return;
+    const unique = Array.from(
+        new Set(ids.filter((id) => typeof id === 'number')),
+    );
+    try {
+        if (unique.length === 0) {
+            localStorage.removeItem(STORAGE_KEY);
+        } else {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(unique));
+        }
+    } catch {
+        // LocalStorage fallback
+    }
+    dispatchWishlistUpdate(0, unique.length > 0);
 }
 
 export function toggleWishlist(

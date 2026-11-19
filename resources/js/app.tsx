@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';
 import { clearPwaUserCaches, initPwaClient } from '@/lib/pwa';
+import { clearWishlistLocal, syncWishlistIds } from '@/lib/wishlist';
 import AdminLayout from '@/layouts/admin-layout';
 import AdminAuthLayout from '@/layouts/admin/admin-auth-layout';
 import CustomerLayout from '@/layouts/customer-layout';
@@ -81,6 +82,15 @@ router.on('success', (event) => {
 
     if (hadAuthenticatedActor && !hasActor) {
         clearPwaUserCaches();
+    }
+
+    const wishlistIds = event.detail.page.props.wishlistIds as
+        | number[]
+        | undefined;
+    if (!auth?.user) {
+        clearWishlistLocal();
+    } else if (Array.isArray(wishlistIds)) {
+        syncWishlistIds(wishlistIds);
     }
 
     hadAuthenticatedActor = hasActor;

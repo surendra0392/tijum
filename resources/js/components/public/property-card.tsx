@@ -1,7 +1,8 @@
-import { Link, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { ArrowUpRight, Heart, Layers, MapPin, Star } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { TIJUM_BRAND_ASSETS } from '@/components/brand/brand-logo';
 import { AmenityList } from '@/components/public/amenity-list';
 import {
@@ -17,6 +18,7 @@ import {
     subscribeToWishlist,
     toggleWishlist,
 } from '@/lib/wishlist';
+import { login } from '@/routes';
 import type { PublicAmenityItem } from '@/types/public-search';
 
 export type PublicPropertyCardData = {
@@ -162,6 +164,11 @@ export function PropertyCard({
 }: PropertyCardProps) {
     const page = usePage();
     const isAuthenticated = Boolean(page.props.auth?.user);
+    const serverWishlisted =
+        isAuthenticated &&
+        typeof property.id === 'number' &&
+        Array.isArray(page.props.wishlistIds) &&
+        page.props.wishlistIds.includes(property.id);
     const resolvedHref =
         typeof href === 'object' && href !== null && 'url' in href
             ? (href as { url: string }).url
@@ -178,19 +185,32 @@ export function PropertyCard({
         uniqueRoomTypes.length - visibleRoomTypes.length,
     );
 
-    const [wishlisted, setWishlisted] = useState(initialWishlisted);
+    const [wishlisted, setWishlisted] = useState(
+        () => isAuthenticated && (initialWishlisted || serverWishlisted),
+    );
     const [justWishlisted, setJustWishlisted] = useState(false);
     const [comparing, setComparing] = useState(false);
 
     useEffect(() => {
-        if (property.id) {
-            setWishlisted(initialWishlisted || isWishlisted(property.id));
+        if (!isAuthenticated) {
+            setWishlisted(false);
+        } else if (typeof property.id === 'number') {
+            setWishlisted(initialWishlisted || serverWishlisted);
         }
         setComparing(isComparing(property.slug));
 
         const unsubWishlist = subscribeToWishlist((e) => {
-            if (property.id && e.detail.propertyId === property.id) {
+            if (!isAuthenticated) {
+                setWishlisted(false);
+                return;
+            }
+            if (typeof property.id !== 'number') {
+                return;
+            }
+            if (e.detail.propertyId === property.id) {
                 setWishlisted(e.detail.wishlisted);
+            } else if (e.detail.propertyId === 0) {
+                setWishlisted(isWishlisted(property.id));
             }
         });
         const unsubCompare = subscribeToCompare((e) => {
@@ -203,7 +223,13 @@ export function PropertyCard({
             unsubWishlist();
             unsubCompare();
         };
-    }, [property.id, property.slug, initialWishlisted]);
+    }, [
+        isAuthenticated,
+        property.id,
+        property.slug,
+        initialWishlisted,
+        serverWishlisted,
+    ]);
 
     return (
         <article
@@ -271,6 +297,13 @@ export function PropertyCard({
                     onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        if (!isAuthenticated) {
+                            toast.info(
+                                'Please log in to save stays to your wishlist.',
+                            );
+                            router.visit(login().url);
+                            return;
+                        }
                         if (onWishlistRemove) {
                             setWishlisted(false);
                             onWishlistRemove();
@@ -280,7 +313,7 @@ export function PropertyCard({
                             const next = toggleWishlist(
                                 property.id,
                                 property.slug,
-                                { syncServer: isAuthenticated },
+                                { syncServer: true },
                             );
                             setWishlisted(next);
                             if (next) {

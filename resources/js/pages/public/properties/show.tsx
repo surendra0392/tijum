@@ -10,6 +10,7 @@ import {
     Utensils,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { AmenityList } from '@/components/public/amenity-list';
 import { FoodInclusionStatus } from '@/components/public/food-inclusion-status';
@@ -37,7 +38,7 @@ import {
     subscribeToWishlist,
     toggleWishlist,
 } from '@/lib/wishlist';
-import { reviewPolicy } from '@/routes';
+import { login, reviewPolicy } from '@/routes';
 import { search as publicSearch } from '@/routes/public';
 import { show as cityShow } from '@/routes/public/cities';
 import { show as propertyShow } from '@/routes/public/properties';
@@ -47,11 +48,17 @@ export default function PropertyDetailPage({
     property,
     seo,
 }: PropertyDetailPageProps) {
-    const page = usePage<{ auth?: { user?: { id: number } | null } }>();
+    const page = usePage<{
+        auth?: { user?: { id: number } | null };
+        wishlistIds?: number[];
+    }>();
     const isAuthenticated = Boolean(page.props.auth?.user);
-    const [wishlisted, setWishlisted] = useState(() =>
-        typeof property.id === 'number' ? isWishlisted(property.id) : false,
-    );
+    const serverWishlisted =
+        isAuthenticated &&
+        typeof property.id === 'number' &&
+        Array.isArray(page.props.wishlistIds) &&
+        page.props.wishlistIds.includes(property.id);
+    const [wishlisted, setWishlisted] = useState(() => serverWishlisted);
     const [copied, setCopied] = useState(false);
     const [checkIn, setCheckIn] = useState(
         property.search_context.check_in || '',
@@ -72,12 +79,13 @@ export default function PropertyDetailPage({
     const publishedReviews = property.published_reviews ?? [];
 
     useEffect(() => {
-        if (typeof property.id !== 'number') {
+        if (!isAuthenticated || typeof property.id !== 'number') {
+            setWishlisted(false);
             return;
         }
 
         const propertyId = property.id;
-        setWishlisted(isWishlisted(propertyId));
+        setWishlisted(serverWishlisted);
 
         return subscribeToWishlist((event) => {
             if (
@@ -87,7 +95,7 @@ export default function PropertyDetailPage({
                 setWishlisted(isWishlisted(propertyId));
             }
         });
-    }, [property.id]);
+    }, [isAuthenticated, property.id, serverWishlisted]);
 
     const todayIso = useMemo(
         () => new Date().toISOString().slice(0, 10),
@@ -152,8 +160,14 @@ export default function PropertyDetailPage({
             return;
         }
 
+        if (!isAuthenticated) {
+            toast.info('Please log in to save stays to your wishlist.');
+            router.visit(login().url);
+            return;
+        }
+
         const next = toggleWishlist(property.id, property.slug, {
-            syncServer: isAuthenticated,
+            syncServer: true,
         });
         setWishlisted(next);
     };

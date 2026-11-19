@@ -18,7 +18,12 @@ import { PWAInstallButton } from '@/components/pwa/PWAInstallPrompt';
 import { BackToTop } from '@/components/public/back-to-top';
 import { MobileAppFloating } from '@/components/public/mobile-app-floating';
 import { ResponsiveContainer } from '@/components/shared/responsive-container';
-import { getWishlistIds, subscribeToWishlist } from '@/lib/wishlist';
+import {
+    clearWishlistLocal,
+    getWishlistIds,
+    subscribeToWishlist,
+    syncWishlistIds,
+} from '@/lib/wishlist';
 import { Button } from '@/components/ui/button';
 import {
     Sheet,
@@ -55,17 +60,28 @@ const destinations = [
 export default function PublicLayout({ children }: PropsWithChildren) {
     const page = usePage();
     const customer = page.props.auth?.user;
+    const serverWishlistIds = page.props.wishlistIds;
     const currentPath = page.url.split('?')[0].split('#')[0] || '/';
     const [mobileOpen, setMobileOpen] = useState(false);
-    const [wishlistCount, setWishlistCount] = useState(0);
+    const [wishlistCount, setWishlistCount] = useState(() =>
+        customer && Array.isArray(serverWishlistIds)
+            ? serverWishlistIds.length
+            : 0,
+    );
 
     useEffect(() => {
         if (!customer) {
+            clearWishlistLocal();
             setWishlistCount(0);
             return;
         }
 
-        setWishlistCount(getWishlistIds().length);
+        if (Array.isArray(serverWishlistIds)) {
+            syncWishlistIds(serverWishlistIds);
+            setWishlistCount(serverWishlistIds.length);
+        } else {
+            setWishlistCount(getWishlistIds().length);
+        }
 
         const unsubWishlist = subscribeToWishlist(() => {
             setWishlistCount(getWishlistIds().length);
@@ -81,7 +97,7 @@ export default function PublicLayout({ children }: PropsWithChildren) {
             unsubWishlist();
             window.removeEventListener('storage', handleStorage);
         };
-    }, [customer]);
+    }, [customer, serverWishlistIds]);
 
     const isActive = (targetPath: string) => {
         if (targetPath === '/') {

@@ -43,6 +43,7 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'appearance' => $request->cookie('appearance') ?? 'light',
             'auth' => $this->resolvePortalAuth($request),
+            'wishlistIds' => $this->resolveCustomerWishlistIds($request),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'googleMapsApiKey' => config('services.google.maps_api_key'),
             'pwa' => [
@@ -81,5 +82,35 @@ class HandleInertiaRequests extends Middleware
         return [
             'user' => $user instanceof User ? $user->toSharedAuthArray() : null,
         ];
+    }
+
+    /**
+     * Share the authenticated customer's saved property IDs so wishlist state
+     * never leaks across guests or different customer accounts.
+     *
+     * @return list<int>
+     */
+    private function resolveCustomerWishlistIds(Request $request): array
+    {
+        if (
+            $request->is('owner', 'owner/*')
+            || $request->routeIs('owner.*')
+            || $request->is('admin', 'admin/*')
+            || $request->routeIs('admin.*')
+        ) {
+            return [];
+        }
+
+        $user = $request->user('web');
+        if (! $user instanceof User) {
+            return [];
+        }
+
+        return array_values(
+            $user->wishlists()
+                ->pluck('property_id')
+                ->map(static fn (mixed $id): int => (int) $id)
+                ->all(),
+        );
     }
 }
