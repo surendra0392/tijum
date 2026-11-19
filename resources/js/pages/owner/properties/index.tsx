@@ -1,12 +1,16 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
+    AlertTriangle,
     Building2,
     Camera,
     DoorClosed,
     FileCheck2,
     Layers,
     MapPin,
+    PauseCircle,
+    PlayCircle,
     PlusCircle,
+    PowerOff,
     Search,
     ShieldCheck,
     Utensils,
@@ -17,6 +21,7 @@ import {
     propertyOperationalStatusMap,
     propertyVerificationStatusMap,
 } from '@/components/owner/properties/property-status-helpers';
+import { ConfirmationDialog } from '@/components/shared/confirmation-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { StatCard } from '@/components/shared/info-card';
 import { PageHeader } from '@/components/shared/page-header';
@@ -48,12 +53,14 @@ import {
     show as showPropertyRoute,
 } from '@/routes/owner/properties';
 import { index as mediaIndexRoute } from '@/routes/owner/properties/media';
+import { update as operationalStatusRoute } from '@/routes/owner/properties/operational-status';
 import { index as roomTypesIndexRoute } from '@/routes/owner/properties/room-types';
 import { index as roomsIndexRoute } from '@/routes/owner/properties/rooms';
 import { show as verificationShowRoute } from '@/routes/owner/properties/verification';
 import type {
     CityOption,
     PropertyCategoryOption,
+    PropertyOperationalStatus,
     PropertySummaryData,
 } from '@/types';
 
@@ -70,6 +77,7 @@ type OwnerPropertiesIndexProps = {
         verified: number;
         active: number;
         drafts: number;
+        closed?: number;
     };
     filters: {
         search: string;
@@ -96,6 +104,9 @@ export default function OwnerPropertiesIndex({
     verificationStatuses,
     canCreateProperty,
 }: OwnerPropertiesIndexProps) {
+    const { errors } = usePage<{ errors?: Record<string, string> }>().props;
+    const statusError = errors?.status;
+
     const [search, setSearch] = useState(filters.search);
     const [status, setStatus] = useState(filters.status);
     const [verificationStatus, setVerificationStatus] = useState(
@@ -103,6 +114,33 @@ export default function OwnerPropertiesIndex({
     );
     const [city, setCity] = useState(filters.city);
     const [category, setCategory] = useState(filters.category);
+    const [pendingStatusChange, setPendingStatusChange] = useState<{
+        property: PropertySummaryData;
+        target: PropertyOperationalStatus;
+    } | null>(null);
+    const [statusBusy, setStatusBusy] = useState(false);
+
+    const handleOperationalStatusConfirm = () => {
+        if (!pendingStatusChange) {
+            return;
+        }
+
+        setStatusBusy(true);
+        router.patch(
+            operationalStatusRoute.url(pendingStatusChange.property.id),
+            {
+                status: pendingStatusChange.target,
+                redirect_to_index: true,
+            },
+            {
+                preserveScroll: true,
+                onFinish: () => {
+                    setStatusBusy(false);
+                    setPendingStatusChange(null);
+                },
+            },
+        );
+    };
 
     const handleFilter = (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -149,6 +187,14 @@ export default function OwnerPropertiesIndex({
                     }
                 />
 
+                {statusError && (
+                    <Alert variant="destructive">
+                        <AlertTriangle aria-hidden="true" />
+                        <AlertTitle>Unable to Update Property Status</AlertTitle>
+                        <AlertDescription>{statusError}</AlertDescription>
+                    </Alert>
+                )}
+
                 {!canCreateProperty && (
                     <Alert variant="warning">
                         <AlertTitle>Partner Approval Required</AlertTitle>
@@ -175,7 +221,11 @@ export default function OwnerPropertiesIndex({
                     <StatCard
                         label="Operationally Active"
                         value={String(stats.active)}
-                        helperText="Live for customer bookings & stays"
+                        helperText={
+                            stats.closed
+                                ? `Live for bookings · ${stats.closed} closed`
+                                : 'Live for customer bookings & stays'
+                        }
                         icon={Layers}
                     />
                     <StatCard
@@ -600,6 +650,81 @@ export default function OwnerPropertiesIndex({
                                                         Verification
                                                     </Link>
                                                 </Button>
+                                                {property.can_toggle_operational_status &&
+                                                    property.status ===
+                                                        'active' && (
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() =>
+                                                                setPendingStatusChange(
+                                                                    {
+                                                                        property,
+                                                                        target: 'temporarily_closed',
+                                                                    },
+                                                                )
+                                                            }
+                                                        >
+                                                            <PauseCircle
+                                                                className="size-3.5"
+                                                                aria-hidden="true"
+                                                            />
+                                                            <span>Pause</span>
+                                                        </Button>
+                                                    )}
+                                                {property.can_toggle_operational_status &&
+                                                    (property.status ===
+                                                        'temporarily_closed' ||
+                                                        property.status ===
+                                                            'archived') && (
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="plum"
+                                                            onClick={() =>
+                                                                setPendingStatusChange(
+                                                                    {
+                                                                        property,
+                                                                        target: 'active',
+                                                                    },
+                                                                )
+                                                            }
+                                                        >
+                                                            <PlayCircle
+                                                                className="size-3.5"
+                                                                aria-hidden="true"
+                                                            />
+                                                            <span>
+                                                                Reopen Active
+                                                            </span>
+                                                        </Button>
+                                                    )}
+                                                {property.can_close_completely && (
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() =>
+                                                            setPendingStatusChange(
+                                                                {
+                                                                    property,
+                                                                    target: 'archived',
+                                                                },
+                                                            )
+                                                        }
+                                                        className="border-rose-300 text-rose-700 hover:bg-rose-600 hover:text-white dark:border-rose-500/50 dark:text-rose-300 dark:hover:bg-rose-600 dark:hover:text-white"
+                                                        data-test={`close-property-${property.id}`}
+                                                    >
+                                                        <PowerOff
+                                                            className="size-3.5"
+                                                            aria-hidden="true"
+                                                        />
+                                                        <span>
+                                                            Close Property
+                                                        </span>
+                                                    </Button>
+                                                )}
                                             </div>
                                         </CardContent>
                                     </Card>
@@ -646,6 +771,44 @@ export default function OwnerPropertiesIndex({
                         </div>
                     </>
                 )}
+
+                <ConfirmationDialog
+                    open={pendingStatusChange !== null}
+                    onOpenChange={(open) =>
+                        !open && setPendingStatusChange(null)
+                    }
+                    tone={
+                        pendingStatusChange?.target === 'archived'
+                            ? 'destructive'
+                            : 'default'
+                    }
+                    title={
+                        pendingStatusChange?.target === 'archived'
+                            ? `Close "${pendingStatusChange.property.name}" Completely?`
+                            : pendingStatusChange?.target ===
+                                'temporarily_closed'
+                              ? `Temporarily Pause "${pendingStatusChange.property.name}"?`
+                              : `Reopen "${pendingStatusChange?.property.name ?? ''}" as Active?`
+                    }
+                    description={
+                        pendingStatusChange?.target === 'archived'
+                            ? 'Closing this property completely removes it from public listings, unpublishes public photos, and blocks new reservations. Historical bookings and payouts remain intact. Blocked automatically if current or upcoming reservations exist.'
+                            : pendingStatusChange?.target ===
+                                'temporarily_closed'
+                              ? 'Pausing operational availability preserves your verification approval and can be reopened anytime.'
+                              : 'Restoring Active status re-enables public visibility and booking readiness for this verified property.'
+                    }
+                    confirmLabel={
+                        pendingStatusChange?.target === 'archived'
+                            ? 'Close Property Completely'
+                            : pendingStatusChange?.target ===
+                                'temporarily_closed'
+                              ? 'Temporarily Close'
+                              : 'Mark Active'
+                    }
+                    loading={statusBusy}
+                    onConfirm={handleOperationalStatusConfirm}
+                />
             </div>
         </>
     );

@@ -32,6 +32,7 @@ class UpdatePropertyOperationalStatusRequest extends FormRequest
                     PropertyOperationalStatus::Archived->value,
                 ]),
             ],
+            'redirect_to_index' => ['sometimes', 'boolean'],
         ];
     }
 }

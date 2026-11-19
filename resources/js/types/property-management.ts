@@ -300,6 +300,7 @@ export type PropertySummaryData = {
     nominal_active_capacity: number;
     cover_media: PropertyMediaData | null;
     can_toggle_operational_status: boolean;
+    can_close_completely?: boolean;
     can_start_amendment: boolean;
     approved_at: string | null;
     updated_at: string | null;

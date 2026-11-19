@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Actions\Owner\Properties;
 
+use App\Enums\PropertyMediaModerationStatus;
 use App\Enums\PropertyOperationalStatus;
 use App\Enums\PropertyVerificationEventType;
 use App\Models\Owner;
 use App\Models\Property;
+use App\Models\PropertyMedia;
+use App\Models\PropertyVerificationApplication;
 use App\Models\PropertyVerificationEvent;
 use App\Models\Reservation;
 use App\Services\PropertyMediaProcessor;
@@ -50,9 +53,21 @@ class TogglePropertyOperationalStatus
                 ]);
             }
 
-            if (! $lockedProperty->hasApprovedBaseline()) {
+            $activeApp = $lockedProperty->activeVerificationApplication()->first();
+
+            if ($targetStatus !== PropertyOperationalStatus::Archived && ! $lockedProperty->hasApprovedBaseline()) {
                 throw ValidationException::withMessages([
                     'status' => 'Only verified properties can be marked Active or Temporarily Closed.',
+                ]);
+            }
+
+            if (
+                $targetStatus === PropertyOperationalStatus::Archived
+                && $activeApp instanceof PropertyVerificationApplication
+                && ! $activeApp->status->isEditableByOwner()
+            ) {
+                throw ValidationException::withMessages([
+                    'status' => 'Withdraw the active verification review application before closing this property completely.',
                 ]);
             }
 
@@ -78,10 +93,10 @@ class TogglePropertyOperationalStatus
             }
 
             $previous = $lockedProperty->status;
-            $hasActiveAmendment = $lockedProperty->activeVerificationApplication()->exists();
+            $hasActiveAmendment = $activeApp instanceof PropertyVerificationApplication;
 
             $bookingEligible = match ($targetStatus) {
-                PropertyOperationalStatus::Active => ! $hasActiveAmendment,
+                PropertyOperationalStatus::Active => ! $hasActiveAmendment && $lockedProperty->hasApprovedBaseline(),
                 PropertyOperationalStatus::TemporarilyClosed,
                 PropertyOperationalStatus::Archived => false,
             };
@@ -99,9 +114,10 @@ class TogglePropertyOperationalStatus
                 actorId: $owner->id,
                 actorName: $owner->name,
                 notes: sprintf(
-                    'Operational status updated from %s to %s (verification approval preserved).',
+                    'Operational status updated from %s to %s%s.',
                     $previous->label(),
                     $targetStatus->label(),
+                    $lockedProperty->hasApprovedBaseline() ? ' (verification approval preserved)' : '',
                 ),
                 metadata: [
                     'previous_operational_status' => $previous->value,
@@ -114,6 +130,22 @@ class TogglePropertyOperationalStatus
                 DB::afterCommit(function () use ($mediaIds): void {
                     foreach ($mediaIds as $mediaId) {
                         $this->mediaProcessor->scheduleUnpublication((int) $mediaId);
+                    }
+                });
+            } elseif (
+                $targetStatus === PropertyOperationalStatus::Active
+                && $previous === PropertyOperationalStatus::Archived
+                && $lockedProperty->hasApprovedBaseline()
+            ) {
+                $mediaIds = PropertyMedia::query()
+                    ->where('property_id', $lockedProperty->id)
+                    ->where('is_archived', false)
+                    ->where('moderation_status', PropertyMediaModerationStatus::Approved->value)
+                    ->pluck('id')
+                    ->all();
+                DB::afterCommit(function () use ($mediaIds): void {
+                    foreach ($mediaIds as $mediaId) {
+                        $this->mediaProcessor->schedulePublication((int) $mediaId);
                     }
                 });
             }

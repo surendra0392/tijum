@@ -108,6 +108,10 @@ class PropertyController extends Controller
                 'verified' => $allOwnerProperties->where('is_verified', true)->count(),
                 'active' => $allOwnerProperties->where('status', PropertyOperationalStatus::Active)->count(),
                 'drafts' => $allOwnerProperties->where('status', PropertyOperationalStatus::Draft)->count(),
+                'closed' => $allOwnerProperties->whereIn('status', [
+                    PropertyOperationalStatus::TemporarilyClosed,
+                    PropertyOperationalStatus::Archived,
+                ])->count(),
             ],
             'filters' => [
                 'search' => $search,
@@ -303,6 +307,11 @@ class PropertyController extends Controller
             'type' => 'success',
             'message' => sprintf('Property operational status set to %s.', $target->label()),
         ]);
+
+        if ($request->boolean('redirect_to_index')) {
+            return to_route('owner.properties.index')
+                ->with('status', 'operational-status-updated');
+        }
 
         return to_route('owner.properties.show', $property)
             ->with('status', 'operational-status-updated');

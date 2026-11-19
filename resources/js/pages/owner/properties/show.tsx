@@ -1,5 +1,7 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
+    AlertTriangle,
+    Archive,
     Building2,
     Camera,
     CheckCircle2,
@@ -11,6 +13,7 @@ import {
     MapPin,
     PauseCircle,
     PlayCircle,
+    PowerOff,
     RefreshCw,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -101,6 +104,9 @@ export default function OwnerPropertyShow({
     events,
     timingRules,
 }: OwnerPropertyShowProps) {
+    const { errors } = usePage<{ errors?: Record<string, string> }>().props;
+    const statusError = errors?.status;
+
     const [pendingOpStatus, setPendingOpStatus] =
         useState<PropertyOperationalStatus | null>(null);
     const [confirmAmendmentStart, setConfirmAmendmentStart] = useState(false);
@@ -207,7 +213,8 @@ export default function OwnerPropertyShow({
                                             <span>Temporarily Close</span>
                                         </Button>
                                     ) : property.status ===
-                                      'temporarily_closed' ? (
+                                          'temporarily_closed' ||
+                                      property.status === 'archived' ? (
                                         <Button
                                             type="button"
                                             variant="plum"
@@ -221,6 +228,21 @@ export default function OwnerPropertyShow({
                                         </Button>
                                     ) : null}
                                 </>
+                            )}
+
+                            {property.can_close_completely && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() =>
+                                        setPendingOpStatus('archived')
+                                    }
+                                    className="border-rose-300 text-rose-700 hover:bg-rose-600 hover:text-white dark:border-rose-500/50 dark:text-rose-300 dark:hover:bg-rose-600 dark:hover:text-white"
+                                    data-test="close-property-completely-button"
+                                >
+                                    <PowerOff aria-hidden="true" />
+                                    <span>Close Property Completely</span>
+                                </Button>
                             )}
 
                             {property.can_start_amendment && (
@@ -265,6 +287,43 @@ export default function OwnerPropertyShow({
                     roomTypesCount={property.room_types_count}
                     roomsCount={property.rooms_count}
                 />
+
+                {statusError && (
+                    <Alert variant="destructive">
+                        <AlertTriangle aria-hidden="true" />
+                        <AlertTitle>Unable to Update Property Status</AlertTitle>
+                        <AlertDescription>{statusError}</AlertDescription>
+                    </Alert>
+                )}
+
+                {property.status === 'archived' && (
+                    <Alert variant="destructive">
+                        <Archive aria-hidden="true" />
+                        <AlertTitle>
+                            Property Closed Completely (Archived)
+                        </AlertTitle>
+                        <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <span>
+                                This property has been withdrawn from public
+                                TIJUM search and new customer bookings. Existing
+                                booking history and settlement records remain
+                                preserved.
+                            </span>
+                            {property.has_approved_baseline && (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="plum"
+                                    onClick={() => setPendingOpStatus('active')}
+                                    className="shrink-0"
+                                >
+                                    <PlayCircle aria-hidden="true" />
+                                    <span>Reopen Property as Active</span>
+                                </Button>
+                            )}
+                        </AlertDescription>
+                    </Alert>
+                )}
 
                 {property.status === 'suspended' && (
                     <Alert variant="destructive">
@@ -586,23 +645,136 @@ export default function OwnerPropertyShow({
                     </CardContent>
                 </Card>
 
+                {(property.can_toggle_operational_status ||
+                    property.can_close_completely) && (
+                    <Card className="min-w-0 border-tijum-surface/85 dark:border-border">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 font-heading text-base font-semibold text-tijum-plum dark:text-foreground">
+                                <PowerOff
+                                    className="size-4 text-tijum-coral"
+                                    aria-hidden="true"
+                                />
+                                <span>
+                                    Property Availability &amp; Closure Controls
+                                </span>
+                            </CardTitle>
+                            <CardDescription>
+                                Choose whether to temporarily pause bookings or
+                                withdraw this property completely from TIJUM.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="grid gap-4 md:grid-cols-2">
+                            {property.can_toggle_operational_status && (
+                                <div className="flex flex-col justify-between gap-3 rounded-xl border border-tijum-surface bg-tijum-cream/35 p-4 dark:border-border dark:bg-muted/30">
+                                    <div className="space-y-1">
+                                        <p className="font-heading text-sm font-semibold text-tijum-plum dark:text-foreground">
+                                            {property.status === 'active'
+                                                ? 'Pause Temporarily (Temporarily Closed)'
+                                                : 'Restore Active Listings'}
+                                        </p>
+                                        <p className="text-xs leading-relaxed text-tijum-plum-muted dark:text-muted-foreground">
+                                            {property.status === 'active'
+                                                ? 'Pause new customer bookings for short breaks or maintenance without losing your verification approval. You can reopen anytime.'
+                                                : 'Make this verified property bookable again on TIJUM public search and reopen public media.'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        {property.status === 'active' ? (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    setPendingOpStatus(
+                                                        'temporarily_closed',
+                                                    )
+                                                }
+                                            >
+                                                <PauseCircle aria-hidden="true" />
+                                                <span>Temporarily Close</span>
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                type="button"
+                                                variant="plum"
+                                                size="sm"
+                                                onClick={() =>
+                                                    setPendingOpStatus('active')
+                                                }
+                                            >
+                                                <PlayCircle aria-hidden="true" />
+                                                <span>
+                                                    Reopen Property as Active
+                                                </span>
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {property.can_close_completely && (
+                                <div className="flex flex-col justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50/35 p-4 dark:border-rose-500/30 dark:bg-rose-950/15">
+                                    <div className="space-y-1">
+                                        <p className="font-heading text-sm font-semibold text-rose-900 dark:text-rose-200">
+                                            Close Property Completely (Archived)
+                                        </p>
+                                        <p className="text-xs leading-relaxed text-rose-800/85 dark:text-rose-200/80">
+                                            Permanently withdraw this property
+                                            from public listings, search, and
+                                            new bookings. Requires no pending or
+                                            confirmed future reservations.
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                                setPendingOpStatus('archived')
+                                            }
+                                            className="border-rose-300 text-rose-700 hover:bg-rose-600 hover:text-white dark:border-rose-500/50 dark:text-rose-300 dark:hover:bg-rose-600 dark:hover:text-white"
+                                        >
+                                            <Archive aria-hidden="true" />
+                                            <span>
+                                                Close Property Completely
+                                            </span>
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+
                 <ConfirmationDialog
                     open={pendingOpStatus !== null}
                     onOpenChange={(open) => !open && setPendingOpStatus(null)}
+                    tone={
+                        pendingOpStatus === 'archived'
+                            ? 'destructive'
+                            : 'default'
+                    }
                     title={
-                        pendingOpStatus === 'temporarily_closed'
-                            ? 'Temporarily Close Property?'
-                            : 'Reopen Property as Active?'
+                        pendingOpStatus === 'archived'
+                            ? 'Close Property Completely?'
+                            : pendingOpStatus === 'temporarily_closed'
+                              ? 'Temporarily Close Property?'
+                              : 'Reopen Property as Active?'
                     }
                     description={
-                        pendingOpStatus === 'temporarily_closed'
-                            ? 'Pausing operational availability preserves your verification approval and does not cancel property verification.'
-                            : 'Restoring Active status re-enables property readiness for booking configuration.'
+                        pendingOpStatus === 'archived'
+                            ? 'Closing this property completely removes it from public listings, unpublishes public photos, and blocks new reservations. Historical bookings and payouts remain intact. Blocked automatically if current or upcoming reservations exist.'
+                            : pendingOpStatus === 'temporarily_closed'
+                              ? 'Pausing operational availability preserves your verification approval and can be reopened anytime.'
+                              : 'Restoring Active status re-enables public visibility and booking readiness for this verified property.'
                     }
                     confirmLabel={
-                        pendingOpStatus === 'temporarily_closed'
-                            ? 'Temporarily Close'
-                            : 'Mark Active'
+                        pendingOpStatus === 'archived'
+                            ? 'Close Property Completely'
+                            : pendingOpStatus === 'temporarily_closed'
+                              ? 'Temporarily Close'
+                              : 'Mark Active'
                     }
                     loading={busy}
                     onConfirm={handleOperationalStatusConfirm}

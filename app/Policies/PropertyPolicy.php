@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\PropertyOperationalStatus;
 use App\Models\Admin;
 use App\Models\Owner;
 use App\Models\Property;
@@ -48,7 +49,7 @@ class PropertyPolicy
     {
         return $property->owner_id === $owner->id
             && $owner->canPublishProperties()
-            && $property->hasApprovedBaseline();
+            && $property->status !== PropertyOperationalStatus::Suspended;
     }
 
     public function manageInventoryByOwner(Owner $owner, Property $property): bool

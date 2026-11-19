@@ -84,6 +84,9 @@ class PropertyPortalData
             'cover_media' => $cover instanceof PropertyMedia ? $cover->toPortalArray('owner') : null,
             'can_toggle_operational_status' => $property->hasApprovedBaseline()
                 && $property->status !== PropertyOperationalStatus::Suspended,
+            'can_close_completely' => $property->status !== PropertyOperationalStatus::Suspended
+                && $property->status !== PropertyOperationalStatus::Archived
+                && (! $activeApp instanceof PropertyVerificationApplication || $activeApp->status->isEditableByOwner()),
             'can_start_amendment' => $property->hasApprovedBaseline()
                 && ! $activeApp instanceof PropertyVerificationApplication,
             'food' => $property->foodSummary(),
