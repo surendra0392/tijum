@@ -176,6 +176,9 @@ Route::prefix('owner')
                 ->name('profile.edit');
             Route::patch('profile', [ProfileController::class, 'update'])
                 ->name('profile.update');
+            Route::put('profile/password', [ProfileController::class, 'updatePassword'])
+                ->middleware('throttle:6,1')
+                ->name('profile.password.update');
 
             Route::prefix('onboarding')
                 ->name('onboarding.')

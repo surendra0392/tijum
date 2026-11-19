@@ -1,4 +1,6 @@
 import { Form, Head, usePage } from '@inertiajs/react';
+import { useRef } from 'react';
+import PasswordInput from '@/components/password-input';
 import { FormField } from '@/components/shared/form-field';
 import { PageHeader } from '@/components/shared/page-header';
 import {
@@ -17,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { dashboard } from '@/routes/owner';
 import { edit as profileEdit, update } from '@/routes/owner/profile';
+import { update as passwordUpdate } from '@/routes/owner/profile/password';
 import type { OwnerStatus } from '@/types';
 
 type OwnerProfileProps = {
@@ -33,6 +36,8 @@ const ownerStatusMap: Record<OwnerStatus, SemanticStatus> = {
 
 export default function OwnerProfile({ status }: OwnerProfileProps) {
     const owner = usePage().props.auth?.owner;
+    const passwordInput = useRef<HTMLInputElement>(null);
+    const currentPasswordInput = useRef<HTMLInputElement>(null);
 
     return (
         <>
@@ -42,7 +47,7 @@ export default function OwnerProfile({ status }: OwnerProfileProps) {
                 <PageHeader
                     eyebrow="Partner Account"
                     title="Partner profile settings"
-                    description="Update your primary partner identity recorded in the TIJUM owners directory."
+                    description="Update your partner contact details and sign-in password."
                     badges={
                         owner && (
                             <StatusBadge
@@ -66,6 +71,15 @@ export default function OwnerProfile({ status }: OwnerProfileProps) {
                         <AlertDescription>
                             Your email address was updated. A fresh partner
                             verification email has been dispatched.
+                        </AlertDescription>
+                    </Alert>
+                )}
+
+                {status === 'password-updated' && (
+                    <Alert variant="success">
+                        <AlertDescription>
+                            Your password has been updated. Use the new
+                            password the next time you sign in.
                         </AlertDescription>
                     </Alert>
                 )}
@@ -150,6 +164,104 @@ export default function OwnerProfile({ status }: OwnerProfileProps) {
                                         className="self-start"
                                     >
                                         Save partner profile
+                                    </Button>
+                                </>
+                            )}
+                        </Form>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Update password</CardTitle>
+                        <CardDescription>
+                            Use a strong, unique password to keep your partner
+                            account secure.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Form
+                            {...passwordUpdate.form()}
+                            options={{ preserveScroll: true }}
+                            resetOnError={[
+                                'password',
+                                'password_confirmation',
+                                'current_password',
+                            ]}
+                            resetOnSuccess
+                            onError={(errors) => {
+                                if (errors.password) {
+                                    passwordInput.current?.focus();
+                                }
+
+                                if (errors.current_password) {
+                                    currentPasswordInput.current?.focus();
+                                }
+                            }}
+                            className="flex flex-col gap-5"
+                        >
+                            {({ processing, errors }) => (
+                                <>
+                                    <FormField
+                                        id="current_password"
+                                        label="Current password"
+                                        required
+                                        error={errors.current_password}
+                                    >
+                                        {(a11y) => (
+                                            <PasswordInput
+                                                {...a11y}
+                                                ref={currentPasswordInput}
+                                                name="current_password"
+                                                autoComplete="current-password"
+                                                placeholder="Enter current password"
+                                                required
+                                            />
+                                        )}
+                                    </FormField>
+
+                                    <FormField
+                                        id="password"
+                                        label="New password"
+                                        required
+                                        error={errors.password}
+                                    >
+                                        {(a11y) => (
+                                            <PasswordInput
+                                                {...a11y}
+                                                ref={passwordInput}
+                                                name="password"
+                                                autoComplete="new-password"
+                                                placeholder="Enter new password"
+                                                required
+                                            />
+                                        )}
+                                    </FormField>
+
+                                    <FormField
+                                        id="password_confirmation"
+                                        label="Confirm new password"
+                                        required
+                                        error={errors.password_confirmation}
+                                    >
+                                        {(a11y) => (
+                                            <PasswordInput
+                                                {...a11y}
+                                                name="password_confirmation"
+                                                autoComplete="new-password"
+                                                placeholder="Re-enter new password"
+                                                required
+                                            />
+                                        )}
+                                    </FormField>
+
+                                    <Button
+                                        type="submit"
+                                        loading={processing}
+                                        className="self-start"
+                                        data-test="owner-update-password-button"
+                                    >
+                                        Update password
                                     </Button>
                                 </>
                             )}

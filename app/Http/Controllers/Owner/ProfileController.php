@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Owner;
 
 use App\Enums\OwnerStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Owner\PasswordUpdateRequest;
 use App\Http\Requests\Owner\ProfileUpdateRequest;
 use App\Models\Owner;
 use Illuminate\Http\RedirectResponse;
@@ -55,5 +56,19 @@ class ProfileController extends Controller
         return redirect()
             ->route('owner.profile.edit')
             ->with('status', $emailChanged ? 'profile-updated-verify-email' : 'profile-updated');
+    }
+
+    public function updatePassword(PasswordUpdateRequest $request): RedirectResponse
+    {
+        /** @var Owner $owner */
+        $owner = $request->user('owner');
+
+        $owner->update([
+            'password' => $request->string('password')->toString(),
+        ]);
+
+        return redirect()
+            ->route('owner.profile.edit')
+            ->with('status', 'password-updated');
     }
 }
