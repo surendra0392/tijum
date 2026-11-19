@@ -359,6 +359,52 @@ export interface CustomerProfile {
     created_at: string;
 }
 
+export interface ContactConfig {
+    phone: string;
+    whatsapp: string;
+    whatsapp_raw?: string;
+    email: string;
+    partners_email?: string;
+    hours: string;
+    address: string;
+}
+
+export interface SocialConfig {
+    facebook: { username: string; url: string };
+    instagram: { username: string; url: string };
+    whatsapp: { number: string; url: string };
+}
+
+export interface PublicConfig {
+    app_name: string;
+    currency: {
+        code: string;
+        symbol: string;
+        minor_unit: number;
+    };
+    launch_cities: City[];
+    categories: any[];
+    timing_policy: any;
+    stay_timing_policy: {
+        check_in_time: string;
+        check_out_time: string;
+        description: string;
+    };
+    payment_gateways: {
+        primary: string;
+        supported: string[];
+    };
+    support: {
+        email: string;
+        phone: string;
+        whatsapp?: string;
+        whatsapp_url?: string;
+        help_url: string;
+    };
+    contact: ContactConfig;
+    social: SocialConfig;
+}
+
 export interface OwnerProfile {
     id: number;
     name: string;

@@ -9,6 +9,17 @@ import {
 } from './types';
 
 export const OwnerApi = {
+    // Profile & Security
+    getProfile: () =>
+        ApiClient.get<ApiResponse<OwnerProfile>>('owner/profile'),
+    updateProfile: (data: { name: string; email?: string; phone?: string }) =>
+        ApiClient.put<ApiResponse<OwnerProfile>>('owner/profile', data),
+    changePassword: (data: {
+        current_password: string;
+        password: string;
+        password_confirmation: string;
+    }) => ApiClient.put<ApiResponse<null>>('owner/password', data),
+
     // Dashboard
     getDashboard: () =>
         ApiClient.get<ApiResponse<PartnerDashboardData>>('owner/dashboard'),
@@ -30,6 +41,16 @@ export const OwnerApi = {
     getReservation: (reference: string) =>
         ApiClient.get<ApiResponse<Reservation>>(
             `owner/reservations/${reference}`,
+        ),
+    checkInReservation: (reference: string, notes?: string) =>
+        ApiClient.post<ApiResponse<Reservation>>(
+            `owner/reservations/${reference}/check-in`,
+            { notes },
+        ),
+    checkOutReservation: (reference: string, notes?: string) =>
+        ApiClient.post<ApiResponse<Reservation>>(
+            `owner/reservations/${reference}/check-out`,
+            { notes },
         ),
 
     // Financial & Settlements (read-only)

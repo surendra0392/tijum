@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Owner;
 
+use App\Enums\ReservationStatus;
 use App\Http\Controllers\Api\V1\ApiController;
 use App\Http\Resources\Api\V1\ReservationResource;
 use App\Models\Owner;
@@ -61,5 +62,67 @@ class OwnerReservationController extends ApiController
         }
 
         return $this->success(new ReservationResource($reservation));
+    }
+
+    public function checkIn(Request $request, string $reference): JsonResponse
+    {
+        /** @var Owner $owner */
+        $owner = $request->user();
+
+        $reservation = Reservation::query()
+            ->where('booking_reference', $reference)
+            ->whereHas('property', fn ($p) => $p->where('owner_id', $owner->id))
+            ->with(['property.city', 'roomType', 'user', 'payments'])
+            ->first();
+
+        if ($reservation === null) {
+            return $this->error("Reservation '{$reference}' not found or unauthorized.", 'NOT_FOUND', 404);
+        }
+
+        if ($reservation->status !== ReservationStatus::Confirmed) {
+            return $this->error('Only confirmed reservations can be checked in.', 'INVALID_STATUS', 422);
+        }
+
+        $validated = $request->validate([
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $reservation->markCheckedIn('owner', $owner->id, $validated['notes'] ?? null);
+
+        return $this->success(
+            new ReservationResource($reservation->fresh(['property.city', 'roomType', 'user', 'payments'])),
+            "Guest for booking {$reservation->booking_reference} marked as checked in."
+        );
+    }
+
+    public function checkOut(Request $request, string $reference): JsonResponse
+    {
+        /** @var Owner $owner */
+        $owner = $request->user();
+
+        $reservation = Reservation::query()
+            ->where('booking_reference', $reference)
+            ->whereHas('property', fn ($p) => $p->where('owner_id', $owner->id))
+            ->with(['property.city', 'roomType', 'user', 'payments'])
+            ->first();
+
+        if ($reservation === null) {
+            return $this->error("Reservation '{$reference}' not found or unauthorized.", 'NOT_FOUND', 404);
+        }
+
+        if ($reservation->status !== ReservationStatus::Confirmed) {
+            return $this->error('Only confirmed reservations can be checked out.', 'INVALID_STATUS', 422);
+        }
+
+        $validated = $request->validate([
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $reservation->markCheckedOut('owner', $owner->id, $validated['notes'] ?? null);
+
+        return $this->success(
+            new ReservationResource($reservation->fresh(['property.city', 'roomType', 'user', 'payments'])),
+            "Guest for booking {$reservation->booking_reference} marked as checked out."
+        );
     }
 }

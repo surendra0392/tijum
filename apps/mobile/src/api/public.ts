@@ -123,4 +123,12 @@ export const PublicApi = {
     getFaqs: () => ApiClient.get<ApiResponse<any[]>>('public/faqs'),
 
     getBanners: () => ApiClient.get<ApiResponse<any[]>>('public/banners'),
+
+    submitContact: (payload: {
+        name: string;
+        email: string;
+        mobile: string;
+        subject: 'booking' | 'partner' | 'general' | string;
+        message: string;
+    }) => ApiClient.post<ApiResponse<any>>('public/contact', payload),
 };

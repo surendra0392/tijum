@@ -23,6 +23,7 @@ class OwnerProfileResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'phone' => $this->phone,
+            'business_name' => $this->businessProfile?->display_business_name ?? $this->businessProfile?->legal_business_name,
             'status' => $this->status->value,
             'status_label' => $this->status->label(),
             'is_verified' => $this->hasVerifiedEmail(),

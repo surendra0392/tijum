@@ -322,3 +322,24 @@ All API V1 endpoints return standard response envelopes:
 }
 ```
 
+### 5.4 Guest Check-In (Front Desk)
+- **Endpoint:** `POST /owner/reservations/{reference}/check-in`
+- **Auth:** Sanctum (`role:owner`)
+- **Payload:**
+```json
+{
+  "notes": "Verified Aadhaar ID at front desk"
+}
+```
+
+### 5.5 Guest Check-Out (Front Desk)
+- **Endpoint:** `POST /owner/reservations/{reference}/check-out`
+- **Auth:** Sanctum (`role:owner`)
+- **Payload:**
+```json
+{
+  "notes": "Room inspected, key card returned"
+}
+```
+
+

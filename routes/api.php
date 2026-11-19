@@ -160,6 +160,8 @@ Route::prefix('v1')->group(function (): void {
         // Reservations
         Route::get('reservations', [OwnerReservationController::class, 'index'])->name('api.v1.owner.reservations.index');
         Route::get('reservations/{reference}', [OwnerReservationController::class, 'show'])->name('api.v1.owner.reservations.show');
+        Route::post('reservations/{reference}/check-in', [OwnerReservationController::class, 'checkIn'])->name('api.v1.owner.reservations.check-in');
+        Route::post('reservations/{reference}/check-out', [OwnerReservationController::class, 'checkOut'])->name('api.v1.owner.reservations.check-out');
 
         // Financial & Settlement statements (read-only)
         Route::get('financial/summary', [OwnerFinancialController::class, 'summary'])->name('api.v1.owner.financial.summary');
