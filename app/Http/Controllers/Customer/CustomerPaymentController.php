@@ -15,6 +15,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use InvalidArgumentException;
+use RuntimeException;
 
 class CustomerPaymentController extends Controller
 {
@@ -40,9 +42,21 @@ class CustomerPaymentController extends Controller
             ], 422);
         }
 
-        $orderPayload = $action->execute($reservation, $user);
+        try {
+            $orderPayload = $action->execute($reservation, $user);
 
-        return response()->json($orderPayload);
+            return response()->json($orderPayload);
+        } catch (InvalidArgumentException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (RuntimeException $e) {
+            $status = $e->getCode() === 401 ? 401 : 500;
+
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], $status);
+        }
     }
 
     public function verify(

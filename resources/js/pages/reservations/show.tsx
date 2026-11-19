@@ -215,14 +215,41 @@ export default function ReservationShow({
                         },
                         {
                             preserveScroll: true,
+                            onError: (errors) => {
+                                const firstError = Object.values(errors)[0];
+                                setPaymentError(
+                                    typeof firstError === 'string'
+                                        ? firstError
+                                        : 'Payment signature verification failed. Please retry or contact support.',
+                                );
+                                setPaying(false);
+                            },
+                            onFinish: () => {
+                                setPaying(false);
+                            },
                         },
                     );
                 },
                 modal: {
                     ondismiss: () => {
                         setPaying(false);
+                        setPaymentError(
+                            'Payment checkout was cancelled before completion. You can try again within your payment window.',
+                        );
                     },
                 },
+            });
+
+            rzp.on('payment.failed', (failureResponse: unknown) => {
+                const payload = failureResponse as {
+                    error?: { description?: string; reason?: string };
+                };
+                setPaying(false);
+                setPaymentError(
+                    payload?.error?.description ||
+                        payload?.error?.reason ||
+                        'Payment failed at the gateway. Please try another payment method.',
+                );
             });
 
             rzp.open();

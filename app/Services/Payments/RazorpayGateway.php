@@ -7,11 +7,14 @@ namespace App\Services\Payments;
 use App\Contracts\PaymentGateway;
 use App\Models\Reservation;
 use App\Models\ReservationPayment;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
+use Throwable;
 
 class RazorpayGateway implements PaymentGateway
 {
@@ -30,6 +33,14 @@ class RazorpayGateway implements PaymentGateway
 
     public function createOrder(Reservation $reservation, ReservationPayment $payment): array
     {
+        if ($payment->amount_minor < 100) {
+            throw new InvalidArgumentException('Minimum Razorpay order amount is 100 paise.');
+        }
+
+        if ($this->keyId === '' || $this->keySecret === '') {
+            throw new RuntimeException('Razorpay API credentials are not configured.', 401);
+        }
+
         $payload = [
             'amount' => $payment->amount_minor,
             'currency' => $payment->currency,
@@ -45,9 +56,14 @@ class RazorpayGateway implements PaymentGateway
         $response = $this->client()
             ->post(self::BASE_URL.'/orders', $payload);
 
+        if ($response->status() === 401) {
+            $error = $response->json('error.description') ?? 'Razorpay authentication failed.';
+            throw new RuntimeException("Gateway Auth Error: {$error}", 401);
+        }
+
         if (! $response->successful()) {
             $error = $response->json('error.description') ?? 'Failed to create Razorpay order.';
-            throw new RuntimeException("Gateway Order Error: {$error}");
+            throw new RuntimeException("Gateway Order Error: {$error}", 500);
         }
 
         /** @var array<string, mixed> $data */
@@ -221,6 +237,12 @@ class RazorpayGateway implements PaymentGateway
 
         return Http::withBasicAuth($this->keyId, $this->keySecret)
             ->timeout(15)
-            ->retry(2, 200, throw: false);
+            ->retry(
+                2,
+                200,
+                static fn (Throwable $exception): bool => $exception instanceof ConnectionException
+                    || ($exception instanceof RequestException && $exception->response->serverError()),
+                throw: false,
+            );
     }
 }
