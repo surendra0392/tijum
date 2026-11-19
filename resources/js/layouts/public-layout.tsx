@@ -456,12 +456,7 @@ export default function PublicLayout({ children }: PropsWithChildren) {
                                     </nav>
 
                                     <div className="mt-6 border-t border-tijum-cream/15 pt-5">
-                                        <p className="font-heading text-xs font-semibold tracking-wider text-tijum-cream/65 uppercase">
-                                            Connect with TIJUM
-                                        </p>
-                                        <div className="mt-2.5">
-                                            <SocialLinks variant="footer" />
-                                        </div>
+                                        <SocialLinks variant="footer" />
                                     </div>
 
                                     <div className="mt-auto space-y-3 pt-6">
@@ -542,27 +537,7 @@ export default function PublicLayout({ children }: PropsWithChildren) {
                                 Co-Living with clear room pricing and exact meal
                                 information before you book.
                             </p>
-                            <div className="flex flex-wrap items-center gap-3">
-                                <Button size="sm" asChild>
-                                    <Link href={search()}>
-                                        Explore stays
-                                        <ArrowRight aria-hidden="true" />
-                                    </Link>
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-tijum-cream/40 bg-transparent text-tijum-cream hover:bg-tijum-cream/10 hover:text-tijum-cream"
-                                    asChild
-                                >
-                                    <Link href={contact()}>Contact us</Link>
-                                </Button>
-                            </div>
-
-                            <div className="space-y-2.5 pt-2">
-                                <p className="font-heading text-xs font-semibold tracking-wider text-tijum-cream/65 uppercase">
-                                    Official Social Channels
-                                </p>
+                            <div className="pt-1">
                                 <SocialLinks variant="footer" />
                             </div>
                         </div>
@@ -575,7 +550,6 @@ export default function PublicLayout({ children }: PropsWithChildren) {
                                 How it works
                             </FooterLink>
                             <FooterLink href={about()}>About TIJUM</FooterLink>
-                            <FooterLink href={contact()}>Contact us</FooterLink>
                             <FooterLink href={blogIndex()}>
                                 Living guides
                             </FooterLink>
@@ -609,9 +583,6 @@ export default function PublicLayout({ children }: PropsWithChildren) {
                             <FooterLink href={grievanceRedressal()}>
                                 Grievance redressal
                             </FooterLink>
-                            <FooterLink href={login()}>
-                                Customer login
-                            </FooterLink>
                         </FooterGroup>
 
                         <FooterGroup title="Property partners">
@@ -628,43 +599,8 @@ export default function PublicLayout({ children }: PropsWithChildren) {
                     </div>
 
                     <div className="mt-12 flex flex-col gap-3 border-t border-tijum-cream/15 pt-6 text-xs text-tijum-cream/65 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                            <p>© 2026 TIJUM. All rights reserved.</p>
-                            <Link
-                                href={contact()}
-                                className="underline-offset-2 hover:text-tijum-peach hover:underline"
-                            >
-                                Helpdesk: +91 8142334033
-                            </Link>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-4">
-                            <a
-                                href="https://wa.me/918142334033"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="hover:text-tijum-peach"
-                            >
-                                WhatsApp: 8142334033
-                            </a>
-                            <a
-                                href="https://instagram.com/tijum.official"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="hover:text-tijum-peach"
-                            >
-                                Instagram: @tijum.official
-                            </a>
-                            <a
-                                href="https://facebook.com/tijum.official"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="hover:text-tijum-peach"
-                            >
-                                Facebook: @tijum.official
-                            </a>
-                            <p className="hidden sm:inline">·</p>
-                            <p>Stay easy. Eat well. Spend less.</p>
-                        </div>
+                        <p>© 2026 TIJUM. All rights reserved.</p>
+                        <p>Stay easy. Eat well. Spend less.</p>
                     </div>
                 </ResponsiveContainer>
             </footer>

@@ -748,15 +748,6 @@ export type SocialLinkItem = {
 
 export const SOCIAL_LINKS: readonly SocialLinkItem[] = [
     {
-        name: 'WhatsApp',
-        handle: '+91 8142334033',
-        display: '+91 8142334033',
-        href: 'https://wa.me/918142334033',
-        ariaLabel: 'Chat with TIJUM on WhatsApp at +91 8142334033',
-        description:
-            'Instant booking inquiries, room availability, and guest support.',
-    },
-    {
         name: 'Instagram',
         handle: 'tijum.official',
         display: '@tijum.official',
@@ -773,6 +764,15 @@ export const SOCIAL_LINKS: readonly SocialLinkItem[] = [
         ariaLabel: 'Follow TIJUM on Facebook @tijum.official',
         description:
             'Community news, partner spotlights, and accommodation offers.',
+    },
+    {
+        name: 'WhatsApp',
+        handle: '+91 8142334033',
+        display: '+91 8142334033',
+        href: 'https://wa.me/918142334033',
+        ariaLabel: 'Chat with TIJUM on WhatsApp at +91 8142334033',
+        description:
+            'Instant booking inquiries, room availability, and guest support.',
     },
 ] as const;
 

@@ -127,9 +127,9 @@ export function SocialLinks({
         );
     }
 
-    // Default 'footer' variant: styled for dark plum background
+    // Default 'footer' variant: elegant icon-only buttons for footer/dark backgrounds
     return (
-        <div className={cn('flex flex-wrap items-center gap-2.5', className)}>
+        <div className={cn('flex items-center gap-2.5', className)}>
             {SOCIAL_LINKS.map((item) => (
                 <a
                     key={item.name}
@@ -137,18 +137,13 @@ export function SocialLinks({
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={item.ariaLabel}
-                    title={`${item.name} (${item.display}) - ${item.description}`}
-                    className="group inline-flex items-center gap-2 rounded-full border border-tijum-cream/20 bg-tijum-cream/10 px-3.5 py-1.5 text-xs text-tijum-cream transition-all duration-200 hover:border-tijum-peach hover:bg-tijum-cream/20 hover:text-tijum-peach focus-visible:ring-2 focus-visible:ring-tijum-peach focus-visible:outline-none"
+                    title={`${item.name} (${item.display})`}
+                    className="flex size-9 items-center justify-center rounded-full border border-tijum-cream/20 bg-tijum-cream/10 text-tijum-cream transition-all duration-200 hover:border-tijum-coral hover:bg-tijum-coral hover:text-white focus-visible:ring-2 focus-visible:ring-tijum-coral focus-visible:outline-none"
                 >
                     <SocialIcon
                         name={item.name}
-                        className="size-3.5 transition-transform duration-200 group-hover:scale-110"
+                        className="size-4.5 transition-transform duration-200 hover:scale-110"
                     />
-                    <span className="font-heading font-medium tracking-wide">
-                        {item.name === 'WhatsApp'
-                            ? item.display
-                            : `${item.name} ${item.display}`}
-                    </span>
                 </a>
             ))}
         </div>
