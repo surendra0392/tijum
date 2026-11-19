@@ -127,6 +127,7 @@ All API responses return consistent JSON envelopes.
 | `GET` | `/api/v1/public/faqs` | Published FAQ directory by category |
 | `GET` | `/api/v1/public/blog` | Marketplace articles and local city guides |
 | `GET` | `/api/v1/public/banners` | Active promotional and marketing banners |
+| `POST` | `/api/v1/public/contact` | Customer inquiries and contact form submission with WhatsApp routing |
 
 ---
 
@@ -192,6 +193,11 @@ All API responses return consistent JSON envelopes.
 - `POST /api/v1/owner/notifications/mark-all-read` — Mark all read.
 - `POST /api/v1/owner/devices/register` — Register host device Expo Push token.
 - `DELETE /api/v1/owner/devices/unregister` — Unregister host push token.
+
+### 6.5 Host Profile & Security
+- `GET /api/v1/owner/profile` — Retrieve host partner profile and verification status.
+- `PUT /api/v1/owner/profile` — Update host primary contact details and mobile number.
+- `PUT /api/v1/owner/password` — Update partner portal password with current password verification.
 
 ---
 

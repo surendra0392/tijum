@@ -55,26 +55,87 @@ All API V1 endpoints return standard response envelopes:
   "data": {
     "app_name": "TIJUM",
     "version": "1.0.0",
-    "currency": "INR",
-    "currency_symbol": "₹",
-    "timing_rules": {
-      "check_in": "09:00",
-      "check_out": "08:00",
-      "early_arrival": "07:00",
-      "early_arrival_surcharge_paise": 0
+    "currency": {
+      "code": "INR",
+      "symbol": "₹",
+      "minor_unit": 2
+    },
+    "stay_timing_policy": {
+      "check_in_time": "09:00:00",
+      "check_out_time": "08:00:00",
+      "description": "Check-in from 09:00 • Checkout by 08:00"
     },
     "categories": [
       { "id": 1, "name": "Hostels & PG", "slug": "hostels-pg" },
       { "id": 2, "name": "Homestays", "slug": "homestays" },
       { "id": 3, "name": "Co-Living", "slug": "co-living" }
     ],
-    "support_phone": "+91 80000 00000",
-    "support_email": "support@tijum.com"
+    "support": {
+      "phone": "8142334033",
+      "email": "support@tijum.com",
+      "whatsapp": "8142334033",
+      "whatsapp_url": "https://wa.me/918142334033",
+      "help_url": "https://tijum.com/faqs"
+    },
+    "contact": {
+      "phone": "8142334033",
+      "whatsapp": "8142334033",
+      "email": "support@tijum.com",
+      "partners_email": "partners@tijum.com",
+      "hours": "Monday – Saturday: 9:00 AM – 8:00 PM IST",
+      "address": "TIJUM Marketplace Pvt. Ltd., Level 4, Cyber Gateway, HITEC City, Hyderabad, Telangana 500081, India"
+    },
+    "social": {
+      "facebook": {
+        "username": "tijum.official",
+        "url": "https://facebook.com/tijum.official"
+      },
+      "instagram": {
+        "username": "tijum.official",
+        "url": "https://instagram.com/tijum.official"
+      },
+      "whatsapp": {
+        "number": "8142334033",
+        "url": "https://wa.me/918142334033"
+      }
+    }
   }
 }
 ```
 
-### 2.2 Property Search & Filters
+### 2.2 Submit Contact / Inquiries
+- **Endpoint:** `POST /public/contact`
+- **Auth:** None (Public)
+- **Rate Limit:** 30/min
+- **Payload:**
+```json
+{
+  "name": "Anitha Reddy",
+  "email": "anitha@example.com",
+  "mobile": "+91 9876543210",
+  "subject": "booking",
+  "message": "Inquiring about monthly hostel stay in Hyderabad."
+}
+```
+- **Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "status": "received",
+    "subject": "booking",
+    "subject_label": "Stay / Booking Assistance",
+    "whatsapp_url": "https://wa.me/918142334033?text=...",
+    "channels": {
+      "support_email": "support@tijum.com",
+      "whatsapp_desk": "8142334033"
+    }
+  },
+  "message": "Thank you for reaching out! Our team will contact you shortly."
+}
+```
+
+### 2.3 Property Search & Filters
 - **Endpoint:** `GET /public/properties`
 - **Query Parameters:**
   - `city`: City ID or slug (e.g. `vijayawada`)
@@ -202,3 +263,62 @@ All API V1 endpoints return standard response envelopes:
 - **Endpoint:** `GET /customer/rewards/points/ledger`
 - **Auth:** Sanctum (`role:customer`)
 - **Response:** Double-entry list of points credits, debits, and unexpired balances.
+
+---
+
+## 5. PARTNER / OWNER PORTAL APIS
+
+### 5.1 Owner Profile
+- **Endpoint:** `GET /owner/profile`
+- **Auth:** Sanctum (`role:owner`)
+- **Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "Anitha Reddy",
+    "email": "anitha.reddy@tijum.com",
+    "phone": "+91 9849122334",
+    "status": "active",
+    "status_label": "Active",
+    "is_verified": true,
+    "can_sign_in": true,
+    "account_type": "partner",
+    "created_at": "2026-11-10T12:00:00Z"
+  }
+}
+```
+
+### 5.2 Update Owner Profile
+- **Endpoint:** `PUT /owner/profile`
+- **Auth:** Sanctum (`role:owner`)
+- **Payload:**
+```json
+{
+  "name": "Anitha Reddy",
+  "email": "anitha.reddy@tijum.com",
+  "phone": "+91 9849122334"
+}
+```
+
+### 5.3 Update Owner Password
+- **Endpoint:** `PUT /owner/password`
+- **Auth:** Sanctum (`role:owner`)
+- **Payload:**
+```json
+{
+  "current_password": "CurrentPassword123!",
+  "password": "NewSecurePassword123!",
+  "password_confirmation": "NewSecurePassword123!"
+}
+```
+- **Response:**
+```json
+{
+  "success": true,
+  "data": null,
+  "message": "Password updated successfully"
+}
+```
+

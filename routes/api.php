@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\Owner\OwnerDashboardController;
 use App\Http\Controllers\Api\V1\Owner\OwnerDeviceController;
 use App\Http\Controllers\Api\V1\Owner\OwnerFinancialController;
 use App\Http\Controllers\Api\V1\Owner\OwnerNotificationController;
+use App\Http\Controllers\Api\V1\Owner\OwnerProfileController;
 use App\Http\Controllers\Api\V1\Owner\OwnerPropertyController;
 use App\Http\Controllers\Api\V1\Owner\OwnerReservationController;
 use App\Http\Controllers\Api\V1\Public\PublicCategoryController;
@@ -56,6 +57,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('blog/{slug}', [PublicContentController::class, 'blogShow'])->name('api.v1.public.blog.show');
         Route::get('faqs', [PublicContentController::class, 'faqs'])->name('api.v1.public.faqs');
         Route::get('banners', [PublicContentController::class, 'banners'])->name('api.v1.public.banners');
+        Route::post('contact', [PublicContentController::class, 'contact'])->name('api.v1.public.contact');
     });
 
     // 2. Authentication: Separate Customer & Owner flows
@@ -143,6 +145,11 @@ Route::prefix('v1')->group(function (): void {
 
     // 4. Owner / Partner Authenticated Operations
     Route::prefix('owner')->middleware(['auth:sanctum', 'auth.owner'])->group(function (): void {
+        // Profile & Security
+        Route::get('profile', [OwnerProfileController::class, 'show'])->name('api.v1.owner.profile.show');
+        Route::put('profile', [OwnerProfileController::class, 'update'])->name('api.v1.owner.profile.update');
+        Route::put('password', [OwnerProfileController::class, 'updatePassword'])->name('api.v1.owner.password.update');
+
         // Dashboard
         Route::get('dashboard', OwnerDashboardController::class)->name('api.v1.owner.dashboard');
 

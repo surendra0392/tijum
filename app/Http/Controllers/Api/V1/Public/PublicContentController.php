@@ -11,6 +11,7 @@ use App\Models\ContentFaq;
 use App\Models\ContentPage;
 use App\Models\MarketingBanner;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class PublicContentController extends ApiController
 {
@@ -101,5 +102,45 @@ class PublicContentController extends ApiController
             ->get();
 
         return $this->success($banners);
+    }
+
+    public function contact(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255'],
+            'mobile' => ['required', 'string', 'regex:/^[+0-9\s\-()]{10,20}$/'],
+            'subject' => ['required', 'string', 'in:booking,partner,general'],
+            'message' => ['required', 'string', 'max:3000'],
+        ]);
+
+        $subjectLabels = [
+            'booking' => 'Stay / Booking Assistance',
+            'partner' => 'List a Hostel, PG or Homestay',
+            'general' => 'General Inquiry or Feedback',
+        ];
+
+        $whatsappRaw = (string) config('tijum.contact.whatsapp_raw', '918142334033');
+        $whatsappText = urlencode(
+            "Hi TIJUM Support,\n"
+            ."Name: {$validated['name']}\n"
+            ."Subject: {$subjectLabels[$validated['subject']]}\n"
+            ."Mobile: {$validated['mobile']}\n"
+            ."Email: {$validated['email']}\n"
+            ."Message: {$validated['message']}"
+        );
+
+        $whatsappUrl = "https://wa.me/{$whatsappRaw}?text={$whatsappText}";
+
+        return $this->success([
+            'status' => 'received',
+            'subject' => $validated['subject'],
+            'subject_label' => $subjectLabels[$validated['subject']],
+            'whatsapp_url' => $whatsappUrl,
+            'channels' => [
+                'support_email' => config('tijum.contact.email', 'support@tijum.com'),
+                'whatsapp_desk' => config('tijum.contact.whatsapp', '8142334033'),
+            ],
+        ], 'Thank you for reaching out! Our team will contact you shortly.');
     }
 }

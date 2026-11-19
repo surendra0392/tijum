@@ -2,17 +2,17 @@
 
 **Document Reference:** `TIJUM-API-INVENTORY-V1.0-2026`  
 **Status:** Authoritative / Verified Against Route Table  
-**Total Registered Routes:** 72 Active Endpoints  
+**Total Registered Routes:** 76 Active Endpoints  
 **Base URL:** `/api/v1`  
 **Authentication Scheme:** Bearer Token via Laravel Sanctum (Custom abilities `role:customer` & `role:owner`)  
 
 ---
 
-## 1. COMPLETE 72-ROUTE INVENTORY TABLE
+## 1. COMPLETE 76-ROUTE INVENTORY TABLE
 
 | # | HTTP Method | Path | Route Name | Controller Action | Auth Guard / Ability | Rate Limit |
 | :- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **PUBLIC CATALOG & CMS (11 ROUTES)** |
+| **PUBLIC CATALOG & CMS (12 ROUTES)** |
 | 1 | `GET` | `/api/v1/public/config` | `api.v1.public.config` | `PublicConfigController` | None (Public) | 60/min |
 | 2 | `GET` | `/api/v1/public/cities` | `api.v1.public.cities.index` | `PublicCityController@index` | None (Public) | 60/min |
 | 3 | `GET` | `/api/v1/public/cities/{slug}` | `api.v1.public.cities.show` | `PublicCityController@show` | None (Public) | 60/min |
@@ -24,6 +24,7 @@
 | 9 | `GET` | `/api/v1/public/pages/{slug}` | `api.v1.public.pages.show` | `PublicContentController@page` | None (Public) | 60/min |
 | 10 | `GET` | `/api/v1/public/blog` | `api.v1.public.blog.index` | `PublicContentController@blogIndex` | None (Public) | 60/min |
 | 11 | `GET` | `/api/v1/public/blog/{slug}` | `api.v1.public.blog.show` | `PublicContentController@blogShow` | None (Public) | 60/min |
+| 12 | `POST` | `/api/v1/public/contact` | `api.v1.public.contact` | `PublicContentController@contact` | None (Public) | 30/min |
 | **AUTHENTICATION SERVICES (12 ROUTES)** |
 | 12 | `POST` | `/api/v1/auth/customer/login` | `api.v1.auth.customer.login` | `CustomerAuthController@login` | None | 10/min |
 | 13 | `POST` | `/api/v1/auth/customer/register` | `api.v1.auth.customer.register` | `CustomerAuthController@register` | None | 5/min |
@@ -78,21 +79,24 @@
 | 56 | `GET` | `/api/v1/customer/notifications/unread-count` | `api.v1.customer.notifications.unread-count`| `CustomerNotificationController@unreadCount`| `sanctum` (`role:customer`)| 60/min |
 | 57 | `POST` | `/api/v1/customer/notifications/{id}/read` | `api.v1.customer.notifications.read` | `CustomerNotificationController@markRead` | `sanctum` (`role:customer`) | 60/min |
 | 58 | `POST` | `/api/v1/customer/notifications/mark-all-read` | `api.v1.customer.notifications.mark-all-read` | `CustomerNotificationController@markAllRead` | `sanctum` (`role:customer`) | 60/min |
-| **OWNER PORTAL API (14 ROUTES)** |
-| 59 | `GET` | `/api/v1/owner/dashboard` | `api.v1.owner.dashboard` | `OwnerDashboardController` | `sanctum` (`role:owner`) | 60/min |
-| 60 | `GET` | `/api/v1/owner/properties` | `api.v1.owner.properties.index` | `OwnerPropertyController@index` | `sanctum` (`role:owner`) | 60/min |
-| 61 | `GET` | `/api/v1/owner/properties/{id}` | `api.v1.owner.properties.show` | `OwnerPropertyController@show` | `sanctum` (`role:owner`) | 60/min |
-| 62 | `GET` | `/api/v1/owner/reservations` | `api.v1.owner.reservations.index` | `OwnerReservationController@index` | `sanctum` (`role:owner`) | 60/min |
-| 63 | `GET` | `/api/v1/owner/reservations/{reference}` | `api.v1.owner.reservations.show` | `OwnerReservationController@show` | `sanctum` (`role:owner`) | 60/min |
-| 64 | `GET` | `/api/v1/owner/financial/summary` | `api.v1.owner.financial.summary` | `OwnerFinancialController@summary` | `sanctum` (`role:owner`) | 60/min |
-| 65 | `GET` | `/api/v1/owner/financial/settlements` | `api.v1.owner.financial.settlements` | `OwnerFinancialController@settlements` | `sanctum` (`role:owner`) | 60/min |
-| 66 | `POST` | `/api/v1/owner/devices/register` | `api.v1.owner.devices.register` | `OwnerDeviceController@register` | `sanctum` (`role:owner`) | 60/min |
-| 67 | `DELETE`| `/api/v1/owner/devices/unregister` | `api.v1.owner.devices.unregister` | `OwnerDeviceController@unregister` | `sanctum` (`role:owner`) | 60/min |
-| 68 | `GET` | `/api/v1/owner/notifications` | `api.v1.owner.notifications.index` | `OwnerNotificationController@index` | `sanctum` (`role:owner`) | 60/min |
-| 69 | `GET` | `/api/v1/owner/notifications/unread-count` | `api.v1.owner.notifications.unread-count` | `OwnerNotificationController@unreadCount` | `sanctum` (`role:owner`) | 60/min |
-| 70 | `POST` | `/api/v1/owner/notifications/{id}/read` | `api.v1.owner.notifications.read` | `OwnerNotificationController@markRead` | `sanctum` (`role:owner`) | 60/min |
-| 71 | `POST` | `/api/v1/owner/notifications/mark-all-read` | `api.v1.owner.notifications.mark-all-read` | `OwnerNotificationController@markAllRead` | `sanctum` (`role:owner`) | 60/min |
-| 72 | `GET` | `/api/v1/customer/rewards/coupons` | `api.v1.customer.rewards.coupons` | `CustomerRewardsController@coupons` | `sanctum` (`role:customer`) | 60/min |
+| **OWNER PORTAL API (17 ROUTES)** |
+| 59 | `GET` | `/api/v1/owner/profile` | `api.v1.owner.profile.show` | `OwnerProfileController@show` | `sanctum` (`role:owner`) | 60/min |
+| 60 | `PUT` | `/api/v1/owner/profile` | `api.v1.owner.profile.update` | `OwnerProfileController@update` | `sanctum` (`role:owner`) | 30/min |
+| 61 | `PUT` | `/api/v1/owner/password` | `api.v1.owner.password.update` | `OwnerProfileController@updatePassword` | `sanctum` (`role:owner`) | 10/min |
+| 62 | `GET` | `/api/v1/owner/dashboard` | `api.v1.owner.dashboard` | `OwnerDashboardController` | `sanctum` (`role:owner`) | 60/min |
+| 63 | `GET` | `/api/v1/owner/properties` | `api.v1.owner.properties.index` | `OwnerPropertyController@index` | `sanctum` (`role:owner`) | 60/min |
+| 64 | `GET` | `/api/v1/owner/properties/{id}` | `api.v1.owner.properties.show` | `OwnerPropertyController@show` | `sanctum` (`role:owner`) | 60/min |
+| 65 | `GET` | `/api/v1/owner/reservations` | `api.v1.owner.reservations.index` | `OwnerReservationController@index` | `sanctum` (`role:owner`) | 60/min |
+| 66 | `GET` | `/api/v1/owner/reservations/{reference}` | `api.v1.owner.reservations.show` | `OwnerReservationController@show` | `sanctum` (`role:owner`) | 60/min |
+| 67 | `GET` | `/api/v1/owner/financial/summary` | `api.v1.owner.financial.summary` | `OwnerFinancialController@summary` | `sanctum` (`role:owner`) | 60/min |
+| 68 | `GET` | `/api/v1/owner/financial/settlements` | `api.v1.owner.financial.settlements` | `OwnerFinancialController@settlements` | `sanctum` (`role:owner`) | 60/min |
+| 69 | `POST` | `/api/v1/owner/devices/register` | `api.v1.owner.devices.register` | `OwnerDeviceController@register` | `sanctum` (`role:owner`) | 60/min |
+| 70 | `DELETE`| `/api/v1/owner/devices/unregister` | `api.v1.owner.devices.unregister` | `OwnerDeviceController@unregister` | `sanctum` (`role:owner`) | 60/min |
+| 71 | `GET` | `/api/v1/owner/notifications` | `api.v1.owner.notifications.index` | `OwnerNotificationController@index` | `sanctum` (`role:owner`) | 60/min |
+| 72 | `GET` | `/api/v1/owner/notifications/unread-count` | `api.v1.owner.notifications.unread-count` | `OwnerNotificationController@unreadCount` | `sanctum` (`role:owner`) | 60/min |
+| 73 | `POST` | `/api/v1/owner/notifications/{id}/read` | `api.v1.owner.notifications.read` | `OwnerNotificationController@markRead` | `sanctum` (`role:owner`) | 60/min |
+| 74 | `POST` | `/api/v1/owner/notifications/mark-all-read` | `api.v1.owner.notifications.mark-all-read` | `OwnerNotificationController@markAllRead` | `sanctum` (`role:owner`) | 60/min |
+| 75 | `GET` | `/api/v1/customer/rewards/coupons` | `api.v1.customer.rewards.coupons` | `CustomerRewardsController@coupons` | `sanctum` (`role:customer`) | 60/min |
 
 ---
-*Verified against Laravel Route Registrar: 72 routes active.*
+*Verified against Laravel Route Registrar: 76 routes active.*

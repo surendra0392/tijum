@@ -28,6 +28,31 @@ class PublicConfigController extends ApiController
 
         $platformConfig = PlatformSetting::getPublicConfig();
 
+        $contactConfig = config('tijum.contact', [
+            'phone' => '8142334033',
+            'whatsapp' => '8142334033',
+            'whatsapp_raw' => '918142334033',
+            'email' => 'support@tijum.com',
+            'partners_email' => 'partners@tijum.com',
+            'hours' => 'Monday – Saturday: 9:00 AM – 8:00 PM IST',
+            'address' => 'TIJUM Marketplace Pvt. Ltd., Level 4, Cyber Gateway, HITEC City, Hyderabad, Telangana 500081, India',
+        ]);
+
+        $socialConfig = config('tijum.social', [
+            'facebook' => [
+                'username' => 'tijum.official',
+                'url' => 'https://facebook.com/tijum.official',
+            ],
+            'instagram' => [
+                'username' => 'tijum.official',
+                'url' => 'https://instagram.com/tijum.official',
+            ],
+            'whatsapp' => [
+                'number' => '8142334033',
+                'url' => 'https://wa.me/918142334033',
+            ],
+        ]);
+
         return $this->success(array_merge($platformConfig, [
             'currency' => [
                 'code' => $platformConfig['currency'] ?? 'INR',
@@ -71,10 +96,14 @@ class PublicConfigController extends ApiController
                 ],
             ],
             'support' => [
-                'email' => $platformConfig['support_email'] ?? 'support@tijum.com',
-                'phone' => $platformConfig['support_phone'] ?? '+91 40 6828 0000',
+                'email' => $platformConfig['support_email'] ?? ($contactConfig['email'] ?? 'support@tijum.com'),
+                'phone' => $platformConfig['support_phone'] ?? ($contactConfig['phone'] ?? '8142334033'),
+                'whatsapp' => $contactConfig['whatsapp'] ?? '8142334033',
+                'whatsapp_url' => $socialConfig['whatsapp']['url'] ?? 'https://wa.me/918142334033',
                 'help_url' => url('/faqs'),
             ],
+            'contact' => $contactConfig,
+            'social' => $socialConfig,
         ]));
     }
 }
