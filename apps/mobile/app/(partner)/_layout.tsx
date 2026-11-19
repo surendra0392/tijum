@@ -103,6 +103,13 @@ export default function PartnerTabsLayout() {
                     headerTitle: 'Booking Review',
                 }}
             />
+            <Tabs.Screen
+                name="reviews/index"
+                options={{
+                    href: null,
+                    headerTitle: 'Guest Reviews',
+                }}
+            />
         </Tabs>
     );
 }

@@ -1,18 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    View,
-    Text,
-    FlatList,
-    StyleSheet,
     ActivityIndicator,
+    FlatList,
+    Image,
+    Modal,
     RefreshControl,
     SafeAreaView,
-    Image,
-    TouchableOpacity,
     ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { OwnerApi } from '../../../src/api/owner';
-import { PropertyDetail } from '../../../src/api/types';
+import { PhysicalRoom, PropertyDetail } from '../../../src/api/types';
 import { Badge } from '../../../src/components/Badge';
 import { CategoryBadge } from '../../../src/components/CategoryBadge';
 import {
@@ -25,7 +26,15 @@ import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 import { StayTimingBadge } from '../../../src/components/StayTimingBadge';
-import { Building2, Home, MapPin, Sparkles, Users } from 'lucide-react-native';
+import {
+    Building2,
+    DoorClosed,
+    Home,
+    MapPin,
+    Sparkles,
+    Users,
+    X,
+} from 'lucide-react-native';
 
 export default function PartnerPropertiesScreen() {
     const [properties, setProperties] = useState<PropertyDetail[]>([]);
@@ -34,6 +43,35 @@ export default function PartnerPropertiesScreen() {
     const [activeCategoryFilter, setActiveCategoryFilter] = useState<
         'all' | CanonicalCategorySlug
     >('all');
+
+    // Physical Rooms Modal State
+    const [selectedPropertyForRooms, setSelectedPropertyForRooms] =
+        useState<PropertyDetail | null>(null);
+    const [physicalRooms, setPhysicalRooms] = useState<PhysicalRoom[]>([]);
+    const [loadingRooms, setLoadingRooms] = useState(false);
+    const [roomsError, setRoomsError] = useState('');
+
+    const handleOpenRooms = async (property: PropertyDetail) => {
+        setSelectedPropertyForRooms(property);
+        setRoomsError('');
+        setLoadingRooms(true);
+        try {
+            const res = await OwnerApi.getPropertyRooms(property.id);
+            if (res.data) {
+                setPhysicalRooms(res.data);
+            }
+        } catch (e: any) {
+            setRoomsError(e.message || 'Failed to retrieve physical room list.');
+        } finally {
+            setLoadingRooms(false);
+        }
+    };
+
+    const handleCloseRooms = () => {
+        setSelectedPropertyForRooms(null);
+        setPhysicalRooms([]);
+        setRoomsError('');
+    };
 
     useEffect(() => {
         loadProperties();
@@ -208,6 +246,22 @@ export default function PartnerPropertiesScreen() {
                         </Text>
                     )}
                 </View>
+
+                {/* Physical Rooms Viewer Trigger */}
+                <TouchableOpacity
+                    style={styles.viewRoomsBtn}
+                    onPress={() => handleOpenRooms(item)}
+                    activeOpacity={0.75}
+                >
+                    <DoorClosed
+                        size={15}
+                        color={Colors.deepPlum}
+                        style={{ marginRight: 6 }}
+                    />
+                    <Text style={styles.viewRoomsBtnText}>
+                        Inspect Physical Rooms
+                    </Text>
+                </TouchableOpacity>
             </View>
         </View>
     );
@@ -315,6 +369,194 @@ export default function PartnerPropertiesScreen() {
                     }
                 />
             )}
+
+            {/* Physical Rooms Viewer Modal */}
+            <Modal
+                visible={Boolean(selectedPropertyForRooms)}
+                transparent
+                animationType="slide"
+                onRequestClose={handleCloseRooms}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.modalTitle}>
+                                    Physical Room Inventory
+                                </Text>
+                                <Text
+                                    style={styles.modalSubtitle}
+                                    numberOfLines={1}
+                                >
+                                    {selectedPropertyForRooms?.name}
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                onPress={handleCloseRooms}
+                                hitSlop={{
+                                    top: 10,
+                                    bottom: 10,
+                                    left: 10,
+                                    right: 10,
+                                }}
+                            >
+                                <X size={20} color={Colors.gray600} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {roomsError ? (
+                            <View style={styles.modalErrorBox}>
+                                <Text style={styles.modalErrorText}>
+                                    {roomsError}
+                                </Text>
+                            </View>
+                        ) : null}
+
+                        {loadingRooms ? (
+                            <View
+                                style={{
+                                    padding: Spacing.xl,
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <ActivityIndicator
+                                    size="small"
+                                    color={Colors.deepPlum}
+                                />
+                                <Text
+                                    style={[
+                                        styles.loadingText,
+                                        { marginTop: 8 },
+                                    ]}
+                                >
+                                    Loading room inventory...
+                                </Text>
+                            </View>
+                        ) : physicalRooms.length === 0 ? (
+                            <View
+                                style={{
+                                    padding: Spacing.xl,
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Text style={styles.emptyRoomsText}>
+                                    No physical rooms configured yet for this
+                                    property.
+                                </Text>
+                            </View>
+                        ) : (
+                            <ScrollView
+                                showsVerticalScrollIndicator={false}
+                                style={{ maxHeight: 400 }}
+                            >
+                                <View
+                                    style={{
+                                        gap: Spacing.xs,
+                                        paddingBottom: Spacing.md,
+                                    }}
+                                >
+                                    {physicalRooms.map((room) => (
+                                        <View
+                                            key={room.id}
+                                            style={styles.roomItemCard}
+                                        >
+                                            <View style={{ flex: 1 }}>
+                                                <View
+                                                    style={{
+                                                        flexDirection: 'row',
+                                                        alignItems: 'center',
+                                                    }}
+                                                >
+                                                    <Text
+                                                        style={
+                                                            styles.roomItemNumber
+                                                        }
+                                                    >
+                                                        Room {room.room_number}
+                                                    </Text>
+                                                    {room.floor !== null &&
+                                                    room.floor !==
+                                                        undefined ? (
+                                                        <Text
+                                                            style={
+                                                                styles.roomItemFloor
+                                                            }
+                                                        >
+                                                            (Floor {room.floor})
+                                                        </Text>
+                                                    ) : null}
+                                                </View>
+                                                <Text
+                                                    style={styles.roomItemMeta}
+                                                >
+                                                    {room.room_type_name ||
+                                                        'Standard Category'}
+                                                </Text>
+                                                {room.current_allocation
+                                                    ?.guest_name ? (
+                                                    <Text
+                                                        style={
+                                                            styles.roomAllocationMeta
+                                                        }
+                                                    >
+                                                        Guest:{' '}
+                                                        {
+                                                            room
+                                                                .current_allocation
+                                                                .guest_name
+                                                        }{' '}
+                                                        • Dep:{' '}
+                                                        {
+                                                            room
+                                                                .current_allocation
+                                                                .check_out_date
+                                                        }
+                                                    </Text>
+                                                ) : null}
+                                            </View>
+                                            <View
+                                                style={{
+                                                    alignItems: 'flex-end',
+                                                }}
+                                            >
+                                                {room.is_occupied ? (
+                                                    <View
+                                                        style={
+                                                            styles.occupiedBadge
+                                                        }
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.occupiedBadgeText
+                                                            }
+                                                        >
+                                                            Occupied
+                                                        </Text>
+                                                    </View>
+                                                ) : (
+                                                    <View
+                                                        style={
+                                                            styles.availableBadge
+                                                        }
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.availableBadgeText
+                                                            }
+                                                        >
+                                                            Available
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        </View>
+                                    ))}
+                                </View>
+                            </ScrollView>
+                        )}
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -490,5 +732,118 @@ const styles = StyleSheet.create({
         color: Colors.gray500,
         textAlign: 'center',
         marginTop: Spacing.xs,
+    },
+    viewRoomsBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.warmOffWhite,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+        borderRadius: BorderRadius.base,
+        paddingVertical: Spacing.sm,
+        marginTop: Spacing.md,
+    },
+    viewRoomsBtnText: {
+        fontSize: Typography.fontSize.xs,
+        fontWeight: '700',
+        color: Colors.deepPlum,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: Colors.white,
+        borderTopLeftRadius: BorderRadius.xl,
+        borderTopRightRadius: BorderRadius.xl,
+        padding: Spacing.lg,
+        maxHeight: '85%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: Spacing.md,
+        paddingBottom: Spacing.xs,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.gray100,
+    },
+    modalTitle: {
+        ...Typography.titleMedium,
+        color: Colors.deepPlum,
+        fontWeight: '800',
+    },
+    modalSubtitle: {
+        ...Typography.bodySmall,
+        color: Colors.gray500,
+        marginTop: 2,
+    },
+    modalErrorBox: {
+        backgroundColor: '#FFF1F2',
+        padding: Spacing.sm,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FFE4E6',
+        marginBottom: Spacing.sm,
+    },
+    modalErrorText: {
+        fontSize: 12,
+        color: '#E11D48',
+        fontWeight: '600',
+    },
+    roomItemCard: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: Spacing.md,
+        borderRadius: 8,
+        backgroundColor: Colors.warmOffWhite,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+    },
+    roomItemNumber: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: Colors.deepPlum,
+    },
+    roomItemFloor: {
+        fontSize: 12,
+        color: Colors.gray600,
+        marginLeft: 6,
+    },
+    roomItemMeta: {
+        fontSize: 12,
+        color: Colors.gray500,
+        marginTop: 2,
+    },
+    roomAllocationMeta: {
+        fontSize: 11,
+        color: '#059669',
+        fontWeight: '600',
+        marginTop: 3,
+    },
+    occupiedBadge: {
+        backgroundColor: '#FEE2E2',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    occupiedBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#DC2626',
+    },
+    availableBadge: {
+        backgroundColor: '#DCFCE7',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    availableBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#15803D',
     },
 });

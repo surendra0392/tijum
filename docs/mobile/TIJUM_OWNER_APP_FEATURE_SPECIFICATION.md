@@ -2,15 +2,16 @@
 
 **Document Reference:** `docs/mobile/TIJUM_OWNER_APP_FEATURE_SPECIFICATION.md`  
 **Application Scope:** `apps/mobile/app/(partner)/` and `(auth)/owner-*`  
+**Framework:** React Native 0.83.10 / Expo SDK 55 (Expo Router 55, React 19.2.0)  
 **Target Audience:** Accommodation hosts, property managers, and front-desk operators  
-**Date:** November 20, 2026  
-**Status:** **ACTIVE & CERTIFIED**
+**Date:** November 20, 2026 (Phase M9 Reconciled)  
+**Status:** **ACTIVE, RECONCILED & CERTIFIED**
 
 ---
 
 ## 1. Feature Overview
 
-The Partner Mobile Application empowers accommodation hosts across Andhra Pradesh & Telangana to run front-desk operations, manage real-time inventory, allocate physical rooms to incoming guests, inspect financial settlements, and maintain property performance on mobile devices.
+The Partner Mobile Application empowers accommodation hosts across Andhra Pradesh & Telangana to run front-desk operations, manage real-time inventory, allocate physical rooms to incoming guests, inspect physical room inventories, respond to guest reviews, inspect financial settlements, and maintain property performance on mobile devices.
 
 ---
 
@@ -19,7 +20,7 @@ The Partner Mobile Application empowers accommodation hosts across Andhra Prades
 ### 2.1 Partner Authentication & Onboarding
 - **Partner Login (`app/(auth)/owner-login.tsx`):**
   - Sign in using host email or phone + password.
-  - "Forgot Password?" dialog providing host email password reset via `PublicApi.forgotPassword()`.
+  - "Forgot Password?" dialog providing host email password reset via `PublicApi.forgotPassword(email, 'owner')`.
 - **Partner Registration (`app/(auth)/owner-register.tsx`):**
   - 10-field host onboarding registration:
     * Legal business entity name & display name.
@@ -35,6 +36,7 @@ The Partner Mobile Application empowers accommodation hosts across Andhra Prades
   - Incoming guest check-ins scheduled for today.
   - Scheduled check-outs requiring room turnover.
   - Unsettled partner payouts in paise.
+  - Quick action card navigating directly to Guest Reviews management.
 
 ### 2.3 Front-Desk Operations & Reservation Management
 - **Reservations List (`(partner)/reservations/index.tsx`):**
@@ -60,12 +62,24 @@ The Partner Mobile Application empowers accommodation hosts across Andhra Prades
   - Submits selection via `OwnerApi.allocateRoom(reference, physicalRoomId)`.
   - Re-allocation: Allows changing assigned rooms on confirmed stays before check-in.
 
-### 2.5 Property & Room Inventory Inspection
+### 2.5 Property & Physical Room Inventory Inspection
 - **Properties Hub (`(partner)/properties/index.tsx`):**
   - Lists verified partner properties with approval and operational badges.
   - Shows active room categories, daily/monthly rates, and operational status.
+  - **Physical Rooms Viewer:** Interactive drawer/modal displaying all individual physical rooms per property (room number, floor, room type, active status) querying `OwnerApi.getPropertyRooms(property.id)`.
 
-### 2.6 Account Profile & Security Settings
+### 2.6 Partner Review Management
+- **Reviews Hub (`(partner)/reviews/index.tsx`):**
+  - Lists all guest reviews across properties owned by the partner querying `OwnerApi.getReviews()`.
+  - Displays overall rating and 4 subcategory breakdowns (Cleanliness, Food & Dining, Communication, Value).
+  - Displays guest display name, stay dates (check-in / check-out), and property name.
+  - Shows existing partner responses with moderation status.
+  - **Review Response Modal:**
+    * Textarea supporting host responses up to 2,500 characters (~500 words).
+    * Real-time character counter (`${len}/2500`).
+    * Submission action calling `OwnerApi.replyToReview(reviewId, response)`.
+
+### 2.7 Account Profile & Security Settings
 - **Partner Account (`(partner)/account.tsx`):**
   - **Primary Partner Contact Card:**
     * Displays and updates host full name and contact phone number.

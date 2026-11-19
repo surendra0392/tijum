@@ -184,6 +184,16 @@ export const CustomerApi = {
         ApiClient.post<ApiResponse<any>>(`customer/wishlist/${propertyId}`),
     removeFromWishlist: (propertyId: number) =>
         ApiClient.delete<ApiResponse<any>>(`customer/wishlist/${propertyId}`),
+    toggleWishlist: (propertyId: number, currentlySaved?: boolean) => {
+        if (currentlySaved) {
+            return ApiClient.delete<ApiResponse<any>>(
+                `customer/wishlist/${propertyId}`,
+            );
+        }
+        return ApiClient.post<ApiResponse<any>>(
+            `customer/wishlist/${propertyId}`,
+        );
+    },
 
     // Push Device Registration
     registerDevice: (data: {

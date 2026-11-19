@@ -20,13 +20,14 @@ import { Typography } from '../../../src/theme/typography';
 import { Input } from '../../../src/components/Input';
 import { Button } from '../../../src/components/Button';
 import {
-    User,
-    Lock,
-    ShieldCheck,
-    ChevronRight,
     ChevronDown,
+    ChevronRight,
     Coins,
     Gift,
+    Heart,
+    Lock,
+    ShieldCheck,
+    User,
 } from 'lucide-react-native';
 
 export default function CustomerProfileScreen() {
@@ -291,6 +292,26 @@ export default function CustomerProfileScreen() {
                             />
                         </View>
                     ) : null}
+
+                    {/* Saved Stays */}
+                    <View style={styles.divider} />
+                    <Text style={styles.sectionTitle}>Saved Stays & Favorites</Text>
+                    <TouchableOpacity
+                        style={styles.menuRow}
+                        onPress={() => router.push('/(customer)/wishlist' as any)}
+                    >
+                        <View style={styles.inlineRow}>
+                            <Heart
+                                size={18}
+                                color={Colors.coral}
+                                style={{ marginRight: 8 }}
+                            />
+                            <Text style={styles.menuLabel}>
+                                Saved Stays (Wishlist)
+                            </Text>
+                        </View>
+                        <ChevronRight size={16} color={Colors.gray400} />
+                    </TouchableOpacity>
 
                     {/* Customer Protection Support */}
                     <View style={styles.divider} />

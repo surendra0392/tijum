@@ -168,6 +168,35 @@ export interface PhysicalRoom {
     room_type_name?: string;
 }
 
+export interface OwnerReview {
+    id: number;
+    property_id: number;
+    property_name: string;
+    customer_display_name?: string;
+    guest_name?: string;
+    overall_rating: number;
+    cleanliness_rating?: number;
+    food_quality_rating?: number;
+    communication_rating?: number;
+    value_rating?: number;
+    title?: string | null;
+    content?: string | null;
+    created_at?: string;
+    submitted_at?: string;
+    verified_booking?: boolean;
+    stay_dates?: {
+        check_in_date: string;
+        checkout_date: string;
+    };
+    response?: {
+        id?: number;
+        response_text: string;
+        status: string;
+        submitted_at?: string;
+        published_at?: string | null;
+    } | null;
+}
+
 export interface Reservation {
     id: number;
     booking_reference: string;

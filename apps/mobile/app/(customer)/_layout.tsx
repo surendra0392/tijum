@@ -125,6 +125,13 @@ export default function CustomerTabsLayout() {
                     headerTitle: 'Available Coupons',
                 }}
             />
+            <Tabs.Screen
+                name="wishlist/index"
+                options={{
+                    href: null,
+                    headerTitle: 'Saved Stays',
+                }}
+            />
         </Tabs>
     );
 }

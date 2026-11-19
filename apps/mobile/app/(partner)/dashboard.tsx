@@ -19,13 +19,14 @@ import { Badge } from '../../src/components/Badge';
 import { Button } from '../../src/components/Button';
 import { ReservationStatusBadge } from '../../src/components/ReservationStatusBadge';
 import {
-    Zap,
+    Building2,
+    Calendar,
     ChevronRight,
     ClipboardList,
-    Building2,
-    Wallet,
-    Calendar,
+    Star,
     User,
+    Wallet,
+    Zap,
 } from 'lucide-react-native';
 
 export default function PartnerDashboardScreen() {
@@ -173,6 +174,29 @@ export default function PartnerDashboardScreen() {
                             <Text style={styles.actionText}>Payouts</Text>
                         </TouchableOpacity>
                     </View>
+
+                    {/* Guest Reviews Quick Access Card */}
+                    <TouchableOpacity
+                        style={styles.reviewsHighlightCard}
+                        activeOpacity={0.85}
+                        onPress={() =>
+                            router.push('/(partner)/reviews/index' as any)
+                        }
+                    >
+                        <View style={styles.reviewsHighlightIcon}>
+                            <Star size={18} color="#D97706" fill="#D97706" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.reviewsHighlightTitle}>
+                                Guest Ratings & Reviews
+                            </Text>
+                            <Text style={styles.reviewsHighlightSub}>
+                                Monitor feedback, subcategory ratings, and
+                                publish partner responses.
+                            </Text>
+                        </View>
+                        <ChevronRight size={18} color={Colors.gray400} />
+                    </TouchableOpacity>
 
                     {/* Recent Reservations */}
                     <View style={styles.sectionHeader}>
@@ -441,6 +465,41 @@ const styles = StyleSheet.create({
     emptyText: {
         ...Typography.bodyMedium,
         color: Colors.gray500,
+    },
+    reviewsHighlightCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.white,
+        borderRadius: 12,
+        padding: Spacing.md,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+        marginBottom: Spacing.md,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+    reviewsHighlightIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#FEF3C7',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: Spacing.md,
+    },
+    reviewsHighlightTitle: {
+        fontSize: Typography.fontSize.sm,
+        fontWeight: '700',
+        color: Colors.deepPlum,
+    },
+    reviewsHighlightSub: {
+        fontSize: 11,
+        color: Colors.gray600,
+        marginTop: 2,
+        lineHeight: 16,
     },
     center: {
         flex: 1,

@@ -136,7 +136,7 @@ export default function CustomerSupportScreen() {
             if (res.data) {
                 Alert.alert(
                     'Grievance Lodged',
-                    'Our Customer Protection team has received your ticket. We will review your booking and resolve within 2 hours.',
+                    'Our Customer Protection desk will acknowledge your grievance within 48 hours and resolve it within 30 days pursuant to the TIJUM Grievance Redressal Policy.',
                 );
                 setDescription('');
                 loadCases();

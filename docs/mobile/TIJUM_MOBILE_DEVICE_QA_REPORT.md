@@ -3,24 +3,24 @@
 **Document Reference:** `docs/mobile/TIJUM_MOBILE_DEVICE_QA_REPORT.md`  
 **Application Target:** `apps/mobile/`  
 **Test Framework:** Node.js Native Test Runner (`node --experimental-strip-types --test`)  
-**TypeScript Version:** 5.3 (Strict Check `tsc --noEmit`)  
-**Date:** November 20, 2026  
+**TypeScript Version:** 5.7+ (Strict Check `tsc --noEmit`)  
+**Date:** November 20, 2026 (Phase M9 Reconciled)  
 **Status:** **100% PASSED (Zero Defects)**
 
 ---
 
 ## 1. Test Suite Summary
 
-The native mobile test suite contains **79 automated tests across 32 suites**, executed with sub-second performance (568ms):
+The native mobile test suite contains **88 automated tests across 39 suites**, executed with sub-second performance (~424ms):
 
 ```
-ℹ tests 79
-ℹ suites 32
-ℹ pass 79
+ℹ tests 88
+ℹ suites 39
+ℹ pass 88
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
-ℹ duration_ms 568.2764
+ℹ duration_ms 424.7866
 ```
 
 ---
@@ -65,6 +65,26 @@ The native mobile test suite contains **79 automated tests across 32 suites**, e
 
 ### 2.5 Offline Session Revocation (`__tests__/offlineRevocation.test.ts`)
 - 17 stress tests covering multi-token retention, FIFO ordering, SecureStore persistence, HTTP 401 dead-token purging, HTTP 429 backoff, corrupted JSON self-healing, and domain switching safety.
+
+### 2.6 Phase M9 Completion & Parity (`__tests__/phaseM9Completion.test.ts`)
+- **Grievance Redressal SLA Compliance:**
+  - Validates alert text compliance with Consumer Protection (E-Commerce) Rules 2020: 48h acknowledgement and 30d resolution.
+  - Verifies removal of inaccurate 2-hour resolution promise.
+- **Referral Reward Copy Qualification:**
+  - Validates dynamic interpolation of `referee_reward_points` and `referrer_reward_points` from API profile.
+  - Verifies generic fallback copy ("administrator-configured bonus points").
+- **Dedicated Customer Wishlist Screen & Navigation:**
+  - Validates `app/(customer)/wishlist/index.tsx` screen implementation with `CustomerApi.getWishlist()`.
+  - Verifies route registration in `(customer)/_layout.tsx` and profile link in `(customer)/profile/index.tsx`.
+- **Partner Review Management Screen & Navigation:**
+  - Validates `app/(partner)/reviews/index.tsx` screen implementation with `OwnerApi.getReviews()`.
+  - Validates response modal with 2,500-character limit counter and `OwnerApi.replyToReview()` integration.
+  - Verifies route registration in `(partner)/_layout.tsx` and dashboard quick card in `(partner)/dashboard.tsx`.
+- **Partner Physical Rooms Inventory Viewer:**
+  - Validates physical rooms modal in `app/(partner)/properties/index.tsx` querying `OwnerApi.getPropertyRooms()`.
+- **API Client Methods Validation:**
+  - Validates `CustomerApi.getWishlist` and `CustomerApi.toggleWishlist` exports.
+  - Validates `OwnerApi.getReviews` and `OwnerApi.replyToReview` exports.
 
 ---
 

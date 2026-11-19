@@ -2,9 +2,10 @@
 
 **Document Reference:** `docs/mobile/TIJUM_CUSTOMER_APP_FEATURE_SPECIFICATION.md`  
 **Application Scope:** `apps/mobile/app/(customer)/` and `(auth)/customer-*`  
+**Framework:** React Native 0.83.10 / Expo SDK 55 (Expo Router 55, React 19.2.0)  
 **Target Audience:** Students, working professionals, and long-term accommodation seekers  
-**Date:** November 20, 2026  
-**Status:** **ACTIVE & CERTIFIED**
+**Date:** November 20, 2026 (Phase M9 Reconciled)  
+**Status:** **ACTIVE, RECONCILED & CERTIFIED**
 
 ---
 
@@ -20,12 +21,12 @@ The Customer Mobile Application delivers an intuitive, transparent accommodation
 - **Login (`app/(auth)/customer-login.tsx`):**
   - Sign in via email or 10-digit mobile phone + password.
   - Automatic push notification token registration with backend.
-  - "Forgot Password?" dialog providing email password reset with input validation.
-  - Compliant branding: *\"Stay easy. Eat well. Spend less.\"*
+  - "Forgot Password?" dialog providing email password reset with input validation via `PublicApi.forgotPassword()`.
+  - Compliant branding: *\"Stay easy. Eat well. Spend less.\"* with transparent meal disclosures copy.
 - **Registration (`app/(auth)/customer-register.tsx`):**
   - 10-digit phone normalization (strips non-digits and leading `91`).
   - Automatic referral code capture via deep link or local storage.
-  - 250 bonus points incentive on completed first stay.
+  - Dynamically configured bonus points incentive on completed first stay.
 
 ### 2.2 Marketplace Discovery & Search
 - **Category Consolidation (`(customer)/explore/index.tsx`):**
@@ -41,7 +42,15 @@ The Customer Mobile Application delivers an intuitive, transparent accommodation
   - Verified host details and amenity badge grid.
   - Room category selector with daily, weekly, and monthly rates.
 
-### 2.3 Booking Checkout & Inventory Holds
+### 2.3 Dedicated Wishlist & Saved Stays
+- **Wishlist Hub (`(customer)/wishlist/index.tsx`):**
+  - Dedicated full-screen wishlist querying `CustomerApi.getWishlist()`.
+  - Rendered property cards with primary image, canonical category badge, pricing, and location.
+  - Heart toggle action calling `CustomerApi.toggleWishlist(propertyId)` for instant unfavorite removal.
+  - Pull-to-refresh, animated loading skeleton states, and empty state CTA redirecting to Explore.
+  - Direct entry point accessible from Customer Profile navigation.
+
+### 2.4 Booking Checkout & Inventory Holds
 - **Checkout Engine (`(customer)/bookings/create.tsx`):**
   - 15-minute transactional inventory hold preventing double-booking.
   - Real-time stay duration calculator (daily/monthly).
@@ -50,7 +59,7 @@ The Customer Mobile Application delivers an intuitive, transparent accommodation
   - Loyalty points redemption (FEFO engine) capped against net payable amount.
   - Native Razorpay checkout with auto-filled customer contact details.
 
-### 2.4 Booking Management & Verified Reviews
+### 2.5 Booking Management & Verified Reviews
 - **Booking Hub (`(customer)/bookings/index.tsx`):**
   - Filter tabs: *All*, *Awaiting Payment*, *Confirmed*, *Completed*, *Cancelled*.
   - Direct checkout retry for active holds within the 15-minute window.
@@ -63,17 +72,18 @@ The Customer Mobile Application delivers an intuitive, transparent accommodation
     * Written review text input with $\ge 10$ character validation.
     * Real-time submission via `CustomerApi.submitReview()` with instantaneous in-place view refresh.
 
-### 2.5 Rewards & Loyalty Points Hub
+### 2.6 Rewards & Loyalty Points Hub
 - **Points Ledger (`(customer)/rewards/points.tsx`):**
   - Total active points balance and FEFO expiry lot schedule.
 - **Referrals (`(customer)/rewards/referrals.tsx`):**
   - Unique shareable referral code and link.
   - Native share dialog for WhatsApp and social apps.
   - Referral status tracking: Pending qualification vs. Credited stays.
+  - **Dynamic Reward Copy:** Dynamically references `profile?.referee_reward_points` and `profile?.referrer_reward_points` from `RewardsApi.getReferralProfile()`, eliminating hardcoded point assumptions.
 - **Coupons (`(customer)/rewards/coupons.tsx`):**
   - Available promotional discount campaigns and copyable coupon codes.
 
-### 2.6 Customer Protection & Support
+### 2.7 Customer Protection & Support
 - **Support Hub (`(customer)/support/index.tsx`):**
   - Direct touchpoints: WhatsApp chat, phone call (`tel:+918142334033`), email (`support@tijum.com`).
   - Contact Inquiry submission tab with validation.
@@ -81,4 +91,5 @@ The Customer Mobile Application delivers an intuitive, transparent accommodation
     * Food not provided / meal quality discrepancy.
     * Room / amenity discrepancy.
     * Emergency relocation request.
-    * 2-hour response SLA guarantee.
+  - **Statutory Grievance Redressal SLA:** Complies strictly with Consumer Protection (E-Commerce) Rules 2020:
+    * *\"Our Customer Protection desk will acknowledge your grievance within 48 hours and resolve it within 30 days pursuant to the TIJUM Grievance Redressal Policy.\"*

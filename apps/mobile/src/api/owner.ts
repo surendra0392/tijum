@@ -3,6 +3,7 @@ import {
     ApiResponse,
     NotificationItem,
     OwnerProfile,
+    OwnerReview,
     PartnerDashboardData,
     PhysicalRoom,
     PropertyDetail,
@@ -62,6 +63,18 @@ export const OwnerApi = {
             `owner/reservations/${reference}/check-out`,
             { notes },
         ),
+
+    // Guest Reviews Management
+    getReviews: (params?: {
+        property_id?: number;
+        rating?: number;
+        page?: number;
+        status?: string;
+    }) => ApiClient.get<ApiResponse<OwnerReview[]>>('owner/reviews', params),
+    replyToReview: (id: number, responseText: string) =>
+        ApiClient.post<ApiResponse<any>>(`owner/reviews/${id}/response`, {
+            response: responseText,
+        }),
 
     // Financial & Settlements (read-only)
     getFinancialSummary: () =>

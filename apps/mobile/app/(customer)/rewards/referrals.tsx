@@ -101,9 +101,12 @@ export default function ReferralsScreen() {
     const handleCopyCode = () => {
         if (!profile?.referral_code) return;
         setCopied(true);
+        const refereeReward = profile.referee_reward_points
+            ? `${profile.referee_reward_points} bonus points`
+            : 'administrator-configured bonus points';
         Alert.alert(
             'Referral Code Copied!',
-            `Code: ${profile.referral_code}\n\nShare this code with your friends to give them 250 points on their first stay.`,
+            `Code: ${profile.referral_code}\n\nShare this code with your friends to give them ${refereeReward} on their first stay.`,
             [{ text: 'OK', onPress: () => setCopied(false) }],
         );
     };
@@ -111,7 +114,10 @@ export default function ReferralsScreen() {
     const handleNativeShare = async () => {
         if (!profile) return;
         try {
-            const message = `Join me on TIJUM for verified hostels, homestays, and co-living with daily meals included! Sign up using my referral link to get 250 loyalty points on your stay: ${profile.referral_link} or use code ${profile.referral_code}`;
+            const refereeReward = profile.referee_reward_points
+                ? `${profile.referee_reward_points} loyalty points`
+                : 'bonus loyalty points';
+            const message = `Join me on TIJUM for verified hostels, homestays, and co-living with daily meals included! Sign up using my referral link to get ${refereeReward} on your stay: ${profile.referral_link} or use code ${profile.referral_code}`;
             const RNShare = (ReactNative as any).Share;
             if (RNShare && typeof RNShare.share === 'function') {
                 await RNShare.share({
@@ -127,6 +133,14 @@ export default function ReferralsScreen() {
         }
     };
 
+    const refereePointsLabel = profile?.referee_reward_points
+        ? `${profile.referee_reward_points} bonus points`
+        : 'administrator-configured bonus points';
+
+    const referrerPointsLabel = profile?.referrer_reward_points
+        ? `${profile.referrer_reward_points} points`
+        : 'bonus points';
+
     const renderHeader = () => (
         <View style={styles.headerSection}>
             {/* Hero Offer Banner */}
@@ -139,8 +153,8 @@ export default function ReferralsScreen() {
                     Invite Friends, Earn Free Stays
                 </Text>
                 <Text style={styles.heroDesc}>
-                    Give friends 250 points for their first stay. You'll receive
-                    500 points when their check-out is completed!
+                    Give friends {refereePointsLabel} for their first stay. You'll receive{' '}
+                    {referrerPointsLabel} when their check-out is completed!
                 </Text>
 
                 {/* Referral Code & Share Controls */}
@@ -236,8 +250,7 @@ export default function ReferralsScreen() {
                             Friend joins and books
                         </Text>
                         <Text style={styles.stepDesc}>
-                            Your friend creates an account and gets 250 bonus
-                            points applied on their stay.
+                            Your friend creates an account and gets {refereePointsLabel} applied on their stay.
                         </Text>
                     </View>
                 </View>
@@ -251,10 +264,11 @@ export default function ReferralsScreen() {
                         <Text style={styles.stepNumber}>3</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.stepTitle}>You get 500 points</Text>
+                        <Text style={styles.stepTitle}>
+                            You get {referrerPointsLabel}
+                        </Text>
                         <Text style={styles.stepDesc}>
-                            Once your friend successfully checks out, 500 points
-                            credit straight to your wallet.
+                            Once your friend successfully checks out, {referrerPointsLabel} credit straight to your wallet.
                         </Text>
                     </View>
                 </View>
