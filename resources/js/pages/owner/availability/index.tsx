@@ -98,6 +98,40 @@ type Props = {
     status?: string;
 };
 
+function minorToRupees(minor: number | null | undefined): string {
+    if (minor === null || minor === undefined) {
+        return '';
+    }
+    const rupees = minor / 100;
+    return Number.isInteger(rupees) ? String(rupees) : rupees.toFixed(2);
+}
+
+function rupeesToMinor(raw: string): number | null {
+    const trimmed = raw.trim();
+    if (trimmed === '') {
+        return null;
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        return null;
+    }
+    return Math.round(parsed * 100);
+}
+
+function formatRupeePreview(raw: string): string | null {
+    const trimmed = raw.trim();
+    if (trimmed === '') {
+        return null;
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        return null;
+    }
+    return new Intl.NumberFormat('en-IN', {
+        maximumFractionDigits: 2,
+    }).format(parsed);
+}
+
 export default function OwnerAvailabilityIndex({
     properties,
     selectedPropertyId,
@@ -112,7 +146,7 @@ export default function OwnerAvailabilityIndex({
 }: Props) {
     const [blockModalOpen, setBlockModalOpen] = useState(false);
 
-    // Pricing form
+    // Pricing form (UI works in INR Rupees, submits integer paise to backend)
     const pricingForm = useForm({
         food_provided: property?.food?.food_provided ?? false,
         breakfast_included: property?.food?.breakfast_included ?? false,
@@ -120,16 +154,9 @@ export default function OwnerAvailabilityIndex({
         dinner_included: property?.food?.dinner_included ?? false,
         room_types: roomTypes.map((rt) => ({
             id: rt.id,
-            daily_rate_minor:
-                rt.daily_rate_minor !== null ? String(rt.daily_rate_minor) : '',
-            weekly_rate_minor:
-                rt.weekly_rate_minor !== null
-                    ? String(rt.weekly_rate_minor)
-                    : '',
-            monthly_rate_minor:
-                rt.monthly_rate_minor !== null
-                    ? String(rt.monthly_rate_minor)
-                    : '',
+            daily_rate: minorToRupees(rt.daily_rate_minor),
+            weekly_rate: minorToRupees(rt.weekly_rate_minor),
+            monthly_rate: minorToRupees(rt.monthly_rate_minor),
         })),
     });
 
@@ -170,21 +197,15 @@ export default function OwnerAvailabilityIndex({
         if (!property) return;
 
         pricingForm.transform((data) => ({
-            ...data,
+            food_provided: data.food_provided,
+            breakfast_included: data.breakfast_included,
+            lunch_included: data.lunch_included,
+            dinner_included: data.dinner_included,
             room_types: data.room_types.map((rt) => ({
                 id: rt.id,
-                daily_rate_minor:
-                    rt.daily_rate_minor === ''
-                        ? null
-                        : Number(rt.daily_rate_minor),
-                weekly_rate_minor:
-                    rt.weekly_rate_minor === ''
-                        ? null
-                        : Number(rt.weekly_rate_minor),
-                monthly_rate_minor:
-                    rt.monthly_rate_minor === ''
-                        ? null
-                        : Number(rt.monthly_rate_minor),
+                daily_rate_minor: rupeesToMinor(rt.daily_rate),
+                weekly_rate_minor: rupeesToMinor(rt.weekly_rate),
+                monthly_rate_minor: rupeesToMinor(rt.monthly_rate),
             })),
         }));
 
@@ -241,7 +262,7 @@ export default function OwnerAvailabilityIndex({
 
     const setRoomRate = (
         id: number,
-        field: 'daily_rate_minor' | 'weekly_rate_minor' | 'monthly_rate_minor',
+        field: 'daily_rate' | 'weekly_rate' | 'monthly_rate',
         value: string,
     ) => {
         pricingForm.setData(
@@ -831,13 +852,13 @@ export default function OwnerAvailabilityIndex({
                                         </CardTitle>
                                     </div>
                                     <Badge variant="outline">
-                                        Amounts in INR Paise (100 = ₹1.00)
+                                        Amounts in Indian Rupees (₹)
                                     </Badge>
                                 </div>
                                 <CardDescription>
-                                    Enter rates in minor units (e.g. 120000 =
-                                    ₹1,200/day). Guests can book by Day, Week,
-                                    or Month.
+                                    Enter rates directly in Rupees (e.g. 1200
+                                    for ₹1,200/day). Leave blank if a stay
+                                    duration is not offered.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -846,6 +867,17 @@ export default function OwnerAvailabilityIndex({
                                         const formRow =
                                             pricingForm.data.room_types.find(
                                                 (r) => r.id === rt.id,
+                                            );
+                                        const dailyPreview = formatRupeePreview(
+                                            formRow?.daily_rate ?? '',
+                                        );
+                                        const weeklyPreview =
+                                            formatRupeePreview(
+                                                formRow?.weekly_rate ?? '',
+                                            );
+                                        const monthlyPreview =
+                                            formatRupeePreview(
+                                                formRow?.monthly_rate ?? '',
                                             );
 
                                         return (
@@ -890,36 +922,42 @@ export default function OwnerAvailabilityIndex({
                                                             htmlFor={`daily_${rt.id}`}
                                                             className="text-xs text-tijum-plum-muted dark:text-muted-foreground"
                                                         >
-                                                            Daily Rate (Paise)
+                                                            Daily Rate (₹)
                                                         </Label>
                                                         <div className="relative">
+                                                            <span
+                                                                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm font-medium text-tijum-plum-muted dark:text-muted-foreground"
+                                                                aria-hidden="true"
+                                                            >
+                                                                ₹
+                                                            </span>
                                                             <Input
                                                                 id={`daily_${rt.id}`}
                                                                 type="number"
-                                                                placeholder="e.g. 100000"
+                                                                min={0}
+                                                                step="0.01"
+                                                                placeholder="e.g. 1200"
                                                                 value={
-                                                                    formRow?.daily_rate_minor ??
+                                                                    formRow?.daily_rate ??
                                                                     ''
                                                                 }
                                                                 onChange={(e) =>
                                                                     setRoomRate(
                                                                         rt.id,
-                                                                        'daily_rate_minor',
+                                                                        'daily_rate',
                                                                         e.target
                                                                             .value,
                                                                     )
                                                                 }
-                                                                className="font-mono text-sm tabular-nums"
+                                                                disabled={
+                                                                    !canManage
+                                                                }
+                                                                className="pl-7 font-mono text-sm tabular-nums"
                                                             />
                                                         </div>
-                                                        {formRow?.daily_rate_minor && (
+                                                        {dailyPreview && (
                                                             <span className="text-[11px] font-medium tabular-nums text-tijum-coral dark:text-tijum-peach">
-                                                                ≈ ₹
-                                                                {(
-                                                                    Number(
-                                                                        formRow.daily_rate_minor,
-                                                                    ) / 100
-                                                                ).toLocaleString()}
+                                                                ₹{dailyPreview}
                                                                 /day
                                                             </span>
                                                         )}
@@ -930,34 +968,42 @@ export default function OwnerAvailabilityIndex({
                                                             htmlFor={`weekly_${rt.id}`}
                                                             className="text-xs text-tijum-plum-muted dark:text-muted-foreground"
                                                         >
-                                                            Weekly Rate (Paise)
+                                                            Weekly Rate (₹)
                                                         </Label>
-                                                        <Input
-                                                            id={`weekly_${rt.id}`}
-                                                            type="number"
-                                                            placeholder="e.g. 600000"
-                                                            value={
-                                                                formRow?.weekly_rate_minor ??
-                                                                ''
-                                                            }
-                                                            onChange={(e) =>
-                                                                setRoomRate(
-                                                                    rt.id,
-                                                                    'weekly_rate_minor',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            className="font-mono text-sm"
-                                                        />
-                                                        {formRow?.weekly_rate_minor && (
-                                                            <span className="text-[11px] font-medium text-tijum-coral">
-                                                                ≈ ₹
-                                                                {(
-                                                                    Number(
-                                                                        formRow.weekly_rate_minor,
-                                                                    ) / 100
-                                                                ).toLocaleString()}
+                                                        <div className="relative">
+                                                            <span
+                                                                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm font-medium text-tijum-plum-muted dark:text-muted-foreground"
+                                                                aria-hidden="true"
+                                                            >
+                                                                ₹
+                                                            </span>
+                                                            <Input
+                                                                id={`weekly_${rt.id}`}
+                                                                type="number"
+                                                                min={0}
+                                                                step="0.01"
+                                                                placeholder="e.g. 6000"
+                                                                value={
+                                                                    formRow?.weekly_rate ??
+                                                                    ''
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setRoomRate(
+                                                                        rt.id,
+                                                                        'weekly_rate',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    !canManage
+                                                                }
+                                                                className="pl-7 font-mono text-sm tabular-nums"
+                                                            />
+                                                        </div>
+                                                        {weeklyPreview && (
+                                                            <span className="text-[11px] font-medium tabular-nums text-tijum-coral dark:text-tijum-peach">
+                                                                ₹{weeklyPreview}
                                                                 /wk
                                                             </span>
                                                         )}
@@ -966,36 +1012,45 @@ export default function OwnerAvailabilityIndex({
                                                     <div className="space-y-1">
                                                         <Label
                                                             htmlFor={`monthly_${rt.id}`}
-                                                            className="text-xs text-tijum-plum-muted"
+                                                            className="text-xs text-tijum-plum-muted dark:text-muted-foreground"
                                                         >
-                                                            Monthly Rate (Paise)
+                                                            Monthly Rate (₹)
                                                         </Label>
-                                                        <Input
-                                                            id={`monthly_${rt.id}`}
-                                                            type="number"
-                                                            placeholder="e.g. 2400000"
-                                                            value={
-                                                                formRow?.monthly_rate_minor ??
-                                                                ''
-                                                            }
-                                                            onChange={(e) =>
-                                                                setRoomRate(
-                                                                    rt.id,
-                                                                    'monthly_rate_minor',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            className="font-mono text-sm"
-                                                        />
-                                                        {formRow?.monthly_rate_minor && (
-                                                            <span className="text-[11px] font-medium text-tijum-coral">
-                                                                ≈ ₹
-                                                                {(
-                                                                    Number(
-                                                                        formRow.monthly_rate_minor,
-                                                                    ) / 100
-                                                                ).toLocaleString()}
+                                                        <div className="relative">
+                                                            <span
+                                                                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm font-medium text-tijum-plum-muted dark:text-muted-foreground"
+                                                                aria-hidden="true"
+                                                            >
+                                                                ₹
+                                                            </span>
+                                                            <Input
+                                                                id={`monthly_${rt.id}`}
+                                                                type="number"
+                                                                min={0}
+                                                                step="0.01"
+                                                                placeholder="e.g. 24000"
+                                                                value={
+                                                                    formRow?.monthly_rate ??
+                                                                    ''
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setRoomRate(
+                                                                        rt.id,
+                                                                        'monthly_rate',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    !canManage
+                                                                }
+                                                                className="pl-7 font-mono text-sm tabular-nums"
+                                                            />
+                                                        </div>
+                                                        {monthlyPreview && (
+                                                            <span className="text-[11px] font-medium tabular-nums text-tijum-coral dark:text-tijum-peach">
+                                                                ₹
+                                                                {monthlyPreview}
                                                                 /mo
                                                             </span>
                                                         )}

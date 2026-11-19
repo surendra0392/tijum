@@ -1,4 +1,4 @@
-﻿import { Head, useForm } from '@inertiajs/react';
+﻿import { Head, router, useForm } from '@inertiajs/react';
 import { ArrowRight } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { PropertyStepNavigation } from '@/components/owner/properties/property-step-navigation';
@@ -65,6 +65,40 @@ type Props = {
     status?: string | null;
 };
 
+function minorToRupees(minor: number | null | undefined): string {
+    if (minor === null || minor === undefined) {
+        return '';
+    }
+    const rupees = minor / 100;
+    return Number.isInteger(rupees) ? String(rupees) : rupees.toFixed(2);
+}
+
+function rupeesToMinor(raw: string): number | null {
+    const trimmed = raw.trim();
+    if (trimmed === '') {
+        return null;
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        return null;
+    }
+    return Math.round(parsed * 100);
+}
+
+function formatRupeePreview(raw: string): string | null {
+    const trimmed = raw.trim();
+    if (trimmed === '') {
+        return null;
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        return null;
+    }
+    return new Intl.NumberFormat('en-IN', {
+        maximumFractionDigits: 2,
+    }).format(parsed);
+}
+
 export default function OwnerPropertyPricing({
     property,
     roomTypes,
@@ -81,9 +115,9 @@ export default function OwnerPropertyPricing({
         dinner_included: property.food.dinner_included,
         room_types: roomTypes.map((rt) => ({
             id: rt.id,
-            daily_rate_minor: rt.daily_rate_minor ?? '',
-            weekly_rate_minor: rt.weekly_rate_minor ?? '',
-            monthly_rate_minor: rt.monthly_rate_minor ?? '',
+            daily_rate: minorToRupees(rt.daily_rate_minor),
+            weekly_rate: minorToRupees(rt.weekly_rate_minor),
+            monthly_rate: minorToRupees(rt.monthly_rate_minor),
         })),
     });
 
@@ -100,21 +134,15 @@ export default function OwnerPropertyPricing({
     const submitPricing = (e: FormEvent) => {
         e.preventDefault();
         form.transform((data) => ({
-            ...data,
+            food_provided: data.food_provided,
+            breakfast_included: data.breakfast_included,
+            lunch_included: data.lunch_included,
+            dinner_included: data.dinner_included,
             room_types: data.room_types.map((rt) => ({
                 id: rt.id,
-                daily_rate_minor:
-                    rt.daily_rate_minor === ''
-                        ? null
-                        : Number(rt.daily_rate_minor),
-                weekly_rate_minor:
-                    rt.weekly_rate_minor === ''
-                        ? null
-                        : Number(rt.weekly_rate_minor),
-                monthly_rate_minor:
-                    rt.monthly_rate_minor === ''
-                        ? null
-                        : Number(rt.monthly_rate_minor),
+                daily_rate_minor: rupeesToMinor(rt.daily_rate),
+                weekly_rate_minor: rupeesToMinor(rt.weekly_rate),
+                monthly_rate_minor: rupeesToMinor(rt.monthly_rate),
             })),
         }));
         form.put(pricingRoutes.update.url(property.id), {
@@ -142,7 +170,7 @@ export default function OwnerPropertyPricing({
 
     const setRoomRate = (
         id: number,
-        field: 'daily_rate_minor' | 'weekly_rate_minor' | 'monthly_rate_minor',
+        field: 'daily_rate' | 'weekly_rate' | 'monthly_rate',
         value: string,
     ) => {
         form.setData(
@@ -154,11 +182,12 @@ export default function OwnerPropertyPricing({
     };
 
     const cancelBlock = (blockId: number) => {
-        useForm({}).post(
+        router.post(
             pricingRoutes.availabilityBlocks.cancel.url({
                 property: property.id,
                 block: blockId,
             }),
+            {},
             { preserveScroll: true },
         );
     };
@@ -168,11 +197,13 @@ export default function OwnerPropertyPricing({
             <Head title={`${property.name} · Pricing & Availability`} />
             <div className="min-w-0 space-y-6">
                 <PageHeader
-                    eyebrow={`${property.property_reference} · Pricing & Availability`}
+                    eyebrow={`${property.property_reference} · Rates & Meals`}
                     title={property.name}
-                    description="Set property-level food inclusion and direct room-type pricing in INR minor units. Availability blocks do not create reservations."
+                    description="Set property-level meal inclusions and direct room-type rates in Indian Rupees (₹)."
                     badges={
-                        <Badge variant="outline">{options.currencyCode}</Badge>
+                        <Badge variant="outline">
+                            {options.currencyCode} (₹)
+                        </Badge>
                     }
                 />
 
@@ -190,16 +221,6 @@ export default function OwnerPropertyPricing({
                         </AlertDescription>
                     </Alert>
                 )}
-
-                <Alert variant="info">
-                    <AlertTitle>Phase 09A pricing model</AlertTitle>
-                    <AlertDescription>
-                        Food is declared at property level. Pricing is stored
-                        directly on each room type (daily/weekly/monthly).
-                        AC/Non-AC remains a room-type attribute. No rate plans,
-                        seasonal pricing, or amenity additional charges.
-                    </AlertDescription>
-                </Alert>
 
                 <form onSubmit={submitPricing} className="space-y-6">
                     <Card>
@@ -263,10 +284,16 @@ export default function OwnerPropertyPricing({
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>Direct room-type pricing</CardTitle>
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <CardTitle>Direct room-type pricing</CardTitle>
+                                <Badge variant="outline">
+                                    Amounts in Indian Rupees (₹)
+                                </Badge>
+                            </div>
                             <CardDescription>
-                                Enter amounts in minor units (paise). Leave
-                                blank if a duration is not offered.{' '}
+                                Enter amounts directly in Indian Rupees (e.g.
+                                1200 for ₹1,200/day). Leave blank if a duration
+                                is not offered.{' '}
                                 {evaluation.configured_room_types_count}/
                                 {evaluation.active_room_types_count} room types
                                 configured.
@@ -283,6 +310,20 @@ export default function OwnerPropertyPricing({
                                     const row = form.data.room_types.find(
                                         (r) => r.id === rt.id,
                                     );
+                                    const hasAnyRate =
+                                        rt.daily_rate_minor !== null ||
+                                        rt.weekly_rate_minor !== null ||
+                                        rt.monthly_rate_minor !== null;
+                                    const dailyPreview = formatRupeePreview(
+                                        row?.daily_rate ?? '',
+                                    );
+                                    const weeklyPreview = formatRupeePreview(
+                                        row?.weekly_rate ?? '',
+                                    );
+                                    const monthlyPreview = formatRupeePreview(
+                                        row?.monthly_rate ?? '',
+                                    );
+
                                     return (
                                         <div
                                             key={rt.id}
@@ -304,12 +345,12 @@ export default function OwnerPropertyPricing({
                                                 </div>
                                                 <Badge
                                                     variant={
-                                                        rt.has_any_direct_rate
+                                                        hasAnyRate
                                                             ? 'plum'
                                                             : 'outline'
                                                     }
                                                 >
-                                                    {rt.has_any_direct_rate
+                                                    {hasAnyRate
                                                         ? 'Configured'
                                                         : 'Missing rates'}
                                                 </Badge>
@@ -319,73 +360,124 @@ export default function OwnerPropertyPricing({
                                                     <Label
                                                         htmlFor={`daily-${rt.id}`}
                                                     >
-                                                        Daily (minor)
+                                                        Daily Rate (₹)
                                                     </Label>
-                                                    <Input
-                                                        id={`daily-${rt.id}`}
-                                                        type="number"
-                                                        min={0}
-                                                        value={
-                                                            row?.daily_rate_minor ??
-                                                            ''
-                                                        }
-                                                        onChange={(e) =>
-                                                            setRoomRate(
-                                                                rt.id,
-                                                                'daily_rate_minor',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        disabled={!canManage}
-                                                    />
+                                                    <div className="relative">
+                                                        <span
+                                                            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm font-medium text-tijum-plum-muted dark:text-muted-foreground"
+                                                            aria-hidden="true"
+                                                        >
+                                                            ₹
+                                                        </span>
+                                                        <Input
+                                                            id={`daily-${rt.id}`}
+                                                            type="number"
+                                                            min={0}
+                                                            step="0.01"
+                                                            placeholder="e.g. 1200"
+                                                            value={
+                                                                row?.daily_rate ??
+                                                                ''
+                                                            }
+                                                            onChange={(e) =>
+                                                                setRoomRate(
+                                                                    rt.id,
+                                                                    'daily_rate',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            disabled={!canManage}
+                                                            className="pl-7 font-mono tabular-nums"
+                                                        />
+                                                    </div>
+                                                    {dailyPreview && (
+                                                        <p className="text-[11px] font-medium tabular-nums text-tijum-coral dark:text-tijum-peach">
+                                                            ₹{dailyPreview}/day
+                                                        </p>
+                                                    )}
                                                 </div>
                                                 <div className="space-y-1">
                                                     <Label
                                                         htmlFor={`weekly-${rt.id}`}
                                                     >
-                                                        Weekly (minor)
+                                                        Weekly Rate (₹)
                                                     </Label>
-                                                    <Input
-                                                        id={`weekly-${rt.id}`}
-                                                        type="number"
-                                                        min={0}
-                                                        value={
-                                                            row?.weekly_rate_minor ??
-                                                            ''
-                                                        }
-                                                        onChange={(e) =>
-                                                            setRoomRate(
-                                                                rt.id,
-                                                                'weekly_rate_minor',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        disabled={!canManage}
-                                                    />
+                                                    <div className="relative">
+                                                        <span
+                                                            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm font-medium text-tijum-plum-muted dark:text-muted-foreground"
+                                                            aria-hidden="true"
+                                                        >
+                                                            ₹
+                                                        </span>
+                                                        <Input
+                                                            id={`weekly-${rt.id}`}
+                                                            type="number"
+                                                            min={0}
+                                                            step="0.01"
+                                                            placeholder="e.g. 6000"
+                                                            value={
+                                                                row?.weekly_rate ??
+                                                                ''
+                                                            }
+                                                            onChange={(e) =>
+                                                                setRoomRate(
+                                                                    rt.id,
+                                                                    'weekly_rate',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            disabled={!canManage}
+                                                            className="pl-7 font-mono tabular-nums"
+                                                        />
+                                                    </div>
+                                                    {weeklyPreview && (
+                                                        <p className="text-[11px] font-medium tabular-nums text-tijum-coral dark:text-tijum-peach">
+                                                            ₹{weeklyPreview}/wk
+                                                        </p>
+                                                    )}
                                                 </div>
                                                 <div className="space-y-1">
                                                     <Label
                                                         htmlFor={`monthly-${rt.id}`}
                                                     >
-                                                        Monthly (minor)
+                                                        Monthly Rate (₹)
                                                     </Label>
-                                                    <Input
-                                                        id={`monthly-${rt.id}`}
-                                                        type="number"
-                                                        min={0}
-                                                        value={
-                                                            row?.monthly_rate_minor ??
-                                                            ''
-                                                        }
-                                                        onChange={(e) =>
-                                                            setRoomRate(
-                                                                rt.id,
-                                                                'monthly_rate_minor',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        disabled={!canManage}
-                                                    />
+                                                    <div className="relative">
+                                                        <span
+                                                            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm font-medium text-tijum-plum-muted dark:text-muted-foreground"
+                                                            aria-hidden="true"
+                                                        >
+                                                            ₹
+                                                        </span>
+                                                        <Input
+                                                            id={`monthly-${rt.id}`}
+                                                            type="number"
+                                                            min={0}
+                                                            step="0.01"
+                                                            placeholder="e.g. 24000"
+                                                            value={
+                                                                row?.monthly_rate ??
+                                                                ''
+                                                            }
+                                                            onChange={(e) =>
+                                                                setRoomRate(
+                                                                    rt.id,
+                                                                    'monthly_rate',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            disabled={!canManage}
+                                                            className="pl-7 font-mono tabular-nums"
+                                                        />
+                                                    </div>
+                                                    {monthlyPreview && (
+                                                        <p className="text-[11px] font-medium tabular-nums text-tijum-coral dark:text-tijum-peach">
+                                                            ₹{monthlyPreview}/mo
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -398,7 +490,7 @@ export default function OwnerPropertyPricing({
                                     variant="plum"
                                     disabled={!canManage || form.processing}
                                 >
-                                    Save pricing & food
+                                    Save pricing &amp; food
                                 </Button>
                             </div>
                         </CardContent>
