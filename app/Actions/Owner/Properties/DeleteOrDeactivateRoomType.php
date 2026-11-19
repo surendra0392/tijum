@@ -7,10 +7,12 @@ namespace App\Actions\Owner\Properties;
 use App\Enums\PropertyVerificationEventType;
 use App\Models\Owner;
 use App\Models\Property;
+use App\Models\PropertyMedia;
 use App\Models\PropertyRoomType;
 use App\Models\PropertyVerificationApplication;
 use App\Models\PropertyVerificationEvent;
 use App\Models\Reservation;
+use App\Models\ReservationRoomAllocation;
 use App\Services\StayTimingPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -25,8 +27,9 @@ class DeleteOrDeactivateRoomType
         Property $property,
         PropertyRoomType $roomType,
         bool $deactivateOnly = false,
+        bool $deleteRooms = false,
     ): void {
-        DB::transaction(function () use ($owner, $property, $roomType, $deactivateOnly): void {
+        DB::transaction(function () use ($owner, $property, $roomType, $deactivateOnly, $deleteRooms): void {
             $lockedProperty = Property::query()
                 ->whereKey($property->id)
                 ->lockForUpdate()
@@ -40,10 +43,14 @@ class DeleteOrDeactivateRoomType
 
             $activeApp = $lockedProperty->activeVerificationApplication()->lockForUpdate()->first();
             $hasApproved = $lockedProperty->hasApprovedBaseline();
+            $hasActiveEditableAmendment = $hasApproved
+                && $activeApp instanceof PropertyVerificationApplication
+                && $activeApp->is_amendment
+                && $activeApp->status->isEditableByOwner();
 
-            if ($hasApproved && (! $activeApp instanceof PropertyVerificationApplication || ! $activeApp->is_amendment || ! $activeApp->status->isEditableByOwner())) {
+            if (! $hasApproved && $activeApp instanceof PropertyVerificationApplication && ! $activeApp->status->isEditableByOwner()) {
                 throw ValidationException::withMessages([
-                    'room_type' => 'Deactivating or deleting a room type on an approved property requires an active amendment.',
+                    'room_type' => 'Room types cannot be modified while verification is currently in review.',
                 ]);
             }
 
@@ -61,14 +68,15 @@ class DeleteOrDeactivateRoomType
 
             if ($hasOccupancy) {
                 throw ValidationException::withMessages([
-                    'room_type' => 'Cannot deactivate a room type with pending or confirmed reservations occupying current or future dates.',
+                    'room_type' => 'Cannot deactivate or delete a room type with pending or confirmed reservations occupying current or future dates.',
                 ]);
             }
 
-            $hasRooms = $lockedRoomType->rooms()->exists();
+            $roomIds = $lockedRoomType->rooms()->pluck('id')->all();
+            $hasRooms = $roomIds !== [];
 
             if ($deactivateOnly) {
-                if ($hasApproved && $lockedRoomType->is_approved_version) {
+                if ($hasActiveEditableAmendment && $lockedRoomType->is_approved_version) {
                     $pending = $lockedRoomType->effectiveAttributes($activeApp);
                     $pending['is_active'] = false;
                     $lockedRoomType->forceFill([
@@ -92,10 +100,31 @@ class DeleteOrDeactivateRoomType
                 return;
             }
 
-            if ($hasRooms) {
+            if ($hasRooms && ! $deleteRooms) {
                 throw ValidationException::withMessages([
-                    'room_type' => 'This room type cannot be deleted while physical rooms reference it. Deactivate it instead or reassign rooms.',
+                    'room_type' => 'This room type cannot be deleted while physical rooms reference it. Deactivate it instead or confirm deleting its rooms.',
                 ]);
+            }
+
+            if (Reservation::query()->where('property_room_type_id', $lockedRoomType->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'room_type' => 'This room type has booking history and cannot be permanently deleted. Deactivate it instead.',
+                ]);
+            }
+
+            if ($hasRooms && ReservationRoomAllocation::query()->whereIn('property_room_id', $roomIds)->exists()) {
+                throw ValidationException::withMessages([
+                    'room_type' => 'Physical rooms under this room type have reservation allocation history and cannot be permanently deleted. Deactivate it instead.',
+                ]);
+            }
+
+            if ($hasRooms) {
+                PropertyMedia::query()
+                    ->where('property_id', $lockedProperty->id)
+                    ->whereIn('property_room_id', $roomIds)
+                    ->update(['property_room_id' => null]);
+
+                $lockedRoomType->rooms()->delete();
             }
 
             $deletedName = $lockedRoomType->name;
@@ -109,7 +138,11 @@ class DeleteOrDeactivateRoomType
                 actorType: 'owner',
                 actorId: $owner->id,
                 actorName: $owner->name,
-                notes: sprintf('Removed unreferenced room type "%s".', $deletedName),
+                notes: sprintf(
+                    'Removed room type "%s"%s.',
+                    $deletedName,
+                    $hasRooms ? sprintf(' and %d physical room(s)', count($roomIds)) : '',
+                ),
             );
         });
     }

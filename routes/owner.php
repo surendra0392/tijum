@@ -252,6 +252,9 @@ Route::prefix('owner')
                                     Route::patch('{room}/status', 'updateStatus')
                                         ->whereNumber('room')
                                         ->name('status.update');
+                                    Route::delete('{room}', 'destroy')
+                                        ->whereNumber('room')
+                                        ->name('destroy');
                                 });
 
                             Route::prefix('media')
@@ -277,6 +280,7 @@ Route::prefix('owner')
                                 ->controller(PropertyAmenityController::class)
                                 ->group(function (): void {
                                     Route::get('/', 'index')->name('index');
+                                    Route::put('/sync', 'sync')->name('sync');
                                     Route::post('/property', 'storeProperty')->name('property.store');
                                     Route::patch('/property/{amenity}', 'updateProperty')
                                         ->whereNumber('amenity')

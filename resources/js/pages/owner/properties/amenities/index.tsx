@@ -1,13 +1,17 @@
-import { Head, useForm } from '@inertiajs/react';
-import { AlertTriangle, Info, PlusCircle, Send, Sparkles } from 'lucide-react';
-import { useMemo, useState, type FormEvent } from 'react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    Building2,
+    Check,
+    CheckCircle2,
+    Layers,
+    Save,
+    Sparkles,
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { PropertyStepNavigation } from '@/components/owner/properties/property-step-navigation';
 import { EmptyState } from '@/components/shared/empty-state';
 import { PageHeader } from '@/components/shared/page-header';
-import {
-    StatusBadge,
-    type SemanticStatus,
-} from '@/components/shared/status-badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,20 +24,18 @@ import {
 } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
+import { dashboard } from '@/routes/owner';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import amenitiesRoutes from '@/routes/owner/properties/amenities';
+    index as propertiesIndexRoute,
+    show as showPropertyRoute,
+} from '@/routes/owner/properties';
+import { index as amenitiesIndexRoute } from '@/routes/owner/properties/amenities';
+import { index as roomTypesIndexRoute } from '@/routes/owner/properties/room-types';
 import type {
     AmenityAssignmentSummary,
-    AmenityAvailability,
+    AmenityCatalogueItem,
     AmenityCategoryOption,
-    AmenityReadiness,
     PropertySummaryData,
 } from '@/types';
 
@@ -43,143 +45,9 @@ type Props = {
     catalogue: AmenityCategoryOption[];
     propertyAssignments: AmenityAssignmentSummary[];
     roomTypeAssignments: AmenityAssignmentSummary[];
-    evaluation: AmenityReadiness;
-    options: {
-        availability: { value: AmenityAvailability; label: string }[];
-        statuses: { value: string; label: string }[];
-    };
     canManage: boolean;
+    status?: string;
 };
-
-function statusToSemantic(status: string): SemanticStatus {
-    if (status === 'approved') return 'verified';
-    if (status === 'submitted' || status === 'under_review')
-        return 'processing';
-    if (status === 'needs_information') return 'pending';
-    if (status === 'rejected') return 'rejected';
-    if (status === 'inactive') return 'cancelled';
-    return 'neutral';
-}
-
-function AssignmentCard({
-    assignment,
-    propertyId,
-}: {
-    assignment: AmenityAssignmentSummary;
-    propertyId: number;
-}) {
-    const submitForm = useForm({ declaration_accepted: false as boolean });
-    const onSubmit = (e: FormEvent) => {
-        e.preventDefault();
-        const url =
-            assignment.scope === 'property'
-                ? amenitiesRoutes.property.submit.url([
-                      propertyId,
-                      assignment.id,
-                  ])
-                : amenitiesRoutes.roomType.submit.url([
-                      propertyId,
-                      assignment.id,
-                  ]);
-        submitForm.post(url, { preserveScroll: true });
-    };
-
-    return (
-        <Card>
-            <CardHeader className="pb-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="space-y-1">
-                        <CardTitle className="text-base">
-                            {assignment.amenity?.name ?? 'Amenity'}
-                        </CardTitle>
-                        <CardDescription className="text-xs">
-                            {assignment.scope === 'room_type'
-                                ? `Room type: ${assignment.room_type_name ?? `#${assignment.property_room_type_id}`}`
-                                : 'Property-level amenity'}
-                            {' · '}
-                            {assignment.assignment_reference}
-                        </CardDescription>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <StatusBadge
-                            status={statusToSemantic(assignment.status)}
-                            label={assignment.status_label}
-                        />
-                        <Badge variant="outline">
-                            {assignment.availability_label}
-                        </Badge>
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-                {assignment.details && (
-                    <p className="text-tijum-plum-muted dark:text-muted-foreground">
-                        {assignment.details}
-                    </p>
-                )}
-                {assignment.requested_information && (
-                    <Alert variant="warning">
-                        <AlertTriangle aria-hidden="true" />
-                        <AlertTitle>Information requested</AlertTitle>
-                        <AlertDescription>
-                            {assignment.requested_information}
-                        </AlertDescription>
-                    </Alert>
-                )}
-                {assignment.decision_reason &&
-                    assignment.status === 'rejected' && (
-                        <Alert variant="destructive">
-                            <AlertTitle>Decision reason</AlertTitle>
-                            <AlertDescription>
-                                {assignment.decision_reason}
-                            </AlertDescription>
-                        </Alert>
-                    )}
-                {assignment.can_submit && (
-                    <form
-                        onSubmit={onSubmit}
-                        className="space-y-3 rounded-xl border border-tijum-surface bg-tijum-cream/30 p-3 dark:border-border dark:bg-muted/35"
-                    >
-                        <div className="flex items-start gap-2">
-                            <Checkbox
-                                id={`decl-${assignment.scope}-${assignment.id}`}
-                                checked={submitForm.data.declaration_accepted}
-                                onCheckedChange={(v) =>
-                                    submitForm.setData(
-                                        'declaration_accepted',
-                                        v === true,
-                                    )
-                                }
-                            />
-                            <Label
-                                htmlFor={`decl-${assignment.scope}-${assignment.id}`}
-                                className="text-xs leading-relaxed"
-                            >
-                                I confirm this amenity information is accurate
-                                and matches what is genuinely available to
-                                guests.
-                            </Label>
-                        </div>
-                        {submitForm.errors.declaration_accepted && (
-                            <p className="text-xs text-status-error-fg">
-                                {submitForm.errors.declaration_accepted}
-                            </p>
-                        )}
-                        <Button
-                            type="submit"
-                            size="sm"
-                            variant="plum"
-                            disabled={submitForm.processing}
-                        >
-                            <Send aria-hidden="true" />
-                            <span>Submit for verification</span>
-                        </Button>
-                    </form>
-                )}
-            </CardContent>
-        </Card>
-    );
-}
 
 export default function OwnerPropertyAmenitiesIndex({
     property,
@@ -187,61 +55,199 @@ export default function OwnerPropertyAmenitiesIndex({
     catalogue,
     propertyAssignments,
     roomTypeAssignments,
-    evaluation,
-    options,
     canManage,
+    status,
 }: Props) {
+    const { errors } = usePage<{ errors?: Record<string, string> }>().props;
+    const errorMessage =
+        errors?.amenity ??
+        errors?.amenity_ids ??
+        errors?.property_room_type_id ??
+        null;
+
     const [scope, setScope] = useState<'property' | 'room_type'>('property');
-
-    const propertyAmenities = useMemo(
-        () =>
-            catalogue.flatMap((c) =>
-                (c.amenities ?? []).filter((a) => a.applies_to_property),
-            ),
-        [catalogue],
+    const [activeRoomTypeId, setActiveRoomTypeId] = useState<number | null>(
+        roomTypes[0]?.id ?? null,
     );
-    const roomTypeAmenities = useMemo(
+    const [applyToAllRoomTypes, setApplyToAllRoomTypes] = useState(false);
+    const [saving, setSaving] = useState(false);
+
+    const initialPropertyIds = useMemo(
         () =>
-            catalogue.flatMap((c) =>
-                (c.amenities ?? []).filter((a) => a.applies_to_room_type),
-            ),
-        [catalogue],
+            propertyAssignments
+                .filter((a) => a.is_current && a.status !== 'inactive')
+                .map((a) => a.amenity_id),
+        [propertyAssignments],
     );
 
-    const propForm = useForm({
-        amenity_id: '',
-        availability: 'included' as AmenityAvailability,
-        is_customer_visible: true,
-        details: '',
-    });
-    const rtForm = useForm({
-        property_room_type_id: '',
-        amenity_id: '',
-        availability: 'included' as AmenityAvailability,
-        is_customer_visible: true,
-        details: '',
-    });
+    const initialRoomTypeMap = useMemo(() => {
+        const next: Record<number, number[]> = {};
+        for (const rt of roomTypes) {
+            next[rt.id] = [];
+        }
+        for (const assignment of roomTypeAssignments) {
+            if (!assignment.is_current || assignment.status === 'inactive') {
+                continue;
+            }
+            const rtId = assignment.property_room_type_id;
+            if (typeof rtId === 'number') {
+                next[rtId] ??= [];
+                if (!next[rtId].includes(assignment.amenity_id)) {
+                    next[rtId].push(assignment.amenity_id);
+                }
+            }
+        }
+        return next;
+    }, [roomTypes, roomTypeAssignments]);
 
-    const saveProperty = (e: FormEvent) => {
-        e.preventDefault();
-        propForm.post(amenitiesRoutes.property.store.url(property.id), {
-            preserveScroll: true,
-            onSuccess: () => propForm.reset('amenity_id', 'details'),
+    const [selectedPropertyIds, setSelectedPropertyIds] =
+        useState<number[]>(initialPropertyIds);
+    const [selectedByRoomType, setSelectedByRoomType] =
+        useState<Record<number, number[]>>(initialRoomTypeMap);
+
+    useEffect(() => {
+        setSelectedPropertyIds(initialPropertyIds);
+    }, [initialPropertyIds]);
+
+    useEffect(() => {
+        setSelectedByRoomType(initialRoomTypeMap);
+        if (
+            activeRoomTypeId === null ||
+            !roomTypes.some((rt) => rt.id === activeRoomTypeId)
+        ) {
+            setActiveRoomTypeId(roomTypes[0]?.id ?? null);
+        }
+    }, [initialRoomTypeMap, roomTypes, activeRoomTypeId]);
+
+    const groupedPropertyCategories = useMemo(
+        () =>
+            catalogue
+                .map((category) => ({
+                    ...category,
+                    amenities: (category.amenities ?? []).filter(
+                        (a) => a.applies_to_property,
+                    ),
+                }))
+                .filter((category) => category.amenities.length > 0),
+        [catalogue],
+    );
+
+    const groupedRoomTypeCategories = useMemo(
+        () =>
+            catalogue
+                .map((category) => ({
+                    ...category,
+                    amenities: (category.amenities ?? []).filter(
+                        (a) => a.applies_to_room_type,
+                    ),
+                }))
+                .filter((category) => category.amenities.length > 0),
+        [catalogue],
+    );
+
+    const activeRoomSelectedIds = useMemo(
+        () =>
+            activeRoomTypeId !== null
+                ? (selectedByRoomType[activeRoomTypeId] ?? [])
+                : [],
+        [activeRoomTypeId, selectedByRoomType],
+    );
+
+    const togglePropertyAmenity = (amenityId: number) => {
+        if (!canManage) return;
+        setSelectedPropertyIds((prev) =>
+            prev.includes(amenityId)
+                ? prev.filter((id) => id !== amenityId)
+                : [...prev, amenityId],
+        );
+    };
+
+    const togglePropertyCategory = (items: AmenityCatalogueItem[]) => {
+        if (!canManage) return;
+        const itemIds = items.map((a) => a.id);
+        const allSelected = itemIds.every((id) =>
+            selectedPropertyIds.includes(id),
+        );
+
+        setSelectedPropertyIds((prev) => {
+            if (allSelected) {
+                return prev.filter((id) => !itemIds.includes(id));
+            }
+            const next = new Set(prev);
+            for (const id of itemIds) {
+                next.add(id);
+            }
+            return Array.from(next);
         });
     };
-    const saveRoomType = (e: FormEvent) => {
-        e.preventDefault();
-        rtForm.post(amenitiesRoutes.roomType.store.url(property.id), {
-            preserveScroll: true,
-            onSuccess: () => rtForm.reset('amenity_id', 'details'),
+
+    const toggleRoomTypeAmenity = (amenityId: number) => {
+        if (!canManage || activeRoomTypeId === null) return;
+        setSelectedByRoomType((prev) => {
+            const current = prev[activeRoomTypeId] ?? [];
+            const next = current.includes(amenityId)
+                ? current.filter((id) => id !== amenityId)
+                : [...current, amenityId];
+            return { ...prev, [activeRoomTypeId]: next };
         });
     };
 
-    const propAmenityError = (
-        propForm.errors as Record<string, string | undefined>
-    ).amenity;
-    const rtAmenityError = (rtForm.errors as Record<string, string | undefined>)
-        .amenity;
+    const toggleRoomTypeCategory = (items: AmenityCatalogueItem[]) => {
+        if (!canManage || activeRoomTypeId === null) return;
+        const itemIds = items.map((a) => a.id);
+        const current = selectedByRoomType[activeRoomTypeId] ?? [];
+        const allSelected = itemIds.every((id) => current.includes(id));
+
+        setSelectedByRoomType((prev) => {
+            const existing = prev[activeRoomTypeId] ?? [];
+            if (allSelected) {
+                return {
+                    ...prev,
+                    [activeRoomTypeId]: existing.filter(
+                        (id) => !itemIds.includes(id),
+                    ),
+                };
+            }
+            const next = new Set(existing);
+            for (const id of itemIds) {
+                next.add(id);
+            }
+            return { ...prev, [activeRoomTypeId]: Array.from(next) };
+        });
+    };
+
+    const savePropertyAmenities = () => {
+        setSaving(true);
+        router.put(
+            `/owner/properties/${property.id}/amenities/sync`,
+            {
+                scope: 'property',
+                amenity_ids: selectedPropertyIds,
+            },
+            {
+                preserveScroll: true,
+                onFinish: () => setSaving(false),
+            },
+        );
+    };
+
+    const saveRoomTypeAmenities = () => {
+        if (activeRoomTypeId === null && !applyToAllRoomTypes) return;
+        setSaving(true);
+        router.put(
+            `/owner/properties/${property.id}/amenities/sync`,
+            {
+                scope: 'room_type',
+                property_room_type_id: activeRoomTypeId,
+                apply_to_all_room_types: applyToAllRoomTypes,
+                amenity_ids: activeRoomSelectedIds,
+            },
+            {
+                preserveScroll: true,
+                onFinish: () => setSaving(false),
+            },
+        );
+    };
 
     return (
         <>
@@ -250,477 +256,526 @@ export default function OwnerPropertyAmenitiesIndex({
                 <PageHeader
                     eyebrow={`${property.property_reference} · Amenities`}
                     title="Amenities & Facilities"
-                    description="Manage property-level and room-type amenities separately from AC/Non-AC and food packages. Submit amenity assignments for TIJUM verification before they can be shown to customers."
+                    description="Simply check the amenities available at this property and inside each room type, then click save."
                 />
 
                 <PropertyStepNavigation
                     propertyId={property.id}
                     activeStep="amenities"
+                    roomTypesCount={property.room_types_count}
+                    roomsCount={property.rooms_count}
                 />
 
-                {!property.has_approved_baseline && (
-                    <Alert variant="warning">
-                        <Info aria-hidden="true" />
-                        <AlertTitle>Property verification required</AlertTitle>
+                {(status === 'property-amenities-synced' ||
+                    status === 'room-type-amenities-synced') && (
+                    <Alert variant="success">
+                        <CheckCircle2 aria-hidden="true" />
+                        <AlertTitle>Amenities saved</AlertTitle>
                         <AlertDescription>
-                            Complete and approve property verification before
-                            amenity assignments can be submitted or approved.
+                            {status === 'property-amenities-synced'
+                                ? 'Property-level amenities have been updated and published.'
+                                : 'Room-type amenities have been updated and published.'}
                         </AlertDescription>
                     </Alert>
                 )}
 
-                {evaluation.missing_requirements.length > 0 && (
-                    <Alert variant="warning">
+                {errorMessage && (
+                    <Alert variant="destructive">
                         <AlertTriangle aria-hidden="true" />
-                        <AlertTitle>Readiness notes</AlertTitle>
-                        <AlertDescription>
-                            <ul className="list-disc space-y-1 pl-4">
-                                {evaluation.missing_requirements
-                                    .slice(0, 6)
-                                    .map((item) => (
-                                        <li key={item}>{item}</li>
-                                    ))}
-                            </ul>
-                        </AlertDescription>
+                        <AlertTitle>Unable to Save Amenities</AlertTitle>
+                        <AlertDescription>{errorMessage}</AlertDescription>
                     </Alert>
                 )}
 
-                <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 tabular-nums">
-                    <Card>
-                        <CardContent className="pt-5">
-                            <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                Approved
-                            </p>
-                            <p className="font-heading text-2xl font-bold text-tijum-plum dark:text-foreground">
-                                {evaluation.approved_count}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-5">
-                            <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                Awaiting review
-                            </p>
-                            <p className="font-heading text-2xl font-bold text-tijum-plum dark:text-foreground">
-                                {evaluation.pending_review_count}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-5">
-                            <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                Needs info
-                            </p>
-                            <p className="font-heading text-2xl font-bold text-tijum-plum dark:text-foreground">
-                                {evaluation.needs_information_count}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-5">
-                            <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                Draft/updates
-                            </p>
-                            <p className="font-heading text-2xl font-bold text-tijum-plum dark:text-foreground">
-                                {evaluation.draft_count}
-                            </p>
-                        </CardContent>
-                    </Card>
-                </section>
+                {/* Scope Switcher Tabs */}
+                <div
+                    role="tablist"
+                    aria-label="Amenity scope"
+                    className="inline-flex flex-wrap items-center gap-1.5 rounded-2xl border border-tijum-surface/85 bg-card p-1.5 shadow-2xs dark:border-border"
+                >
+                    <button
+                        type="button"
+                        role="tab"
+                        aria-selected={scope === 'property'}
+                        onClick={() => setScope('property')}
+                        className={cn(
+                            'inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 font-heading text-xs font-semibold transition-all',
+                            scope === 'property'
+                                ? 'bg-tijum-plum text-tijum-cream shadow-xs dark:bg-tijum-coral dark:text-white'
+                                : 'text-tijum-plum-muted hover:bg-tijum-cream/65 hover:text-tijum-plum dark:text-muted-foreground dark:hover:text-foreground',
+                        )}
+                    >
+                        <Building2 className="size-4" aria-hidden="true" />
+                        <span>Property Amenities</span>
+                        <Badge
+                            variant="outline"
+                            className={cn(
+                                'px-1.5 py-0 text-[10px] font-bold tabular-nums',
+                                scope === 'property'
+                                    ? 'border-white/30 bg-white/15 text-white'
+                                    : '',
+                            )}
+                        >
+                            {selectedPropertyIds.length}
+                        </Badge>
+                    </button>
 
-                {canManage && (
+                    <button
+                        type="button"
+                        role="tab"
+                        aria-selected={scope === 'room_type'}
+                        onClick={() => setScope('room_type')}
+                        className={cn(
+                            'inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 font-heading text-xs font-semibold transition-all',
+                            scope === 'room_type'
+                                ? 'bg-tijum-plum text-tijum-cream shadow-xs dark:bg-tijum-coral dark:text-white'
+                                : 'text-tijum-plum-muted hover:bg-tijum-cream/65 hover:text-tijum-plum dark:text-muted-foreground dark:hover:text-foreground',
+                        )}
+                    >
+                        <Layers className="size-4" aria-hidden="true" />
+                        <span>Room-Type Amenities</span>
+                        <Badge
+                            variant="outline"
+                            className={cn(
+                                'px-1.5 py-0 text-[10px] font-bold tabular-nums',
+                                scope === 'room_type'
+                                    ? 'border-white/30 bg-white/15 text-white'
+                                    : '',
+                            )}
+                        >
+                            {roomTypes.length} types
+                        </Badge>
+                    </button>
+                </div>
+
+                {scope === 'property' ? (
                     <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Sparkles
-                                    className="size-5 text-tijum-coral"
-                                    aria-hidden="true"
-                                />
-                                Add or update amenity assignment
-                            </CardTitle>
-                            <CardDescription>
-                                Food, meals, menus, AC/Non-AC, pricing, and
-                                physical-room amenities are managed in their own
-                                systems.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex flex-wrap gap-2">
-                                <Button
-                                    type="button"
-                                    variant={
-                                        scope === 'property'
-                                            ? 'plum'
-                                            : 'outline'
-                                    }
-                                    size="sm"
-                                    onClick={() => setScope('property')}
-                                >
-                                    Property-level
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant={
-                                        scope === 'room_type'
-                                            ? 'plum'
-                                            : 'outline'
-                                    }
-                                    size="sm"
-                                    onClick={() => setScope('room_type')}
-                                >
-                                    Room-type
-                                </Button>
+                        <CardHeader className="flex flex-col gap-3 border-b border-tijum-surface/75 pb-4 sm:flex-row sm:items-center sm:justify-between dark:border-border">
+                            <div>
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <Sparkles
+                                        className="size-4 text-tijum-coral"
+                                        aria-hidden="true"
+                                    />
+                                    <span>
+                                        Select Amenities Available at{' '}
+                                        {property.name}
+                                    </span>
+                                </CardTitle>
+                                <CardDescription className="text-xs">
+                                    Checked items appear directly under shared
+                                    property facilities on TIJUM.
+                                </CardDescription>
                             </div>
+                            {canManage && (
+                                <Button
+                                    type="button"
+                                    onClick={savePropertyAmenities}
+                                    disabled={saving}
+                                    className="shrink-0"
+                                >
+                                    <Save
+                                        className="mr-1.5 size-4"
+                                        aria-hidden="true"
+                                    />
+                                    <span>
+                                        {saving
+                                            ? 'Saving…'
+                                            : `Save Property Amenities (${selectedPropertyIds.length})`}
+                                    </span>
+                                </Button>
+                            )}
+                        </CardHeader>
 
-                            {scope === 'property' ? (
-                                <form
-                                    onSubmit={saveProperty}
-                                    className="grid gap-4 md:grid-cols-2"
-                                >
-                                    <div className="space-y-1 md:col-span-2">
-                                        <Label htmlFor="prop-amenity">
-                                            Amenity
-                                        </Label>
-                                        <Select
-                                            value={propForm.data.amenity_id}
-                                            onValueChange={(v) =>
-                                                propForm.setData(
-                                                    'amenity_id',
-                                                    v,
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger id="prop-amenity">
-                                                <SelectValue placeholder="Select property amenity" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {propertyAmenities.map((a) => (
-                                                    <SelectItem
-                                                        key={a.id}
-                                                        value={String(a.id)}
-                                                    >
-                                                        {a.name} (
-                                                        {a.category?.name ??
-                                                            'Catalogue'}
-                                                        )
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {propForm.errors.amenity_id && (
-                                            <p className="text-xs text-status-error-fg">
-                                                {propForm.errors.amenity_id}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label htmlFor="prop-avail">
-                                            Availability
-                                        </Label>
-                                        <Select
-                                            value={propForm.data.availability}
-                                            onValueChange={(v) =>
-                                                propForm.setData(
-                                                    'availability',
-                                                    v as AmenityAvailability,
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger id="prop-avail">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {options.availability.map(
-                                                    (o) => (
-                                                        <SelectItem
-                                                            key={o.value}
-                                                            value={o.value}
-                                                        >
-                                                            {o.label}
-                                                        </SelectItem>
-                                                    ),
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                        {propForm.errors.availability && (
-                                            <p className="text-xs text-status-error-fg">
-                                                {propForm.errors.availability}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2 pt-6">
-                                        <Checkbox
-                                            id="prop-visible"
-                                            checked={
-                                                propForm.data
-                                                    .is_customer_visible
-                                            }
-                                            onCheckedChange={(v) =>
-                                                propForm.setData(
-                                                    'is_customer_visible',
-                                                    v === true,
-                                                )
-                                            }
-                                        />
-                                        <Label htmlFor="prop-visible">
-                                            Customer-visible when approved
-                                        </Label>
-                                    </div>
-                                    <div className="space-y-1 md:col-span-2">
-                                        <Label htmlFor="prop-details">
-                                            Details (optional)
-                                        </Label>
-                                        <Textarea
-                                            id="prop-details"
-                                            value={propForm.data.details}
-                                            onChange={(e) =>
-                                                propForm.setData(
-                                                    'details',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="Optional safe details (no pricing)."
-                                        />
-                                        {propForm.errors.details && (
-                                            <p className="text-xs text-status-error-fg">
-                                                {propForm.errors.details}
-                                            </p>
-                                        )}
-                                    </div>
-                                    {propAmenityError && (
-                                        <p className="text-xs text-status-error-fg md:col-span-2">
-                                            {propAmenityError}
-                                        </p>
-                                    )}
-                                    <div className="md:col-span-2">
-                                        <Button
-                                            type="submit"
-                                            variant="plum"
-                                            disabled={propForm.processing}
-                                        >
-                                            <PlusCircle aria-hidden="true" />
-                                            Save property amenity
-                                        </Button>
-                                    </div>
-                                </form>
+                        <CardContent className="space-y-6 pt-5">
+                            {groupedPropertyCategories.length === 0 ? (
+                                <EmptyState
+                                    icon={Sparkles}
+                                    title="No property amenities in catalogue"
+                                    description="TIJUM administrators configure the master amenity catalogue."
+                                />
                             ) : (
-                                <form
-                                    onSubmit={saveRoomType}
-                                    className="grid gap-4 md:grid-cols-2"
-                                >
-                                    <div className="space-y-1">
-                                        <Label htmlFor="rt-type">
-                                            Room type
-                                        </Label>
-                                        <Select
-                                            value={
-                                                rtForm.data
-                                                    .property_room_type_id
-                                            }
-                                            onValueChange={(v) =>
-                                                rtForm.setData(
-                                                    'property_room_type_id',
-                                                    v,
-                                                )
-                                            }
+                                groupedPropertyCategories.map((category) => {
+                                    const allSelected = category.amenities.every(
+                                        (a) =>
+                                            selectedPropertyIds.includes(a.id),
+                                    );
+                                    return (
+                                        <div
+                                            key={category.id}
+                                            className="space-y-3"
                                         >
-                                            <SelectTrigger id="rt-type">
-                                                <SelectValue placeholder="Select room type" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {roomTypes.map((rt) => (
-                                                    <SelectItem
-                                                        key={rt.id}
-                                                        value={String(rt.id)}
+                                            <div className="flex items-center justify-between border-b border-tijum-surface/70 pb-2 dark:border-border">
+                                                <h3 className="font-heading text-xs font-bold tracking-wider text-tijum-plum uppercase dark:text-foreground">
+                                                    {category.name}
+                                                </h3>
+                                                {canManage && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            togglePropertyCategory(
+                                                                category.amenities,
+                                                            )
+                                                        }
+                                                        className="cursor-pointer text-xs font-semibold text-tijum-coral hover:underline"
                                                     >
-                                                        {rt.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {rtForm.errors
-                                            .property_room_type_id && (
-                                            <p className="text-xs text-status-error-fg">
-                                                {
-                                                    rtForm.errors
-                                                        .property_room_type_id
-                                                }
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label htmlFor="rt-amenity">
-                                            Amenity
-                                        </Label>
-                                        <Select
-                                            value={rtForm.data.amenity_id}
-                                            onValueChange={(v) =>
-                                                rtForm.setData('amenity_id', v)
-                                            }
-                                        >
-                                            <SelectTrigger id="rt-amenity">
-                                                <SelectValue placeholder="Select room-type amenity" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {roomTypeAmenities.map((a) => (
-                                                    <SelectItem
-                                                        key={a.id}
-                                                        value={String(a.id)}
-                                                    >
-                                                        {a.name} (
-                                                        {a.category?.name ??
-                                                            'Catalogue'}
-                                                        )
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {rtForm.errors.amenity_id && (
-                                            <p className="text-xs text-status-error-fg">
-                                                {rtForm.errors.amenity_id}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label htmlFor="rt-avail">
-                                            Availability
-                                        </Label>
-                                        <Select
-                                            value={rtForm.data.availability}
-                                            onValueChange={(v) =>
-                                                rtForm.setData(
-                                                    'availability',
-                                                    v as AmenityAvailability,
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger id="rt-avail">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {options.availability.map(
-                                                    (o) => (
-                                                        <SelectItem
-                                                            key={o.value}
-                                                            value={o.value}
-                                                        >
-                                                            {o.label}
-                                                        </SelectItem>
-                                                    ),
+                                                        {allSelected
+                                                            ? 'Deselect all'
+                                                            : 'Select all'}
+                                                    </button>
                                                 )}
-                                            </SelectContent>
-                                        </Select>
-                                        {rtForm.errors.availability && (
-                                            <p className="text-xs text-status-error-fg">
-                                                {rtForm.errors.availability}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2 pt-6">
-                                        <Checkbox
-                                            id="rt-visible"
-                                            checked={
-                                                rtForm.data.is_customer_visible
-                                            }
-                                            onCheckedChange={(v) =>
-                                                rtForm.setData(
-                                                    'is_customer_visible',
-                                                    v === true,
-                                                )
-                                            }
-                                        />
-                                        <Label htmlFor="rt-visible">
-                                            Customer-visible when approved
-                                        </Label>
-                                    </div>
-                                    <div className="space-y-1 md:col-span-2">
-                                        <Label htmlFor="rt-details">
-                                            Details (optional)
-                                        </Label>
-                                        <Textarea
-                                            id="rt-details"
-                                            value={rtForm.data.details}
-                                            onChange={(e) =>
-                                                rtForm.setData(
-                                                    'details',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="Optional safe details (no pricing)."
-                                        />
-                                        {rtForm.errors.details && (
-                                            <p className="text-xs text-status-error-fg">
-                                                {rtForm.errors.details}
-                                            </p>
-                                        )}
-                                    </div>
-                                    {rtAmenityError && (
-                                        <p className="text-xs text-status-error-fg md:col-span-2">
-                                            {rtAmenityError}
+                                            </div>
+                                            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+                                                {category.amenities.map(
+                                                    (amenity) => {
+                                                        const checked =
+                                                            selectedPropertyIds.includes(
+                                                                amenity.id,
+                                                            );
+                                                        return (
+                                                            <AmenityToggleTile
+                                                                key={amenity.id}
+                                                                amenity={amenity}
+                                                                checked={checked}
+                                                                disabled={
+                                                                    !canManage
+                                                                }
+                                                                onToggle={() =>
+                                                                    togglePropertyAmenity(
+                                                                        amenity.id,
+                                                                    )
+                                                                }
+                                                            />
+                                                        );
+                                                    },
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+
+                            {canManage &&
+                                groupedPropertyCategories.length > 0 && (
+                                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-tijum-surface pt-4 dark:border-border">
+                                        <p className="text-xs text-muted-foreground tabular-nums">
+                                            <strong>
+                                                {selectedPropertyIds.length}
+                                            </strong>{' '}
+                                            property amenities selected
                                         </p>
-                                    )}
-                                    <div className="md:col-span-2">
                                         <Button
-                                            type="submit"
-                                            variant="plum"
-                                            disabled={rtForm.processing}
+                                            type="button"
+                                            onClick={savePropertyAmenities}
+                                            disabled={saving}
                                         >
-                                            <PlusCircle aria-hidden="true" />
-                                            Save room-type amenity
+                                            <Save
+                                                className="mr-1.5 size-4"
+                                                aria-hidden="true"
+                                            />
+                                            <span>
+                                                {saving
+                                                    ? 'Saving…'
+                                                    : 'Save Property Amenities'}
+                                            </span>
                                         </Button>
                                     </div>
-                                </form>
+                                )}
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <Card>
+                        <CardHeader className="flex flex-col gap-3 border-b border-tijum-surface/75 pb-4 sm:flex-row sm:items-center sm:justify-between dark:border-border">
+                            <div>
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <Layers
+                                        className="size-4 text-tijum-coral"
+                                        aria-hidden="true"
+                                    />
+                                    <span>
+                                        Select Amenities Per Room Type
+                                    </span>
+                                </CardTitle>
+                                <CardDescription className="text-xs">
+                                    Pick a room type below and check its room
+                                    features (AC/Non-AC &amp; meals are set on
+                                    Room Types / Pricing).
+                                </CardDescription>
+                            </div>
+                            {canManage && roomTypes.length > 0 && (
+                                <Button
+                                    type="button"
+                                    onClick={saveRoomTypeAmenities}
+                                    disabled={saving}
+                                    className="shrink-0"
+                                >
+                                    <Save
+                                        className="mr-1.5 size-4"
+                                        aria-hidden="true"
+                                    />
+                                    <span>
+                                        {saving
+                                            ? 'Saving…'
+                                            : applyToAllRoomTypes
+                                              ? 'Save to All Room Types'
+                                              : `Save Room-Type Amenities (${activeRoomSelectedIds.length})`}
+                                    </span>
+                                </Button>
+                            )}
+                        </CardHeader>
+
+                        <CardContent className="space-y-5 pt-5">
+                            {roomTypes.length === 0 ? (
+                                <EmptyState
+                                    icon={Layers}
+                                    title="No room types yet"
+                                    description="Create at least one Room Type first before assigning room-type amenities."
+                                    action={
+                                        <Button asChild size="sm">
+                                            <Link
+                                                href={roomTypesIndexRoute(
+                                                    property.id,
+                                                )}
+                                            >
+                                                Manage Room Types
+                                            </Link>
+                                        </Button>
+                                    }
+                                />
+                            ) : (
+                                <>
+                                    {/* Room Type Pills + Apply To All Toggle */}
+                                    <div className="flex flex-col gap-3 rounded-xl border border-tijum-surface bg-tijum-cream/35 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-border dark:bg-muted/30">
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            {roomTypes.map((rt) => {
+                                                const isActive =
+                                                    rt.id === activeRoomTypeId;
+                                                const count = (
+                                                    selectedByRoomType[rt.id] ??
+                                                    []
+                                                ).length;
+
+                                                return (
+                                                    <button
+                                                        key={rt.id}
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setActiveRoomTypeId(
+                                                                rt.id,
+                                                            )
+                                                        }
+                                                        className={cn(
+                                                            'inline-flex cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-1.5 font-heading text-xs font-semibold transition-all',
+                                                            isActive
+                                                                ? 'border-tijum-coral bg-tijum-coral text-white shadow-2xs'
+                                                                : 'border-tijum-surface bg-background text-tijum-plum hover:border-tijum-coral/45 dark:border-border dark:text-foreground',
+                                                        )}
+                                                    >
+                                                        <span>{rt.name}</span>
+                                                        <span
+                                                            className={cn(
+                                                                'rounded-full px-1.5 py-0 text-[10px] font-bold tabular-nums',
+                                                                isActive
+                                                                    ? 'bg-white/25 text-white'
+                                                                    : 'bg-tijum-cream text-tijum-plum-muted dark:bg-muted dark:text-muted-foreground',
+                                                            )}
+                                                        >
+                                                            {count}
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {roomTypes.length > 1 && canManage && (
+                                            <div className="flex items-center gap-2">
+                                                <Checkbox
+                                                    id="apply-all-room-types"
+                                                    checked={
+                                                        applyToAllRoomTypes
+                                                    }
+                                                    onCheckedChange={(v) =>
+                                                        setApplyToAllRoomTypes(
+                                                            v === true,
+                                                        )
+                                                    }
+                                                />
+                                                <Label
+                                                    htmlFor="apply-all-room-types"
+                                                    className="cursor-pointer text-xs font-medium"
+                                                >
+                                                    Apply to all {roomTypes.length}{' '}
+                                                    room types
+                                                </Label>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {groupedRoomTypeCategories.map(
+                                        (category) => {
+                                            const allSelected =
+                                                category.amenities.every((a) =>
+                                                    activeRoomSelectedIds.includes(
+                                                        a.id,
+                                                    ),
+                                                );
+                                            return (
+                                                <div
+                                                    key={category.id}
+                                                    className="space-y-3"
+                                                >
+                                                    <div className="flex items-center justify-between border-b border-tijum-surface/70 pb-2 dark:border-border">
+                                                        <h3 className="font-heading text-xs font-bold tracking-wider text-tijum-plum uppercase dark:text-foreground">
+                                                            {category.name}
+                                                        </h3>
+                                                        {canManage && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    toggleRoomTypeCategory(
+                                                                        category.amenities,
+                                                                    )
+                                                                }
+                                                                className="cursor-pointer text-xs font-semibold text-tijum-coral hover:underline"
+                                                            >
+                                                                {allSelected
+                                                                    ? 'Deselect all'
+                                                                    : 'Select all'}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+                                                        {category.amenities.map(
+                                                            (amenity) => {
+                                                                const checked =
+                                                                    activeRoomSelectedIds.includes(
+                                                                        amenity.id,
+                                                                    );
+                                                                return (
+                                                                    <AmenityToggleTile
+                                                                        key={
+                                                                            amenity.id
+                                                                        }
+                                                                        amenity={
+                                                                            amenity
+                                                                        }
+                                                                        checked={
+                                                                            checked
+                                                                        }
+                                                                        disabled={
+                                                                            !canManage
+                                                                        }
+                                                                        onToggle={() =>
+                                                                            toggleRoomTypeAmenity(
+                                                                                amenity.id,
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                );
+                                                            },
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        },
+                                    )}
+
+                                    {canManage && (
+                                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-tijum-surface pt-4 dark:border-border">
+                                            <p className="text-xs text-muted-foreground tabular-nums">
+                                                <strong>
+                                                    {
+                                                        activeRoomSelectedIds.length
+                                                    }
+                                                </strong>{' '}
+                                                amenities selected
+                                                {applyToAllRoomTypes
+                                                    ? ` (will apply to all ${roomTypes.length} room types)`
+                                                    : ''}
+                                            </p>
+                                            <Button
+                                                type="button"
+                                                onClick={saveRoomTypeAmenities}
+                                                disabled={saving}
+                                            >
+                                                <Save
+                                                    className="mr-1.5 size-4"
+                                                    aria-hidden="true"
+                                                />
+                                                <span>
+                                                    {saving
+                                                        ? 'Saving…'
+                                                        : applyToAllRoomTypes
+                                                          ? 'Save to All Room Types'
+                                                          : 'Save Room-Type Amenities'}
+                                                </span>
+                                            </Button>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </CardContent>
                     </Card>
                 )}
-
-                <section className="space-y-4">
-                    <h2 className="font-heading text-lg font-semibold text-tijum-plum dark:text-foreground">
-                        Property-level assignments
-                    </h2>
-                    {propertyAssignments.length === 0 ? (
-                        <EmptyState
-                            icon={Sparkles}
-                            title="No property amenities yet"
-                            description="Add property-level amenities and submit them for verification."
-                        />
-                    ) : (
-                        <div className="grid gap-4 lg:grid-cols-2">
-                            {propertyAssignments.map((a) => (
-                                <AssignmentCard
-                                    key={`p-${a.id}`}
-                                    assignment={a}
-                                    propertyId={property.id}
-                                />
-                            ))}
-                        </div>
-                    )}
-                </section>
-
-                <section className="space-y-4">
-                    <h2 className="font-heading text-lg font-semibold text-tijum-plum dark:text-foreground">
-                        Room-type assignments
-                    </h2>
-                    {roomTypeAssignments.length === 0 ? (
-                        <EmptyState
-                            icon={Sparkles}
-                            title="No room-type amenities yet"
-                            description="Add amenities to specific room types and submit them for verification."
-                        />
-                    ) : (
-                        <div className="grid gap-4 lg:grid-cols-2">
-                            {roomTypeAssignments.map((a) => (
-                                <AssignmentCard
-                                    key={`r-${a.id}`}
-                                    assignment={a}
-                                    propertyId={property.id}
-                                />
-                            ))}
-                        </div>
-                    )}
-                </section>
             </div>
         </>
     );
 }
+
+function AmenityToggleTile({
+    amenity,
+    checked,
+    disabled,
+    onToggle,
+}: {
+    amenity: AmenityCatalogueItem;
+    checked: boolean;
+    disabled: boolean;
+    onToggle: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            disabled={disabled}
+            onClick={onToggle}
+            aria-pressed={checked}
+            className={cn(
+                'flex items-start gap-2.5 rounded-xl border p-3 text-left transition-all',
+                !disabled && 'cursor-pointer',
+                checked
+                    ? 'border-tijum-coral bg-tijum-coral/10 ring-1 ring-tijum-coral/35 dark:border-tijum-coral dark:bg-tijum-coral/15'
+                    : 'border-tijum-surface bg-card hover:border-tijum-coral/40 hover:bg-tijum-cream/35 dark:border-border dark:hover:bg-muted/40',
+            )}
+        >
+            <span
+                className={cn(
+                    'mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border transition-colors',
+                    checked
+                        ? 'border-tijum-coral bg-tijum-coral text-white'
+                        : 'border-tijum-plum-muted/40 bg-background',
+                )}
+            >
+                {checked && <Check className="size-3" strokeWidth={3} />}
+            </span>
+            <span className="min-w-0 flex-1">
+                <span className="block font-heading text-xs font-semibold text-tijum-plum dark:text-foreground">
+                    {amenity.name}
+                </span>
+                {amenity.description && (
+                    <span className="mt-0.5 line-clamp-2 block text-[11px] text-muted-foreground">
+                        {amenity.description}
+                    </span>
+                )}
+            </span>
+        </button>
+    );
+}
+
+OwnerPropertyAmenitiesIndex.layout = {
+    breadcrumbs: [
+        { title: 'Partner Overview', href: dashboard() },
+        { title: 'My Properties', href: propertiesIndexRoute() },
+        { title: 'Property Overview', href: showPropertyRoute(1) },
+        { title: 'Amenities', href: amenitiesIndexRoute(1) },
+    ],
+};

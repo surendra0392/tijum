@@ -58,18 +58,17 @@ class PropertyPolicy
             return false;
         }
 
-        if (! $property->hasApprovedBaseline()) {
-            $activeApplication = $property->activeVerificationApplication()->first();
-
-            return ! $activeApplication instanceof PropertyVerificationApplication
-                || $activeApplication->status->isEditableByOwner();
+        if ($property->status === PropertyOperationalStatus::Suspended) {
+            return false;
         }
 
         $activeApplication = $property->activeVerificationApplication()->first();
 
-        return $activeApplication instanceof PropertyVerificationApplication
-            && $activeApplication->is_amendment
-            && $activeApplication->status->isEditableByOwner();
+        if ($activeApplication instanceof PropertyVerificationApplication && ! $activeApplication->is_amendment) {
+            return $activeApplication->status->isEditableByOwner();
+        }
+
+        return true;
     }
 
     public function manageRoomOperationsByOwner(Owner $owner, Property $property): bool

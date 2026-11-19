@@ -105,7 +105,17 @@ class SavePropertyRoom
                 ]);
             }
 
-            $hasApproved = $lockedProperty->hasApprovedBaseline();
+            $hasApproved = $lockedProperty->hasApprovedBaseline() || $lockedProperty->is_verified;
+            $hasActiveEditableAmendment = $hasApproved
+                && $activeApp instanceof PropertyVerificationApplication
+                && $activeApp->is_amendment
+                && $activeApp->status->isEditableByOwner();
+
+            if (! $hasApproved && $activeApp instanceof PropertyVerificationApplication && ! $activeApp->status->isEditableByOwner()) {
+                throw ValidationException::withMessages([
+                    'room' => 'Rooms cannot be added or modified while property verification is locked for review.',
+                ]);
+            }
 
             if ($existingRoom instanceof PropertyRoom) {
                 $lockedRoom = PropertyRoom::query()
@@ -113,20 +123,6 @@ class SavePropertyRoom
                     ->whereKey($existingRoom->id)
                     ->lockForUpdate()
                     ->firstOrFail();
-
-                $materialInventoryChange = $lockedRoom->property_room_type_id !== $roomType->id
-                    || $lockedRoom->room_number !== $roomNumber;
-
-                if (
-                    $hasApproved
-                    && $lockedRoom->is_approved_version
-                    && $materialInventoryChange
-                    && (! $activeApp instanceof PropertyVerificationApplication || ! $activeApp->is_amendment || ! $activeApp->status->isEditableByOwner())
-                ) {
-                    throw ValidationException::withMessages([
-                        'property_room_type_id' => 'Changing a verified room’s room number or room type requires an active amendment. Operational statuses and internal notes remain editable.',
-                    ]);
-                }
 
                 $lockedRoom->forceFill([
                     'property_room_type_id' => $roomType->id,
@@ -152,27 +148,12 @@ class SavePropertyRoom
                 return $lockedRoom->fresh(['roomType']) ?? $lockedRoom;
             }
 
-            if (
-                $hasApproved
-                && (! $activeApp instanceof PropertyVerificationApplication || ! $activeApp->is_amendment || ! $activeApp->status->isEditableByOwner())
-            ) {
-                throw ValidationException::withMessages([
-                    'room' => 'Adding new physical rooms to an approved property requires starting a Re-Verification Amendment.',
-                ]);
-            }
-
-            if (! $hasApproved && $activeApp instanceof PropertyVerificationApplication && ! $activeApp->status->isEditableByOwner()) {
-                throw ValidationException::withMessages([
-                    'room' => 'Rooms cannot be added while property verification is locked for review.',
-                ]);
-            }
-
             $room = new PropertyRoom;
             $room->forceFill([
                 'property_id' => $lockedProperty->id,
                 'property_room_type_id' => $roomType->id,
-                'amendment_application_id' => $hasApproved ? $activeApp->id : null,
-                'is_approved_version' => false,
+                'amendment_application_id' => $hasActiveEditableAmendment ? $activeApp->id : null,
+                'is_approved_version' => $hasApproved && ! $hasActiveEditableAmendment,
                 'room_number' => $roomNumber,
                 'floor_number' => $floorNumber,
                 'wing_name' => $wingName,

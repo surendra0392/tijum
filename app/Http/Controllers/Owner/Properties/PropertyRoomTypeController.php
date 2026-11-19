@@ -133,13 +133,16 @@ class PropertyRoomTypeController extends Controller
         Gate::forUser($owner)->authorize('deleteByOwner', $roomType);
 
         $deactivate = $request->boolean('deactivate');
-        $deleteOrDeactivate->execute($owner, $property, $roomType, $deactivate);
+        $deleteRooms = $request->boolean('delete_rooms');
+        $deleteOrDeactivate->execute($owner, $property, $roomType, $deactivate, $deleteRooms);
 
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => $deactivate
                 ? __('Room type deactivated while retaining historical physical rooms.')
-                : __('Room type removed.'),
+                : ($deleteRooms
+                    ? __('Room type and its physical rooms removed.')
+                    : __('Room type removed.')),
         ]);
 
         return to_route('owner.properties.room-types.index', $property)

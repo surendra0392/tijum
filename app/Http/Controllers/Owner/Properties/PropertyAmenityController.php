@@ -25,7 +25,10 @@ use App\Services\PropertyAmenityReadiness;
 use App\Support\PropertyPortalData;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -42,7 +45,7 @@ class PropertyAmenityController extends Controller
         Gate::forUser($owner)->authorize('viewAnyByOwner', [PropertyAmenity::class, $property]);
 
         $property->load([
-            'roomTypes' => fn ($q) => $q->where('is_active', true)->orderBy('display_order')->orderBy('name'),
+            'roomTypes' => fn ($q) => $q->orderBy('display_order')->orderBy('name'),
             'amenityAssignments.amenity.category',
             'roomTypeAmenityAssignments.amenity.category',
             'roomTypeAmenityAssignments.roomType',
@@ -198,6 +201,190 @@ class PropertyAmenityController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Room-type amenity submitted for verification.')]);
 
         return back()->with('status', 'room-type-amenity-submitted');
+    }
+
+    public function sync(Request $request, Property $property): RedirectResponse
+    {
+        $owner = $this->resolveOwner($request);
+        Gate::forUser($owner)->authorize('viewByOwner', $property);
+        Gate::forUser($owner)->authorize('createByOwner', [PropertyAmenity::class, $property]);
+
+        $validated = $request->validate([
+            'scope' => ['required', 'string', 'in:property,room_type'],
+            'amenity_ids' => ['present', 'array'],
+            'amenity_ids.*' => ['integer', 'exists:amenities,id'],
+            'property_room_type_id' => ['nullable', 'integer'],
+            'apply_to_all_room_types' => ['sometimes', 'boolean'],
+        ]);
+
+        $selectedIds = array_values(array_unique(array_map(
+            static fn (mixed $id): int => (int) $id,
+            $validated['amenity_ids'],
+        )));
+
+        if ($validated['scope'] === 'property') {
+            $validAmenityIds = Amenity::query()
+                ->active()
+                ->whereIn('id', $selectedIds)
+                ->get()
+                ->filter(static fn (Amenity $amenity): bool => $amenity->applicability_scope->appliesToProperty())
+                ->pluck('id')
+                ->map(static fn (mixed $id): int => (int) $id)
+                ->values()
+                ->all();
+
+            DB::transaction(function () use ($property, $validAmenityIds): void {
+                $currentAssignments = PropertyAmenity::query()
+                    ->where('property_id', $property->id)
+                    ->where('is_current', true)
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('amenity_id');
+
+                $now = now();
+
+                foreach ($currentAssignments as $amenityId => $assignment) {
+                    if (! in_array((int) $amenityId, $validAmenityIds, true)) {
+                        $assignment->forceFill([
+                            'is_current' => false,
+                            'status' => AmenityVerificationStatus::Inactive,
+                        ])->save();
+                    }
+                }
+
+                foreach ($validAmenityIds as $amenityId) {
+                    $existing = $currentAssignments->get($amenityId);
+
+                    if ($existing instanceof PropertyAmenity) {
+                        $existing->forceFill([
+                            'availability' => AmenityAvailability::Included,
+                            'status' => AmenityVerificationStatus::Approved,
+                            'is_customer_visible' => true,
+                            'is_current' => true,
+                            'approved_at' => $existing->approved_at ?? $now,
+                        ])->save();
+                    } else {
+                        $assignment = new PropertyAmenity;
+                        $assignment->forceFill([
+                            'property_id' => $property->id,
+                            'amenity_id' => $amenityId,
+                            'assignment_group_id' => (string) Str::ulid(),
+                            'parent_property_amenity_id' => null,
+                            'superseded_by_property_amenity_id' => null,
+                            'assignment_reference' => sprintf('TPA-%s-%s', $now->format('Y'), strtoupper(Str::random(6))),
+                            'availability' => AmenityAvailability::Included,
+                            'status' => AmenityVerificationStatus::Approved,
+                            'revision_number' => 1,
+                            'is_current' => true,
+                            'is_customer_visible' => true,
+                            'approved_at' => $now,
+                        ])->save();
+                    }
+                }
+            });
+
+            Inertia::flash('toast', [
+                'type' => 'success',
+                'message' => __('Property amenities updated.'),
+            ]);
+
+            return back()->with('status', 'property-amenities-synced');
+        }
+
+        $applyToAll = (bool) ($validated['apply_to_all_room_types'] ?? false);
+        if ($applyToAll) {
+            $targetRoomTypes = $property->roomTypes()->where('is_active', true)->get();
+            if ($targetRoomTypes->isEmpty()) {
+                $targetRoomTypes = $property->roomTypes()->get();
+            }
+            if ($targetRoomTypes->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'property_room_type_id' => 'Add at least one room type before assigning room-type amenities.',
+                ]);
+            }
+        } else {
+            $roomTypeId = (int) ($validated['property_room_type_id'] ?? 0);
+            $roomType = $property->roomTypes()->whereKey($roomTypeId)->first();
+            if (! $roomType instanceof PropertyRoomType) {
+                throw ValidationException::withMessages([
+                    'property_room_type_id' => 'Select a valid room type for this property.',
+                ]);
+            }
+            $targetRoomTypes = collect([$roomType]);
+        }
+
+        $validRoomAmenityIds = Amenity::query()
+            ->active()
+            ->whereIn('id', $selectedIds)
+            ->get()
+            ->filter(static fn (Amenity $amenity): bool => $amenity->applicability_scope->appliesToRoomType())
+            ->pluck('id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->values()
+            ->all();
+
+        DB::transaction(function () use ($property, $targetRoomTypes, $validRoomAmenityIds): void {
+            $now = now();
+
+            foreach ($targetRoomTypes as $roomType) {
+                $currentAssignments = PropertyRoomTypeAmenity::query()
+                    ->where('property_id', $property->id)
+                    ->where('property_room_type_id', $roomType->id)
+                    ->where('is_current', true)
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('amenity_id');
+
+                foreach ($currentAssignments as $amenityId => $assignment) {
+                    if (! in_array((int) $amenityId, $validRoomAmenityIds, true)) {
+                        $assignment->forceFill([
+                            'is_current' => false,
+                            'status' => AmenityVerificationStatus::Inactive,
+                        ])->save();
+                    }
+                }
+
+                foreach ($validRoomAmenityIds as $amenityId) {
+                    $existing = $currentAssignments->get($amenityId);
+
+                    if ($existing instanceof PropertyRoomTypeAmenity) {
+                        $existing->forceFill([
+                            'availability' => AmenityAvailability::Included,
+                            'status' => AmenityVerificationStatus::Approved,
+                            'is_customer_visible' => true,
+                            'is_current' => true,
+                            'approved_at' => $existing->approved_at ?? $now,
+                        ])->save();
+                    } else {
+                        $assignment = new PropertyRoomTypeAmenity;
+                        $assignment->forceFill([
+                            'property_id' => $property->id,
+                            'property_room_type_id' => $roomType->id,
+                            'amenity_id' => $amenityId,
+                            'assignment_group_id' => (string) Str::ulid(),
+                            'parent_property_room_type_amenity_id' => null,
+                            'superseded_by_property_room_type_amenity_id' => null,
+                            'assignment_reference' => sprintf('TRA-%s-%s', $now->format('Y'), strtoupper(Str::random(6))),
+                            'availability' => AmenityAvailability::Included,
+                            'status' => AmenityVerificationStatus::Approved,
+                            'revision_number' => 1,
+                            'is_current' => true,
+                            'is_customer_visible' => true,
+                            'approved_at' => $now,
+                        ])->save();
+                    }
+                }
+            }
+        });
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => $applyToAll
+                ? __('Room-type amenities updated for all room types.')
+                : __('Room-type amenities updated.'),
+        ]);
+
+        return back()->with('status', 'room-type-amenities-synced');
     }
 
     private function authorizePropertyAssignment(Owner $owner, Property $property, PropertyAmenity $assignment): void

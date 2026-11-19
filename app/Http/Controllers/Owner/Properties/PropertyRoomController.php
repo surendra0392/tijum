@@ -7,18 +7,23 @@ namespace App\Http\Controllers\Owner\Properties;
 use App\Actions\Owner\Properties\SavePropertyRoom;
 use App\Actions\Owner\Properties\UpdatePropertyRoomOperationalStatus;
 use App\Enums\PropertyRoomStatus;
+use App\Enums\PropertyVerificationEventType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Owner\Properties\SavePropertyRoomRequest;
 use App\Http\Requests\Owner\Properties\UpdatePropertyRoomStatusRequest;
 use App\Models\Owner;
 use App\Models\Property;
+use App\Models\PropertyMedia;
 use App\Models\PropertyRoom;
 use App\Models\PropertyRoomType;
+use App\Models\PropertyVerificationEvent;
 use App\Support\PropertyPortalData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -210,6 +215,51 @@ class PropertyRoomController extends Controller
 
         return to_route('owner.properties.rooms.index', $property)
             ->with('status', 'room-status-updated');
+    }
+
+    public function destroy(
+        Request $request,
+        Property $property,
+        PropertyRoom $room,
+    ): RedirectResponse {
+        $owner = $this->resolveOwner($request);
+        $this->ensureSameProperty($property, $room);
+        Gate::forUser($owner)->authorize('updateByOwner', $room);
+
+        if ($room->reservationAllocations()->exists()) {
+            throw ValidationException::withMessages([
+                'room' => sprintf('Room %s has reservation allocation history and cannot be deleted. Mark it Inactive instead.', $room->room_number),
+            ]);
+        }
+
+        $roomNumber = $room->room_number;
+
+        DB::transaction(function () use ($property, $room, $owner, $roomNumber): void {
+            PropertyMedia::query()
+                ->where('property_id', $property->id)
+                ->where('property_room_id', $room->id)
+                ->update(['property_room_id' => null]);
+
+            $room->delete();
+
+            PropertyVerificationEvent::record(
+                property: $property,
+                application: $property->activeVerificationApplication()->first(),
+                eventType: PropertyVerificationEventType::RoomUpdated,
+                actorType: 'owner',
+                actorId: $owner->id,
+                actorName: $owner->name,
+                notes: sprintf('Deleted unbooked physical room %s.', $roomNumber),
+            );
+        });
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => sprintf('Physical room %s deleted.', $roomNumber),
+        ]);
+
+        return to_route('owner.properties.rooms.index', $property)
+            ->with('status', 'room-deleted');
     }
 
     private function ensureSameProperty(Property $property, PropertyRoom $room): void

@@ -5,6 +5,7 @@ import {
     Building2,
     Camera,
     CheckCircle2,
+    ChevronDown,
     DoorClosed,
     Edit3,
     FileCheck2,
@@ -13,6 +14,7 @@ import {
     MapPin,
     PauseCircle,
     PlayCircle,
+    PlusCircle,
     PowerOff,
     RefreshCw,
 } from 'lucide-react';
@@ -50,8 +52,14 @@ import {
 } from '@/routes/owner/properties/amendment';
 import { index as mediaIndexRoute } from '@/routes/owner/properties/media';
 import { update as operationalStatusRoute } from '@/routes/owner/properties/operational-status';
-import { index as roomTypesIndexRoute } from '@/routes/owner/properties/room-types';
-import { index as roomsIndexRoute } from '@/routes/owner/properties/rooms';
+import {
+    create as createRoomTypeRoute,
+    index as roomTypesIndexRoute,
+} from '@/routes/owner/properties/room-types';
+import {
+    create as createRoomRoute,
+    index as roomsIndexRoute,
+} from '@/routes/owner/properties/rooms';
 import { show as verificationShowRoute } from '@/routes/owner/properties/verification';
 import { formatStayTime } from '@/lib/stay-timing';
 import type {
@@ -496,11 +504,27 @@ export default function OwnerPropertyShow({
                                     categories
                                 </CardDescription>
                             </div>
-                            <Button variant="outline" size="sm" asChild>
-                                <Link href={roomTypesIndexRoute(property.id)}>
-                                    Manage
-                                </Link>
-                            </Button>
+                            <div className="flex flex-wrap items-center gap-2">
+                                {property.can_manage_inventory && (
+                                    <Button size="sm" asChild>
+                                        <Link
+                                            href={createRoomTypeRoute(
+                                                property.id,
+                                            )}
+                                        >
+                                            <PlusCircle aria-hidden="true" />
+                                            <span>Add Room Type</span>
+                                        </Link>
+                                    </Button>
+                                )}
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link
+                                        href={roomTypesIndexRoute(property.id)}
+                                    >
+                                        Manage
+                                    </Link>
+                                </Button>
+                            </div>
                         </CardHeader>
                         <CardContent className="space-y-2.5">
                             {roomTypes.length === 0 ? (
@@ -547,79 +571,106 @@ export default function OwnerPropertyShow({
                                     types
                                 </CardDescription>
                             </div>
-                            <Button variant="outline" size="sm" asChild>
-                                <Link href={roomsIndexRoute(property.id)}>
-                                    Manage Rooms
-                                </Link>
-                            </Button>
+                            <div className="flex flex-wrap items-center gap-2">
+                                {property.can_manage_inventory &&
+                                    roomTypes.length > 0 && (
+                                        <Button size="sm" asChild>
+                                            <Link
+                                                href={createRoomRoute(
+                                                    property.id,
+                                                )}
+                                            >
+                                                <PlusCircle aria-hidden="true" />
+                                                <span>Add Room</span>
+                                            </Link>
+                                        </Button>
+                                    )}
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href={roomsIndexRoute(property.id)}>
+                                        Manage
+                                    </Link>
+                                </Button>
+                            </div>
                         </CardHeader>
-                        <CardContent className="space-y-2.5">
+                        <CardContent>
                             {rooms.length === 0 ? (
                                 <p className="text-sm text-tijum-plum-muted dark:text-muted-foreground">
                                     No physical room numbers recorded yet.
                                 </p>
                             ) : (
-                                rooms.slice(0, 6).map((room) => (
-                                    <div
-                                        key={room.id}
-                                        className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-tijum-surface px-3.5 py-2.5 text-sm dark:border-border dark:bg-muted/35"
-                                    >
-                                        <div>
-                                            <p className="font-heading font-semibold text-tijum-plum dark:text-foreground">
-                                                Room {room.room_number}
-                                            </p>
-                                            <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                                {room.room_type_name} ·{' '}
-                                                {room.floor_number
-                                                    ? `Floor ${room.floor_number}`
-                                                    : 'No floor specified'}
-                                            </p>
+                                <div className="grid gap-2.5 sm:grid-cols-2">
+                                    {rooms.slice(0, 8).map((room) => (
+                                        <div
+                                            key={room.id}
+                                            className="flex items-center justify-between gap-2 rounded-xl border border-tijum-surface px-3 py-2 text-xs dark:border-border dark:bg-muted/35"
+                                        >
+                                            <div className="min-w-0">
+                                                <p className="truncate font-heading text-sm font-semibold text-tijum-plum dark:text-foreground">
+                                                    Room {room.room_number}
+                                                </p>
+                                                <p className="truncate text-[11px] text-tijum-plum-muted dark:text-muted-foreground">
+                                                    {room.room_type_name}
+                                                    {room.floor_number
+                                                        ? ` · Fl ${room.floor_number}`
+                                                        : ''}
+                                                </p>
+                                            </div>
+                                            <StatusBadge
+                                                status={
+                                                    roomOperationalStatusMap[
+                                                        room.operational_status
+                                                    ]
+                                                }
+                                                label={
+                                                    room.operational_status_label
+                                                }
+                                            />
                                         </div>
-                                        <StatusBadge
-                                            status={
-                                                roomOperationalStatusMap[
-                                                    room.operational_status
-                                                ]
-                                            }
-                                            label={
-                                                room.operational_status_label
-                                            }
-                                        />
-                                    </div>
-                                ))
+                                    ))}
+                                </div>
                             )}
                         </CardContent>
                     </Card>
                 </div>
 
-                <Card className="min-w-0">
-                    <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
-                        <div>
-                            <CardTitle className="flex items-center gap-2">
-                                <History
-                                    className="size-4 text-tijum-coral"
-                                    aria-hidden="true"
-                                />
-                                <span>Property Change &amp; Audit History</span>
-                            </CardTitle>
-                            <CardDescription>
+                <details className="group rounded-2xl border border-tijum-surface/85 bg-card shadow-tijum-card dark:border-border">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 font-heading text-sm font-semibold text-tijum-plum select-none dark:text-foreground">
+                        <span className="flex items-center gap-2">
+                            <History
+                                className="size-4 text-tijum-coral"
+                                aria-hidden="true"
+                            />
+                            <span>
+                                Property Change &amp; Audit History (
+                                {events.length})
+                            </span>
+                        </span>
+                        <span className="flex items-center gap-2 text-xs font-normal text-tijum-plum-muted dark:text-muted-foreground">
+                            <span>Click to expand timeline</span>
+                            <ChevronDown
+                                className="size-4 transition-transform group-open:rotate-180"
+                                aria-hidden="true"
+                            />
+                        </span>
+                    </summary>
+                    <div className="border-t border-tijum-surface/75 px-6 py-4 dark:border-border">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs text-muted-foreground">
                                 Append-only event timeline across edits, room
                                 updates, photos, amendments, and reviews.
-                            </CardDescription>
+                            </p>
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href={mediaIndexRoute(property.id)}>
+                                    Manage Gallery
+                                </Link>
+                            </Button>
                         </div>
-                        <Button variant="outline" size="sm" asChild>
-                            <Link href={mediaIndexRoute(property.id)}>
-                                Manage Gallery
-                            </Link>
-                        </Button>
-                    </CardHeader>
-                    <CardContent>
                         {events.length === 0 ? (
                             <p className="text-sm text-tijum-plum-muted dark:text-muted-foreground">
                                 No activity logged yet.
                             </p>
                         ) : (
-                            <ol className="space-y-2.5">
+                            <ol className="space-y-2">
                                 {events.slice(0, 12).map((evt) => (
                                     <li
                                         key={evt.id}
@@ -642,8 +693,8 @@ export default function OwnerPropertyShow({
                                 ))}
                             </ol>
                         )}
-                    </CardContent>
-                </Card>
+                    </div>
+                </details>
 
                 {(property.can_toggle_operational_status ||
                     property.can_close_completely) && (

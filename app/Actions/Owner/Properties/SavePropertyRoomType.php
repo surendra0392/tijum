@@ -117,13 +117,11 @@ class SavePropertyRoomType
             }
 
             $activeApp = $lockedProperty->activeVerificationApplication()->lockForUpdate()->first();
-            $hasApproved = $lockedProperty->hasApprovedBaseline();
-
-            if ($hasApproved && (! $activeApp instanceof PropertyVerificationApplication || ! $activeApp->is_amendment || ! $activeApp->status->isEditableByOwner())) {
-                throw ValidationException::withMessages([
-                    'room_type' => 'Room types on an approved property require an active Draft or Needs Information amendment.',
-                ]);
-            }
+            $hasApproved = $lockedProperty->hasApprovedBaseline() || $lockedProperty->is_verified;
+            $hasActiveEditableAmendment = $hasApproved
+                && $activeApp instanceof PropertyVerificationApplication
+                && $activeApp->is_amendment
+                && $activeApp->status->isEditableByOwner();
 
             if (! $hasApproved && $activeApp instanceof PropertyVerificationApplication && ! $activeApp->status->isEditableByOwner()) {
                 throw ValidationException::withMessages([
@@ -179,7 +177,7 @@ class SavePropertyRoomType
                     'display_order' => $displayOrder,
                 ];
 
-                if ($hasApproved && $lockedRoomType->is_approved_version) {
+                if ($hasActiveEditableAmendment && $lockedRoomType->is_approved_version) {
                     $lockedRoomType->forceFill([
                         'pending_amendment_data' => $payload,
                         'pending_changes_application_id' => $activeApp->id,
@@ -207,7 +205,7 @@ class SavePropertyRoomType
             $roomType = new PropertyRoomType;
             $roomType->forceFill([
                 'property_id' => $lockedProperty->id,
-                'amendment_application_id' => $hasApproved ? $activeApp->id : null,
+                'amendment_application_id' => $hasActiveEditableAmendment ? $activeApp->id : null,
                 'name' => $name,
                 'slug' => Str::slug($name).'-'.Str::lower(Str::random(6)),
                 'accommodation_mode' => $mode,
@@ -219,7 +217,7 @@ class SavePropertyRoomType
                 'early_check_in_enabled' => $earlyCheckInEnabled,
                 'description' => $description,
                 'is_active' => $isActive,
-                'is_approved_version' => false,
+                'is_approved_version' => $hasApproved && ! $hasActiveEditableAmendment,
                 'display_order' => $displayOrder,
             ]);
             $roomType->save();

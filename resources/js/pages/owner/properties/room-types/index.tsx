@@ -1,5 +1,6 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
+    AlertTriangle,
     Edit3,
     Layers,
     Lock,
@@ -54,9 +55,13 @@ export default function RoomTypesIndex({
     roomTypes,
     timingRules,
 }: RoomTypesIndexProps) {
+    const { errors } = usePage<{ errors?: Record<string, string> }>().props;
+    const roomTypeError = errors?.room_type;
+
     const [pendingAction, setPendingAction] = useState<{
         roomType: PropertyRoomTypeData;
         deactivate: boolean;
+        deleteRooms?: boolean;
     } | null>(null);
     const [processing, setProcessing] = useState(false);
 
@@ -66,9 +71,14 @@ export default function RoomTypesIndex({
         }
 
         setProcessing(true);
+        const query = pendingAction.deactivate
+            ? { deactivate: 1 }
+            : pendingAction.deleteRooms
+              ? { delete_rooms: 1 }
+              : undefined;
         const url = destroyRoomTypeRoute.url(
             [property.id, pendingAction.roomType.id],
-            pendingAction.deactivate ? { query: { deactivate: 1 } } : undefined,
+            query ? { query } : undefined,
         );
 
         router.delete(url, {
@@ -106,6 +116,14 @@ export default function RoomTypesIndex({
                     roomTypesCount={roomTypes.length}
                     roomsCount={property.rooms_count}
                 />
+
+                {roomTypeError && (
+                    <Alert variant="destructive">
+                        <AlertTriangle aria-hidden="true" />
+                        <AlertTitle>Unable to Update Room Type</AlertTitle>
+                        <AlertDescription>{roomTypeError}</AlertDescription>
+                    </Alert>
+                )}
 
                 {!canManageInventory && (
                     <Alert variant="warning">
@@ -278,22 +296,22 @@ export default function RoomTypesIndex({
                                                 </Button>
                                             )}
 
-                                            {rt.rooms_count === 0 && (
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="destructive"
-                                                    onClick={() =>
-                                                        setPendingAction({
-                                                            roomType: rt,
-                                                            deactivate: false,
-                                                        })
-                                                    }
-                                                >
-                                                    <Trash2 aria-hidden="true" />
-                                                    <span>Delete</span>
-                                                </Button>
-                                            )}
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="destructive"
+                                                onClick={() =>
+                                                    setPendingAction({
+                                                        roomType: rt,
+                                                        deactivate: false,
+                                                        deleteRooms:
+                                                            rt.rooms_count > 0,
+                                                    })
+                                                }
+                                            >
+                                                <Trash2 aria-hidden="true" />
+                                                <span>Delete</span>
+                                            </Button>
                                         </div>
                                     )}
                                 </CardContent>
@@ -314,7 +332,9 @@ export default function RoomTypesIndex({
                     description={
                         pendingAction?.deactivate
                             ? 'Deactivating keeps existing historical physical rooms intact while blocking adding new physical rooms to this type.'
-                            : 'This unreferenced room type configuration will be permanently removed.'
+                            : pendingAction?.deleteRooms
+                              ? `This will permanently delete "${pendingAction.roomType.name}" and its ${pendingAction.roomType.rooms_count} unbooked physical room(s). Blocked automatically if any booking history exists.`
+                              : 'This room type configuration will be permanently removed.'
                     }
                     confirmLabel={
                         pendingAction?.deactivate

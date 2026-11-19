@@ -1,17 +1,21 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
+    AlertTriangle,
     Building2,
     DoorClosed,
     Edit3,
     Layers,
     PlusCircle,
+    RotateCcw,
     Search,
+    Trash2,
     Wrench,
     X,
 } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { roomOperationalStatusMap } from '@/components/owner/properties/property-status-helpers';
 import { PropertyStepNavigation } from '@/components/owner/properties/property-step-navigation';
+import { ConfirmationDialog } from '@/components/shared/confirmation-dialog';
 import { DataTable } from '@/components/shared/data-table';
 import { EmptyState } from '@/components/shared/empty-state';
 import { StatCard } from '@/components/shared/info-card';
@@ -19,15 +23,7 @@ import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -90,30 +86,70 @@ export default function RoomsIndex({
     operationalStatuses,
     filters,
 }: RoomsIndexProps) {
+    const { errors } = usePage<{ errors?: Record<string, string> }>().props;
+    const roomError = errors?.room;
+
     const [search, setSearch] = useState(filters.search);
     const [roomTypeFilter, setRoomTypeFilter] = useState(filters.room_type);
     const [statusFilter, setStatusFilter] = useState(
         filters.operational_status,
     );
+    const [deletingRoom, setDeletingRoom] = useState<PropertyRoomData | null>(
+        null,
+    );
+    const [deleteBusy, setDeleteBusy] = useState(false);
 
-    const handleFilter = (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
+    useEffect(() => {
+        setSearch(filters.search);
+        setRoomTypeFilter(filters.room_type);
+        setStatusFilter(filters.operational_status);
+    }, [filters.search, filters.room_type, filters.operational_status]);
+
+    const applyFilters = (
+        overrides: {
+            search?: string;
+            roomType?: string;
+            status?: string;
+        } = {},
+    ) => {
+        const nextSearch = (overrides.search ?? search).trim();
+        const nextType = overrides.roomType ?? roomTypeFilter;
+        const nextStatus = overrides.status ?? statusFilter;
+
         router.get(
             roomsIndexRoute.url(property.id),
             {
-                search: search || undefined,
-                room_type: roomTypeFilter || undefined,
-                operational_status: statusFilter || undefined,
+                search: nextSearch || undefined,
+                room_type: nextType || undefined,
+                operational_status: nextStatus || undefined,
             },
             { preserveState: true, preserveScroll: true },
         );
     };
 
+    const handleFilter = (e: FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        applyFilters();
+    };
+
+    const handleClearSearch = () => {
+        setSearch('');
+        applyFilters({ search: '' });
+    };
+
+    const hasActiveFilters = Boolean(
+        search.trim() || roomTypeFilter || statusFilter,
+    );
+
     const handleClear = () => {
         setSearch('');
         setRoomTypeFilter('');
         setStatusFilter('');
-        router.get(roomsIndexRoute.url(property.id));
+        router.get(
+            roomsIndexRoute.url(property.id),
+            {},
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     const handleQuickStatus = (
@@ -124,6 +160,21 @@ export default function RoomsIndex({
             roomStatusRoute.url([property.id, roomId]),
             { operational_status: nextStatus },
             { preserveScroll: true },
+        );
+    };
+
+    const handleConfirmDelete = () => {
+        if (!deletingRoom) return;
+        setDeleteBusy(true);
+        router.delete(
+            `/owner/properties/${property.id}/rooms/${deletingRoom.id}`,
+            {
+                preserveScroll: true,
+                onFinish: () => {
+                    setDeleteBusy(false);
+                    setDeletingRoom(null);
+                },
+            },
         );
     };
 
@@ -154,6 +205,14 @@ export default function RoomsIndex({
                     roomTypesCount={roomTypes.length}
                     roomsCount={roomSummary.total_rooms}
                 />
+
+                {roomError && (
+                    <Alert variant="destructive">
+                        <AlertTriangle aria-hidden="true" />
+                        <AlertTitle>Unable to Update Physical Room</AlertTitle>
+                        <AlertDescription>{roomError}</AlertDescription>
+                    </Alert>
+                )}
 
                 {roomTypes.length === 0 && (
                     <Alert variant="warning">
@@ -202,126 +261,127 @@ export default function RoomsIndex({
                     />
                 </div>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Filter Physical Rooms</CardTitle>
-                        <CardDescription>
-                            Search by room number, wing, or building, and toggle
-                            operational states cleanly without triggering
-                            property re-verification.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <search>
-                            <form
-                                onSubmit={handleFilter}
-                                className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
-                            >
-                                <div className="min-w-0 space-y-1">
-                                    <Label htmlFor="room-filter-search">
-                                        Room / Wing / Building
-                                    </Label>
-                                    <div className="relative">
-                                        <Search
-                                            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-tijum-plum-muted dark:text-muted-foreground"
-                                            aria-hidden="true"
-                                        />
-                                        <Input
-                                            id="room-filter-search"
-                                            type="search"
-                                            value={search}
-                                            className="w-full min-w-0 pl-9"
-                                            placeholder="101, A-201, East Wing..."
-                                            onChange={(e) =>
-                                                setSearch(e.target.value)
-                                            }
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="min-w-0 space-y-1">
-                                    <Label htmlFor="room-filter-type">
-                                        Room Type
-                                    </Label>
-                                    <Select
-                                        value={roomTypeFilter || 'all'}
-                                        onValueChange={(v) =>
-                                            setRoomTypeFilter(
-                                                v === 'all' ? '' : v,
-                                            )
-                                        }
+                <section
+                    aria-label="Filter physical rooms"
+                    className="rounded-2xl border border-tijum-surface/85 bg-card p-3 shadow-tijum-card dark:border-border"
+                >
+                    <search>
+                        <form
+                            onSubmit={handleFilter}
+                            className="flex flex-col gap-2.5 lg:flex-row lg:items-center"
+                        >
+                            <div className="relative min-w-0 flex-1">
+                                <Search
+                                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-tijum-plum-muted dark:text-muted-foreground"
+                                    aria-hidden="true"
+                                />
+                                <Input
+                                    id="room-filter-search"
+                                    type="text"
+                                    value={search}
+                                    aria-label="Filter by room number, wing, or building"
+                                    className="h-9 pr-16 pl-9 text-xs"
+                                    placeholder="Search room #, wing, or building (e.g. 101, A-201)..."
+                                    onChange={(e) => setSearch(e.target.value)}
+                                />
+                                {search && (
+                                    <button
+                                        type="button"
+                                        onClick={handleClearSearch}
+                                        aria-label="Clear room search"
+                                        className="absolute top-1/2 right-12 -translate-y-1/2 cursor-pointer rounded-md p-1 text-muted-foreground hover:text-foreground"
                                     >
-                                        <SelectTrigger
-                                            id="room-filter-type"
-                                            className="w-full min-w-0"
-                                        >
-                                            <SelectValue placeholder="All room types" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">
-                                                All room types
-                                            </SelectItem>
-                                            {roomTypes.map((rt) => (
-                                                <SelectItem
-                                                    key={rt.id}
-                                                    value={String(rt.id)}
-                                                >
-                                                    {rt.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                        <X className="size-3.5" />
+                                    </button>
+                                )}
+                                <button
+                                    type="submit"
+                                    className="absolute top-1/2 right-1.5 -translate-y-1/2 cursor-pointer rounded-md bg-tijum-cream px-2 py-1 text-[11px] font-semibold text-tijum-plum transition-colors hover:bg-tijum-coral hover:text-white dark:bg-muted dark:text-foreground dark:hover:bg-tijum-coral"
+                                >
+                                    Find
+                                </button>
+                            </div>
 
-                                <div className="min-w-0 space-y-1">
-                                    <Label htmlFor="room-filter-status">
-                                        Operational Status
-                                    </Label>
-                                    <Select
-                                        value={statusFilter || 'all'}
-                                        onValueChange={(v) =>
-                                            setStatusFilter(
-                                                v === 'all' ? '' : v,
-                                            )
-                                        }
+                            <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
+                                <Select
+                                    value={roomTypeFilter || 'all'}
+                                    onValueChange={(v) => {
+                                        const nextType = v === 'all' ? '' : v;
+                                        setRoomTypeFilter(nextType);
+                                        applyFilters({ roomType: nextType });
+                                    }}
+                                >
+                                    <SelectTrigger
+                                        id="room-filter-type"
+                                        aria-label="Filter by room type"
+                                        className="h-9 w-full text-xs sm:w-[190px]"
                                     >
-                                        <SelectTrigger
-                                            id="room-filter-status"
-                                            className="w-full min-w-0"
-                                        >
-                                            <SelectValue placeholder="All statuses" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">
-                                                All statuses
+                                        <SelectValue placeholder="All room types" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">
+                                            All room types
+                                        </SelectItem>
+                                        {roomTypes.map((rt) => (
+                                            <SelectItem
+                                                key={rt.id}
+                                                value={String(rt.id)}
+                                            >
+                                                {rt.name}
                                             </SelectItem>
-                                            {operationalStatuses.map((s) => (
-                                                <SelectItem
-                                                    key={s.value}
-                                                    value={s.value}
-                                                >
-                                                    {s.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
 
-                                <div className="flex flex-wrap items-end gap-2">
-                                    <Button type="submit">Apply</Button>
+                                <Select
+                                    value={statusFilter || 'all'}
+                                    onValueChange={(v) => {
+                                        const nextStatus = v === 'all' ? '' : v;
+                                        setStatusFilter(nextStatus);
+                                        applyFilters({ status: nextStatus });
+                                    }}
+                                >
+                                    <SelectTrigger
+                                        id="room-filter-status"
+                                        aria-label="Filter by operational status"
+                                        className="h-9 w-full text-xs sm:w-[175px]"
+                                    >
+                                        <SelectValue placeholder="All statuses" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">
+                                            All statuses
+                                        </SelectItem>
+                                        {operationalStatuses.map((s) => (
+                                            <SelectItem
+                                                key={s.value}
+                                                value={s.value}
+                                            >
+                                                {s.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                {hasActiveFilters && (
                                     <Button
                                         type="button"
-                                        variant="outline"
+                                        variant="ghost"
+                                        size="sm"
                                         onClick={handleClear}
+                                        className="h-9 shrink-0 px-2.5 text-xs text-tijum-plum-muted hover:text-tijum-plum dark:text-muted-foreground dark:hover:text-foreground"
                                     >
-                                        <X aria-hidden="true" />
-                                        <span>Clear</span>
+                                        <RotateCcw
+                                            className="mr-1 size-3.5"
+                                            aria-hidden="true"
+                                        />
+                                        <span>Reset</span>
                                     </Button>
-                                </div>
-                            </form>
-                        </search>
-                    </CardContent>
-                </Card>
+                                )}
+                            </div>
+                        </form>
+                    </search>
+                </section>
 
                 {rooms.length === 0 ? (
                     <EmptyState
@@ -452,6 +512,20 @@ export default function RoomsIndex({
                                                 <span>Edit</span>
                                             </Link>
                                         </Button>
+                                        {canManageOperations && (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="destructive"
+                                                onClick={() =>
+                                                    setDeletingRoom(row)
+                                                }
+                                                aria-label={`Delete room ${row.room_number}`}
+                                            >
+                                                <Trash2 aria-hidden="true" />
+                                                <span>Delete</span>
+                                            </Button>
+                                        )}
                                     </div>
                                 ),
                             },
@@ -460,6 +534,17 @@ export default function RoomsIndex({
                         getRowKey={(row) => row.id}
                     />
                 )}
+
+                <ConfirmationDialog
+                    open={deletingRoom !== null}
+                    onOpenChange={(open) => !open && setDeletingRoom(null)}
+                    tone="destructive"
+                    title={`Delete Room "${deletingRoom?.room_number ?? ''}"?`}
+                    description="This will permanently remove this unbooked physical room from the property. Rooms with reservation history cannot be deleted (mark them Inactive instead)."
+                    confirmLabel="Delete Room"
+                    loading={deleteBusy}
+                    onConfirm={handleConfirmDelete}
+                />
             </div>
         </>
     );
