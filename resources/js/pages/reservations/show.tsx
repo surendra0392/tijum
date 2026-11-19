@@ -442,7 +442,7 @@ export default function ReservationShow({
     );
 
     return (
-        <ResponsiveContainer width="default" className="py-6 sm:py-8">
+        <ResponsiveContainer width="wide" className="py-6 sm:py-8">
             <div className="space-y-6 pb-12">
                 <Head
                     title={`${reservation.property_name} · ${reservation.booking_reference}`}
@@ -634,7 +634,7 @@ export default function ReservationShow({
                 )}
 
                 {/* Main Two-Column Content */}
-                <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(20rem,0.9fr)]">
+                <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(21rem,0.85fr)]">
                     {/* Left Column: Stay Itinerary, Guest Contact & Actions */}
                     <div className="min-w-0 space-y-6">
                         {/* Active Relocation Offer Banner */}
