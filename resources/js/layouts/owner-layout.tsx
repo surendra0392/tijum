@@ -218,12 +218,6 @@ export default function OwnerLayout({
                         <ThemeToggle />
                         <NotificationBell role="owner" />
                         {owner && (
-                            <StatusBadge
-                                status={ownerBadgeStatus}
-                                label={owner.status_label}
-                            />
-                        )}
-                        {owner && (
                             <DropdownMenu modal={false}>
                                 <DropdownMenuTrigger asChild>
                                     <Button
@@ -249,9 +243,18 @@ export default function OwnerLayout({
                                         <p className="font-heading text-xs font-semibold text-tijum-plum dark:text-foreground">
                                             {owner.name}
                                         </p>
-                                        <p className="text-xs font-normal text-muted-foreground">
+                                        <p className="truncate text-xs font-normal text-muted-foreground">
                                             {owner.email}
                                         </p>
+                                        <div className="flex items-center justify-between gap-2 pt-1.5">
+                                            <span className="text-[11px] font-medium text-tijum-plum-muted dark:text-muted-foreground">
+                                                Account status
+                                            </span>
+                                            <StatusBadge
+                                                status={ownerBadgeStatus}
+                                                label={owner.status_label}
+                                            />
+                                        </div>
                                     </DropdownMenuLabel>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem asChild>
