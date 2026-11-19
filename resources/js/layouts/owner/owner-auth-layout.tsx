@@ -1,6 +1,5 @@
 import type { PropsWithChildren } from 'react';
-import AuthCardLayout from '@/layouts/auth/auth-card-layout';
-import { login as customerLogin } from '@/routes';
+import OwnerAuthSplitLayout from '@/layouts/owner/owner-auth-split-layout';
 
 type AuthMeta = {
     title?: string;
@@ -31,16 +30,12 @@ export default function OwnerAuthLayout({
     const resolvedMaxWidth = maxWidth ?? meta.maxWidth ?? 'default';
 
     return (
-        <AuthCardLayout
-            portalLabel="Partner Portal"
+        <OwnerAuthSplitLayout
             title={resolvedTitle}
             description={resolvedDescription}
             maxWidth={resolvedMaxWidth}
-            switchPrompt="Looking to book a stay?"
-            switchLabel="Customer Sign In"
-            switchHref={customerLogin.url()}
         >
             {children}
-        </AuthCardLayout>
+        </OwnerAuthSplitLayout>
     );
 }

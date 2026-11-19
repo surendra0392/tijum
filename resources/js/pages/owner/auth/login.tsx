@@ -1,5 +1,5 @@
-import { Form, Head } from '@inertiajs/react';
-import { ArrowRight } from 'lucide-react';
+import { Form, Head, Link } from '@inertiajs/react';
+import { ArrowRight, CheckCircle2, Lock, Mail } from 'lucide-react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { register } from '@/routes/owner';
+import { login, register } from '@/routes/owner';
 import { store } from '@/routes/owner/login';
 import { request as passwordRequest } from '@/routes/owner/password';
 
@@ -25,8 +25,32 @@ export default function OwnerLogin({
         <>
             <Head title="Partner Sign In" />
 
+            <div
+                role="tablist"
+                aria-label="Partner portal access"
+                className="mb-6 grid grid-cols-2 rounded-xl border border-tijum-surface/80 bg-tijum-cream/65 p-1"
+            >
+                <Link
+                    href={login()}
+                    role="tab"
+                    aria-selected="true"
+                    className="inline-flex h-10 items-center justify-center rounded-lg bg-tijum-plum font-heading text-sm font-semibold text-tijum-cream shadow-xs"
+                >
+                    Partner sign in
+                </Link>
+                <Link
+                    href={register()}
+                    role="tab"
+                    aria-selected="false"
+                    className="inline-flex h-10 items-center justify-center rounded-lg font-heading text-sm font-medium text-tijum-plum-muted transition-colors hover:text-tijum-plum"
+                >
+                    List your property
+                </Link>
+            </div>
+
             {status && (
-                <Alert variant="info" className="mb-5">
+                <Alert variant="success" className="mb-5">
+                    <CheckCircle2 aria-hidden="true" />
                     <AlertDescription>{status}</AlertDescription>
                 </Alert>
             )}
@@ -40,22 +64,34 @@ export default function OwnerLogin({
                     <>
                         <div className="grid gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="email">
-                                    Email address or Mobile number
+                                <Label
+                                    htmlFor="email"
+                                    className="text-[13px] font-semibold text-tijum-plum"
+                                >
+                                    Partner email or mobile number
                                 </Label>
-                                <Input
-                                    id="email"
-                                    type="text"
-                                    name="email"
-                                    required
-                                    autoFocus
-                                    autoComplete="username"
-                                    placeholder="partner@property.in or 10-digit mobile"
-                                    aria-invalid={Boolean(errors.email)}
-                                    aria-describedby={
-                                        errors.email ? 'email-error' : undefined
-                                    }
-                                />
+                                <div className="relative">
+                                    <Mail
+                                        className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-tijum-plum-muted/80"
+                                        aria-hidden="true"
+                                    />
+                                    <Input
+                                        id="email"
+                                        type="text"
+                                        name="email"
+                                        required
+                                        autoFocus
+                                        autoComplete="username"
+                                        placeholder="partner@property.in or 10-digit mobile"
+                                        className="bg-tijum-cream/25 pl-10 focus-visible:bg-white"
+                                        aria-invalid={Boolean(errors.email)}
+                                        aria-describedby={
+                                            errors.email
+                                                ? 'email-error'
+                                                : undefined
+                                        }
+                                    />
+                                </div>
                                 <InputError
                                     id="email-error"
                                     message={errors.email}
@@ -64,29 +100,41 @@ export default function OwnerLogin({
 
                             <div className="grid gap-2">
                                 <div className="flex items-center justify-between gap-2">
-                                    <Label htmlFor="password">Password</Label>
+                                    <Label
+                                        htmlFor="password"
+                                        className="text-[13px] font-semibold text-tijum-plum"
+                                    >
+                                        Password
+                                    </Label>
                                     {canResetPassword && (
                                         <TextLink
                                             href={passwordRequest()}
-                                            className="text-xs font-semibold text-tijum-plum-muted no-underline hover:text-tijum-plum hover:underline"
+                                            className="text-xs font-semibold text-tijum-coral no-underline hover:text-tijum-plum hover:underline"
                                         >
                                             Forgot password?
                                         </TextLink>
                                     )}
                                 </div>
-                                <PasswordInput
-                                    id="password"
-                                    name="password"
-                                    required
-                                    autoComplete="current-password"
-                                    placeholder="Enter your password"
-                                    aria-invalid={Boolean(errors.password)}
-                                    aria-describedby={
-                                        errors.password
-                                            ? 'password-error'
-                                            : undefined
-                                    }
-                                />
+                                <div className="relative">
+                                    <Lock
+                                        className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-tijum-plum-muted/80"
+                                        aria-hidden="true"
+                                    />
+                                    <PasswordInput
+                                        id="password"
+                                        name="password"
+                                        required
+                                        autoComplete="current-password"
+                                        placeholder="Enter your password"
+                                        className="bg-tijum-cream/25 pl-10 focus-visible:bg-white"
+                                        aria-invalid={Boolean(errors.password)}
+                                        aria-describedby={
+                                            errors.password
+                                                ? 'password-error'
+                                                : undefined
+                                        }
+                                    />
+                                </div>
                                 <InputError
                                     id="password-error"
                                     message={errors.password}
@@ -97,7 +145,7 @@ export default function OwnerLogin({
                                 <Checkbox id="remember" name="remember" />
                                 <Label
                                     htmlFor="remember"
-                                    className="cursor-pointer font-body font-normal text-tijum-plum-muted"
+                                    className="cursor-pointer font-body text-sm font-normal text-tijum-plum-muted"
                                 >
                                     Keep me signed in on this device
                                 </Label>
@@ -107,7 +155,7 @@ export default function OwnerLogin({
                         <Button
                             type="submit"
                             size="lg"
-                            className="w-full"
+                            className="h-12 w-full rounded-xl"
                             loading={processing}
                             data-test="owner-login-button"
                         >
@@ -118,17 +166,15 @@ export default function OwnerLogin({
                             />
                         </Button>
 
-                        <div className="border-t border-tijum-surface/80 pt-5 text-center">
-                            <p className="text-sm text-tijum-plum-muted">
-                                New hostel, PG, or homestay partner?{' '}
-                                <TextLink
-                                    href={register()}
-                                    className="font-semibold text-tijum-plum"
-                                >
-                                    Create a partner account
-                                </TextLink>
-                            </p>
-                        </div>
+                        <p className="pt-1 text-center text-sm text-tijum-plum-muted">
+                            New Hostel/PG, Homestay, or Co-Living partner?{' '}
+                            <TextLink
+                                href={register()}
+                                className="font-semibold text-tijum-plum"
+                            >
+                                Create a partner account
+                            </TextLink>
+                        </p>
                     </>
                 )}
             </Form>
@@ -137,9 +183,9 @@ export default function OwnerLogin({
 }
 
 OwnerLogin.authMeta = {
-    title: 'Partner Sign In',
+    title: 'Partner sign in',
     description:
-        'Access your TIJUM Partner portal to manage your Hostel/PG, Homestay, or Co-Living listings, allocations, and payouts.',
+        'Access your listings, room allocations, guest check-ins, and settlement statements.',
 };
 
 OwnerLogin.layout = OwnerLogin.authMeta;

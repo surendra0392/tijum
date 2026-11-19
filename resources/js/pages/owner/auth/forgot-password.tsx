@@ -1,5 +1,5 @@
 import { Form, Head } from '@inertiajs/react';
-import { ArrowRight, KeyRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, KeyRound, Mail, MailCheck } from 'lucide-react';
 import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -20,8 +20,19 @@ export default function OwnerForgotPassword({
         <>
             <Head title="Partner Forgot Password" />
 
+            <div className="mb-6 flex items-center gap-3 rounded-2xl border border-tijum-surface/85 bg-tijum-cream/50 p-3.5">
+                <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-tijum-plum text-tijum-peach shadow-2xs">
+                    <KeyRound className="size-4" aria-hidden="true" />
+                </span>
+                <p className="text-xs leading-relaxed text-tijum-plum-muted">
+                    Enter the business email registered with your partner
+                    account to receive a secure reset link.
+                </p>
+            </div>
+
             {status && (
-                <Alert variant="info" className="mb-5">
+                <Alert variant="success" className="mb-5">
+                    <MailCheck aria-hidden="true" />
                     <AlertDescription>{status}</AlertDescription>
                 </Alert>
             )}
@@ -29,35 +40,33 @@ export default function OwnerForgotPassword({
             <Form {...email.form()} className="flex flex-col gap-5">
                 {({ processing, errors }) => (
                     <>
-                        <div className="flex items-start gap-3 rounded-xl border border-tijum-surface bg-tijum-cream/55 p-3.5 text-xs leading-relaxed text-tijum-plum-muted">
-                            <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-tijum-peach/30 text-tijum-plum">
-                                <KeyRound
-                                    className="size-4"
+                        <div className="grid gap-2">
+                            <Label
+                                htmlFor="email"
+                                className="text-[13px] font-semibold text-tijum-plum"
+                            >
+                                Partner email address
+                            </Label>
+                            <div className="relative">
+                                <Mail
+                                    className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-tijum-plum-muted/80"
                                     aria-hidden="true"
                                 />
-                            </span>
-                            <p>
-                                Enter the email address registered with your
-                                partner account and we will send recovery
-                                instructions.
-                            </p>
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label htmlFor="email">Partner email address</Label>
-                            <Input
-                                id="email"
-                                type="email"
-                                name="email"
-                                required
-                                autoFocus
-                                autoComplete="email"
-                                placeholder="partner@property.in"
-                                aria-invalid={Boolean(errors.email)}
-                                aria-describedby={
-                                    errors.email ? 'email-error' : undefined
-                                }
-                            />
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    name="email"
+                                    required
+                                    autoFocus
+                                    autoComplete="email"
+                                    placeholder="partner@property.in"
+                                    className="bg-tijum-cream/25 pl-10 focus-visible:bg-white"
+                                    aria-invalid={Boolean(errors.email)}
+                                    aria-describedby={
+                                        errors.email ? 'email-error' : undefined
+                                    }
+                                />
+                            </div>
                             <InputError
                                 id="email-error"
                                 message={errors.email}
@@ -67,7 +76,7 @@ export default function OwnerForgotPassword({
                         <Button
                             type="submit"
                             size="lg"
-                            className="w-full"
+                            className="h-12 w-full rounded-xl"
                             loading={processing}
                         >
                             <span>Send partner reset link</span>
@@ -77,16 +86,17 @@ export default function OwnerForgotPassword({
                             />
                         </Button>
 
-                        <div className="border-t border-tijum-surface/80 pt-5 text-center">
-                            <p className="text-sm text-tijum-plum-muted">
-                                Remembered your credentials?{' '}
-                                <TextLink
-                                    href={login()}
-                                    className="font-semibold text-tijum-plum"
-                                >
-                                    Return to partner sign in
-                                </TextLink>
-                            </p>
+                        <div className="pt-1 text-center">
+                            <TextLink
+                                href={login()}
+                                className="inline-flex items-center gap-1.5 text-sm font-semibold text-tijum-plum no-underline hover:text-tijum-coral"
+                            >
+                                <ArrowLeft
+                                    className="size-3.5"
+                                    aria-hidden="true"
+                                />
+                                <span>Return to partner sign in</span>
+                            </TextLink>
                         </div>
                     </>
                 )}
@@ -98,7 +108,7 @@ export default function OwnerForgotPassword({
 OwnerForgotPassword.authMeta = {
     title: 'Reset partner password',
     description:
-        'Enter your partner email address to receive a password reset link.',
+        'Enter your partner email address to receive password recovery instructions.',
 };
 
 OwnerForgotPassword.layout = OwnerForgotPassword.authMeta;

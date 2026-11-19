@@ -1,11 +1,16 @@
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, Link } from '@inertiajs/react';
 import {
     ArrowLeft,
     ArrowRight,
     Building2,
     Check,
+    ChevronDown,
+    Lock,
+    Mail,
+    MapPin,
+    Phone,
     ShieldCheck,
-    UserCheck,
+    User,
 } from 'lucide-react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
@@ -17,7 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { login } from '@/routes/owner';
+import { login, register } from '@/routes/owner';
 import { store } from '@/routes/owner/register';
 import { privacy, terms as publicTerms } from '@/routes/public';
 
@@ -41,24 +46,27 @@ type Props = {
 
 const STEPS = [
     {
-        number: 1,
+        number: 1 as const,
+        code: '01',
         title: 'Contact',
-        subtitle: 'Owner & contact info',
+        subtitle: 'Owner details',
     },
     {
-        number: 2,
+        number: 2 as const,
+        code: '02',
         title: 'Property',
-        subtitle: 'Classification & area',
+        subtitle: 'Type & location',
     },
     {
-        number: 3,
+        number: 3 as const,
+        code: '03',
         title: 'Security',
-        subtitle: 'Password & terms',
+        subtitle: 'Password & review',
     },
 ] as const;
 
 const selectControlClassName =
-    'h-12 w-full cursor-pointer rounded-xl border border-tijum-surface/80 bg-white px-4 py-2 text-sm text-tijum-plum transition-[color,border-color,box-shadow] outline-none hover:border-tijum-plum/55 focus-visible:border-tijum-coral focus-visible:ring-[3px] focus-visible:ring-tijum-coral/25';
+    'h-12 w-full cursor-pointer appearance-none rounded-xl border border-tijum-surface/85 bg-tijum-cream/25 pr-10 pl-4 py-2 text-sm text-tijum-plum transition-[color,border-color,box-shadow,background-color] outline-none hover:border-tijum-plum/55 focus-visible:border-tijum-coral focus-visible:bg-white focus-visible:ring-[3px] focus-visible:ring-tijum-coral/25';
 
 export default function OwnerRegister({ cities = [], categories = [] }: Props) {
     const defaultCities: CityOption[] =
@@ -276,69 +284,91 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
             ? 'Male Only'
             : availableFor === 'female'
               ? 'Female Only'
-              : 'Both / All Genders';
+              : 'All Genders';
 
     return (
         <>
             <Head title="Partner Registration — List Your Property" />
 
-            <div className="mb-6 space-y-2.5">
-                <nav
-                    aria-label="Registration Progress"
-                    className="rounded-2xl border border-tijum-surface bg-tijum-cream/65 p-1.5"
+            <div
+                role="tablist"
+                aria-label="Partner portal access"
+                className="mb-6 grid grid-cols-2 rounded-xl border border-tijum-surface/80 bg-tijum-cream/65 p-1"
+            >
+                <Link
+                    href={login()}
+                    role="tab"
+                    aria-selected="false"
+                    className="inline-flex h-10 items-center justify-center rounded-lg font-heading text-sm font-medium text-tijum-plum-muted transition-colors hover:text-tijum-plum"
                 >
-                    <ol className="grid grid-cols-3 gap-1.5">
+                    Partner sign in
+                </Link>
+                <Link
+                    href={register()}
+                    role="tab"
+                    aria-selected="true"
+                    className="inline-flex h-10 items-center justify-center rounded-lg bg-tijum-plum font-heading text-sm font-semibold text-tijum-cream shadow-xs"
+                >
+                    List your property
+                </Link>
+            </div>
+
+            {/* Clean architectural 3-step progress rail */}
+            <div className="mb-6 space-y-2.5">
+                <nav aria-label="Registration Progress">
+                    <ol className="grid grid-cols-3 gap-2">
                         {STEPS.map((s) => {
                             const isCompleted = currentStep > s.number;
                             const isCurrent = currentStep === s.number;
+                            const isReachable =
+                                s.number <= highestVisitedStep ||
+                                s.number <= currentStep;
+
                             return (
                                 <li key={s.number}>
                                     <button
                                         type="button"
                                         onClick={() => goToStep(s.number)}
-                                        disabled={
-                                            s.number > highestVisitedStep &&
-                                            s.number > currentStep
-                                        }
+                                        disabled={!isReachable}
                                         className={cn(
-                                            'group flex w-full flex-col gap-0.5 rounded-xl px-2.5 py-2 text-left transition-all',
+                                            'flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-all',
                                             isCurrent
-                                                ? 'border border-tijum-surface bg-white font-bold text-tijum-plum shadow-2xs'
+                                                ? 'border-tijum-plum/30 bg-tijum-cream/75 text-tijum-plum shadow-2xs'
                                                 : isCompleted
-                                                  ? 'cursor-pointer text-tijum-plum hover:bg-white/75'
-                                                  : 'cursor-not-allowed text-tijum-plum-muted/65 opacity-70',
+                                                  ? 'cursor-pointer border-tijum-surface/85 bg-white text-tijum-plum hover:border-tijum-plum/30'
+                                                  : 'cursor-not-allowed border-tijum-surface/60 bg-tijum-cream/25 text-tijum-plum-muted/70',
                                         )}
                                         aria-current={
                                             isCurrent ? 'step' : undefined
                                         }
                                     >
-                                        <div className="flex items-center gap-2 text-xs font-semibold">
-                                            <span
-                                                className={cn(
-                                                    'flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-all',
-                                                    isCurrent
-                                                        ? 'bg-tijum-coral text-white'
-                                                        : isCompleted
-                                                          ? 'bg-tijum-plum text-tijum-cream'
-                                                          : 'bg-tijum-surface text-tijum-plum-muted',
-                                                )}
-                                            >
-                                                {isCompleted ? (
-                                                    <Check
-                                                        className="size-3 stroke-[3]"
-                                                        aria-hidden="true"
-                                                    />
-                                                ) : (
-                                                    s.number
-                                                )}
-                                            </span>
-                                            <span className="truncate font-heading">
+                                        <span
+                                            className={cn(
+                                                'flex size-6 shrink-0 items-center justify-center rounded-lg font-heading text-[11px] font-bold transition-colors',
+                                                isCurrent
+                                                    ? 'bg-tijum-coral text-white'
+                                                    : isCompleted
+                                                      ? 'bg-tijum-plum text-tijum-cream'
+                                                      : 'bg-tijum-surface/80 text-tijum-plum-muted',
+                                            )}
+                                        >
+                                            {isCompleted ? (
+                                                <Check
+                                                    className="size-3.5 stroke-[2.75]"
+                                                    aria-hidden="true"
+                                                />
+                                            ) : (
+                                                s.code
+                                            )}
+                                        </span>
+                                        <div className="min-w-0">
+                                            <p className="truncate font-heading text-xs font-bold">
                                                 {s.title}
-                                            </span>
+                                            </p>
+                                            <p className="hidden truncate text-[11px] text-tijum-plum-muted sm:block">
+                                                {s.subtitle}
+                                            </p>
                                         </div>
-                                        <p className="hidden truncate pl-7 text-[11px] font-normal text-tijum-plum-muted sm:block">
-                                            {s.subtitle}
-                                        </p>
                                     </button>
                                 </li>
                             );
@@ -346,7 +376,7 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                     </ol>
                 </nav>
 
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-tijum-surface/80">
+                <div className="h-1 w-full overflow-hidden rounded-full bg-tijum-surface/75">
                     <div
                         className="h-full rounded-full bg-tijum-coral transition-all duration-300 ease-out"
                         style={{
@@ -376,58 +406,51 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
 
                     return (
                         <>
+                            {/* Step 1: Primary Contact */}
                             <div
                                 className={cn(
-                                    'space-y-4 transition-all duration-200',
+                                    'space-y-4',
                                     currentStep !== 1 && 'hidden',
                                 )}
                             >
-                                <div className="flex items-start gap-3 border-b border-tijum-surface pb-3">
-                                    <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-tijum-peach/30 text-tijum-plum">
-                                        <UserCheck
-                                            className="size-4"
-                                            aria-hidden="true"
-                                        />
-                                    </span>
-                                    <div>
-                                        <h3 className="font-heading text-sm font-bold text-tijum-plum">
-                                            1. Primary Contact &amp; Account
-                                        </h3>
-                                        <p className="text-xs text-tijum-plum-muted">
-                                            Primary contact details for
-                                            verification and reservation alerts.
-                                        </p>
-                                    </div>
-                                </div>
-
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <div className="grid gap-2 sm:col-span-2">
-                                        <Label htmlFor="name">
-                                            Full Name / Owner or Primary Contact{' '}
+                                        <Label
+                                            htmlFor="name"
+                                            className="text-[13px] font-semibold text-tijum-plum"
+                                        >
+                                            Owner or primary contact name{' '}
                                             <span className="text-tijum-coral">
                                                 *
                                             </span>
                                         </Label>
-                                        <Input
-                                            id="name"
-                                            type="text"
-                                            name="name"
-                                            value={name}
-                                            onChange={(e) => {
-                                                setName(e.target.value);
-                                                clearClientError('name');
-                                            }}
-                                            autoComplete="name"
-                                            placeholder="e.g. Ramesh Naidu"
-                                            aria-invalid={Boolean(
-                                                mergedErrors.name,
-                                            )}
-                                            aria-describedby={
-                                                mergedErrors.name
-                                                    ? 'name-error'
-                                                    : undefined
-                                            }
-                                        />
+                                        <div className="relative">
+                                            <User
+                                                className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-tijum-plum-muted/80"
+                                                aria-hidden="true"
+                                            />
+                                            <Input
+                                                id="name"
+                                                type="text"
+                                                name="name"
+                                                value={name}
+                                                onChange={(e) => {
+                                                    setName(e.target.value);
+                                                    clearClientError('name');
+                                                }}
+                                                autoComplete="name"
+                                                placeholder="e.g. Ramesh Naidu"
+                                                className="bg-tijum-cream/25 pl-10 focus-visible:bg-white"
+                                                aria-invalid={Boolean(
+                                                    mergedErrors.name,
+                                                )}
+                                                aria-describedby={
+                                                    mergedErrors.name
+                                                        ? 'name-error'
+                                                        : undefined
+                                                }
+                                            />
+                                        </div>
                                         <InputError
                                             id="name-error"
                                             message={mergedErrors.name}
@@ -435,32 +458,42 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="email">
-                                            Email Address{' '}
+                                        <Label
+                                            htmlFor="email"
+                                            className="text-[13px] font-semibold text-tijum-plum"
+                                        >
+                                            Business email{' '}
                                             <span className="text-tijum-coral">
                                                 *
                                             </span>
                                         </Label>
-                                        <Input
-                                            id="email"
-                                            type="email"
-                                            name="email"
-                                            value={email}
-                                            onChange={(e) => {
-                                                setEmail(e.target.value);
-                                                clearClientError('email');
-                                            }}
-                                            autoComplete="email"
-                                            placeholder="owner@property.in"
-                                            aria-invalid={Boolean(
-                                                mergedErrors.email,
-                                            )}
-                                            aria-describedby={
-                                                mergedErrors.email
-                                                    ? 'email-error'
-                                                    : undefined
-                                            }
-                                        />
+                                        <div className="relative">
+                                            <Mail
+                                                className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-tijum-plum-muted/80"
+                                                aria-hidden="true"
+                                            />
+                                            <Input
+                                                id="email"
+                                                type="email"
+                                                name="email"
+                                                value={email}
+                                                onChange={(e) => {
+                                                    setEmail(e.target.value);
+                                                    clearClientError('email');
+                                                }}
+                                                autoComplete="email"
+                                                placeholder="owner@property.in"
+                                                className="bg-tijum-cream/25 pl-10 focus-visible:bg-white"
+                                                aria-invalid={Boolean(
+                                                    mergedErrors.email,
+                                                )}
+                                                aria-describedby={
+                                                    mergedErrors.email
+                                                        ? 'email-error'
+                                                        : undefined
+                                                }
+                                            />
+                                        </div>
                                         <InputError
                                             id="email-error"
                                             message={mergedErrors.email}
@@ -468,32 +501,42 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="phone">
-                                            Mobile Number (Mandatory){' '}
+                                        <Label
+                                            htmlFor="phone"
+                                            className="text-[13px] font-semibold text-tijum-plum"
+                                        >
+                                            Mobile number{' '}
                                             <span className="text-tijum-coral">
                                                 *
                                             </span>
                                         </Label>
-                                        <Input
-                                            id="phone"
-                                            type="tel"
-                                            name="phone"
-                                            value={phone}
-                                            onChange={(e) => {
-                                                setPhone(e.target.value);
-                                                clearClientError('phone');
-                                            }}
-                                            autoComplete="tel"
-                                            placeholder="e.g. 9876543210"
-                                            aria-invalid={Boolean(
-                                                mergedErrors.phone,
-                                            )}
-                                            aria-describedby={
-                                                mergedErrors.phone
-                                                    ? 'phone-error'
-                                                    : undefined
-                                            }
-                                        />
+                                        <div className="relative">
+                                            <Phone
+                                                className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-tijum-plum-muted/80"
+                                                aria-hidden="true"
+                                            />
+                                            <Input
+                                                id="phone"
+                                                type="tel"
+                                                name="phone"
+                                                value={phone}
+                                                onChange={(e) => {
+                                                    setPhone(e.target.value);
+                                                    clearClientError('phone');
+                                                }}
+                                                autoComplete="tel"
+                                                placeholder="9876543210"
+                                                className="bg-tijum-cream/25 pl-10 focus-visible:bg-white"
+                                                aria-invalid={Boolean(
+                                                    mergedErrors.phone,
+                                                )}
+                                                aria-describedby={
+                                                    mergedErrors.phone
+                                                        ? 'phone-error'
+                                                        : undefined
+                                                }
+                                            />
+                                        </div>
                                         <InputError
                                             id="phone-error"
                                             message={mergedErrors.phone}
@@ -501,13 +544,13 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                     </div>
                                 </div>
 
-                                <div className="pt-2">
+                                <div className="pt-1">
                                     <Button
                                         type="button"
                                         size="lg"
                                         onClick={() => goToStep(2)}
                                         data-test="step-1-next"
-                                        className="w-full"
+                                        className="h-12 w-full rounded-xl"
                                     >
                                         <span>
                                             Continue to Property Details
@@ -520,60 +563,54 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                 </div>
                             </div>
 
+                            {/* Step 2: Property Information */}
                             <div
                                 className={cn(
-                                    'space-y-4 transition-all duration-200',
+                                    'space-y-4',
                                     currentStep !== 2 && 'hidden',
                                 )}
                             >
-                                <div className="flex items-start gap-3 border-b border-tijum-surface pb-3">
-                                    <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-tijum-peach/30 text-tijum-plum">
-                                        <Building2
-                                            className="size-4"
-                                            aria-hidden="true"
-                                        />
-                                    </span>
-                                    <div>
-                                        <h3 className="font-heading text-sm font-bold text-tijum-plum">
-                                            2. Property Information &amp;
-                                            Classification
-                                        </h3>
-                                        <p className="text-xs text-tijum-plum-muted">
-                                            Tell prospective guests about your
-                                            property location and stay category.
-                                        </p>
-                                    </div>
-                                </div>
-
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <div className="grid gap-2 sm:col-span-2">
-                                        <Label htmlFor="property_name">
-                                            Property Name{' '}
+                                        <Label
+                                            htmlFor="property_name"
+                                            className="text-[13px] font-semibold text-tijum-plum"
+                                        >
+                                            Property name{' '}
                                             <span className="text-tijum-coral">
                                                 *
                                             </span>
                                         </Label>
-                                        <Input
-                                            id="property_name"
-                                            type="text"
-                                            name="property_name"
-                                            value={propertyName}
-                                            onChange={(e) => {
-                                                setPropertyName(e.target.value);
-                                                clearClientError(
-                                                    'property_name',
-                                                );
-                                            }}
-                                            placeholder="e.g. Sri Balaji Executive PG & Hostel"
-                                            aria-invalid={Boolean(
-                                                mergedErrors.property_name,
-                                            )}
-                                            aria-describedby={
-                                                mergedErrors.property_name
-                                                    ? 'property_name-error'
-                                                    : undefined
-                                            }
-                                        />
+                                        <div className="relative">
+                                            <Building2
+                                                className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-tijum-plum-muted/80"
+                                                aria-hidden="true"
+                                            />
+                                            <Input
+                                                id="property_name"
+                                                type="text"
+                                                name="property_name"
+                                                value={propertyName}
+                                                onChange={(e) => {
+                                                    setPropertyName(
+                                                        e.target.value,
+                                                    );
+                                                    clearClientError(
+                                                        'property_name',
+                                                    );
+                                                }}
+                                                placeholder="e.g. Sri Balaji Executive PG & Hostel"
+                                                className="bg-tijum-cream/25 pl-10 focus-visible:bg-white"
+                                                aria-invalid={Boolean(
+                                                    mergedErrors.property_name,
+                                                )}
+                                                aria-describedby={
+                                                    mergedErrors.property_name
+                                                        ? 'property_name-error'
+                                                        : undefined
+                                                }
+                                            />
+                                        </div>
                                         <InputError
                                             id="property_name-error"
                                             message={mergedErrors.property_name}
@@ -581,32 +618,45 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="property_category_id">
-                                            Select Property Type{' '}
+                                        <Label
+                                            htmlFor="property_category_id"
+                                            className="text-[13px] font-semibold text-tijum-plum"
+                                        >
+                                            Property type{' '}
                                             <span className="text-tijum-coral">
                                                 *
                                             </span>
                                         </Label>
-                                        <select
-                                            id="property_category_id"
-                                            name="property_category_id"
-                                            value={propertyCategoryId}
-                                            onChange={(e) =>
-                                                setPropertyCategoryId(
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className={selectControlClassName}
-                                        >
-                                            {defaultCategories.map((cat) => (
-                                                <option
-                                                    key={cat.id}
-                                                    value={cat.id}
-                                                >
-                                                    {cat.name}
-                                                </option>
-                                            ))}
-                                        </select>
+                                        <div className="relative">
+                                            <select
+                                                id="property_category_id"
+                                                name="property_category_id"
+                                                value={propertyCategoryId}
+                                                onChange={(e) =>
+                                                    setPropertyCategoryId(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className={
+                                                    selectControlClassName
+                                                }
+                                            >
+                                                {defaultCategories.map(
+                                                    (cat) => (
+                                                        <option
+                                                            key={cat.id}
+                                                            value={cat.id}
+                                                        >
+                                                            {cat.name}
+                                                        </option>
+                                                    ),
+                                                )}
+                                            </select>
+                                            <ChevronDown
+                                                className="pointer-events-none absolute top-1/2 right-3.5 size-4 -translate-y-1/2 text-tijum-plum-muted"
+                                                aria-hidden="true"
+                                            />
+                                        </div>
                                         <InputError
                                             id="property_category_id-error"
                                             message={
@@ -616,31 +666,44 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="available_for">
-                                            Property Available For{' '}
+                                        <Label
+                                            htmlFor="available_for"
+                                            className="text-[13px] font-semibold text-tijum-plum"
+                                        >
+                                            Guest eligibility{' '}
                                             <span className="text-tijum-coral">
                                                 *
                                             </span>
                                         </Label>
-                                        <select
-                                            id="available_for"
-                                            name="available_for"
-                                            value={availableFor}
-                                            onChange={(e) =>
-                                                setAvailableFor(e.target.value)
-                                            }
-                                            className={selectControlClassName}
-                                        >
-                                            <option value="male">
-                                                Male Guests Only
-                                            </option>
-                                            <option value="female">
-                                                Female Guests Only
-                                            </option>
-                                            <option value="both">
-                                                Both / All Genders (Co-ed)
-                                            </option>
-                                        </select>
+                                        <div className="relative">
+                                            <select
+                                                id="available_for"
+                                                name="available_for"
+                                                value={availableFor}
+                                                onChange={(e) =>
+                                                    setAvailableFor(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className={
+                                                    selectControlClassName
+                                                }
+                                            >
+                                                <option value="male">
+                                                    Male Guests Only
+                                                </option>
+                                                <option value="female">
+                                                    Female Guests Only
+                                                </option>
+                                                <option value="both">
+                                                    Both / All Genders (Co-ed)
+                                                </option>
+                                            </select>
+                                            <ChevronDown
+                                                className="pointer-events-none absolute top-1/2 right-3.5 size-4 -translate-y-1/2 text-tijum-plum-muted"
+                                                aria-hidden="true"
+                                            />
+                                        </div>
                                         <InputError
                                             id="available_for-error"
                                             message={mergedErrors.available_for}
@@ -648,27 +711,41 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="city_id">
-                                            Property Location (City){' '}
+                                        <Label
+                                            htmlFor="city_id"
+                                            className="text-[13px] font-semibold text-tijum-plum"
+                                        >
+                                            City{' '}
                                             <span className="text-tijum-coral">
                                                 *
                                             </span>
                                         </Label>
-                                        <select
-                                            id="city_id"
-                                            name="city_id"
-                                            value={cityId}
-                                            onChange={(e) =>
-                                                setCityId(e.target.value)
-                                            }
-                                            className={selectControlClassName}
-                                        >
-                                            {defaultCities.map((c) => (
-                                                <option key={c.id} value={c.id}>
-                                                    {c.name}
-                                                </option>
-                                            ))}
-                                        </select>
+                                        <div className="relative">
+                                            <select
+                                                id="city_id"
+                                                name="city_id"
+                                                value={cityId}
+                                                onChange={(e) =>
+                                                    setCityId(e.target.value)
+                                                }
+                                                className={
+                                                    selectControlClassName
+                                                }
+                                            >
+                                                {defaultCities.map((c) => (
+                                                    <option
+                                                        key={c.id}
+                                                        value={c.id}
+                                                    >
+                                                        {c.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown
+                                                className="pointer-events-none absolute top-1/2 right-3.5 size-4 -translate-y-1/2 text-tijum-plum-muted"
+                                                aria-hidden="true"
+                                            />
+                                        </div>
                                         <InputError
                                             id="city_id-error"
                                             message={mergedErrors.city_id}
@@ -676,31 +753,43 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="locality">
-                                            Property Area / Locality{' '}
+                                        <Label
+                                            htmlFor="locality"
+                                            className="text-[13px] font-semibold text-tijum-plum"
+                                        >
+                                            Area / locality{' '}
                                             <span className="text-tijum-coral">
                                                 *
                                             </span>
                                         </Label>
-                                        <Input
-                                            id="locality"
-                                            type="text"
-                                            name="locality"
-                                            value={locality}
-                                            onChange={(e) => {
-                                                setLocality(e.target.value);
-                                                clearClientError('locality');
-                                            }}
-                                            placeholder="e.g. Madhapur, Brodipet, Benz Circle"
-                                            aria-invalid={Boolean(
-                                                mergedErrors.locality,
-                                            )}
-                                            aria-describedby={
-                                                mergedErrors.locality
-                                                    ? 'locality-error'
-                                                    : undefined
-                                            }
-                                        />
+                                        <div className="relative">
+                                            <MapPin
+                                                className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-tijum-plum-muted/80"
+                                                aria-hidden="true"
+                                            />
+                                            <Input
+                                                id="locality"
+                                                type="text"
+                                                name="locality"
+                                                value={locality}
+                                                onChange={(e) => {
+                                                    setLocality(e.target.value);
+                                                    clearClientError(
+                                                        'locality',
+                                                    );
+                                                }}
+                                                placeholder="e.g. Madhapur, Benz Circle"
+                                                className="bg-tijum-cream/25 pl-10 focus-visible:bg-white"
+                                                aria-invalid={Boolean(
+                                                    mergedErrors.locality,
+                                                )}
+                                                aria-describedby={
+                                                    mergedErrors.locality
+                                                        ? 'locality-error'
+                                                        : undefined
+                                                }
+                                            />
+                                        </div>
                                         <InputError
                                             id="locality-error"
                                             message={mergedErrors.locality}
@@ -708,10 +797,13 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                     </div>
 
                                     <div className="grid gap-2 sm:col-span-2">
-                                        <Label htmlFor="description">
-                                            Describe Property{' '}
+                                        <Label
+                                            htmlFor="description"
+                                            className="text-[13px] font-semibold text-tijum-plum"
+                                        >
+                                            Property overview{' '}
                                             <span className="text-xs font-normal text-tijum-plum-muted">
-                                                (optional brief intro)
+                                                (optional)
                                             </span>
                                         </Label>
                                         <Textarea
@@ -722,8 +814,8 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                                 setDescription(e.target.value)
                                             }
                                             rows={3}
-                                            placeholder="Briefly describe your building, surroundings, nearby landmarks, or facilities..."
-                                            className="rounded-xl border-tijum-surface/80 bg-white text-tijum-plum"
+                                            placeholder="Briefly describe your rooms, nearby landmarks, or facilities..."
+                                            className="rounded-xl border-tijum-surface/85 bg-tijum-cream/25 text-tijum-plum focus-visible:bg-white"
                                             aria-invalid={Boolean(
                                                 mergedErrors.description,
                                             )}
@@ -740,13 +832,14 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-3 pt-2">
+                                <div className="flex items-center gap-3 pt-1">
                                     <Button
                                         type="button"
                                         variant="outline"
                                         size="lg"
                                         onClick={() => goToStep(1)}
                                         data-test="step-2-back"
+                                        className="h-12 rounded-xl"
                                     >
                                         <ArrowLeft
                                             className="size-4"
@@ -759,7 +852,7 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                         size="lg"
                                         onClick={() => goToStep(3)}
                                         data-test="step-2-next"
-                                        className="flex-1"
+                                        className="h-12 flex-1 rounded-xl"
                                     >
                                         <span>Continue to Security</span>
                                         <ArrowRight
@@ -770,114 +863,108 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                 </div>
                             </div>
 
+                            {/* Step 3: Security & Review */}
                             <div
                                 className={cn(
-                                    'space-y-4 transition-all duration-200',
+                                    'space-y-4',
                                     currentStep !== 3 && 'hidden',
                                 )}
                             >
-                                <div className="flex items-start gap-3 border-b border-tijum-surface pb-3">
-                                    <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-tijum-peach/30 text-tijum-plum">
-                                        <ShieldCheck
-                                            className="size-4"
-                                            aria-hidden="true"
-                                        />
-                                    </span>
-                                    <div>
-                                        <h3 className="font-heading text-sm font-bold text-tijum-plum">
-                                            3. Account Security &amp; Agreement
-                                        </h3>
-                                        <p className="text-xs text-tijum-plum-muted">
-                                            Set your password and confirm
-                                            listing details to activate your
-                                            partner account.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-3 rounded-2xl border border-tijum-surface bg-tijum-cream/60 p-4">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <span className="font-heading text-[11px] font-bold tracking-[0.12em] text-tijum-plum uppercase">
-                                            Listing Summary
+                                <div className="space-y-3 rounded-2xl border border-tijum-surface/85 bg-tijum-cream/50 p-4">
+                                    <div className="flex items-center justify-between gap-2 border-b border-tijum-surface/75 pb-2.5">
+                                        <span className="font-heading text-xs font-bold text-tijum-plum">
+                                            Property submission summary
                                         </span>
                                         <button
                                             type="button"
                                             onClick={() => goToStep(2)}
-                                            className="cursor-pointer font-heading text-xs font-semibold text-tijum-plum underline decoration-tijum-coral/65 underline-offset-4 hover:text-tijum-coral"
+                                            className="cursor-pointer font-heading text-xs font-semibold text-tijum-coral hover:text-tijum-plum hover:underline"
                                         >
-                                            Edit Details
+                                            Edit details
                                         </button>
                                     </div>
-                                    <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
+                                    <dl className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
                                         <div>
-                                            <span className="block text-[11px] text-tijum-plum-muted">
+                                            <dt className="text-[11px] text-tijum-plum-muted">
                                                 Property
-                                            </span>
-                                            <span className="block truncate font-semibold text-tijum-plum">
+                                            </dt>
+                                            <dd className="truncate font-semibold text-tijum-plum">
                                                 {propertyName.trim() ||
                                                     'Property'}
-                                            </span>
+                                            </dd>
                                         </div>
                                         <div>
-                                            <span className="block text-[11px] text-tijum-plum-muted">
-                                                Type &amp; Gender
-                                            </span>
-                                            <span className="block truncate font-semibold text-tijum-plum">
+                                            <dt className="text-[11px] text-tijum-plum-muted">
+                                                Category &amp; guests
+                                            </dt>
+                                            <dd className="truncate font-semibold text-tijum-plum">
                                                 {selectedCategoryName} ·{' '}
                                                 {genderLabel}
-                                            </span>
+                                            </dd>
                                         </div>
                                         <div>
-                                            <span className="block text-[11px] text-tijum-plum-muted">
+                                            <dt className="text-[11px] text-tijum-plum-muted">
                                                 Location
-                                            </span>
-                                            <span className="block truncate font-semibold text-tijum-plum">
+                                            </dt>
+                                            <dd className="truncate font-semibold text-tijum-plum">
                                                 {locality.trim()
                                                     ? `${locality.trim()}, ${selectedCityName}`
                                                     : selectedCityName}
-                                            </span>
+                                            </dd>
                                         </div>
                                         <div>
-                                            <span className="block text-[11px] text-tijum-plum-muted">
-                                                Owner / Contact
-                                            </span>
-                                            <span className="block truncate font-semibold text-tijum-plum">
-                                                {name.trim() || 'Contact'}{' '}
+                                            <dt className="text-[11px] text-tijum-plum-muted">
+                                                Primary contact
+                                            </dt>
+                                            <dd className="truncate font-semibold text-tijum-plum">
+                                                {name.trim() || 'Contact'}
                                                 {phone.trim()
-                                                    ? `(${phone.trim()})`
+                                                    ? ` · ${phone.trim()}`
                                                     : ''}
-                                            </span>
+                                            </dd>
                                         </div>
-                                    </div>
+                                    </dl>
                                 </div>
 
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <div className="grid gap-2">
-                                        <Label htmlFor="password">
+                                        <Label
+                                            htmlFor="password"
+                                            className="text-[13px] font-semibold text-tijum-plum"
+                                        >
                                             Password{' '}
                                             <span className="text-tijum-coral">
                                                 *
                                             </span>
                                         </Label>
-                                        <PasswordInput
-                                            id="password"
-                                            name="password"
-                                            value={password}
-                                            onChange={(e) => {
-                                                setPassword(e.target.value);
-                                                clearClientError('password');
-                                            }}
-                                            autoComplete="new-password"
-                                            placeholder="Minimum 8 characters"
-                                            aria-invalid={Boolean(
-                                                mergedErrors.password,
-                                            )}
-                                            aria-describedby={
-                                                mergedErrors.password
-                                                    ? 'password-error'
-                                                    : undefined
-                                            }
-                                        />
+                                        <div className="relative">
+                                            <Lock
+                                                className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-tijum-plum-muted/80"
+                                                aria-hidden="true"
+                                            />
+                                            <PasswordInput
+                                                id="password"
+                                                name="password"
+                                                value={password}
+                                                onChange={(e) => {
+                                                    setPassword(e.target.value);
+                                                    clearClientError(
+                                                        'password',
+                                                    );
+                                                }}
+                                                autoComplete="new-password"
+                                                placeholder="Minimum 8 characters"
+                                                className="bg-tijum-cream/25 pl-10 focus-visible:bg-white"
+                                                aria-invalid={Boolean(
+                                                    mergedErrors.password,
+                                                )}
+                                                aria-describedby={
+                                                    mergedErrors.password
+                                                        ? 'password-error'
+                                                        : undefined
+                                                }
+                                            />
+                                        </div>
                                         <InputError
                                             id="password-error"
                                             message={mergedErrors.password}
@@ -885,35 +972,45 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="password_confirmation">
-                                            Confirm Password{' '}
+                                        <Label
+                                            htmlFor="password_confirmation"
+                                            className="text-[13px] font-semibold text-tijum-plum"
+                                        >
+                                            Confirm password{' '}
                                             <span className="text-tijum-coral">
                                                 *
                                             </span>
                                         </Label>
-                                        <PasswordInput
-                                            id="password_confirmation"
-                                            name="password_confirmation"
-                                            value={passwordConfirmation}
-                                            onChange={(e) => {
-                                                setPasswordConfirmation(
-                                                    e.target.value,
-                                                );
-                                                clearClientError(
-                                                    'password_confirmation',
-                                                );
-                                            }}
-                                            autoComplete="new-password"
-                                            placeholder="Re-enter password"
-                                            aria-invalid={Boolean(
-                                                mergedErrors.password_confirmation,
-                                            )}
-                                            aria-describedby={
-                                                mergedErrors.password_confirmation
-                                                    ? 'password_confirmation-error'
-                                                    : undefined
-                                            }
-                                        />
+                                        <div className="relative">
+                                            <Lock
+                                                className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-4 -translate-y-1/2 text-tijum-plum-muted/80"
+                                                aria-hidden="true"
+                                            />
+                                            <PasswordInput
+                                                id="password_confirmation"
+                                                name="password_confirmation"
+                                                value={passwordConfirmation}
+                                                onChange={(e) => {
+                                                    setPasswordConfirmation(
+                                                        e.target.value,
+                                                    );
+                                                    clearClientError(
+                                                        'password_confirmation',
+                                                    );
+                                                }}
+                                                autoComplete="new-password"
+                                                placeholder="Re-enter password"
+                                                className="bg-tijum-cream/25 pl-10 focus-visible:bg-white"
+                                                aria-invalid={Boolean(
+                                                    mergedErrors.password_confirmation,
+                                                )}
+                                                aria-describedby={
+                                                    mergedErrors.password_confirmation
+                                                        ? 'password_confirmation-error'
+                                                        : undefined
+                                                }
+                                            />
+                                        </div>
                                         <InputError
                                             id="password_confirmation-error"
                                             message={
@@ -923,8 +1020,8 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                     </div>
                                 </div>
 
-                                <div className="space-y-1.5 pt-1">
-                                    <div className="flex items-start gap-3 rounded-xl border border-tijum-surface bg-tijum-cream/45 p-3.5">
+                                <div className="space-y-1.5 pt-0.5">
+                                    <div className="flex items-start gap-2.5">
                                         <Checkbox
                                             id="terms"
                                             name="terms"
@@ -946,19 +1043,18 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                         />
                                         <Label
                                             htmlFor="terms"
-                                            className="cursor-pointer font-body text-xs leading-relaxed text-tijum-plum-muted"
+                                            className="cursor-pointer font-body text-xs leading-relaxed font-normal text-tijum-plum-muted"
                                         >
-                                            I confirm that I am the authorized
-                                            owner or operator of this property,
-                                            and I agree to the{' '}
+                                            I confirm I am the authorized owner
+                                            or operator of this property, and I
+                                            agree to the{' '}
                                             <a
                                                 href={publicTerms.url()}
                                                 target="_blank"
                                                 rel="noreferrer"
                                                 className="font-semibold text-tijum-plum underline decoration-tijum-coral/60 underline-offset-2 hover:text-tijum-coral"
                                             >
-                                                TIJUM Partner Terms &amp;
-                                                Conditions
+                                                Partner Terms &amp; Conditions
                                             </a>{' '}
                                             and{' '}
                                             <a
@@ -981,13 +1077,14 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                     />
                                 </div>
 
-                                <div className="flex items-center gap-3 pt-2">
+                                <div className="flex items-center gap-3 pt-1">
                                     <Button
                                         type="button"
                                         variant="outline"
                                         size="lg"
                                         onClick={() => goToStep(2)}
                                         data-test="step-3-back"
+                                        className="h-12 rounded-xl"
                                     >
                                         <ArrowLeft
                                             className="size-4"
@@ -998,7 +1095,7 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                     <Button
                                         type="submit"
                                         size="lg"
-                                        className="flex-1"
+                                        className="h-12 flex-1 rounded-xl"
                                         loading={processing}
                                         data-test="owner-register-button"
                                     >
@@ -1011,17 +1108,15 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
                                 </div>
                             </div>
 
-                            <div className="border-t border-tijum-surface/80 pt-5 text-center">
-                                <p className="text-sm text-tijum-plum-muted">
-                                    Already registered as a partner?{' '}
-                                    <TextLink
-                                        href={login()}
-                                        className="font-semibold text-tijum-plum"
-                                    >
-                                        Sign in to Partner Portal
-                                    </TextLink>
-                                </p>
-                            </div>
+                            <p className="pt-1 text-center text-sm text-tijum-plum-muted">
+                                Already registered as a partner?{' '}
+                                <TextLink
+                                    href={login()}
+                                    className="font-semibold text-tijum-plum"
+                                >
+                                    Sign in to Partner Portal
+                                </TextLink>
+                            </p>
                         </>
                     );
                 }}
@@ -1031,9 +1126,9 @@ export default function OwnerRegister({ cities = [], categories = [] }: Props) {
 }
 
 OwnerRegister.authMeta = {
-    title: 'Partner Registration & Property Listing',
+    title: 'List your property on TIJUM',
     description:
-        'List your Hostel/PG, Homestay, or Co-Living property on TIJUM and start accepting direct guest bookings.',
+        'Register your Hostel/PG, Homestay, or Co-Living space in three quick steps to start accepting direct guest bookings.',
     maxWidth: 'wide' as const,
 };
 
