@@ -2,10 +2,12 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Archive,
+    ArrowRight,
     Building2,
     Camera,
     CheckCircle2,
     ChevronDown,
+    Clock,
     DoorClosed,
     Edit3,
     FileCheck2,
@@ -13,6 +15,7 @@ import {
     Layers,
     MapPin,
     PauseCircle,
+    Phone,
     PlayCircle,
     PlusCircle,
     PowerOff,
@@ -27,8 +30,7 @@ import {
 } from '@/components/owner/properties/property-status-helpers';
 import { PropertyStepNavigation } from '@/components/owner/properties/property-step-navigation';
 import { ConfirmationDialog } from '@/components/shared/confirmation-dialog';
-import { InfoPanel, StatCard } from '@/components/shared/info-card';
-import { PageHeader } from '@/components/shared/page-header';
+import { StatCard } from '@/components/shared/info-card';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +42,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { formatStayTime } from '@/lib/stay-timing';
 import { dashboard } from '@/routes/owner';
 import {
     edit as editPropertyRoute,
@@ -61,7 +64,6 @@ import {
     index as roomsIndexRoute,
 } from '@/routes/owner/properties/rooms';
 import { show as verificationShowRoute } from '@/routes/owner/properties/verification';
-import { formatStayTime } from '@/lib/stay-timing';
 import type {
     PropertyFieldsSnapshot,
     PropertyMediaData,
@@ -121,6 +123,14 @@ export default function OwnerPropertyShow({
     const [confirmAmendmentCancel, setConfirmAmendmentCancel] = useState(false);
     const [busy, setBusy] = useState(false);
 
+    const coverSrc =
+        property.cover_media?.public_optimized_url ??
+        property.cover_media?.public_thumbnail_url ??
+        property.cover_media?.thumbnail_preview_url ??
+        media[0]?.public_thumbnail_url ??
+        media[0]?.thumbnail_preview_url ??
+        null;
+
     const handleOperationalStatusConfirm = () => {
         if (!pendingOpStatus) {
             return;
@@ -167,48 +177,201 @@ export default function OwnerPropertyShow({
         );
     };
 
+    const showSubmitAction =
+        !property.is_verified || property.is_amendment_active;
+
     return (
         <>
             <Head title={`${property.name} · Property Overview`} />
 
             <div className="min-w-0 space-y-6">
-                <PageHeader
-                    eyebrow={`${property.category?.name ?? 'Property'} · ${property.property_reference}`}
-                    title={property.name}
-                    description={`${property.details.address_line_1}, ${property.locality}, ${property.city?.name ?? ''} (${property.state})`}
-                    badges={
-                        <>
-                            <StatusBadge
-                                status={
-                                    propertyVerificationStatusMap[
-                                        property.verification_status
-                                    ]
-                                }
-                                label={property.verification_status_label}
-                            />
-                            <StatusBadge
-                                status={
-                                    propertyOperationalStatusMap[
-                                        property.status
-                                    ]
-                                }
-                                label={property.status_label}
-                            />
-                            {property.is_amendment_active && (
-                                <Badge variant="default">
-                                    Amendment Rev #
-                                    {application?.revision_number}
-                                </Badge>
+                <section className="overflow-hidden rounded-2xl border border-tijum-surface/90 bg-white shadow-xs dark:border-border dark:bg-card">
+                    <div className="flex flex-col gap-5 p-5 sm:p-6 md:flex-row md:items-center">
+                        <Link
+                            href={mediaIndexRoute(property.id)}
+                            className="group relative aspect-[16/10] w-full shrink-0 overflow-hidden rounded-xl bg-tijum-cream md:h-28 md:w-44 lg:h-32 lg:w-52 dark:bg-muted"
+                        >
+                            {coverSrc ? (
+                                <img
+                                    src={coverSrc}
+                                    alt={
+                                        property.cover_media?.alt_text ??
+                                        property.name
+                                    }
+                                    className="size-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                                />
+                            ) : (
+                                <div className="flex size-full flex-col items-center justify-center gap-1.5 text-tijum-plum-muted dark:text-muted-foreground">
+                                    <Camera
+                                        className="size-6 opacity-70"
+                                        aria-hidden="true"
+                                    />
+                                    <span className="text-xs font-medium">
+                                        Add cover photo
+                                    </span>
+                                </div>
                             )}
-                        </>
-                    }
-                    actions={
-                        <div className="flex flex-wrap gap-2">
+                            <div
+                                className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent"
+                                aria-hidden="true"
+                            />
+                            <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
+                                <Camera
+                                    className="size-3"
+                                    aria-hidden="true"
+                                />
+                                <span>{media.length}</span>
+                            </span>
+                        </Link>
+
+                        <div className="min-w-0 flex-1 space-y-2.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-heading text-xs font-semibold tracking-wider text-tijum-plum-muted uppercase dark:text-muted-foreground">
+                                    {property.category?.name ?? 'Property'} ·{' '}
+                                    {property.property_reference}
+                                </span>
+                                <StatusBadge
+                                    status={
+                                        propertyVerificationStatusMap[
+                                            property.verification_status
+                                        ]
+                                    }
+                                    label={property.verification_status_label}
+                                />
+                                <StatusBadge
+                                    status={
+                                        propertyOperationalStatusMap[
+                                            property.status
+                                        ]
+                                    }
+                                    label={property.status_label}
+                                />
+                                {property.is_amendment_active && (
+                                    <Badge variant="default">
+                                        Amendment Rev #
+                                        {application?.revision_number}
+                                    </Badge>
+                                )}
+                            </div>
+
+                            <h1 className="font-heading text-2xl leading-tight font-bold tracking-tight text-tijum-plum sm:text-3xl dark:text-foreground">
+                                {property.name}
+                            </h1>
+
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-tijum-plum-muted sm:text-sm dark:text-muted-foreground">
+                                <span className="inline-flex items-center gap-1.5">
+                                    <MapPin
+                                        className="size-3.5 shrink-0 text-tijum-coral"
+                                        aria-hidden="true"
+                                    />
+                                    <span>
+                                        {property.details.address_line_1},{' '}
+                                        {property.locality},{' '}
+                                        {property.city?.name ?? ''} (
+                                        {property.state})
+                                    </span>
+                                </span>
+                                <span className="inline-flex items-center gap-1.5">
+                                    <Clock
+                                        className="size-3.5 shrink-0 text-tijum-coral"
+                                        aria-hidden="true"
+                                    />
+                                    <span>
+                                        Check-in{' '}
+                                        {formatStayTime(
+                                            timingRules.standard_check_in_time,
+                                        )}{' '}
+                                        · Check-out{' '}
+                                        {formatStayTime(
+                                            timingRules.standard_check_out_time,
+                                        )}
+                                    </span>
+                                </span>
+                                <span className="inline-flex items-center gap-1.5">
+                                    <Phone
+                                        className="size-3.5 shrink-0 text-tijum-coral"
+                                        aria-hidden="true"
+                                    />
+                                    <span>
+                                        {property.details.contact_person_name} ·{' '}
+                                        {property.details.contact_phone}
+                                    </span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-tijum-surface/80 bg-tijum-cream/30 px-5 py-3 sm:px-6 dark:border-border dark:bg-muted/25">
+                        <div className="flex flex-wrap items-center gap-2">
+                            {showSubmitAction && (
+                                <Button size="sm" asChild>
+                                    <Link
+                                        href={verificationShowRoute(
+                                            property.id,
+                                        )}
+                                    >
+                                        <FileCheck2 aria-hidden="true" />
+                                        <span>Verification &amp; Submit</span>
+                                    </Link>
+                                </Button>
+                            )}
+
+                            <Button
+                                size="sm"
+                                variant={
+                                    !showSubmitAction &&
+                                    property.can_edit_details
+                                        ? 'default'
+                                        : 'outline'
+                                }
+                                asChild
+                            >
+                                <Link href={editPropertyRoute(property.id)}>
+                                    <Edit3 aria-hidden="true" />
+                                    <span>
+                                        {property.can_edit_details
+                                            ? 'Edit Property Details'
+                                            : 'View Property Details'}
+                                    </span>
+                                </Link>
+                            </Button>
+
+                            {property.can_start_amendment && (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="plum"
+                                    onClick={() =>
+                                        setConfirmAmendmentStart(true)
+                                    }
+                                    data-test="start-amendment-btn"
+                                >
+                                    <RefreshCw aria-hidden="true" />
+                                    <span>Amend Listing</span>
+                                </Button>
+                            )}
+
+                            {application?.can_cancel_amendment && (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() =>
+                                        setConfirmAmendmentCancel(true)
+                                    }
+                                >
+                                    Cancel Amendment
+                                </Button>
+                            )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
                             {property.can_toggle_operational_status && (
                                 <>
                                     {property.status === 'active' ? (
                                         <Button
                                             type="button"
+                                            size="sm"
                                             variant="outline"
                                             onClick={() =>
                                                 setPendingOpStatus(
@@ -218,13 +381,14 @@ export default function OwnerPropertyShow({
                                             data-test="pause-property-button"
                                         >
                                             <PauseCircle aria-hidden="true" />
-                                            <span>Temporarily Close</span>
+                                            <span>Pause Bookings</span>
                                         </Button>
                                     ) : property.status ===
                                           'temporarily_closed' ||
                                       property.status === 'archived' ? (
                                         <Button
                                             type="button"
+                                            size="sm"
                                             variant="plum"
                                             onClick={() =>
                                                 setPendingOpStatus('active')
@@ -241,53 +405,21 @@ export default function OwnerPropertyShow({
                             {property.can_close_completely && (
                                 <Button
                                     type="button"
+                                    size="sm"
                                     variant="outline"
                                     onClick={() =>
                                         setPendingOpStatus('archived')
                                     }
-                                    className="border-rose-300 text-rose-700 hover:bg-rose-600 hover:text-white dark:border-rose-500/50 dark:text-rose-300 dark:hover:bg-rose-600 dark:hover:text-white"
+                                    className="border-rose-200 bg-white text-rose-700 hover:border-rose-600 hover:bg-rose-600 hover:text-white dark:border-rose-500/40 dark:bg-transparent dark:text-rose-300 dark:hover:bg-rose-600 dark:hover:text-white"
                                     data-test="close-property-completely-button"
                                 >
                                     <PowerOff aria-hidden="true" />
-                                    <span>Close Property Completely</span>
+                                    <span>Close Property</span>
                                 </Button>
                             )}
-
-                            {property.can_start_amendment && (
-                                <Button
-                                    type="button"
-                                    variant="plum"
-                                    onClick={() =>
-                                        setConfirmAmendmentStart(true)
-                                    }
-                                    data-test="start-amendment-btn"
-                                >
-                                    <RefreshCw aria-hidden="true" />
-                                    <span>Start Re-Verification Amendment</span>
-                                </Button>
-                            )}
-
-                            {application?.can_cancel_amendment && (
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    onClick={() =>
-                                        setConfirmAmendmentCancel(true)
-                                    }
-                                >
-                                    Cancel Amendment
-                                </Button>
-                            )}
-
-                            <Button asChild>
-                                <Link href={verificationShowRoute(property.id)}>
-                                    <FileCheck2 aria-hidden="true" />
-                                    <span>Verification &amp; Submit</span>
-                                </Link>
-                            </Button>
                         </div>
-                    }
-                />
+                    </div>
+                </section>
 
                 <PropertyStepNavigation
                     propertyId={property.id}
@@ -343,26 +475,73 @@ export default function OwnerPropertyShow({
                     </Alert>
                 )}
 
-                {property.is_verified && (
-                    <Alert variant="success">
-                        <CheckCircle2 aria-hidden="true" />
-                        <AlertTitle>
-                            Independent Property Verification Approved
-                        </AlertTitle>
-                        <AlertDescription>
-                            This property is independently verified and ready
-                            for customer bookings, food-inclusive rate management,
-                            and daily front desk operations.{' '}
-                            {!property.booking_eligible &&
-                                property.is_amendment_active &&
-                                'Customer booking eligibility is currently paused while your amendment revision is active.'}
-                        </AlertDescription>
-                    </Alert>
+                {property.is_verified &&
+                    !property.booking_eligible &&
+                    property.is_amendment_active && (
+                        <Alert variant="warning">
+                            <AlertTriangle aria-hidden="true" />
+                            <AlertTitle>
+                                Bookings Paused During Amendment
+                            </AlertTitle>
+                            <AlertDescription>
+                                Customer booking eligibility is temporarily
+                                paused while your amendment revision is active.
+                                Submit or cancel the amendment to resume live
+                                bookings.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                {(!property.is_verified ||
+                    evaluation.missing_requirements.length > 0) && (
+                    <Card className="min-w-0 border-tijum-surface/90 dark:border-border">
+                        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <CardTitle className="text-base">
+                                    Verification Readiness
+                                </CardTitle>
+                                <CardDescription>
+                                    Complete all checks below before submitting
+                                    for review.
+                                </CardDescription>
+                            </div>
+                            <Button size="sm" asChild>
+                                <Link href={verificationShowRoute(property.id)}>
+                                    <span>Open Verification Console</span>
+                                    <ArrowRight aria-hidden="true" />
+                                </Link>
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            {evaluation.missing_requirements.length === 0 ? (
+                                <div className="flex items-start gap-2.5 text-sm text-status-success-fg">
+                                    <CheckCircle2
+                                        className="mt-0.5 size-4 shrink-0"
+                                        aria-hidden="true"
+                                    />
+                                    <span>
+                                        All minimum property, room type,
+                                        physical room, photograph, and document
+                                        checks pass and are ready for
+                                        submission.
+                                    </span>
+                                </div>
+                            ) : (
+                                <ul className="list-disc space-y-1.5 pl-4 text-xs text-tijum-plum-muted dark:text-muted-foreground">
+                                    {evaluation.missing_requirements.map(
+                                        (req) => (
+                                            <li key={req}>{req}</li>
+                                        ),
+                                    )}
+                                </ul>
+                            )}
+                        </CardContent>
+                    </Card>
                 )}
 
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <StatCard
-                        label="Configured Room Types"
+                        label="Room Types"
                         value={String(roomTypes.length)}
                         helperText="AC / Non-AC & sharing modes"
                         icon={Layers}
@@ -374,124 +553,17 @@ export default function OwnerPropertyShow({
                         icon={DoorClosed}
                     />
                     <StatCard
-                        label="Nominal Active Capacity"
-                        value={`${roomSummary.nominal_active_capacity} places`}
-                        helperText="Derived dynamically from active physical rooms"
+                        label="Active Capacity"
+                        value={`${roomSummary.nominal_active_capacity} guests`}
+                        helperText="Derived from active physical rooms"
                         icon={Building2}
                     />
                     <StatCard
-                        label="Uploaded Photos"
+                        label="Gallery Photos"
                         value={String(media.length)}
                         helperText={`Property photos: ${evaluation.property_photos_count}/${evaluation.min_property_photos} min`}
                         icon={Camera}
                     />
-                </div>
-
-                <div className="grid gap-6 lg:grid-cols-2">
-                    <InfoPanel
-                        title="Property Overview & Location"
-                        description="Verified category, launch city, contact details, and physical street coordinates."
-                        action={
-                            <div className="border-t border-tijum-surface pt-3 dark:border-border">
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link href={editPropertyRoute(property.id)}>
-                                        <Edit3 aria-hidden="true" />
-                                        <span>
-                                            {property.can_edit_details
-                                                ? 'Edit Overview & Location'
-                                                : 'View Locked Details'}
-                                        </span>
-                                    </Link>
-                                </Button>
-                            </div>
-                        }
-                    >
-                        <dl className="space-y-2 text-sm">
-                            <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-2">
-                                <dt className="text-tijum-plum-muted dark:text-muted-foreground">
-                                    Category
-                                </dt>
-                                <dd className="min-w-0 font-semibold wrap-anywhere text-tijum-plum dark:text-foreground">
-                                    {property.category?.name}
-                                </dd>
-                            </div>
-                            <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-2">
-                                <dt className="text-tijum-plum-muted dark:text-muted-foreground">
-                                    Launch City
-                                </dt>
-                                <dd className="inline-flex min-w-0 items-center gap-1 font-semibold wrap-anywhere text-tijum-plum dark:text-foreground">
-                                    <MapPin
-                                        className="size-3.5 shrink-0 text-tijum-coral"
-                                        aria-hidden="true"
-                                    />
-                                    <span>
-                                        {property.city?.name}, {property.state}
-                                    </span>
-                                </dd>
-                            </div>
-                            <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-2">
-                                <dt className="text-tijum-plum-muted dark:text-muted-foreground">
-                                    Contact
-                                </dt>
-                                <dd className="min-w-0 font-semibold wrap-anywhere text-tijum-plum dark:text-foreground">
-                                    {property.details.contact_person_name} ·{' '}
-                                    {property.details.contact_phone}
-                                </dd>
-                            </div>
-                            <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-2">
-                                <dt className="text-tijum-plum-muted dark:text-muted-foreground">
-                                    Check-in / Checkout
-                                </dt>
-                                <dd className="min-w-0 font-semibold wrap-anywhere text-tijum-plum dark:text-foreground">
-                                    {formatStayTime(
-                                        timingRules.standard_check_in_time,
-                                    )}{' '}
-                                    /{' '}
-                                    {formatStayTime(
-                                        timingRules.standard_check_out_time,
-                                    )}
-                                </dd>
-                            </div>
-                        </dl>
-                    </InfoPanel>
-
-                    <InfoPanel
-                        title="Submission Readiness"
-                        description="All requirements below are verified on the backend before review submission."
-                        action={
-                            <div className="border-t border-tijum-surface pt-3 dark:border-border">
-                                <Button size="sm" asChild>
-                                    <Link
-                                        href={verificationShowRoute(
-                                            property.id,
-                                        )}
-                                    >
-                                        Open Verification Console
-                                    </Link>
-                                </Button>
-                            </div>
-                        }
-                    >
-                        {evaluation.missing_requirements.length === 0 ? (
-                            <div className="flex items-start gap-2.5 text-sm text-status-success-fg">
-                                <CheckCircle2
-                                    className="mt-0.5 size-4 shrink-0"
-                                    aria-hidden="true"
-                                />
-                                <span>
-                                    All minimum property, room type, physical
-                                    room, photograph, and document checks pass
-                                    for review submission.
-                                </span>
-                            </div>
-                        ) : (
-                            <ul className="list-disc space-y-1.5 pl-4 text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                {evaluation.missing_requirements.map((req) => (
-                                    <li key={req}>{req}</li>
-                                ))}
-                            </ul>
-                        )}
-                    </InfoPanel>
                 </div>
 
                 <div className="grid gap-6 lg:grid-cols-2">
@@ -592,40 +664,186 @@ export default function OwnerPropertyShow({
                                 </Button>
                             </div>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="space-y-3">
                             {rooms.length === 0 ? (
                                 <p className="text-sm text-tijum-plum-muted dark:text-muted-foreground">
                                     No physical room numbers recorded yet.
                                 </p>
                             ) : (
-                                <div className="grid gap-2.5 sm:grid-cols-2">
-                                    {rooms.slice(0, 8).map((room) => (
-                                        <div
-                                            key={room.id}
-                                            className="flex items-center justify-between gap-2 rounded-xl border border-tijum-surface px-3 py-2 text-xs dark:border-border dark:bg-muted/35"
-                                        >
-                                            <div className="min-w-0">
-                                                <p className="truncate font-heading text-sm font-semibold text-tijum-plum dark:text-foreground">
-                                                    Room {room.room_number}
-                                                </p>
-                                                <p className="truncate text-[11px] text-tijum-plum-muted dark:text-muted-foreground">
-                                                    {room.room_type_name}
-                                                    {room.floor_number
-                                                        ? ` · Fl ${room.floor_number}`
-                                                        : ''}
-                                                </p>
+                                <>
+                                    <div className="grid gap-2.5 sm:grid-cols-2">
+                                        {rooms.slice(0, 8).map((room) => (
+                                            <div
+                                                key={room.id}
+                                                className="flex items-center justify-between gap-2 rounded-xl border border-tijum-surface px-3 py-2 text-xs dark:border-border dark:bg-muted/35"
+                                            >
+                                                <div className="min-w-0">
+                                                    <p className="truncate font-heading text-sm font-semibold text-tijum-plum dark:text-foreground">
+                                                        Room {room.room_number}
+                                                    </p>
+                                                    <p className="truncate text-[11px] text-tijum-plum-muted dark:text-muted-foreground">
+                                                        {room.room_type_name}
+                                                        {room.floor_number
+                                                            ? ` · Fl ${room.floor_number}`
+                                                            : ''}
+                                                    </p>
+                                                </div>
+                                                <StatusBadge
+                                                    status={
+                                                        roomOperationalStatusMap[
+                                                            room
+                                                                .operational_status
+                                                        ]
+                                                    }
+                                                    label={
+                                                        room.operational_status_label
+                                                    }
+                                                />
                                             </div>
-                                            <StatusBadge
-                                                status={
-                                                    roomOperationalStatusMap[
-                                                        room.operational_status
-                                                    ]
-                                                }
-                                                label={
-                                                    room.operational_status_label
-                                                }
-                                            />
+                                        ))}
+                                    </div>
+                                    {rooms.length > 8 && (
+                                        <div className="flex justify-end pt-1">
+                                            <Link
+                                                href={roomsIndexRoute(
+                                                    property.id,
+                                                )}
+                                                className="inline-flex items-center gap-1 text-xs font-semibold text-tijum-coral hover:underline"
+                                            >
+                                                <span>
+                                                    View all {rooms.length}{' '}
+                                                    physical rooms
+                                                </span>
+                                                <ArrowRight
+                                                    className="size-3.5"
+                                                    aria-hidden="true"
+                                                />
+                                            </Link>
                                         </div>
+                                    )}
+                                </>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-12">
+                    <Card className="min-w-0 lg:col-span-5">
+                        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <CardTitle>Location &amp; Contact</CardTitle>
+                                <CardDescription>
+                                    Verified street coordinates and front-desk
+                                    contact
+                                </CardDescription>
+                            </div>
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href={editPropertyRoute(property.id)}>
+                                    <Edit3 aria-hidden="true" />
+                                    <span>
+                                        {property.can_edit_details
+                                            ? 'Edit'
+                                            : 'View'}
+                                    </span>
+                                </Link>
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            <dl className="divide-y divide-tijum-surface/75 text-sm dark:divide-border">
+                                <div className="flex items-baseline justify-between gap-3 py-2.5 first:pt-0">
+                                    <dt className="text-tijum-plum-muted dark:text-muted-foreground">
+                                        Category
+                                    </dt>
+                                    <dd className="text-right font-semibold text-tijum-plum dark:text-foreground">
+                                        {property.category?.name}
+                                    </dd>
+                                </div>
+                                <div className="flex items-baseline justify-between gap-3 py-2.5">
+                                    <dt className="text-tijum-plum-muted dark:text-muted-foreground">
+                                        Launch City
+                                    </dt>
+                                    <dd className="text-right font-semibold text-tijum-plum dark:text-foreground">
+                                        {property.city?.name}, {property.state}
+                                    </dd>
+                                </div>
+                                <div className="flex items-baseline justify-between gap-3 py-2.5">
+                                    <dt className="text-tijum-plum-muted dark:text-muted-foreground">
+                                        Locality
+                                    </dt>
+                                    <dd className="text-right font-semibold text-tijum-plum dark:text-foreground">
+                                        {property.locality}
+                                    </dd>
+                                </div>
+                                <div className="flex items-baseline justify-between gap-3 py-2.5">
+                                    <dt className="text-tijum-plum-muted dark:text-muted-foreground">
+                                        Contact Person
+                                    </dt>
+                                    <dd className="text-right font-semibold text-tijum-plum dark:text-foreground">
+                                        {property.details.contact_person_name}
+                                    </dd>
+                                </div>
+                                <div className="flex items-baseline justify-between gap-3 py-2.5 last:pb-0">
+                                    <dt className="text-tijum-plum-muted dark:text-muted-foreground">
+                                        Phone
+                                    </dt>
+                                    <dd className="text-right font-semibold text-tijum-plum tabular-nums dark:text-foreground">
+                                        {property.details.contact_phone}
+                                    </dd>
+                                </div>
+                            </dl>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="min-w-0 lg:col-span-7">
+                        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <CardTitle>Photo Gallery</CardTitle>
+                                <CardDescription>
+                                    {media.length === 0
+                                        ? 'Upload clear property and room photographs for guests.'
+                                        : `${media.length} uploaded photo${media.length === 1 ? '' : 's'} across property and room types.`}
+                                </CardDescription>
+                            </div>
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href={mediaIndexRoute(property.id)}>
+                                    <span>Manage Gallery</span>
+                                    <ArrowRight aria-hidden="true" />
+                                </Link>
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            {media.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-tijum-surface bg-tijum-cream/25 py-10 text-center dark:border-border dark:bg-muted/20">
+                                    <Camera
+                                        className="size-6 text-tijum-plum-muted"
+                                        aria-hidden="true"
+                                    />
+                                    <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
+                                        No photographs uploaded yet.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                    {media.slice(0, 4).map((item) => (
+                                        <Link
+                                            key={item.id}
+                                            href={mediaIndexRoute(property.id)}
+                                            className="group relative aspect-[4/3] overflow-hidden rounded-xl border border-tijum-surface bg-tijum-cream dark:border-border dark:bg-muted"
+                                        >
+                                            <img
+                                                src={
+                                                    item.public_thumbnail_url ??
+                                                    item.thumbnail_preview_url
+                                                }
+                                                alt={item.alt_text}
+                                                className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                            />
+                                            {item.is_cover && (
+                                                <span className="absolute top-1.5 left-1.5 rounded-full bg-tijum-plum/85 px-2 py-0.5 text-[10px] font-semibold text-white">
+                                                    Cover
+                                                </span>
+                                            )}
+                                        </Link>
                                     ))}
                                 </div>
                             )}
@@ -654,17 +872,10 @@ export default function OwnerPropertyShow({
                         </span>
                     </summary>
                     <div className="border-t border-tijum-surface/75 px-6 py-4 dark:border-border">
-                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-xs text-muted-foreground">
-                                Append-only event timeline across edits, room
-                                updates, photos, amendments, and reviews.
-                            </p>
-                            <Button variant="outline" size="sm" asChild>
-                                <Link href={mediaIndexRoute(property.id)}>
-                                    Manage Gallery
-                                </Link>
-                            </Button>
-                        </div>
+                        <p className="mb-3 text-xs text-muted-foreground">
+                            Append-only event timeline across edits, room
+                            updates, photos, amendments, and reviews.
+                        </p>
                         {events.length === 0 ? (
                             <p className="text-sm text-tijum-plum-muted dark:text-muted-foreground">
                                 No activity logged yet.
@@ -696,108 +907,6 @@ export default function OwnerPropertyShow({
                     </div>
                 </details>
 
-                {(property.can_toggle_operational_status ||
-                    property.can_close_completely) && (
-                    <Card className="min-w-0 border-tijum-surface/85 dark:border-border">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 font-heading text-base font-semibold text-tijum-plum dark:text-foreground">
-                                <PowerOff
-                                    className="size-4 text-tijum-coral"
-                                    aria-hidden="true"
-                                />
-                                <span>
-                                    Property Availability &amp; Closure Controls
-                                </span>
-                            </CardTitle>
-                            <CardDescription>
-                                Choose whether to temporarily pause bookings or
-                                withdraw this property completely from TIJUM.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="grid gap-4 md:grid-cols-2">
-                            {property.can_toggle_operational_status && (
-                                <div className="flex flex-col justify-between gap-3 rounded-xl border border-tijum-surface bg-tijum-cream/35 p-4 dark:border-border dark:bg-muted/30">
-                                    <div className="space-y-1">
-                                        <p className="font-heading text-sm font-semibold text-tijum-plum dark:text-foreground">
-                                            {property.status === 'active'
-                                                ? 'Pause Temporarily (Temporarily Closed)'
-                                                : 'Restore Active Listings'}
-                                        </p>
-                                        <p className="text-xs leading-relaxed text-tijum-plum-muted dark:text-muted-foreground">
-                                            {property.status === 'active'
-                                                ? 'Pause new customer bookings for short breaks or maintenance without losing your verification approval. You can reopen anytime.'
-                                                : 'Make this verified property bookable again on TIJUM public search and reopen public media.'}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        {property.status === 'active' ? (
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() =>
-                                                    setPendingOpStatus(
-                                                        'temporarily_closed',
-                                                    )
-                                                }
-                                            >
-                                                <PauseCircle aria-hidden="true" />
-                                                <span>Temporarily Close</span>
-                                            </Button>
-                                        ) : (
-                                            <Button
-                                                type="button"
-                                                variant="plum"
-                                                size="sm"
-                                                onClick={() =>
-                                                    setPendingOpStatus('active')
-                                                }
-                                            >
-                                                <PlayCircle aria-hidden="true" />
-                                                <span>
-                                                    Reopen Property as Active
-                                                </span>
-                                            </Button>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {property.can_close_completely && (
-                                <div className="flex flex-col justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50/35 p-4 dark:border-rose-500/30 dark:bg-rose-950/15">
-                                    <div className="space-y-1">
-                                        <p className="font-heading text-sm font-semibold text-rose-900 dark:text-rose-200">
-                                            Close Property Completely (Archived)
-                                        </p>
-                                        <p className="text-xs leading-relaxed text-rose-800/85 dark:text-rose-200/80">
-                                            Permanently withdraw this property
-                                            from public listings, search, and
-                                            new bookings. Requires no pending or
-                                            confirmed future reservations.
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() =>
-                                                setPendingOpStatus('archived')
-                                            }
-                                            className="border-rose-300 text-rose-700 hover:bg-rose-600 hover:text-white dark:border-rose-500/50 dark:text-rose-300 dark:hover:bg-rose-600 dark:hover:text-white"
-                                        >
-                                            <Archive aria-hidden="true" />
-                                            <span>
-                                                Close Property Completely
-                                            </span>
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
-
                 <ConfirmationDialog
                     open={pendingOpStatus !== null}
                     onOpenChange={(open) => !open && setPendingOpStatus(null)}
@@ -824,7 +933,7 @@ export default function OwnerPropertyShow({
                         pendingOpStatus === 'archived'
                             ? 'Close Property Completely'
                             : pendingOpStatus === 'temporarily_closed'
-                              ? 'Temporarily Close'
+                              ? 'Pause Bookings'
                               : 'Mark Active'
                     }
                     loading={busy}
