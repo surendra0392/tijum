@@ -267,11 +267,12 @@ export default function RoomTypesIndex({
                                     </p>
 
                                     {canManageInventory && (
-                                        <div className="flex flex-wrap gap-2 border-t border-tijum-surface pt-3 dark:border-border">
+                                        <div className="flex flex-wrap items-center gap-2 border-t border-tijum-surface pt-3 dark:border-border">
                                             <Button
                                                 size="sm"
                                                 variant="outline"
                                                 asChild
+                                                className="h-8 gap-1.5 rounded-lg px-3 text-xs"
                                             >
                                                 <Link
                                                     href={editRoomTypeRoute([
@@ -279,7 +280,10 @@ export default function RoomTypesIndex({
                                                         rt.id,
                                                     ])}
                                                 >
-                                                    <Edit3 aria-hidden="true" />
+                                                    <Edit3
+                                                        className="size-3.5"
+                                                        aria-hidden="true"
+                                                    />
                                                     <span>Edit</span>
                                                 </Link>
                                             </Button>
@@ -295,6 +299,7 @@ export default function RoomTypesIndex({
                                                             mode: 'deactivate',
                                                         })
                                                     }
+                                                    className="h-8 gap-1.5 rounded-lg px-3 text-xs"
                                                 >
                                                     Deactivate
                                                 </Button>
@@ -302,15 +307,18 @@ export default function RoomTypesIndex({
                                                 <Button
                                                     type="button"
                                                     size="sm"
-                                                    variant="plum"
                                                     onClick={() =>
                                                         setPendingAction({
                                                             roomType: rt,
                                                             mode: 'activate',
                                                         })
                                                     }
+                                                    className="h-8 gap-1.5 rounded-lg border border-emerald-600 bg-emerald-600 px-3 text-xs text-white shadow-2xs hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:bg-emerald-500"
                                                 >
-                                                    <CheckCircle2 aria-hidden="true" />
+                                                    <CheckCircle2
+                                                        className="size-3.5"
+                                                        aria-hidden="true"
+                                                    />
                                                     <span>Activate</span>
                                                 </Button>
                                             )}
@@ -327,8 +335,12 @@ export default function RoomTypesIndex({
                                                             rt.rooms_count > 0,
                                                     })
                                                 }
+                                                className="h-8 gap-1.5 rounded-lg px-3 text-xs"
                                             >
-                                                <Trash2 aria-hidden="true" />
+                                                <Trash2
+                                                    className="size-3.5"
+                                                    aria-hidden="true"
+                                                />
                                                 <span>Delete</span>
                                             </Button>
                                         </div>
