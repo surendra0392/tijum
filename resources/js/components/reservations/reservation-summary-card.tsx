@@ -1,12 +1,15 @@
 import { Link } from '@inertiajs/react';
 import {
+    AlertTriangle,
+    ArrowRightLeft,
+    CalendarCheck,
     CalendarDays,
     CheckCircle2,
     ChevronRight,
-    Clock,
     DoorClosed,
     DoorOpen,
     FileText,
+    KeyRound,
     Mail,
     Phone,
     User,
@@ -19,6 +22,7 @@ import {
     formatReservationDate,
     formatReservationMoney,
 } from '@/lib/reservation-format';
+import { cn } from '@/lib/utils';
 import type { ReservationSummary } from '@/types';
 
 type ReservationSummaryCardProps = {
@@ -50,6 +54,34 @@ export function ReservationSummaryCard({
     const checkedInLabel = formatDateTimeShort(reservation.checked_in_at);
     const checkedOutLabel = formatDateTimeShort(reservation.checked_out_at);
 
+    const historyEntries = reservation.room_history ?? [];
+    const currentRooms = reservation.allocated_rooms ?? [];
+    const isFullyAllocated =
+        (reservation.allocated_quantity ?? 0) >= reservation.quantity &&
+        currentRooms.length > 0;
+
+    const historyRoomTrail: string[] = [];
+    for (const entry of historyEntries) {
+        if (
+            entry.room_number &&
+            historyRoomTrail[historyRoomTrail.length - 1] !== entry.room_number
+        ) {
+            historyRoomTrail.push(entry.room_number);
+        }
+    }
+    const hadRoomChange = historyEntries.some(
+        (e) => e.status === 'changed' || e.action === 'room_changed',
+    );
+
+    const roomSequenceLabel =
+        hadRoomChange && historyRoomTrail.length > 1
+            ? `Room ${historyRoomTrail.join(' → ')}`
+            : currentRooms.length > 0
+              ? `Room ${currentRooms.join(', ')}`
+              : historyRoomTrail.length > 0
+                ? `Room ${historyRoomTrail.join(', ')}`
+                : null;
+
     return (
         <Card className="gap-4 py-5 transition-all hover:border-tijum-coral/40 hover:shadow-md dark:hover:border-tijum-coral/40">
             <CardHeader className="gap-3 px-5 sm:flex-row sm:items-start sm:justify-between">
@@ -58,8 +90,10 @@ export function ReservationSummaryCard({
                         <p className="font-heading text-xs font-semibold tracking-wide text-tijum-plum-muted uppercase dark:text-muted-foreground">
                             {reservation.booking_reference}
                         </p>
+
+                        {/* Distinct Guest Stay Lifecycle Badges */}
                         {showGuestCustomerData && reservation.is_checked_out && (
-                            <Badge className="gap-1 border-emerald-200 bg-emerald-100 text-[11px] text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-950/60 dark:text-emerald-200">
+                            <Badge className="gap-1 border-indigo-300 bg-indigo-100 text-[11px] text-indigo-900 dark:border-indigo-400/40 dark:bg-indigo-950/70 dark:text-indigo-200">
                                 <DoorClosed className="size-3" />
                                 <span>
                                     Checked Out
@@ -69,29 +103,74 @@ export function ReservationSummaryCard({
                                 </span>
                             </Badge>
                         )}
+
                         {showGuestCustomerData &&
                             reservation.is_checked_in &&
                             !reservation.is_checked_out && (
-                                <Badge className="gap-1 border-emerald-200 bg-emerald-100 text-[11px] text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-950/60 dark:text-emerald-200">
+                                <Badge className="gap-1 border-emerald-300 bg-emerald-100 text-[11px] text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-950/70 dark:text-emerald-200">
                                     <DoorOpen className="size-3" />
                                     <span>
-                                        In-House
+                                        Checked In · In-House
                                         {checkedInLabel
-                                            ? ` · Checked in ${checkedInLabel}`
+                                            ? ` (${checkedInLabel})`
                                             : ''}
                                     </span>
                                 </Badge>
                             )}
+
                         {showGuestCustomerData &&
                             reservation.status === 'confirmed' &&
                             !reservation.is_checked_in &&
                             !reservation.is_checked_out && (
                                 <Badge
                                     variant="outline"
-                                    className="gap-1 border-amber-300 bg-amber-50 text-[11px] text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/60 dark:text-amber-200"
+                                    className="gap-1 border-sky-300 bg-sky-100 text-[11px] text-sky-900 dark:border-sky-400/40 dark:bg-sky-950/70 dark:text-sky-200"
                                 >
-                                    <Clock className="size-3" />
+                                    <CalendarCheck className="size-3" />
                                     <span>Awaiting Check-In</span>
+                                </Badge>
+                            )}
+
+                        {/* Physical Room Allocation / Stayed Room Badge */}
+                        {showGuestCustomerData && roomSequenceLabel && (
+                            <Badge
+                                variant="outline"
+                                className={cn(
+                                    'gap-1 text-[11px] font-semibold',
+                                    reservation.is_checked_out
+                                        ? 'border-indigo-200 bg-indigo-50 text-indigo-900 dark:border-indigo-500/35 dark:bg-indigo-950/50 dark:text-indigo-200'
+                                        : hadRoomChange
+                                          ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/50 dark:text-amber-200'
+                                          : 'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-500/35 dark:bg-sky-950/50 dark:text-sky-200',
+                                )}
+                            >
+                                {hadRoomChange ? (
+                                    <ArrowRightLeft className="size-3" />
+                                ) : (
+                                    <KeyRound className="size-3" />
+                                )}
+                                <span>
+                                    {reservation.is_checked_out
+                                        ? `Stayed: ${roomSequenceLabel}`
+                                        : roomSequenceLabel}
+                                </span>
+                            </Badge>
+                        )}
+
+                        {showGuestCustomerData &&
+                            reservation.status === 'confirmed' &&
+                            !reservation.is_checked_out &&
+                            !isFullyAllocated && (
+                                <Badge
+                                    variant="outline"
+                                    className="gap-1 border-orange-300 bg-orange-100 text-[11px] text-orange-900 dark:border-orange-400/40 dark:bg-orange-950/70 dark:text-orange-200"
+                                >
+                                    <AlertTriangle className="size-3" />
+                                    <span>
+                                        Needs Room Allocation (
+                                        {reservation.allocated_quantity ?? 0}/
+                                        {reservation.quantity})
+                                    </span>
                                 </Badge>
                             )}
                     </div>
@@ -147,9 +226,9 @@ export function ReservationSummaryCard({
                             </a>
                         )}
                         {reservation.is_checked_out && checkedInLabel && (
-                            <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-tijum-plum-muted dark:text-muted-foreground">
+                            <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-indigo-800 dark:text-indigo-300">
                                 <CheckCircle2
-                                    className="size-3 text-status-success-fg"
+                                    className="size-3 text-indigo-600 dark:text-indigo-400"
                                     aria-hidden="true"
                                 />
                                 <span>

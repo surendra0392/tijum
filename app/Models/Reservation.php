@@ -80,6 +80,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string|null $checked_out_by_type
  * @property int|null $checked_out_by_id
  * @property string|null $checkout_notes
+ * @property array<int, array<string, mixed>>|null $room_allocation_history
  * @property-read Collection<int, ReservationRoomAllocation> $allocations
  * @property-read Collection<int, ReservationPayment> $payments
  * @property-read Collection<int, ReservationRefund> $refunds
@@ -140,6 +141,7 @@ class Reservation extends Model
             'expired_at' => 'datetime',
             'checked_in_at' => 'datetime',
             'checked_out_at' => 'datetime',
+            'room_allocation_history' => 'array',
             'early_check_in_requested' => 'boolean',
             'requires_refund_review' => 'boolean',
             'is_relocated_replacement' => 'boolean',
@@ -510,5 +512,103 @@ class Reservation extends Model
             'checked_out_by_id' => null,
             'checkout_notes' => null,
         ])->save();
+    }
+
+    /**
+     * Complete chronological history of physical rooms allotted to or occupied by the guest until checkout.
+     *
+     * @return list<array{
+     *     property_room_id: int,
+     *     room_number: string,
+     *     floor_number: string|null,
+     *     allocated_quantity: int,
+     *     status: string,
+     *     status_label: string,
+     *     action: string,
+     *     previous_rooms: list<string>,
+     *     replaced_by_rooms: list<string>,
+     *     allocated_at: string|null,
+     *     released_at: string|null
+     * }>
+     */
+    public function resolvedRoomStayHistory(): array
+    {
+        $this->loadMissing('allocations.room');
+
+        $rawHistory = is_array($this->room_allocation_history) ? $this->room_allocation_history : [];
+
+        if ($rawHistory === [] && $this->allocations->isNotEmpty()) {
+            foreach ($this->allocations as $allocation) {
+                $rawHistory[] = [
+                    'property_room_id' => (int) $allocation->property_room_id,
+                    'room_number' => (string) $allocation->room->room_number,
+                    'floor_number' => $allocation->room->floor_number,
+                    'allocated_quantity' => (int) $allocation->allocated_quantity,
+                    'status' => 'active',
+                    'action' => 'initial_allocation',
+                    'previous_rooms' => [],
+                    'replaced_by_rooms' => [],
+                    'allocated_at' => ($allocation->created_at ?? $this->confirmed_at ?? $this->created_at)?->toISOString(),
+                    'released_at' => null,
+                ];
+            }
+        }
+
+        $isCheckedOut = $this->checked_out_at !== null;
+        $isCheckedIn = $this->checked_in_at !== null;
+        $checkedOutIso = $this->checked_out_at?->toISOString();
+
+        $normalized = [];
+
+        foreach ($rawHistory as $entry) {
+            $rawStatus = (string) ($entry['status'] ?? 'active');
+            $previousRooms = array_values(array_map(
+                static fn (mixed $r): string => (string) $r,
+                is_array($entry['previous_rooms'] ?? null) ? $entry['previous_rooms'] : [],
+            ));
+            $replacedByRooms = array_values(array_map(
+                static fn (mixed $r): string => (string) $r,
+                is_array($entry['replaced_by_rooms'] ?? null) ? $entry['replaced_by_rooms'] : [],
+            ));
+
+            $status = $rawStatus;
+            $releasedAt = isset($entry['released_at']) && is_string($entry['released_at'])
+                ? $entry['released_at']
+                : null;
+
+            if ($rawStatus === 'active' && $isCheckedOut) {
+                $status = 'checked_out';
+                $releasedAt = $releasedAt ?? $checkedOutIso;
+            }
+
+            $statusLabel = match ($status) {
+                'checked_out' => 'Stayed Until Check-Out',
+                'changed' => $replacedByRooms !== []
+                    ? 'Changed to Room '.implode(', ', $replacedByRooms)
+                    : 'Room Changed',
+                'released' => 'Released',
+                default => $isCheckedIn ? 'Occupying (In-House)' : 'Allotted for Stay',
+            };
+
+            $normalized[] = [
+                'property_room_id' => (int) ($entry['property_room_id'] ?? 0),
+                'room_number' => (string) ($entry['room_number'] ?? ''),
+                'floor_number' => isset($entry['floor_number']) && $entry['floor_number'] !== ''
+                    ? (string) $entry['floor_number']
+                    : null,
+                'allocated_quantity' => (int) ($entry['allocated_quantity'] ?? 1),
+                'status' => $status,
+                'status_label' => $statusLabel,
+                'action' => (string) ($entry['action'] ?? 'initial_allocation'),
+                'previous_rooms' => $previousRooms,
+                'replaced_by_rooms' => $replacedByRooms,
+                'allocated_at' => isset($entry['allocated_at']) && is_string($entry['allocated_at'])
+                    ? $entry['allocated_at']
+                    : null,
+                'released_at' => $releasedAt,
+            ];
+        }
+
+        return $normalized;
     }
 }

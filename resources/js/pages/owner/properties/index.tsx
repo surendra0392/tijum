@@ -175,7 +175,7 @@ export default function OwnerPropertiesIndex({
                     <StatCard
                         label="Operationally Active"
                         value={String(stats.active)}
-                        helperText="Ready for future meal/pricing phases"
+                        helperText="Live for customer bookings & stays"
                         icon={Layers}
                     />
                     <StatCard

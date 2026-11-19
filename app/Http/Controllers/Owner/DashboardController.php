@@ -93,6 +93,7 @@ class DashboardController extends Controller
         $activeReservations = Reservation::query()
             ->whereHas('property', static fn ($p) => $p->where('owner_id', $owner->id))
             ->where('status', ReservationStatus::Confirmed)
+            ->whereNull('checked_out_at')
             ->whereDate('checkout_date', '>=', $today)
             ->count();
 

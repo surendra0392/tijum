@@ -27,7 +27,7 @@ class ReservationController extends Controller
             ->whereHas('property', fn ($property) => $property->where('owner_id', $owner->id));
 
         $query = (clone $baseOwnerQuery)
-            ->with(['property', 'roomType', 'successfulPayment', 'review', 'user'])
+            ->with(['property', 'roomType', 'successfulPayment', 'review', 'user', 'allocations.room'])
             ->latest('created_at')
             ->latest('id');
 
@@ -132,7 +132,7 @@ class ReservationController extends Controller
     {
         return [
             'data' => collect($paginator->items())
-                ->map(fn (Reservation $reservation): array => $this->data->summary($reservation))
+                ->map(fn (Reservation $reservation): array => $this->data->summary($reservation, 'owner'))
                 ->values()->all(),
             'meta' => [
                 'current_page' => $paginator->currentPage(),

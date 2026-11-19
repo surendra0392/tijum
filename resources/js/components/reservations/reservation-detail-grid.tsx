@@ -210,20 +210,38 @@ export function ReservationDetailGrid({
 
                             {reservation.allocations &&
                                 reservation.allocations.length > 0 && (
-                                    <div className="flex items-center gap-2 rounded-lg border border-tijum-surface/70 bg-tijum-cream/30 px-3 py-2 text-xs dark:border-border dark:bg-muted/30">
-                                        <KeyRound
-                                            className="size-3.5 shrink-0 text-tijum-coral"
-                                            aria-hidden="true"
-                                        />
-                                        <span className="text-muted-foreground">
-                                            Assigned Room:
-                                        </span>
-                                        <span className="font-semibold text-tijum-plum dark:text-foreground">
-                                            Room{' '}
-                                            {reservation.allocations
-                                                .map((a) => a.room_number)
-                                                .join(', ')}
-                                        </span>
+                                    <div className="space-y-1 rounded-lg border border-tijum-surface/70 bg-tijum-cream/30 px-3 py-2 text-xs dark:border-border dark:bg-muted/30">
+                                        <div className="flex items-center gap-2">
+                                            <KeyRound
+                                                className="size-3.5 shrink-0 text-tijum-coral"
+                                                aria-hidden="true"
+                                            />
+                                            <span className="text-muted-foreground">
+                                                {reservation.is_checked_out
+                                                    ? 'Room Stayed:'
+                                                    : 'Assigned Room:'}
+                                            </span>
+                                            <span className="font-semibold text-tijum-plum dark:text-foreground">
+                                                Room{' '}
+                                                {reservation.allocations
+                                                    .map((a) => a.room_number)
+                                                    .join(', ')}
+                                            </span>
+                                        </div>
+                                        {reservation.room_history &&
+                                            reservation.room_history.length >
+                                                reservation.allocations
+                                                    .length && (
+                                                <p className="pl-5 text-[11px] text-amber-800 dark:text-amber-300">
+                                                    Stay trail: Room{' '}
+                                                    {reservation.room_history
+                                                        .map(
+                                                            (h) =>
+                                                                h.room_number,
+                                                        )
+                                                        .join(' → Room ')}
+                                                </p>
+                                            )}
                                     </div>
                                 )}
 
@@ -232,11 +250,11 @@ export function ReservationDetailGrid({
                                 <div className="space-y-1.5 border-t border-tijum-surface/75 pt-2.5 text-xs dark:border-border">
                                     {reservation.checked_in_at && (
                                         <div className="flex items-center justify-between gap-2">
-                                            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                                                <DoorOpen className="size-3.5 text-status-success-fg" />
+                                            <span className="inline-flex items-center gap-1.5 font-medium text-emerald-700 dark:text-emerald-300">
+                                                <DoorOpen className="size-3.5 text-emerald-600" />
                                                 <span>Checked in</span>
                                             </span>
-                                            <span className="font-medium text-tijum-plum dark:text-foreground">
+                                            <span className="font-medium tabular-nums text-tijum-plum dark:text-foreground">
                                                 {new Date(
                                                     reservation.checked_in_at,
                                                 ).toLocaleString('en-IN', {
@@ -251,11 +269,11 @@ export function ReservationDetailGrid({
                                     )}
                                     {reservation.checked_out_at && (
                                         <div className="flex items-center justify-between gap-2">
-                                            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                                                <DoorClosed className="size-3.5 text-tijum-coral" />
+                                            <span className="inline-flex items-center gap-1.5 font-medium text-indigo-700 dark:text-indigo-300">
+                                                <DoorClosed className="size-3.5 text-indigo-600" />
                                                 <span>Checked out</span>
                                             </span>
-                                            <span className="font-medium text-tijum-plum dark:text-foreground">
+                                            <span className="font-medium tabular-nums text-tijum-plum dark:text-foreground">
                                                 {new Date(
                                                     reservation.checked_out_at,
                                                 ).toLocaleString('en-IN', {

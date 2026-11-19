@@ -2,6 +2,7 @@ import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowDownLeft,
+    ArrowRightLeft,
     ArrowUpRight,
     Building2,
     Calendar,
@@ -82,7 +83,27 @@ type FrontDeskReservation = {
     check_in_notes?: string | null;
     checkout_notes?: string | null;
     total_amount_rupees: string;
-    allocated_rooms: Array<{ room_id: number; room_number: string }>;
+    allocated_rooms: Array<{
+        room_id: number;
+        room_number: string;
+        floor_number?: string | null;
+        allocated_quantity?: number;
+    }>;
+    room_history?: Array<{
+        property_room_id: number;
+        room_number: string;
+        floor_number?: string | null;
+        allocated_quantity: number;
+        status: string;
+        status_label: string;
+        action: string;
+        previous_rooms: string[];
+        replaced_by_rooms: string[];
+        allocated_at?: string | null;
+        released_at?: string | null;
+    }>;
+    allocated_quantity?: number;
+    required_quantity?: number;
     is_allocated: boolean;
     is_overdue_arrival: boolean;
     is_overdue_departure: boolean;
@@ -269,6 +290,22 @@ export default function OwnerFrontDeskIndex({
                                 {res.guests_count} Guest
                                 {res.guests_count === 1 ? '' : 's'}
                             </Badge>
+                            {res.checked_out_at ? (
+                                <Badge className="border-indigo-300 bg-indigo-100 text-indigo-900 dark:border-indigo-400/40 dark:bg-indigo-950/70 dark:text-indigo-200">
+                                    <DoorClosed className="mr-1 size-3" />
+                                    Checked Out
+                                </Badge>
+                            ) : res.checked_in_at ? (
+                                <Badge className="border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-950/70 dark:text-emerald-200">
+                                    <DoorOpen className="mr-1 size-3" />
+                                    Checked In · In-House
+                                </Badge>
+                            ) : (
+                                <Badge className="border-sky-300 bg-sky-100 text-sky-900 dark:border-sky-400/40 dark:bg-sky-950/70 dark:text-sky-200">
+                                    <CalendarCheck className="mr-1 size-3" />
+                                    Awaiting Check-In
+                                </Badge>
+                            )}
                             {res.early_check_in_requested && (
                                 <Badge className="border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/60 dark:text-amber-200">
                                     <Clock className="mr-1 size-3" /> Early
@@ -304,15 +341,30 @@ export default function OwnerFrontDeskIndex({
                                 {res.room_type_name}
                             </span>
                             {res.allocated_rooms.length > 0 ? (
-                                <span className="flex items-center gap-1 font-semibold text-tijum-plum dark:text-foreground">
+                                <span className="flex flex-wrap items-center gap-1.5 font-semibold text-tijum-plum dark:text-foreground">
                                     <KeyRound className="size-3.5 text-tijum-coral" />
-                                    Room{' '}
-                                    {res.allocated_rooms
-                                        .map((r) => r.room_number)
-                                        .join(', ')}
+                                    <span>
+                                        {res.checked_out_at
+                                            ? 'Stayed in Room '
+                                            : 'Room '}
+                                        {res.allocated_rooms
+                                            .map((r) => r.room_number)
+                                            .join(', ')}
+                                    </span>
+                                    {res.room_history &&
+                                        res.room_history.length >
+                                            res.allocated_rooms.length && (
+                                            <span className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/60 dark:text-amber-200">
+                                                <ArrowRightLeft className="size-2.5" />
+                                                Room{' '}
+                                                {res.room_history
+                                                    .map((h) => h.room_number)
+                                                    .join(' → ')}
+                                            </span>
+                                        )}
                                 </span>
                             ) : (
-                                <span className="flex items-center gap-1 font-medium text-status-warning-fg">
+                                <span className="flex items-center gap-1 font-medium text-orange-700 dark:text-orange-300">
                                     <AlertTriangle className="size-3.5" />
                                     No room allocated yet
                                 </span>
@@ -371,7 +423,7 @@ export default function OwnerFrontDeskIndex({
                         )}
 
                         {res.checked_out_at && (
-                            <p className="text-[11px] text-tijum-plum-muted">
+                            <p className="text-[11px] font-medium text-indigo-700 dark:text-indigo-300">
                                 Checked out on{' '}
                                 {new Date(
                                     res.checked_out_at,
@@ -389,7 +441,7 @@ export default function OwnerFrontDeskIndex({
 
                     {/* Operational action buttons */}
                     <div className="flex flex-wrap items-center gap-2 pt-2 lg:pt-0">
-                        {type === 'arrival' && (
+                        {type === 'arrival' && res.is_allocated && (
                             <Button
                                 size="sm"
                                 onClick={() => {
@@ -410,7 +462,7 @@ export default function OwnerFrontDeskIndex({
                                     setCheckOutModalRes(res);
                                     checkOutForm.reset();
                                 }}
-                                className="bg-tijum-coral font-medium text-white hover:bg-tijum-coral/90"
+                                className="bg-indigo-600 font-medium text-white hover:bg-indigo-700"
                             >
                                 <LogOut className="mr-1.5 size-4" /> Check Out
                                 Guest
@@ -425,20 +477,24 @@ export default function OwnerFrontDeskIndex({
                                     setCheckOutModalRes(res);
                                     checkOutForm.reset();
                                 }}
-                                className="border-tijum-coral text-tijum-coral hover:bg-tijum-coral hover:text-white dark:border-tijum-coral/70 dark:text-tijum-peach dark:hover:bg-tijum-coral dark:hover:text-white"
+                                className="border-indigo-300 text-indigo-700 hover:bg-indigo-600 hover:text-white dark:border-indigo-500/60 dark:text-indigo-300 dark:hover:bg-indigo-600 dark:hover:text-white"
                             >
-                                <LogOut className="mr-1.5 size-4" /> Early Check
-                                Out
+                                <LogOut className="mr-1.5 size-4" /> Check Out
+                                Guest
                             </Button>
                         )}
 
                         {!res.is_allocated && type !== 'history' && (
-                            <Button size="sm" variant="outline" asChild>
+                            <Button
+                                size="sm"
+                                asChild
+                                className="bg-tijum-coral font-medium text-white hover:bg-tijum-coral/90"
+                            >
                                 <Link
-                                    href={`/owner/reservations/${res.booking_reference}`}
+                                    href={`/owner/reservations/${res.booking_reference}#room-allocation-card`}
                                 >
                                     <KeyRound className="mr-1.5 size-4" />{' '}
-                                    Assign Room
+                                    Assign Room First
                                 </Link>
                             </Button>
                         )}
@@ -1097,7 +1153,7 @@ export default function OwnerFrontDeskIndex({
                                 <Button
                                     type="submit"
                                     disabled={checkOutForm.processing}
-                                    className="bg-tijum-coral font-semibold text-white hover:bg-tijum-coral/90"
+                                    className="bg-indigo-600 font-semibold text-white hover:bg-indigo-700"
                                 >
                                     {checkOutForm.processing
                                         ? 'Processing...'

@@ -17,6 +17,7 @@ use App\Models\Reservation;
 use App\Models\ReservationRoomAllocation;
 use App\Policies\ReservationPolicy;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -54,6 +55,13 @@ class SaveReservationAllocations
                 ]);
             }
 
+            if ($lockedReservation->checked_out_at !== null) {
+                throw ValidationException::withMessages([
+                    'reservation' => 'Room allocations cannot be modified after the guest has checked out.',
+                ]);
+            }
+
+            $existingAllocations = $lockedReservation->allocations()->with('room')->get();
             $checkIn = $lockedReservation->check_in_date;
             $checkout = $lockedReservation->checkout_date;
 
@@ -62,7 +70,7 @@ class SaveReservationAllocations
                 static fn (int $id): bool => $id > 0,
             ));
             $selectedRoomIds = array_unique($selectedRoomIds);
-            $currentRoomIds = $lockedReservation->allocations()
+            $currentRoomIds = $existingAllocations
                 ->pluck('property_room_id')
                 ->map(static fn (mixed $id): int => (int) $id)
                 ->all();
@@ -154,6 +162,8 @@ class SaveReservationAllocations
                 $lockedReservation->allocations()->delete();
             }
 
+            $newByRoom = [];
+
             foreach ($selectedRooms as $room) {
                 $requested = $byRoom[$room->id] ?? 0;
 
@@ -165,8 +175,134 @@ class SaveReservationAllocations
                     ['reservation_id' => $lockedReservation->id, 'property_room_id' => $room->id],
                     ['allocated_quantity' => $requested],
                 );
+
+                $newByRoom[(int) $room->id] = [
+                    'room_number' => (string) $room->room_number,
+                    'floor_number' => $room->floor_number,
+                    'allocated_quantity' => $requested,
+                ];
             }
+
+            $this->recordRoomAllocationHistory($lockedReservation, $existingAllocations, $newByRoom);
         }, 3);
+    }
+
+    /**
+     * @param  Collection<int, ReservationRoomAllocation>  $existingAllocations
+     * @param  array<int, array{room_number: string, floor_number: string|null, allocated_quantity: int}>  $newByRoom
+     */
+    private function recordRoomAllocationHistory(
+        Reservation $reservation,
+        Collection $existingAllocations,
+        array $newByRoom,
+    ): void {
+        $history = is_array($reservation->room_allocation_history) ? $reservation->room_allocation_history : [];
+        $nowIso = now()->toISOString();
+
+        $oldByRoom = [];
+        foreach ($existingAllocations as $existing) {
+            $oldByRoom[(int) $existing->property_room_id] = [
+                'room_number' => (string) $existing->room->room_number,
+                'floor_number' => $existing->room->floor_number,
+                'allocated_quantity' => (int) $existing->allocated_quantity,
+                'allocated_at' => ($existing->created_at ?? $reservation->confirmed_at ?? now())->toISOString(),
+            ];
+        }
+
+        if ($history === [] && $oldByRoom !== []) {
+            foreach ($oldByRoom as $oldRoomId => $oldMeta) {
+                $history[] = [
+                    'property_room_id' => $oldRoomId,
+                    'room_number' => $oldMeta['room_number'],
+                    'floor_number' => $oldMeta['floor_number'],
+                    'allocated_quantity' => $oldMeta['allocated_quantity'],
+                    'status' => 'active',
+                    'action' => 'initial_allocation',
+                    'previous_rooms' => [],
+                    'replaced_by_rooms' => [],
+                    'allocated_at' => $oldMeta['allocated_at'],
+                    'released_at' => null,
+                ];
+            }
+        }
+
+        $removedRoomIds = array_diff(array_keys($oldByRoom), array_keys($newByRoom));
+        $addedRoomIds = array_diff(array_keys($newByRoom), array_keys($oldByRoom));
+        $changedQtyRoomIds = [];
+
+        foreach ($newByRoom as $roomId => $newMeta) {
+            if (isset($oldByRoom[$roomId]) && $oldByRoom[$roomId]['allocated_quantity'] !== $newMeta['allocated_quantity']) {
+                $changedQtyRoomIds[] = $roomId;
+            }
+        }
+
+        if ($removedRoomIds === [] && $addedRoomIds === [] && $changedQtyRoomIds === [] && $history !== []) {
+            return;
+        }
+
+        $removedRoomNumbers = array_values(array_map(
+            static fn (int $id): string => $oldByRoom[$id]['room_number'],
+            $removedRoomIds,
+        ));
+        $addedRoomNumbers = array_values(array_map(
+            static fn (int $id): string => $newByRoom[$id]['room_number'],
+            $addedRoomIds,
+        ));
+        $allNewRoomNumbers = array_values(array_map(
+            static fn (array $meta): string => $meta['room_number'],
+            $newByRoom,
+        ));
+
+        foreach ($history as $index => $entry) {
+            if (($entry['status'] ?? 'active') !== 'active') {
+                continue;
+            }
+
+            $entryRoomId = (int) ($entry['property_room_id'] ?? 0);
+
+            if (in_array($entryRoomId, $removedRoomIds, true) || in_array($entryRoomId, $changedQtyRoomIds, true)) {
+                $history[$index]['status'] = $newByRoom !== [] ? 'changed' : 'released';
+                $history[$index]['released_at'] = $nowIso;
+                $history[$index]['replaced_by_rooms'] = $addedRoomNumbers !== []
+                    ? $addedRoomNumbers
+                    : array_values(array_filter(
+                        $allNewRoomNumbers,
+                        static fn (string $num): bool => $num !== (string) ($entry['room_number'] ?? ''),
+                    ));
+            }
+        }
+
+        $hadAnyHistory = $oldByRoom !== [] || $history !== [];
+
+        foreach ($newByRoom as $roomId => $newMeta) {
+            $isUnchangedExisting = isset($oldByRoom[$roomId]) && ! in_array($roomId, $changedQtyRoomIds, true);
+            if ($isUnchangedExisting) {
+                continue;
+            }
+
+            $action = match (true) {
+                in_array($roomId, $changedQtyRoomIds, true) => 'quantity_updated',
+                $hadAnyHistory => 'room_changed',
+                default => 'initial_allocation',
+            };
+
+            $history[] = [
+                'property_room_id' => $roomId,
+                'room_number' => $newMeta['room_number'],
+                'floor_number' => $newMeta['floor_number'],
+                'allocated_quantity' => $newMeta['allocated_quantity'],
+                'status' => 'active',
+                'action' => $action,
+                'previous_rooms' => $removedRoomNumbers,
+                'replaced_by_rooms' => [],
+                'allocated_at' => $nowIso,
+                'released_at' => null,
+            ];
+        }
+
+        $reservation->forceFill([
+            'room_allocation_history' => array_values($history),
+        ])->save();
     }
 
     private function isBlockedForStay(

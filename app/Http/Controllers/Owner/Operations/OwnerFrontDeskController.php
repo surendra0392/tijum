@@ -180,8 +180,13 @@ class OwnerFrontDeskController extends Controller
             'allocated_rooms' => $res->allocations->map(fn ($a) => [
                 'room_id' => $a->property_room_id,
                 'room_number' => $a->room->room_number,
+                'floor_number' => $a->room->floor_number,
+                'allocated_quantity' => $a->allocated_quantity,
             ])->values()->all(),
-            'is_allocated' => $res->allocations->isNotEmpty(),
+            'room_history' => $res->resolvedRoomStayHistory(),
+            'allocated_quantity' => $res->allocatedQuantity(),
+            'required_quantity' => (int) $res->quantity,
+            'is_allocated' => $res->allocatedQuantity() >= (int) $res->quantity && $res->allocations->isNotEmpty(),
             'is_overdue_arrival' => $isOverdueArrival,
             'is_overdue_departure' => $isOverdueDeparture,
         ];

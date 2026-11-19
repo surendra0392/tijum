@@ -3,7 +3,6 @@ import {
     Building2,
     Camera,
     CheckCircle2,
-    Clock,
     DoorClosed,
     Edit3,
     FileCheck2,
@@ -278,17 +277,15 @@ export default function OwnerPropertyShow({
                 )}
 
                 {property.is_verified && (
-                    <Alert variant="info">
-                        <Clock aria-hidden="true" />
+                    <Alert variant="success">
+                        <CheckCircle2 aria-hidden="true" />
                         <AlertTitle>
-                            Independent Property Verification Complete — Future
-                            Booking Stages Remain Pending
+                            Independent Property Verification Approved
                         </AlertTitle>
                         <AlertDescription>
                             This property is independently verified and ready
-                            for upcoming food-inclusive packages, amenities,
-                            pricing, and availability configuration before
-                            public customer reservations open.{' '}
+                            for customer bookings, food-inclusive rate management,
+                            and daily front desk operations.{' '}
                             {!property.booking_eligible &&
                                 property.is_amendment_active &&
                                 'Customer booking eligibility is currently paused while your amendment revision is active.'}

@@ -29,19 +29,26 @@ class ReservationData
     ) {}
 
     /**
+     * @param  'customer'|'owner'|'admin'  $viewer
      * @return array<string, mixed>
      */
-    public function summary(Reservation $reservation): array
+    public function summary(Reservation $reservation, string $viewer = 'customer'): array
     {
-        $reservation->loadMissing([
+        $relations = [
             'property',
             'roomType',
             'successfulPayment',
             'review',
             'user',
-        ]);
+        ];
 
-        return [
+        if ($viewer === 'owner' || $viewer === 'admin') {
+            $relations[] = 'allocations.room';
+        }
+
+        $reservation->loadMissing($relations);
+
+        $summary = [
             'booking_reference' => $reservation->booking_reference,
             'status' => $reservation->status->value,
             'status_label' => $reservation->statusLabel(),
@@ -77,6 +84,17 @@ class ReservationData
             'checkout_notes' => $reservation->checkout_notes,
             'created_at' => $reservation->created_at?->toISOString(),
         ];
+
+        if ($viewer === 'owner' || $viewer === 'admin') {
+            $summary['allocated_quantity'] = $reservation->allocatedQuantity();
+            $summary['allocated_rooms'] = $reservation->allocations
+                ->map(static fn (ReservationRoomAllocation $allocation): string => (string) $allocation->room->room_number)
+                ->values()
+                ->all();
+            $summary['room_history'] = $reservation->resolvedRoomStayHistory();
+        }
+
+        return $summary;
     }
 
     /**
@@ -102,7 +120,7 @@ class ReservationData
         ]);
 
         $property = $this->propertySummary($reservation);
-        $data = array_merge($this->summary($reservation), [
+        $data = array_merge($this->summary($reservation, $viewer), [
             'property_id' => $reservation->property_id,
             'owner_id' => $reservation->property?->owner_id,
             'property_locality' => trim(implode(', ', array_filter([
@@ -152,6 +170,7 @@ class ReservationData
             $data['allocations'] = $allocations['items'];
             $data['allocated_quantity'] = $allocations['allocated'];
             $data['remaining_quantity'] = $reservation->remainingQuantity();
+            $data['room_history'] = $reservation->resolvedRoomStayHistory();
 
             if ($viewer === 'owner') {
                 $data['available_rooms'] = $this->availableRooms($reservation);
@@ -265,7 +284,9 @@ class ReservationData
             $items[] = [
                 'property_room_id' => $allocation->property_room_id,
                 'room_number' => $allocation->room->room_number,
+                'floor_number' => $allocation->room->floor_number,
                 'allocated_quantity' => $allocation->allocated_quantity,
+                'allocated_at' => $allocation->created_at?->toISOString(),
             ];
         }
 
@@ -353,8 +374,11 @@ class ReservationData
         }
 
         if ($viewer === 'owner') {
-            $base['can_cancel'] = in_array($reservation->status, [ReservationStatus::AwaitingPayment, ReservationStatus::Confirmed], true);
-            $base['can_allocate'] = $reservation->status === ReservationStatus::Confirmed;
+            $base['can_cancel'] = in_array($reservation->status, [ReservationStatus::AwaitingPayment, ReservationStatus::Confirmed], true)
+                && $reservation->checked_in_at === null
+                && $reservation->checked_out_at === null;
+            $base['can_allocate'] = $reservation->status === ReservationStatus::Confirmed
+                && $reservation->checked_out_at === null;
 
             return $base;
         }

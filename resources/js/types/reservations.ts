@@ -57,13 +57,32 @@ export type ReservationSummary = {
     checked_out_at?: string | null;
     checked_out_by_type?: string | null;
     checkout_notes?: string | null;
+    allocated_quantity?: number;
+    allocated_rooms?: string[];
+    room_history?: ReservationRoomHistoryEntry[];
     created_at: string;
 };
 
 export type ReservationAllocation = {
     property_room_id: number;
     room_number: string;
+    floor_number?: string | null;
     allocated_quantity: number;
+    allocated_at?: string | null;
+};
+
+export type ReservationRoomHistoryEntry = {
+    property_room_id: number;
+    room_number: string;
+    floor_number?: string | null;
+    allocated_quantity: number;
+    status: 'active' | 'changed' | 'checked_out' | 'released';
+    status_label: string;
+    action: 'initial_allocation' | 'room_changed' | 'quantity_updated';
+    previous_rooms: string[];
+    replaced_by_rooms: string[];
+    allocated_at?: string | null;
+    released_at?: string | null;
 };
 
 export type ReservationAvailableRoom = {
