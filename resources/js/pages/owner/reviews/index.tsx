@@ -1,7 +1,6 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import {
     Building2,
-    CheckCircle2,
     Flag,
     MessageSquare,
     MessageSquareReply,
@@ -39,7 +38,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
 
 interface OwnerReviewItem {
     id: number;
@@ -244,141 +242,125 @@ export default function OwnerReviewIndex({
                 </Card>
             </div>
 
-            {/* Filter Bar */}
-            <Card>
-                <CardContent className="p-4 sm:p-5">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                        <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-                            {/* Property Filter */}
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                                    <Building2 className="size-3.5 text-tijum-coral" />
-                                    Filter by Property
-                                </Label>
-                                <Select
-                                    value={propertyId}
-                                    onValueChange={(val) => {
-                                        setPropertyId(val);
-                                        handleFilterChange(val, rating, status);
-                                    }}
-                                >
-                                    <SelectTrigger size="sm" className="w-full text-xs">
-                                        <SelectValue placeholder="All Properties" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All Properties
-                                        </SelectItem>
-                                        {properties.map((p) => (
-                                            <SelectItem
-                                                key={p.id}
-                                                value={String(p.id)}
-                                            >
-                                                {p.name} (
-                                                {p.average_rating > 0
-                                                    ? `${p.average_rating} / 5`
-                                                    : 'New'}
-                                                )
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+            {/* Single-Row Filter Toolbar */}
+            <section
+                aria-label="Filter guest reviews"
+                className="rounded-2xl border border-tijum-surface/85 bg-white p-3 shadow-2xs dark:border-border dark:bg-card"
+            >
+                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Select
+                            value={propertyId}
+                            onValueChange={(val) => {
+                                setPropertyId(val);
+                                handleFilterChange(val, rating, status);
+                            }}
+                        >
+                            <SelectTrigger
+                                aria-label="Filter by property"
+                                className="h-9 w-full text-xs sm:w-[220px]"
+                            >
+                                <SelectValue placeholder="All Properties" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">
+                                    All Properties
+                                </SelectItem>
+                                {properties.map((p) => (
+                                    <SelectItem key={p.id} value={String(p.id)}>
+                                        {p.name} (
+                                        {p.average_rating > 0
+                                            ? `${p.average_rating} / 5`
+                                            : 'New'}
+                                        )
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
 
-                            {/* Rating Filter */}
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                                    <Star className="size-3.5 text-tijum-coral" />
-                                    Rating
-                                </Label>
-                                <Select
-                                    value={rating}
-                                    onValueChange={(val) => {
-                                        setRating(val);
-                                        handleFilterChange(propertyId, val, status);
-                                    }}
-                                >
-                                    <SelectTrigger size="sm" className="w-full text-xs">
-                                        <SelectValue placeholder="All Ratings" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All Ratings
-                                        </SelectItem>
-                                        <SelectItem value="5">5 Stars</SelectItem>
-                                        <SelectItem value="4">4 Stars</SelectItem>
-                                        <SelectItem value="3">3 Stars</SelectItem>
-                                        <SelectItem value="2">2 Stars</SelectItem>
-                                        <SelectItem value="1">1 Star</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                        <Select
+                            value={rating}
+                            onValueChange={(val) => {
+                                setRating(val);
+                                handleFilterChange(propertyId, val, status);
+                            }}
+                        >
+                            <SelectTrigger
+                                aria-label="Filter by rating"
+                                className="h-9 w-full text-xs sm:w-[140px]"
+                            >
+                                <SelectValue placeholder="All Ratings" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Ratings</SelectItem>
+                                <SelectItem value="5">5 Stars</SelectItem>
+                                <SelectItem value="4">4 Stars</SelectItem>
+                                <SelectItem value="3">3 Stars</SelectItem>
+                                <SelectItem value="2">2 Stars</SelectItem>
+                                <SelectItem value="1">1 Star</SelectItem>
+                            </SelectContent>
+                        </Select>
 
-                            {/* Status Filter */}
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                                    <CheckCircle2 className="size-3.5 text-tijum-coral" />
-                                    Review Status
-                                </Label>
-                                <Select
-                                    value={status}
-                                    onValueChange={(val) => {
-                                        setStatus(val);
-                                        handleFilterChange(propertyId, rating, val);
-                                    }}
-                                >
-                                    <SelectTrigger size="sm" className="w-full text-xs">
-                                        <SelectValue placeholder="All Statuses" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All Statuses
-                                        </SelectItem>
-                                        <SelectItem value="published">
-                                            Published
-                                        </SelectItem>
-                                        <SelectItem value="pending_moderation">
-                                            Pending Moderation
-                                        </SelectItem>
-                                        <SelectItem value="rejected">
-                                            Rejected
-                                        </SelectItem>
-                                        <SelectItem value="hidden">
-                                            Hidden
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
+                        <Select
+                            value={status}
+                            onValueChange={(val) => {
+                                setStatus(val);
+                                handleFilterChange(propertyId, rating, val);
+                            }}
+                        >
+                            <SelectTrigger
+                                aria-label="Filter by review status"
+                                className="h-9 w-full text-xs sm:w-[175px]"
+                            >
+                                <SelectValue placeholder="All Statuses" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">
+                                    All Statuses
+                                </SelectItem>
+                                <SelectItem value="published">
+                                    Published
+                                </SelectItem>
+                                <SelectItem value="pending_moderation">
+                                    Pending Moderation
+                                </SelectItem>
+                                <SelectItem value="rejected">
+                                    Rejected
+                                </SelectItem>
+                                <SelectItem value="hidden">Hidden</SelectItem>
+                            </SelectContent>
+                        </Select>
 
-                        {/* Reset & Summary Actions */}
-                        <div className="flex items-center justify-between gap-3 sm:justify-end lg:pb-0.5">
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                <span className="font-semibold tabular-nums text-foreground">{reviews.total}</span> {reviews.total === 1 ? 'review' : 'reviews'}
-                            </span>
+                        {hasActiveFilters && (
                             <Button
-                                variant="outline"
+                                type="button"
+                                variant="ghost"
                                 size="sm"
-                                disabled={!hasActiveFilters}
-                                className={cn(
-                                    "h-10 px-3.5 text-xs gap-1.5 shrink-0 transition-opacity",
-                                    !hasActiveFilters && "opacity-50 cursor-not-allowed"
-                                )}
                                 onClick={() => {
-                                    if (!hasActiveFilters) return;
                                     setPropertyId('all');
                                     setRating('all');
                                     setStatus('all');
                                     router.get('/owner/reviews');
                                 }}
+                                className="h-9 shrink-0 px-2.5 text-xs text-tijum-plum-muted hover:text-tijum-plum dark:text-muted-foreground dark:hover:text-foreground"
                             >
-                                <RotateCcw className="size-3.5" />
-                                Clear Filters
+                                <RotateCcw
+                                    className="mr-1 size-3.5"
+                                    aria-hidden="true"
+                                />
+                                <span>Reset</span>
                             </Button>
-                        </div>
+                        )}
                     </div>
-                </CardContent>
-            </Card>
+
+                    <span className="px-1 text-xs whitespace-nowrap text-tijum-plum-muted tabular-nums dark:text-muted-foreground">
+                        <span className="font-semibold text-tijum-plum dark:text-foreground">
+                            {reviews.total}
+                        </span>{' '}
+                        {reviews.total === 1 ? 'review' : 'reviews'}
+                    </span>
+                </div>
+            </section>
 
             {/* Reviews List */}
             {reviews.data.length === 0 ? (

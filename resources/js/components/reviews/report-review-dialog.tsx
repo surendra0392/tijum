@@ -28,53 +28,53 @@ interface ReportReviewDialogProps {
 
 const REPORT_REASONS = [
     {
-        value: 'hate_speech_or_harassment',
-        label: 'Hate Speech or Harassment',
-        desc: 'Abusive language, discrimination, slurs, or targeted threats.',
-    },
-    {
-        value: 'vulgar_or_obscene_language',
-        label: 'Vulgar or Obscene Language',
-        desc: 'Profanity, sexually explicit remarks, or inappropriate phrasing.',
-    },
-    {
-        value: 'personally_identifiable_information',
-        label: 'Personally Identifiable Information (PII)',
-        desc: 'Exposes private phone numbers, full addresses, PAN, Aadhaar, or emails.',
-    },
-    {
-        value: 'false_or_misleading_facts',
-        label: 'Demonstrably False Information',
+        value: 'fake_fraudulent',
+        label: 'Suspected Fake or Inauthentic Review',
         desc: 'Fabricated assertions that contradict verifiable booking records.',
     },
     {
-        value: 'commercial_advertising_or_spam',
-        label: 'Spam or Commercial Promotion',
+        value: 'non_guest',
+        label: 'Reviewer Not Involved in Booking',
+        desc: 'Posted by someone who did not actually stay at the property.',
+    },
+    {
+        value: 'personal_info_disclosed',
+        label: 'Personal or Sensitive Information Disclosed',
+        desc: 'Exposes private phone numbers, full addresses, PAN, Aadhaar, or emails.',
+    },
+    {
+        value: 'abusive_threatening',
+        label: 'Abusive, Profane or Threatening Language',
+        desc: 'Profanity, explicit remarks, coercion, or threats.',
+    },
+    {
+        value: 'harassment_discrimination',
+        label: 'Harassment or Discriminatory Content',
+        desc: 'Hate speech, discrimination, slurs, or targeted harassment.',
+    },
+    {
+        value: 'spam_advertising',
+        label: 'Spam, Commercial Advertising or Solicitation',
         desc: 'Links to competitors, affiliate codes, or promotional solicitations.',
     },
     {
-        value: 'off_topic_or_irrelevant',
-        label: 'Off-Topic Content',
-        desc: 'Does not relate to the stay experience or accommodation.',
-    },
-    {
-        value: 'extortion_or_blackmail',
-        label: 'Threats or Coercion',
-        desc: 'Using a negative review to demand free services, refunds, or perks.',
-    },
-    {
         value: 'conflict_of_interest',
-        label: 'Conflict of Interest',
+        label: 'Conflict of Interest or Competitor Post',
         desc: 'Submitted by competing owners or affiliated parties.',
     },
     {
-        value: 'duplicate_or_multiple_submission',
-        label: 'Duplicate Submission',
-        desc: 'Repeated reviews for the same stay across different entries.',
+        value: 'irrelevant',
+        label: 'Irrelevant or Off-Topic Content',
+        desc: 'Does not relate to the stay experience or accommodation.',
     },
     {
-        value: 'other_content_policy_violation',
-        label: 'Other Policy Violation',
+        value: 'copied_manipulated',
+        label: 'Copied or Systematically Manipulated Feedback',
+        desc: 'Repeated or copied review text across multiple submissions.',
+    },
+    {
+        value: 'other_policy_violation',
+        label: 'Other Review Policy Violation',
         desc: 'Breaches TIJUM Review Policy terms not listed above.',
     },
 ];

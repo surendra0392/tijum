@@ -64,6 +64,11 @@ class OwnerCommissionAgreementController extends Controller
 
         $action->execute($agreement, $owner);
 
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __('You have accepted the commercial agreement terms.'),
+        ]);
+
         return redirect()->route('owner.commission-agreements.index')
             ->with('success', 'You have accepted the commercial agreement terms.');
     }

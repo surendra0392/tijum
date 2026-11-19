@@ -1,10 +1,11 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     LifeBuoy,
     MessageSquare,
     Plus,
 } from 'lucide-react';
 import { useState } from 'react';
+import InputError from '@/components/input-error';
 import {
     OWNER_SUPPORT_TABS,
     OwnerSectionTabs,
@@ -74,6 +75,7 @@ export default function OwnerSupportIndex({
     properties,
     categories,
 }: OwnerSupportIndexProps) {
+    const { errors } = usePage<{ errors?: Record<string, string> }>().props;
     const [createModalOpen, setCreateModalOpen] = useState(false);
     const [subject, setSubject] = useState('');
     const [category, setCategory] = useState(
@@ -347,6 +349,7 @@ export default function OwnerSupportIndex({
                                 className="text-xs"
                                 required
                             />
+                            <InputError message={errors?.subject} />
                         </div>
 
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -450,6 +453,7 @@ export default function OwnerSupportIndex({
                                 className="text-xs"
                                 required
                             />
+                            <InputError message={errors?.message} />
                         </div>
 
                         <DialogFooter className="gap-2 pt-2 sm:gap-0">

@@ -120,10 +120,20 @@ class OwnerReviewController extends Controller
         }
 
         if (! $review->isPublished()) {
+            Inertia::flash('toast', [
+                'type' => 'error',
+                'message' => __('Responses can only be submitted for published reviews.'),
+            ]);
+
             return back()->with('error', 'Responses can only be submitted for published reviews.');
         }
 
         if ($review->response()->exists()) {
+            Inertia::flash('toast', [
+                'type' => 'error',
+                'message' => __('A response has already been submitted for this review.'),
+            ]);
+
             return back()->with('error', 'A response has already been submitted for this review.');
         }
 
@@ -137,6 +147,11 @@ class OwnerReviewController extends Controller
             'response_text' => trim((string) $validated['response_text']),
             'status' => ReviewResponseStatus::PendingModeration,
             'submitted_at' => CarbonImmutable::now(),
+        ]);
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __('Your response has been submitted for moderation and will appear once approved.'),
         ]);
 
         return back()->with('status', 'Your response has been submitted for moderation and will appear once approved.');
@@ -165,6 +180,11 @@ class OwnerReviewController extends Controller
             'status' => ReviewResponseStatus::PendingModeration,
         ]);
 
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __('Your response has been updated and resubmitted for moderation.'),
+        ]);
+
         return back()->with('status', 'Your response has been updated and resubmitted for moderation.');
     }
 
@@ -189,6 +209,11 @@ class OwnerReviewController extends Controller
             ->exists();
 
         if ($alreadyReported) {
+            Inertia::flash('toast', [
+                'type' => 'error',
+                'message' => __('You have already submitted an active report for this review.'),
+            ]);
+
             return back()->with('error', 'You have already submitted an active report for this review.');
         }
 
@@ -199,6 +224,11 @@ class OwnerReviewController extends Controller
             'reason_category' => $validated['reason_category'],
             'explanation' => $validated['explanation'] ?? null,
             'status' => ReviewReportStatus::Submitted,
+        ]);
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __('Thank you. Your report has been submitted to TIJUM operations for investigation.'),
         ]);
 
         return back()->with('status', 'Thank you. Your report has been submitted to TIJUM operations for investigation. The review remains published pending review.');

@@ -7,6 +7,7 @@ import {
     CheckCircle2,
     Clock,
     MessageSquare,
+    RotateCcw,
     Search,
     ShieldCheck,
     User,
@@ -161,55 +162,11 @@ export default function OwnerComplaintsIndex({
             />
 
             {/* Header */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <PageHeader
-                    eyebrow="Partner Operations"
-                    title="Guest Complaints & Grievances"
-                    description="Resolve reported room mismatches, meal discrepancies, and customer protection inquiries with TIJUM Care."
-                />
-
-                <div className="flex flex-wrap items-center gap-2">
-                    {/* Category Filter */}
-                    <Select
-                        value={filters.category || 'all'}
-                        onValueChange={(v) => updateFilter('category', v)}
-                    >
-                        <SelectTrigger size="sm" className="w-[190px] text-xs">
-                            <SelectValue placeholder="All Categories" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Categories</SelectItem>
-                            {categories.map((c) => (
-                                <SelectItem key={c.value} value={c.value}>
-                                    {c.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-
-                    {/* Property Filter */}
-                    <Select
-                        value={
-                            filters.property_id
-                                ? String(filters.property_id)
-                                : 'all'
-                        }
-                        onValueChange={(v) => updateFilter('property_id', v)}
-                    >
-                        <SelectTrigger size="sm" className="w-[180px] text-xs">
-                            <SelectValue placeholder="All Properties" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Properties</SelectItem>
-                            {properties.map((p) => (
-                                <SelectItem key={p.id} value={String(p.id)}>
-                                    {p.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-            </div>
+            <PageHeader
+                eyebrow="Partner Operations"
+                title="Guest Complaints & Grievances"
+                description="Resolve reported room mismatches, meal discrepancies, and customer protection inquiries with TIJUM Care."
+            />
 
             {/* KPI Cards */}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 tabular-nums">
@@ -331,42 +288,118 @@ export default function OwnerComplaintsIndex({
                 </Alert>
             )}
 
-            {/* Status Tabs and Search */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <Tabs
-                    value={filters.status}
-                    onValueChange={(v) => updateFilter('status', v)}
-                    className="w-auto"
-                >
-                    <TabsList variant="pill">
-                        <TabsTrigger value="all">
-                            All ({stats.total_complaints})
-                        </TabsTrigger>
-                        <TabsTrigger value="action_required">
-                            Action Required ({stats.action_required_count})
-                        </TabsTrigger>
-                        <TabsTrigger value="under_review">
-                            Under Review ({stats.under_review_count})
-                        </TabsTrigger>
-                        <TabsTrigger value="resolved">
-                            Resolved ({stats.resolved_count})
-                        </TabsTrigger>
-                    </TabsList>
-                </Tabs>
+            {/* Unified Single-Row Filter Toolbar */}
+            <section
+                aria-label="Filter guest complaints"
+                className="rounded-2xl border border-tijum-surface/85 bg-white p-3 shadow-2xs dark:border-border dark:bg-card"
+            >
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                    <Tabs
+                        value={filters.status}
+                        onValueChange={(v) => updateFilter('status', v)}
+                        className="w-auto"
+                    >
+                        <TabsList variant="pill">
+                            <TabsTrigger value="all">
+                                All ({stats.total_complaints})
+                            </TabsTrigger>
+                            <TabsTrigger value="action_required">
+                                Action Required ({stats.action_required_count})
+                            </TabsTrigger>
+                            <TabsTrigger value="under_review">
+                                Under Review ({stats.under_review_count})
+                            </TabsTrigger>
+                            <TabsTrigger value="resolved">
+                                Resolved ({stats.resolved_count})
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
 
-                <form
-                    onSubmit={handleSearch}
-                    className="relative flex items-center"
-                >
-                    <Search className="pointer-events-none absolute left-3 size-3.5 text-tijum-plum-muted dark:text-muted-foreground" />
-                    <Input
-                        name="search"
-                        defaultValue={filters.search || ''}
-                        placeholder="Search reference, guest, details..."
-                        className="h-10 w-64 pl-8 text-xs"
-                    />
-                </form>
-            </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <form
+                            onSubmit={handleSearch}
+                            className="relative flex min-w-[200px] flex-1 items-center sm:flex-initial"
+                        >
+                            <Search className="pointer-events-none absolute left-3 size-3.5 text-tijum-plum-muted dark:text-muted-foreground" />
+                            <Input
+                                name="search"
+                                defaultValue={filters.search || ''}
+                                placeholder="Search ref, guest, details..."
+                                className="h-9 w-full pl-8 text-xs sm:w-52"
+                            />
+                        </form>
+
+                        <Select
+                            value={
+                                filters.property_id
+                                    ? String(filters.property_id)
+                                    : 'all'
+                            }
+                            onValueChange={(v) =>
+                                updateFilter('property_id', v)
+                            }
+                        >
+                            <SelectTrigger
+                                aria-label="Filter by property"
+                                className="h-9 w-full text-xs sm:w-[165px]"
+                            >
+                                <SelectValue placeholder="All Properties" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">
+                                    All Properties
+                                </SelectItem>
+                                {properties.map((p) => (
+                                    <SelectItem key={p.id} value={String(p.id)}>
+                                        {p.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        <Select
+                            value={filters.category || 'all'}
+                            onValueChange={(v) => updateFilter('category', v)}
+                        >
+                            <SelectTrigger
+                                aria-label="Filter by category"
+                                className="h-9 w-full text-xs sm:w-[175px]"
+                            >
+                                <SelectValue placeholder="All Categories" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">
+                                    All Categories
+                                </SelectItem>
+                                {categories.map((c) => (
+                                    <SelectItem key={c.value} value={c.value}>
+                                        {c.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        {(filters.status !== 'all' ||
+                            Boolean(filters.category) ||
+                            Boolean(filters.property_id) ||
+                            Boolean(filters.search)) && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => router.get('/owner/complaints')}
+                                className="h-9 shrink-0 px-2.5 text-xs text-tijum-plum-muted hover:text-tijum-plum dark:text-muted-foreground dark:hover:text-foreground"
+                            >
+                                <RotateCcw
+                                    className="mr-1 size-3.5"
+                                    aria-hidden="true"
+                                />
+                                <span>Reset</span>
+                            </Button>
+                        )}
+                    </div>
+                </div>
+            </section>
 
             {/* Cases List */}
             {cases.data.length === 0 ? (
@@ -487,10 +520,10 @@ export default function OwnerComplaintsIndex({
                                         <div className="flex items-center gap-1 text-xs tabular-nums text-tijum-plum-muted dark:text-muted-foreground">
                                             <MessageSquare className="size-3.5" />
                                             <span>
-                                                {c.messages_count} reply
+                                                {c.messages_count}{' '}
                                                 {c.messages_count === 1
-                                                    ? ''
-                                                    : 'ies'}
+                                                    ? 'reply'
+                                                    : 'replies'}
                                             </span>
                                         </div>
                                         <Button

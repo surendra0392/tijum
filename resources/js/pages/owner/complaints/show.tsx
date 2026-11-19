@@ -1,21 +1,19 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import {
-    AlertCircle,
     ArrowLeft,
-    Building2,
-    Calendar,
     Clock,
-    FileText,
-    KeyRound,
     MessageSquare,
     Paperclip,
     Send,
     ShieldAlert,
     ShieldCheck,
-    User,
 } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { PageHeader } from '@/components/shared/page-header';
+import InputError from '@/components/input-error';
+import {
+    OWNER_SUPPORT_TABS,
+    OwnerSectionTabs,
+} from '@/components/owner/owner-section-tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -104,6 +102,11 @@ export default function OwnerComplaintShow({
         <div className="space-y-6">
             <Head
                 title={`Complaint ${caseData.case_reference} · Resolution Desk`}
+            />
+
+            <OwnerSectionTabs
+                items={OWNER_SUPPORT_TABS}
+                ariaLabel="Reviews and support navigation"
             />
 
             {/* Back button and header */}
@@ -345,7 +348,7 @@ export default function OwnerComplaintShow({
                                                     <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-tijum-surface/60 bg-card/85 px-2.5 py-1.5 text-[11px] dark:border-border">
                                                         <Paperclip className="size-3 text-tijum-coral" />
                                                         <a
-                                                            href={`/storage/${msg.attachment_path}`}
+                                                            href={`/owner/complaints/${caseData.case_reference}/messages/${msg.id}/attachment`}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
                                                             className="truncate font-medium text-tijum-coral underline dark:text-tijum-peach"
@@ -387,6 +390,12 @@ export default function OwnerComplaintShow({
                                     }
                                     required
                                     className="text-xs"
+                                />
+                                <InputError
+                                    message={messageForm.errors.message}
+                                />
+                                <InputError
+                                    message={messageForm.errors.attachment}
                                 />
 
                                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

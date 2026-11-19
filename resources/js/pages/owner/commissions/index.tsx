@@ -262,8 +262,8 @@ export default function CommissionAgreementsIndex({
                                     %
                                 </p>
                                 <p className="text-[11px] tabular-nums text-tijum-plum-muted dark:text-muted-foreground">
-                                    ({active_agreement.commission_rate_bps} bps
-                                    integer arithmetic)
+                                    ({active_agreement.commission_rate_bps} basis
+                                    points)
                                 </p>
                             </div>
                             <div>

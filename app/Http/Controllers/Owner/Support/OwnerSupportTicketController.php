@@ -115,6 +115,11 @@ class OwnerSupportTicketController extends Controller
             'is_internal_note' => false,
         ]);
 
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => "Support ticket {$ticket->ticket_reference} submitted. A partner success specialist will reply shortly.",
+        ]);
+
         return redirect()
             ->route('owner.support.show', $ticket->ticket_reference)
             ->with('status', "Support ticket {$ticket->ticket_reference} submitted. A partner success specialist will reply shortly.");
@@ -195,6 +200,11 @@ class OwnerSupportTicketController extends Controller
                 : $ticket->status,
         ])->save();
 
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __('Your message has been sent to partner support.'),
+        ]);
+
         return back()->with('status', 'Your message has been sent to partner support.');
     }
 
@@ -212,6 +222,11 @@ class OwnerSupportTicketController extends Controller
             'status' => SupportTicketStatus::Closed,
             'closed_at' => now(),
         ])->save();
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => "Ticket {$ticket->ticket_reference} has been closed.",
+        ]);
 
         return back()->with('status', "Ticket {$ticket->ticket_reference} has been closed.");
     }

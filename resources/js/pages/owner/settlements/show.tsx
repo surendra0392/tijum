@@ -1,20 +1,20 @@
 import { Head, Link } from '@inertiajs/react';
 import {
     ArrowLeft,
-    Building2,
-    Calendar,
-    CheckCircle2,
-    Clock,
     Download,
-    FileSpreadsheet,
-    FileText,
-    HelpCircle,
-    Info,
     Printer,
-    Receipt,
     ShieldCheck,
 } from 'lucide-react';
 import { useState } from 'react';
+import {
+    OWNER_FINANCE_TABS,
+    OwnerSectionTabs,
+} from '@/components/owner/owner-section-tabs';
+import { Pagination } from '@/components/shared/pagination';
+import {
+    StatusBadge,
+    type SemanticStatus,
+} from '@/components/shared/status-badge';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -23,11 +23,6 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { Pagination } from '@/components/shared/pagination';
-import {
-    StatusBadge,
-    type SemanticStatus,
-} from '@/components/shared/status-badge';
 
 interface SettlementItem {
     id: number;
@@ -118,8 +113,13 @@ export default function SettlementShow({ settlement }: Props) {
     );
 
     return (
-        <div className="space-y-8 p-6 lg:p-8">
+        <div className="space-y-6">
             <Head title={`Settlement ${settlement.settlement_reference}`} />
+
+            <OwnerSectionTabs
+                items={OWNER_FINANCE_TABS}
+                ariaLabel="Earnings and payouts navigation"
+            />
 
             {/* Back link & actions bar */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

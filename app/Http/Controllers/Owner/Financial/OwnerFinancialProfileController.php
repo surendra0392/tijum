@@ -56,6 +56,11 @@ class OwnerFinancialProfileController extends Controller
 
         $action->execute($owner, $request->validated());
 
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __('Your partner financial profile has been submitted for verification.'),
+        ]);
+
         return redirect()->route('owner.financial-profile.show')
             ->with('success', 'Your partner financial profile has been submitted for verification.');
     }

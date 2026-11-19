@@ -79,6 +79,19 @@ function getOnboardingSemantic(status: string): SemanticStatus {
     }
 }
 
+function normalizeSupplierClassification(raw?: string): string {
+    if (
+        raw === 'regular' ||
+        raw === 'registered_hotelier'
+    ) {
+        return 'regular';
+    }
+    if (raw === 'composition') {
+        return 'composition';
+    }
+    return 'unregistered';
+}
+
 export default function FinancialProfileIndex({ profile }: Props) {
     const isLocked =
         profile?.onboarding_status === 'active' ||
@@ -92,8 +105,9 @@ export default function FinancialProfileIndex({ profile }: Props) {
             pan_number: profile?.pan_number ?? '',
             gst_registered: profile?.gst_registered ?? false,
             gstin: profile?.gstin ?? '',
-            supplier_legal_classification:
-                profile?.supplier_legal_classification ?? 'unregistered_hostel',
+            supplier_legal_classification: normalizeSupplierClassification(
+                profile?.supplier_legal_classification,
+            ),
             bank_beneficiary_name: profile?.bank_beneficiary_name ?? '',
             bank_account_number: '',
             bank_account_number_confirmation: '',
@@ -360,14 +374,16 @@ export default function FinancialProfileIndex({ profile }: Props) {
                                     <SelectValue placeholder="Select Classification" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="unregistered_hostel">
-                                        Unregistered Hostel / PG Operator
+                                    <SelectItem value="unregistered">
+                                        Unregistered Supplier (Hostel / PG /
+                                        Homestay)
                                     </SelectItem>
-                                    <SelectItem value="registered_hotelier">
-                                        GST Registered Accommodation Provider
+                                    <SelectItem value="regular">
+                                        Regular GST Registered Accommodation
+                                        Provider
                                     </SelectItem>
-                                    <SelectItem value="homestay_individual">
-                                        Individual Homestay Host
+                                    <SelectItem value="composition">
+                                        Composition Scheme GST Supplier
                                     </SelectItem>
                                 </SelectContent>
                             </Select>

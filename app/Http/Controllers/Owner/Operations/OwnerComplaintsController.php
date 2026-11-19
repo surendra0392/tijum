@@ -10,14 +10,17 @@ use App\Enums\CaseStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Protection\AddCaseMessageRequest;
 use App\Models\CustomerProtectionCase;
+use App\Models\CustomerProtectionCaseMessage;
 use App\Models\Owner;
 use App\Models\Property;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OwnerComplaintsController extends Controller
 {
@@ -209,6 +212,26 @@ class OwnerComplaintsController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Your reply was submitted successfully.')]);
 
         return back()->with('status', 'message-sent');
+    }
+
+    public function downloadAttachment(
+        Request $request,
+        CustomerProtectionCase $case,
+        CustomerProtectionCaseMessage $message,
+    ): StreamedResponse {
+        $owner = $this->resolveOwner($request);
+        abort_if($case->owner_id !== $owner->id, 403);
+        abort_if($message->customer_protection_case_id !== $case->id || $message->is_internal_note, 404);
+        abort_if(! is_string($message->attachment_path) || $message->attachment_path === '', 404);
+
+        $diskName = (string) config('tijum.customer_protection.attachments.disk', 'local');
+        $disk = Storage::disk($diskName);
+        abort_unless($disk->exists($message->attachment_path), 404);
+
+        return $disk->download(
+            $message->attachment_path,
+            $message->attachment_name ?: basename($message->attachment_path),
+        );
     }
 
     private function resolveOwner(Request $request): Owner

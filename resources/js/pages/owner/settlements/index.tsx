@@ -3,9 +3,7 @@ import {
     Download,
     Eye,
     FileSpreadsheet,
-    FileText,
     Info,
-    Receipt,
     Wallet,
 } from 'lucide-react';
 import {
@@ -92,7 +90,7 @@ export default function OwnerSettlementsIndex({
         <>
             <Head title="Partner Settlements & Earnings" />
 
-            <div className="mx-auto max-w-7xl space-y-6">
+            <div className="space-y-6">
                 <OwnerSectionTabs
                     items={OWNER_FINANCE_TABS}
                     ariaLabel="Earnings and payouts navigation"
@@ -114,21 +112,6 @@ export default function OwnerSettlementsIndex({
                             contractual commission deductions, and provider
                             transfers.
                         </p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <Button variant="outline" asChild size="sm">
-                            <Link href="/owner/financial-profile">
-                                <Receipt className="mr-1.5 size-4" />
-                                Bank Details
-                            </Link>
-                        </Button>
-                        <Button variant="outline" asChild size="sm">
-                            <Link href="/owner/commission-agreements">
-                                <FileText className="mr-1.5 size-4" />
-                                Commission Terms
-                            </Link>
-                        </Button>
                     </div>
                 </div>
 
@@ -213,32 +196,33 @@ export default function OwnerSettlementsIndex({
                 {/* Filter Tabs */}
                 <div className="inline-flex flex-wrap items-center gap-1.5 rounded-2xl border border-tijum-surface/80 bg-card p-1.5 shadow-tijum-card dark:border-border">
                     {[
-                        'all',
-                        'draft',
-                        'approved',
-                        'settled',
-                        'on_hold',
-                        'failed',
+                        { key: 'all', label: 'All Statements' },
+                        { key: 'draft', label: 'Draft' },
+                        { key: 'pending_approval', label: 'Pending Approval' },
+                        { key: 'approved', label: 'Approved' },
+                        { key: 'settled', label: 'Settled' },
+                        { key: 'on_hold', label: 'On Hold' },
+                        { key: 'failed', label: 'Failed' },
                     ].map((st) => {
                         const active =
-                            (!filters.status && st === 'all') ||
-                            filters.status === st;
+                            (!filters.status && st.key === 'all') ||
+                            filters.status === st.key;
                         return (
                             <button
-                                key={st}
+                                key={st.key}
                                 type="button"
                                 onClick={() =>
                                     handleFilterChange(
-                                        st === 'all' ? '' : st,
+                                        st.key === 'all' ? '' : st.key,
                                     )
                                 }
-                                className={`rounded-xl px-3.5 py-2 text-xs font-semibold capitalize transition-all ${
+                                className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition-all ${
                                     active
                                         ? 'bg-tijum-plum text-tijum-cream shadow-xs dark:bg-tijum-coral dark:text-white'
                                         : 'text-tijum-plum-muted hover:bg-tijum-cream/80 hover:text-tijum-plum dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground'
                                 }`}
                             >
-                                {st.replace('_', ' ')}
+                                {st.label}
                             </button>
                         );
                     })}

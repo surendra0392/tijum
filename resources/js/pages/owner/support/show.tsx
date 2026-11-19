@@ -1,21 +1,19 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
-    AlertTriangle,
     ArrowLeft,
     Building2,
     CheckCircle2,
-    Clock,
-    FileText,
     HelpCircle,
-    LifeBuoy,
-    Lock,
-    MapPin,
     MessageSquare,
     Send,
-    Shield,
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
+import InputError from '@/components/input-error';
+import {
+    OWNER_SUPPORT_TABS,
+    OwnerSectionTabs,
+} from '@/components/owner/owner-section-tabs';
 import { PageHeader } from '@/components/shared/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -64,6 +62,7 @@ export default function OwnerSupportShow({
     ticket,
     messages,
 }: OwnerSupportShowProps) {
+    const { errors } = usePage<{ errors?: Record<string, string> }>().props;
     const [replyText, setReplyText] = useState('');
     const [isSending, setIsSending] = useState(false);
     const [closeModalOpen, setCloseModalOpen] = useState(false);
@@ -101,6 +100,11 @@ export default function OwnerSupportShow({
     return (
         <div className="space-y-6">
             <Head title={`${ticket.ticket_reference} · Partner Support`} />
+
+            <OwnerSectionTabs
+                items={OWNER_SUPPORT_TABS}
+                ariaLabel="Reviews and support navigation"
+            />
 
             <PageHeader
                 eyebrow="Partner Support Ticket"
@@ -181,6 +185,24 @@ export default function OwnerSupportShow({
                             </h3>
                         </div>
 
+                        {messages.length === 0 && ticket.message && (
+                            <div className="rounded-2xl border border-tijum-surface/80 bg-card p-4 shadow-tijum-card dark:border-border">
+                                <div className="flex items-center justify-between border-b border-tijum-surface/60 pb-2 dark:border-border">
+                                    <span className="font-heading text-xs font-bold text-tijum-plum dark:text-foreground">
+                                        Initial Request
+                                    </span>
+                                    <span className="text-[11px] text-muted-foreground">
+                                        {new Date(
+                                            ticket.created_at,
+                                        ).toLocaleString()}
+                                    </span>
+                                </div>
+                                <div className="pt-2.5 text-xs leading-relaxed whitespace-pre-wrap text-tijum-plum dark:text-foreground">
+                                    {ticket.message}
+                                </div>
+                            </div>
+                        )}
+
                         {messages.map((msg) => {
                             const isAdmin = msg.sender_type === 'admin';
 
@@ -252,6 +274,7 @@ export default function OwnerSupportShow({
                                     className="resize-none text-xs"
                                     required
                                 />
+                                <InputError message={errors?.message} />
 
                                 <div className="flex justify-end pt-1">
                                     <Button

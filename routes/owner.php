@@ -103,6 +103,9 @@ Route::prefix('owner')
                 Route::get('/', [OwnerComplaintsController::class, 'index'])->name('index');
                 Route::get('{case:case_reference}', [OwnerComplaintsController::class, 'show'])->name('show');
                 Route::post('{case:case_reference}/messages', [OwnerComplaintsController::class, 'storeMessage'])->name('messages.store');
+                Route::get('{case:case_reference}/messages/{message}/attachment', [OwnerComplaintsController::class, 'downloadAttachment'])
+                    ->whereNumber('message')
+                    ->name('messages.attachment');
             });
 
             Route::prefix('reservations')->name('reservations.')->group(function (): void {

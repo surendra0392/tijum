@@ -1,5 +1,5 @@
-import { Head } from '@inertiajs/react';
-import { Download, Printer } from 'lucide-react';
+import { Head, Link } from '@inertiajs/react';
+import { ArrowLeft, Download, Printer } from 'lucide-react';
 import BrandLogo from '@/components/brand/brand-logo';
 import { Button } from '@/components/ui/button';
 
@@ -65,12 +65,13 @@ export default function SettlementStatement({ settlement }: Props) {
 
             {/* Print & Export action toolbar (hidden on print) */}
             <div className="mx-auto mb-6 flex max-w-4xl items-center justify-between print:hidden">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.close()}
-                >
-                    Close Window
+                <Button variant="outline" size="sm" asChild>
+                    <Link
+                        href={`/owner/settlements/${settlement.settlement_reference}`}
+                    >
+                        <ArrowLeft className="mr-1.5 size-4" />
+                        Back to Settlement
+                    </Link>
                 </Button>
                 <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" asChild>
