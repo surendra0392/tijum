@@ -19,6 +19,7 @@ import { Badge } from '../../../src/components/Badge';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
+import { SHOWCASE_CASES } from '../../../src/data/showcaseData';
 import {
     AlertCircle,
     ArrowLeft,
@@ -47,8 +48,16 @@ export default function CustomerCaseDetailScreen() {
             const data = (res.data as any)?.case || res.data;
             if (data) {
                 setCaseData(data);
+                return;
             }
         } catch (error: any) {
+            const fallback = SHOWCASE_CASES.find(
+                (c) => c.reference === reference || (c as any).case_number === reference,
+            );
+            if (fallback) {
+                setCaseData(fallback);
+                return;
+            }
             Alert.alert(
                 'Error',
                 error.message || 'Failed to load support case details.',

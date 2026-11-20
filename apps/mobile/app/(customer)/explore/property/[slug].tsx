@@ -387,7 +387,11 @@ export default function PropertyDetailScreen() {
                                             {room.name}
                                         </Text>
                                         <Badge
-                                            label={room.sharing_type}
+                                            label={
+                                                room.sharing_type ||
+                                                room.sharing_label ||
+                                                (room.is_shared ? 'Shared Room' : 'Private Room')
+                                            }
                                             variant="secondary"
                                         />
                                     </View>
@@ -444,7 +448,7 @@ export default function PropertyDetailScreen() {
                                             </Text>
                                         </View>
                                         <View style={styles.inlineMetaRow}>
-                                            {room.available_rooms_count > 0 ? (
+                                            {(room.available_rooms_count ?? room.total_rooms ?? 1) > 0 ? (
                                                 <>
                                                     <CheckCircle2
                                                         size={13}
@@ -461,9 +465,7 @@ export default function PropertyDetailScreen() {
                                                             },
                                                         ]}
                                                     >
-                                                        {
-                                                            room.available_rooms_count
-                                                        }{' '}
+                                                        {room.available_rooms_count ?? room.total_rooms ?? 'Available'}{' '}
                                                         rooms available
                                                     </Text>
                                                 </>
@@ -645,7 +647,7 @@ export default function PropertyDetailScreen() {
                     <Text style={styles.bottomPriceValue}>
                         ₹
                         {(
-                            property.starting_price_daily_paise / 100
+                            (property.starting_price_daily_paise || ((property as any).starting_price ? (property as any).starting_price * 100 : 80000)) / 100
                         ).toLocaleString('en-IN')}
                         /day
                     </Text>

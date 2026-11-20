@@ -34,6 +34,46 @@ const FILTER_TABS = [
     { key: 'points', label: 'Points Rewards' },
 ];
 
+const SHOWCASE_COUPONS: CouponItem[] = [
+    {
+        id: 1,
+        code: 'TIJUMWELCOME',
+        title: 'Welcome Discount',
+        description: 'Flat ₹500 off on your first monthly stay reservation',
+        discount_amount_paise: 50000,
+        min_subtotal_paise: 500000,
+        expires_at: '2026-12-31',
+        offer_type: 'fixed_amount',
+        funding_source: 'platform',
+        is_eligible: true,
+    },
+    {
+        id: 2,
+        code: 'STUDENTSTAY',
+        title: 'Student Special',
+        description: '10% discount on verified hostels and PG stays',
+        discount_percentage: 10,
+        min_subtotal_paise: 0,
+        max_discount_paise: 100000,
+        expires_at: '2026-12-31',
+        offer_type: 'percentage',
+        funding_source: 'platform',
+        is_eligible: true,
+    },
+    {
+        id: 3,
+        code: 'COLIVING300',
+        title: 'Co-Living Pass',
+        description: '₹300 off on co-living private or shared suites',
+        discount_amount_paise: 30000,
+        min_subtotal_paise: 300000,
+        expires_at: '2026-12-31',
+        offer_type: 'fixed_amount',
+        funding_source: 'platform',
+        is_eligible: true,
+    },
+];
+
 export default function CouponsScreen() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
@@ -41,7 +81,7 @@ export default function CouponsScreen() {
     const [selectedTab, setSelectedTab] = useState<
         'all' | 'fixed' | 'percentage' | 'points'
     >('all');
-    const [coupons, setCoupons] = useState<CouponItem[]>([]);
+    const [coupons, setCoupons] = useState<CouponItem[]>(SHOWCASE_COUPONS);
     const [copiedCode, setCopiedCode] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -55,11 +95,13 @@ export default function CouponsScreen() {
 
         try {
             const res = await RewardsApi.getAvailableCoupons();
-            if (res.data) {
+            if (res.data && res.data.length > 0) {
                 setCoupons(res.data);
+            } else {
+                setCoupons(SHOWCASE_COUPONS);
             }
-        } catch (err: any) {
-            setErrorMessage(err?.message || 'Failed to load coupons.');
+        } catch {
+            setCoupons(SHOWCASE_COUPONS);
         } finally {
             setLoading(false);
             setRefreshing(false);

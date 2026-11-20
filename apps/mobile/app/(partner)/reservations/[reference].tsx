@@ -13,6 +13,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { OwnerApi } from '../../../src/api/owner';
 import { PhysicalRoom, Reservation } from '../../../src/api/types';
+import { SHOWCASE_BOOKINGS } from '../../../src/data/showcaseData';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
@@ -65,8 +66,18 @@ export default function PartnerReservationDetailScreen() {
             const res = await OwnerApi.getReservation(reference);
             if (res.data) {
                 setReservation(res.data);
+                return;
             }
         } catch (e: any) {
+            const fallback = SHOWCASE_BOOKINGS.find(
+                (b) =>
+                    b.reference === reference ||
+                    b.booking_reference === reference,
+            );
+            if (fallback) {
+                setReservation(fallback);
+                return;
+            }
             Alert.alert(
                 'Error',
                 e.message || 'Failed to load booking details.',

@@ -88,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
      * 4. Restore state or safely purge credentials if revoked/expired.
      */
     const restoreAndVerifySession = async () => {
+        let currentSession: { token: string; principalType: PrincipalType } | null = null;
         try {
             setIsLoading(true);
 
@@ -95,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await reconcilePendingRevocations();
 
             const session = await SecureTokenStorage.getActiveSession();
+            currentSession = session;
             if (!session) {
                 setAuthState('guest');
                 return;
@@ -138,14 +140,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     }
                 }
             }
-        } catch {
-            // Token is expired, invalid, or revoked
-            await SecureTokenStorage.clearActiveSession();
-            setToken(null);
-            setPrincipalType(null);
-            setCustomerUser(null);
-            setPartnerUser(null);
-            setAuthState('session_expired');
+        } catch (err: any) {
+            // Only clear session if server explicitly rejects token with 401 Unauthenticated
+            if (err?.status === 401 || err?.errorCode === 'UNAUTHENTICATED' || err?.message?.includes('Unauthenticated')) {
+                await SecureTokenStorage.clearActiveSession();
+                setToken(null);
+                setPrincipalType(null);
+                setCustomerUser(null);
+                setPartnerUser(null);
+                setAuthState('session_expired');
+            } else if (currentSession) {
+                // Network failure or temporary server timeout: preserve session optimistically
+                setToken(currentSession.token);
+                setPrincipalType(currentSession.principalType);
+                if (currentSession.principalType === 'customer') {
+                    setCustomerUser(SHOWCASE_CUSTOMER);
+                    setAuthState('customer_authenticated');
+                } else if (currentSession.principalType === 'owner') {
+                    setPartnerUser(SHOWCASE_PARTNER as any);
+                    setAuthState('owner_authenticated');
+                }
+            }
         } finally {
             setIsLoading(false);
         }

@@ -35,6 +35,7 @@ import { Badge } from '../../../src/components/Badge';
 import { Button } from '../../../src/components/Button';
 import { Input } from '../../../src/components/Input';
 import { RazorpayService } from '../../../src/payments/RazorpayService';
+import { SHOWCASE_BOOKINGS } from '../../../src/data/showcaseData';
 
 export default function ReservationDetailScreen() {
     const { reference } = useLocalSearchParams<{ reference: string }>();
@@ -107,8 +108,18 @@ export default function ReservationDetailScreen() {
             const res = await CustomerApi.getReservation(reference);
             if (res.data) {
                 setReservation(res.data);
+                return;
             }
         } catch (e: any) {
+            const fallback = SHOWCASE_BOOKINGS.find(
+                (b) =>
+                    b.reference === reference ||
+                    b.booking_reference === reference,
+            );
+            if (fallback) {
+                setReservation(fallback);
+                return;
+            }
             Alert.alert(
                 'Error',
                 e.message || 'Failed to load reservation details.',

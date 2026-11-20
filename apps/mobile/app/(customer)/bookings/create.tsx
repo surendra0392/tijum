@@ -14,6 +14,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { PublicApi } from '../../../src/api/public';
 import { CustomerApi } from '../../../src/api/customer';
 import { RewardsApi } from '../../../src/api/rewards';
+import { useAuth } from '../../../src/auth/AuthContext';
 import { PointsWallet, PropertyDetail, RoomType } from '../../../src/api/types';
 import { Colors } from '../../../src/theme/colors';
 import { Spacing } from '../../../src/theme/spacing';
@@ -39,6 +40,7 @@ export default function CreateReservationScreen() {
         property_slug: string;
     }>();
     const router = useRouter();
+    const { token, authState } = useAuth();
 
     const [property, setProperty] = useState<PropertyDetail | null>(null);
     const [loading, setLoading] = useState(true);
@@ -185,14 +187,22 @@ export default function CreateReservationScreen() {
 
         const calculateAuthoritativeQuote = async () => {
             try {
-                // Call backend quote endpoint to evaluate inventory availability & rate
-                const quoteRes = await CustomerApi.quoteReservation(property.id, {
+                // Call backend quote endpoint to evaluate inventory availability & rate (public first, then customer)
+                const quoteRes = await PublicApi.quoteStay(property.id, {
                     property_room_type_id: selectedRoomId,
                     check_in_date: checkInDate,
                     duration_type: durationType,
                     duration_quantity: durCount,
                     quantity: count,
-                });
+                }).catch(() =>
+                    CustomerApi.quoteReservation(property.id, {
+                        property_room_type_id: selectedRoomId,
+                        check_in_date: checkInDate,
+                        duration_type: durationType,
+                        duration_quantity: durCount,
+                        quantity: count,
+                    })
+                );
 
                 if (!isCurrent) return;
 
@@ -367,6 +377,21 @@ export default function CreateReservationScreen() {
     const handleSubmit = async () => {
         if (!property || !selectedRoomId) {
             Alert.alert('Required', 'Please select a room category.');
+            return;
+        }
+
+        if (!token || authState !== 'customer_authenticated') {
+            Alert.alert(
+                'Sign In Required',
+                'Please sign in to your customer account to complete your reservation.',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Sign In',
+                        onPress: () => router.push('/(auth)/customer-login'),
+                    },
+                ],
+            );
             return;
         }
 
