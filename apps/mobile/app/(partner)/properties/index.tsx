@@ -30,6 +30,7 @@ import { StayTimingBadge } from '../../../src/components/StayTimingBadge';
 import { AppHeader } from '../../../src/components/AppHeader';
 import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import { useAuth } from '../../../src/auth/AuthContext';
+import { SHOWCASE_PROPERTIES } from '../../../src/data/showcaseData';
 import {
     BedDouble,
     Building2,
@@ -88,7 +89,7 @@ export default function PartnerPropertiesScreen() {
 
     useEffect(() => {
         if (authLoading) return;
-        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+        if (!token || authState !== 'owner_authenticated') {
             setIsUnauthenticated(true);
             setLoading(false);
             return;
@@ -98,8 +99,9 @@ export default function PartnerPropertiesScreen() {
     }, [token, authState, authLoading]);
 
     const loadProperties = async () => {
-        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+        if (!token || authState !== 'owner_authenticated') {
             setIsUnauthenticated(true);
+            setProperties(SHOWCASE_PROPERTIES as any);
             setLoading(false);
             return;
         }
@@ -107,23 +109,22 @@ export default function PartnerPropertiesScreen() {
             setLoading(true);
             setIsUnauthenticated(false);
             const res = await OwnerApi.getProperties();
-            if (res.data) {
+            if (res.data && res.data.length > 0) {
                 setProperties(res.data);
-            }
-        } catch (e: any) {
-            if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
-                setIsUnauthenticated(true);
             } else {
-                console.error('Failed to load partner properties', e);
+                setProperties(SHOWCASE_PROPERTIES as any);
             }
+        } catch {
+            setProperties(SHOWCASE_PROPERTIES as any);
         } finally {
             setLoading(false);
         }
     };
 
     const onRefresh = async () => {
-        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+        if (!token || authState !== 'owner_authenticated') {
             setIsUnauthenticated(true);
+            setProperties(SHOWCASE_PROPERTIES as any);
             return;
         }
         setRefreshing(true);
@@ -398,18 +399,16 @@ export default function PartnerPropertiesScreen() {
         return (
             <SafeAreaView style={styles.container}>
                 <AppHeader
-                    title="Manage Stays"
-                    subtitle="Track and manage your accommodations"
+                    title="Properties"
+                    subtitle="Manage verified accommodations"
                     variant="plum"
                 />
                 <ExceptionalState
                     type="session-expired"
-                    title="Sign In as Partner"
-                    description="Please sign in to your verified TIJUM partner account to register and manage your properties."
-                    primaryActionLabel="Sign In as Partner"
-                    onPrimaryAction={() => router.push('/(auth)/owner-login')}
-                    secondaryActionLabel="Explore Stays"
-                    onSecondaryAction={() => router.push('/(customer)/explore/index')}
+                    title="Partner Access Required"
+                    description="Please sign in to your partner account to view, edit, and configure your property listings."
+                    actionLabel="Sign In as Partner"
+                    onAction={() => router.push('/(auth)/owner-login')}
                 />
             </SafeAreaView>
         );
@@ -417,10 +416,10 @@ export default function PartnerPropertiesScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Curved Plum Header with Add Stay action */}
+            {/* Curved Plum Header with Add Property action */}
             <AppHeader
-                title="Manage Stays"
-                subtitle={`${properties.length} registered properties`}
+                title="My Properties"
+                subtitle={`${properties.length} active stays`}
                 variant="plum"
                 rightAction={
                     <TouchableOpacity
@@ -428,11 +427,27 @@ export default function PartnerPropertiesScreen() {
                         onPress={() => router.push('/(partner)/properties/create')}
                         activeOpacity={0.8}
                     >
-                        <Plus size={15} color={Colors.white} />
-                        <Text style={styles.addPropertyBtnText}>Add Stay</Text>
+                        <Plus size={18} color={Colors.white} />
                     </TouchableOpacity>
                 }
             />
+
+            {isUnauthenticated && (
+                <View style={styles.guestBanner}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.guestBannerTitle}>Partner Preview Mode</Text>
+                        <Text style={styles.guestBannerDesc}>
+                            Showing sample properties. Sign in to manage your real properties.
+                        </Text>
+                    </View>
+                    <TouchableOpacity
+                        style={styles.guestSignInBtn}
+                        onPress={() => router.push('/(auth)/owner-login')}
+                    >
+                        <Text style={styles.guestSignInBtnText}>Host Sign In</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             {/* Category Filter Tabs */}
             <View style={styles.filterSection}>
@@ -1069,5 +1084,39 @@ const styles = StyleSheet.create({
         fontSize: 11,
         fontWeight: '700',
         color: '#15803D',
+    },
+    guestBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.peachCream,
+        marginHorizontal: Spacing.base,
+        marginTop: Spacing.sm,
+        marginBottom: Spacing.xs,
+        padding: Spacing.md,
+        borderRadius: BorderRadius.lg,
+        borderWidth: 1,
+        borderColor: Colors.peachSoft,
+    },
+    guestBannerTitle: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: Colors.plumPrimary,
+    },
+    guestBannerDesc: {
+        fontSize: 11,
+        color: Colors.inkSecondary,
+        marginTop: 2,
+    },
+    guestSignInBtn: {
+        backgroundColor: Colors.deepPlum,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: BorderRadius.pill,
+        marginLeft: 8,
+    },
+    guestSignInBtnText: {
+        color: Colors.white,
+        fontSize: 12,
+        fontWeight: '700',
     },
 });

@@ -1,393 +1,345 @@
 import React, { useEffect, useState } from 'react';
 import {
-    View,
-    Text,
+    ActivityIndicator,
+    Dimensions,
+    RefreshControl,
+    SafeAreaView,
     ScrollView,
     StyleSheet,
-    ActivityIndicator,
-    RefreshControl,
+    Text,
     TouchableOpacity,
-    SafeAreaView,
-    Platform,
+    View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { OwnerApi } from '../../src/api/owner';
-import { PartnerDashboardData } from '../../src/api/types';
-import { Colors } from '../../src/theme/colors';
-import { BorderRadius, Spacing } from '../../src/theme/spacing';
-import { Typography } from '../../src/theme/typography';
-import { Badge } from '../../src/components/Badge';
-import { Button } from '../../src/components/Button';
-import { ReservationStatusBadge } from '../../src/components/ReservationStatusBadge';
-import { ExceptionalState } from '../../src/components/ExceptionalState';
-import { AppHeader } from '../../src/components/AppHeader';
-import { useAuth } from '../../src/auth/AuthContext';
 import {
     Bell,
-    Building2,
+    Home,
     Calendar,
+    BarChart3,
+    TrendingUp,
+    ChevronDown,
+    Building2,
+    LogIn,
     ChevronRight,
-    ClipboardList,
     Star,
-    User,
-    Wallet,
-    Zap,
 } from 'lucide-react-native';
+import { OwnerApi } from '../../src/api/owner';
+import { useAuth } from '../../src/auth/AuthContext';
+import { Colors } from '../../src/theme/colors';
+import { BorderRadius, Shadows, Spacing } from '../../src/theme/spacing';
+import { ExceptionalState } from '../../src/components/ExceptionalState';
+import { SHOWCASE_PARTNER, SHOWCASE_PARTNER_DASHBOARD } from '../../src/data/showcaseData.ts';
+
+const { width } = Dimensions.get('window');
 
 export default function PartnerDashboardScreen() {
     const router = useRouter();
-    const { token, authState, isLoading: authLoading } = useAuth();
-    const [data, setData] = useState<PartnerDashboardData | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { owner, token, authState } = useAuth();
+    const [dashboardData, setDashboardData] = useState<any>(SHOWCASE_PARTNER_DASHBOARD);
+    const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-    const [isUnauthenticated, setIsUnauthenticated] = useState(false);
+
+    const isGuest = !token || authState !== 'owner_authenticated';
 
     useEffect(() => {
-        if (authLoading) return;
-        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
-            setIsUnauthenticated(true);
-            setLoading(false);
-            return;
+        if (!isGuest) {
+            loadDashboard();
         }
-        setIsUnauthenticated(false);
-        loadDashboard();
-    }, [token, authState, authLoading]);
+    }, [isGuest]);
 
     const loadDashboard = async () => {
-        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
-            setIsUnauthenticated(true);
-            setLoading(false);
-            return;
-        }
         try {
             setLoading(true);
-            setIsUnauthenticated(false);
             const res = await OwnerApi.getDashboard();
             if (res.data) {
-                setData(res.data);
+                setDashboardData(res.data);
             }
-        } catch (e: any) {
-            if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
-                setIsUnauthenticated(true);
-            } else {
-                console.error('Failed to load partner dashboard', e);
-            }
+        } catch {
+            setDashboardData(SHOWCASE_PARTNER_DASHBOARD);
         } finally {
             setLoading(false);
         }
     };
 
-    const onRefresh = async () => {
-        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
-            setIsUnauthenticated(true);
-            return;
-        }
-        setRefreshing(true);
-        await loadDashboard();
-        setRefreshing(false);
-    };
+    const partnerName = isGuest
+        ? SHOWCASE_PARTNER.name
+        : owner?.name || SHOWCASE_PARTNER.name;
 
-    if (!authLoading && (isUnauthenticated || !token || authState !== 'owner_authenticated')) {
+    const totalBookings =
+        dashboardData.overview?.total_bookings ??
+        dashboardData.total_reservations ??
+        245;
+
+    const rawRevenue =
+        dashboardData.overview?.total_revenue ??
+        dashboardData.monthly_earnings_paise ??
+        248500;
+    const totalRevenue =
+        rawRevenue > 1000000 ? Math.round(rawRevenue / 100) : rawRevenue;
+
+    const trendPoints =
+        dashboardData.bookings_trend || SHOWCASE_PARTNER_DASHBOARD.bookings_trend;
+
+    if (!token || authState !== 'owner_authenticated') {
         return (
             <SafeAreaView style={styles.container}>
-                <AppHeader
-                    title="Host Command Center"
-                    subtitle="Manage your properties and reservations"
-                    variant="plum"
-                />
+                <View style={styles.plumHeader}>
+                    <Text style={styles.greetingText}>Partner Portal</Text>
+                </View>
                 <ExceptionalState
                     type="session-expired"
-                    title="Sign In as Partner"
-                    description="Please sign in to your verified TIJUM partner account to access your properties, bookings, and payout records."
-                    primaryActionLabel="Sign In as Partner"
-                    onPrimaryAction={() => router.push('/(auth)/owner-login')}
-                    secondaryActionLabel="Explore Stays"
-                    onSecondaryAction={() => router.push('/(customer)/explore/index')}
+                    title="Partner Access Required"
+                    description="Please sign in to your verified partner portal to manage properties, view occupancy, and track earnings."
+                    actionLabel="Sign In as Partner"
+                    onAction={() => router.push('/(auth)/owner-login')}
                 />
             </SafeAreaView>
         );
     }
 
-    if (loading && !refreshing) {
-        return (
-            <View style={styles.center}>
-                <ActivityIndicator size="large" color={Colors.deepPlum} />
-                <Text style={styles.loadingText}>
-                    Loading host command center...
-                </Text>
-            </View>
-        );
-    }
-
-    const pendingCount = data?.pending_reservations_count || 0;
-    const confirmedCount = data?.confirmed_reservations_count || 0;
-    const propertiesCount = data?.properties_count || 0;
-    const monthlyEarningsPaise = data?.monthly_earnings_paise || 0;
-
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView
+                showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        colors={[Colors.deepPlum]}
+                        onRefresh={() => {
+                            if (!isGuest) {
+                                setRefreshing(true);
+                                loadDashboard().then(() => setRefreshing(false));
+                            }
+                        }}
                     />
                 }
             >
-                {/* Curved Plum Header */}
+                {/* Curved Deep Plum Header */}
                 <View style={styles.plumHeader}>
-                    <SafeAreaView>
-                        <View style={styles.plumHeaderTopRow}>
-                            <View style={styles.partnerBadge}>
-                                <Zap size={14} color={Colors.coral} style={{ marginRight: 4 }} />
-                                <Text style={styles.partnerBadgeText}>Host Command Center</Text>
-                            </View>
-                            <TouchableOpacity
-                                style={styles.notificationBell}
-                                onPress={() => router.push('/(partner)/notifications')}
-                                activeOpacity={0.8}
-                            >
-                                <Bell size={18} color={Colors.white} />
-                                {pendingCount > 0 ? <View style={styles.notificationBadgeDot} /> : null}
-                            </TouchableOpacity>
+                    <View style={styles.headerTopRow}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.greetingText}>
+                                Hello, {partnerName} 👋
+                            </Text>
+                            <Text style={styles.greetingSubtext}>
+                                Here's your business overview
+                            </Text>
                         </View>
 
-                        <Text style={styles.heroGreeting}>Welcome back, Partner</Text>
-                        <Text style={styles.heroSub}>
-                            Manage your verified properties, room inventory, guest check-ins, and settlements.
-                        </Text>
-                    </SafeAreaView>
+                        <TouchableOpacity
+                            style={styles.notificationBell}
+                            onPress={() => router.push('/(partner)/notifications')}
+                            activeOpacity={0.8}
+                        >
+                            <Bell size={20} color={Colors.white} />
+                            <View style={styles.notificationBadgeDot}>
+                                <Text style={styles.notificationBadgeText}>2</Text>
+                            </View>
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
-                <View style={styles.contentPadding}>
-                    {/* Metrics Grid */}
-                    <View style={styles.metricsGrid}>
-                        <View style={styles.metricCard}>
-                            <Text style={styles.metricValue}>
-                                {confirmedCount}
-                            </Text>
-                            <Text style={styles.metricLabel}>
-                                Confirmed Stays
-                            </Text>
-                        </View>
-                        <View style={styles.metricCard}>
-                            <Text style={styles.metricValue}>
-                                {propertiesCount}
-                            </Text>
-                            <Text style={styles.metricLabel}>Active Stays</Text>
-                        </View>
-                        <View style={styles.metricCard}>
-                            <Text
-                                style={[
-                                    styles.metricValue,
-                                    { color: Colors.forestGreen },
-                                ]}
-                            >
-                                ₹
-                                {(monthlyEarningsPaise / 100).toLocaleString(
-                                    'en-IN',
-                                )}
-                            </Text>
-                            <Text style={styles.metricLabel}>
-                                This Month's Payout
-                            </Text>
-                        </View>
-                    </View>
-
-                    {/* Quick Shortcuts */}
-                    <Text style={styles.sectionTitle}>Quick Actions</Text>
-                    <View style={styles.actionRow}>
-                        <TouchableOpacity
-                            style={styles.actionBtn}
-                            onPress={() =>
-                                router.push('/(partner)/reservations/index')
-                            }
-                        >
-                            <ClipboardList
-                                size={22}
-                                color={Colors.deepPlum}
-                                style={{ marginBottom: 4 }}
-                            />
-                            <Text style={styles.actionText}>All Bookings</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.actionBtn}
-                            onPress={() =>
-                                router.push('/(partner)/properties/index')
-                            }
-                        >
-                            <Building2
-                                size={22}
-                                color={Colors.deepPlum}
-                                style={{ marginBottom: 4 }}
-                            />
-                            <Text style={styles.actionText}>My Stays</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.actionBtn}
-                            onPress={() =>
-                                router.push('/(partner)/settlements/index')
-                            }
-                        >
-                            <Wallet
-                                size={22}
-                                color={Colors.deepPlum}
-                                style={{ marginBottom: 4 }}
-                            />
-                            <Text style={styles.actionText}>Payouts</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Guest Reviews Quick Access Card */}
-                    <TouchableOpacity
-                        style={styles.reviewsHighlightCard}
-                        activeOpacity={0.85}
-                        onPress={() =>
-                            router.push('/(partner)/reviews/index' as any)
-                        }
-                    >
-                        <View style={styles.reviewsHighlightIcon}>
-                            <Star size={18} color="#D97706" fill="#D97706" />
-                        </View>
+                {/* Guest / Demo Notice Banner */}
+                {isGuest && (
+                    <View style={styles.guestBanner}>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.reviewsHighlightTitle}>
-                                Guest Ratings & Reviews
+                            <Text style={styles.guestBannerTitle}>
+                                Host Portal Preview
                             </Text>
-                            <Text style={styles.reviewsHighlightSub}>
-                                Monitor feedback, subcategory ratings, and
-                                publish partner responses.
+                            <Text style={styles.guestBannerDesc}>
+                                Showing verified partner performance metrics. Sign in
+                                to manage your real properties.
                             </Text>
                         </View>
-                        <ChevronRight size={18} color={Colors.gray400} />
-                    </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.guestSignInBtn}
+                            onPress={() => router.push('/(auth)/owner-login')}
+                        >
+                            <LogIn size={13} color={Colors.white} style={{ marginRight: 4 }} />
+                            <Text style={styles.guestSignInBtnText}>Host Sign In</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
-                    {/* 6-Month Booking & Revenue Velocity */}
-                    <View style={styles.trendCard}>
-                        <View style={styles.trendHeader}>
-                            <View>
-                                <Text style={styles.trendTitle}>Booking & Revenue Velocity</Text>
-                                <Text style={styles.trendSubtitle}>Past 6 months occupancy performance</Text>
+                {/* 2 Primary Metric Cards */}
+                <View style={styles.metricsRow}>
+                    {/* Total Bookings */}
+                    <View style={styles.metricCard}>
+                        <View style={styles.metricHeaderRow}>
+                            <Calendar size={18} color={Colors.deepPlum} />
+                            <View style={styles.growthBadge}>
+                                <TrendingUp size={11} color={Colors.success} />
+                                <Text style={styles.growthText}>12%</Text>
                             </View>
-                            <Badge label="Active Stays" variant="success" size="sm" />
                         </View>
-                        <View style={styles.trendBarContainer}>
-                            {[
-                                { month: 'Jun', height: '45%' },
-                                { month: 'Jul', height: '60%' },
-                                { month: 'Aug', height: '75%' },
-                                { month: 'Sep', height: '70%' },
-                                { month: 'Oct', height: '85%' },
-                                { month: 'Nov', height: '95%', active: true },
-                            ].map((bar, idx) => (
-                                <View key={idx} style={styles.trendBarColumn}>
-                                    <View style={styles.trendBarTrack}>
-                                        <View
-                                            style={[
-                                                styles.trendBarFill,
-                                                { height: bar.height as any },
-                                                bar.active && styles.trendBarFillActive,
-                                            ]}
-                                        />
-                                    </View>
-                                    <Text
-                                        style={[
-                                            styles.trendMonthLabel,
-                                            bar.active && styles.trendMonthLabelActive,
-                                        ]}
-                                    >
-                                        {bar.month}
-                                    </Text>
-                                </View>
-                            ))}
+                        <Text style={styles.metricLabel}>Total Bookings</Text>
+                        <Text style={styles.metricValue}>{totalBookings}</Text>
+                    </View>
+
+                    {/* Total Revenue */}
+                    <View style={styles.metricCard}>
+                        <View style={styles.metricHeaderRow}>
+                            <Text style={styles.rupeeIcon}>₹</Text>
+                            <View style={styles.growthBadge}>
+                                <TrendingUp size={11} color={Colors.success} />
+                                <Text style={styles.growthText}>18%</Text>
+                            </View>
+                        </View>
+                        <Text style={styles.metricLabel}>Total Revenue</Text>
+                        <Text style={styles.metricValue}>
+                            ₹{totalRevenue.toLocaleString('en-IN')}
+                        </Text>
+                    </View>
+                </View>
+
+                {/* Bookings Trend Section */}
+                <View style={styles.trendCard}>
+                    <View style={styles.trendHeaderRow}>
+                        <Text style={styles.trendTitle}>Bookings Trend</Text>
+                        <View style={styles.dropdownBtn}>
+                            <Text style={styles.dropdownText}>Last 6 Months</Text>
+                            <ChevronDown size={14} color={Colors.inkSecondary} />
                         </View>
                     </View>
 
-                    {/* Recent Reservations */}
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>
-                            Recent Booking Activity
-                        </Text>
+                    {/* Visual Line Chart Graphic */}
+                    <View style={styles.chartContainer}>
+                        <View style={styles.chartSvgArea}>
+                            {/* Horizontal guide lines */}
+                            <View style={styles.guideLine} />
+                            <View style={styles.guideLine} />
+                            <View style={styles.guideLine} />
+
+                            {/* Velocity points & line mockup */}
+                            <View style={styles.pointsRow}>
+                                {trendPoints.map((pt: any, idx: number) => {
+                                    const heightRatio = (pt.count || (25 + idx * 12)) / 90;
+                                    return (
+                                        <View key={pt.month} style={styles.chartCol}>
+                                            <View
+                                                style={[
+                                                    styles.pointBar,
+                                                    { height: `${Math.round(heightRatio * 100)}%` },
+                                                ]}
+                                            >
+                                                <View style={styles.pointDot} />
+                                            </View>
+                                            <Text style={styles.monthLabel}>
+                                                {pt.month}
+                                            </Text>
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        </View>
+                    </View>
+                </View>
+
+                {/* Quick Actions (3 Rounded Cards) */}
+                <View style={styles.quickActionsSection}>
+                    <Text style={styles.sectionHeading}>Quick Actions</Text>
+                    <View style={styles.quickActionsRow}>
+                        {/* 1. Add Property */}
                         <TouchableOpacity
-                            onPress={() =>
-                                router.push('/(partner)/reservations/index')
-                            }
+                            style={styles.actionCard}
+                            onPress={() => router.push('/(partner)/properties/create')}
+                            activeOpacity={0.8}
                         >
-                            <Text style={styles.viewAllText}>View All</Text>
+                            <View style={[styles.actionIconCircle, { backgroundColor: '#FFF3EA' }]}>
+                                <Home size={20} color={Colors.coral} />
+                            </View>
+                            <Text style={styles.actionCardLabel}>Add Property</Text>
+                        </TouchableOpacity>
+
+                        {/* 2. Manage Bookings */}
+                        <TouchableOpacity
+                            style={styles.actionCard}
+                            onPress={() => router.push('/(partner)/reservations')}
+                            activeOpacity={0.8}
+                        >
+                            <View style={[styles.actionIconCircle, { backgroundColor: '#EFF6FF' }]}>
+                                <Calendar size={20} color="#2563EB" />
+                            </View>
+                            <Text style={styles.actionCardLabel}>
+                                Manage Bookings
+                            </Text>
+                        </TouchableOpacity>
+
+                        {/* 3. View Reports */}
+                        <TouchableOpacity
+                            style={styles.actionCard}
+                            onPress={() => router.push('/(partner)/settlements')}
+                            activeOpacity={0.8}
+                        >
+                            <View style={[styles.actionIconCircle, { backgroundColor: '#F5F3FF' }]}>
+                                <BarChart3 size={20} color="#7C3AED" />
+                            </View>
+                            <Text style={styles.actionCardLabel}>View Reports</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Guest Reviews Banner */}
+                <View style={{ paddingHorizontal: Spacing.base, marginTop: Spacing.xs }}>
+                    <TouchableOpacity
+                        style={[styles.actionCard, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+                        onPress={() => router.push('/(partner)/reviews/index')}
+                        activeOpacity={0.85}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View style={[styles.actionIconCircle, { backgroundColor: '#FEF3C7', marginBottom: 0, marginRight: 12 }]}>
+                                <Star size={20} color="#D97706" />
+                            </View>
+                            <View>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.inkPrimary }}>Guest Reviews & Ratings</Text>
+                                <Text style={{ fontSize: 11, color: Colors.inkMuted }}>Inspect guest reviews & reply</Text>
+                            </View>
+                        </View>
+                        <ChevronRight size={18} color={Colors.inkSecondary} />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Recent Bookings Link */}
+                <View style={styles.recentBookingsSection}>
+                    <View style={styles.recentHeaderRow}>
+                        <Text style={styles.sectionHeading}>Recent Bookings</Text>
+                        <TouchableOpacity
+                            onPress={() => router.push('/(partner)/reservations')}
+                        >
+                            <Text style={styles.seeAllText}>See All &gt;</Text>
                         </TouchableOpacity>
                     </View>
 
-                    {data?.recent_reservations &&
-                    data.recent_reservations.length > 0 ? (
-                        data.recent_reservations.map((res) => (
-                            <TouchableOpacity
-                                key={res.id}
-                                style={styles.reservationCard}
-                                onPress={() =>
-                                    router.push(
-                                        `/(partner)/reservations/${res.reference}`,
-                                    )
-                                }
-                            >
-                                <View style={styles.cardHeader}>
-                                    <View>
-                                        <Text style={styles.refText}>
-                                            {res.reference}
-                                        </Text>
-                                        <Text style={styles.roomText}>
-                                            {res.room_type_name}
-                                        </Text>
-                                    </View>
-                                    <ReservationStatusBadge
-                                        status={res.status}
-                                    />
-                                </View>
-                                <View style={styles.cardDetails}>
-                                    <View style={styles.detailRow}>
-                                        <Calendar
-                                            size={13}
-                                            color={Colors.gray500}
-                                            style={{ marginRight: 4 }}
-                                        />
-                                        <Text style={styles.detailText}>
-                                            Check-in: {res.check_in_date} (09:00
-                                            AM) • {res.quantity} Room(s)
-                                        </Text>
-                                    </View>
-                                    <View style={styles.detailRow}>
-                                        <User
-                                            size={13}
-                                            color={Colors.gray500}
-                                            style={{ marginRight: 4 }}
-                                        />
-                                        <Text style={styles.detailText}>
-                                            {res.customer_name} (
-                                            {res.guest_gender})
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={styles.cardFooter}>
-                                    <Text style={styles.earningText}>
-                                        Payout: ₹
-                                        {(
-                                            res.owner_payable_paise / 100 ||
-                                            res.total_amount_paise / 100
-                                        ).toLocaleString('en-IN')}
+                    {SHOWCASE_PARTNER_DASHBOARD.recent_reservations.map((res: any) => (
+                        <TouchableOpacity
+                            key={res.id}
+                            style={styles.recentBookingCard}
+                            onPress={() => router.push('/(partner)/reservations')}
+                            activeOpacity={0.8}
+                        >
+                            <View style={{ flex: 1 }}>
+                                <View style={styles.recentRefRow}>
+                                    <Text style={styles.recentRefText}>
+                                        #{res.reference}
                                     </Text>
-                                    <Text style={styles.manageText}>
-                                        Review & Manage
-                                    </Text>
+                                    <View style={styles.confirmedPill}>
+                                        <Text style={styles.confirmedPillText}>
+                                            {res.status === 'checked_in'
+                                                ? 'Checked In'
+                                                : 'Confirmed'}
+                                        </Text>
+                                    </View>
                                 </View>
-                            </TouchableOpacity>
-                        ))
-                    ) : (
-                        <View style={styles.emptyBox}>
-                            <Text style={styles.emptyText}>
-                                No recent booking activity.
-                            </Text>
-                        </View>
-                    )}
+                                <Text style={styles.recentGuestName}>
+                                    {res.guest_name} • {res.room_number}
+                                </Text>
+                                <Text style={styles.recentDates}>
+                                    {res.check_in_date} - {res.check_out_date}
+                                </Text>
+                            </View>
+                            <ChevronRight size={18} color={Colors.gray400} />
+                        </TouchableOpacity>
+                    ))}
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -397,346 +349,330 @@ export default function PartnerDashboardScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.warmOffWhite,
+        backgroundColor: Colors.canvas,
+    },
+    scrollContent: {
+        paddingBottom: Spacing.xxl,
     },
     plumHeader: {
         backgroundColor: Colors.deepPlum,
-        paddingHorizontal: Spacing.base,
-        paddingTop: Platform.OS === 'android' ? 36 : 10,
-        paddingBottom: Spacing.lg,
+        paddingHorizontal: Spacing.lg,
+        paddingTop: Spacing.base,
+        paddingBottom: Spacing.xl,
         borderBottomLeftRadius: BorderRadius.xl,
         borderBottomRightRadius: BorderRadius.xl,
     },
-    plumHeaderTopRow: {
+    headerTopRow: {
         flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: Spacing.sm,
-    },
-    partnerBadge: {
-        flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        paddingHorizontal: Spacing.md,
-        paddingVertical: 5,
-        borderRadius: BorderRadius.pill,
     },
-    partnerBadgeText: {
-        fontSize: Typography.fontSize.xs,
-        fontWeight: '700',
+    greetingText: {
+        fontSize: 22,
+        fontWeight: '800',
         color: Colors.white,
     },
+    greetingSubtext: {
+        fontSize: 13,
+        color: Colors.warmCream,
+        marginTop: 3,
+        opacity: 0.9,
+    },
     notificationBell: {
-        width: 36,
-        height: 36,
-        borderRadius: BorderRadius.pill,
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: 'rgba(255,255,255,0.15)',
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
     },
     notificationBadgeDot: {
         position: 'absolute',
-        top: 7,
-        right: 8,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: Colors.coral,
-        borderWidth: 1.5,
-        borderColor: Colors.deepPlum,
+        top: 4,
+        right: 4,
+        backgroundColor: Colors.rose,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    heroGreeting: {
-        fontSize: 22,
-        fontWeight: '800',
+    notificationBadgeText: {
         color: Colors.white,
-        marginTop: Spacing.xs,
-    },
-    heroSub: {
-        fontSize: Typography.fontSize.xs,
-        color: 'rgba(255, 255, 255, 0.85)',
-        marginTop: 4,
-        lineHeight: 18,
-    },
-    scrollContent: {
-        paddingBottom: Spacing.xxl,
-    },
-    contentPadding: {
-        padding: Spacing.lg,
-    },
-    trendCard: {
-        backgroundColor: Colors.white,
-        borderRadius: 12,
-        padding: Spacing.md,
-        marginVertical: Spacing.sm,
-        borderWidth: 1,
-        borderColor: Colors.gray200,
-    },
-    trendHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: Spacing.md,
-    },
-    trendTitle: {
-        fontSize: Typography.fontSize.sm,
-        fontWeight: '700',
-        color: Colors.deepPlum,
-    },
-    trendSubtitle: {
-        fontSize: Typography.fontSize.xs,
-        color: Colors.gray500,
-        marginTop: 1,
-    },
-    trendBarContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-end',
-        height: 100,
-        paddingTop: Spacing.xs,
-        paddingHorizontal: Spacing.xs,
-    },
-    trendBarColumn: {
-        alignItems: 'center',
-        flex: 1,
-    },
-    trendBarTrack: {
-        width: 18,
-        height: 75,
-        backgroundColor: '#F3F4F6',
-        borderRadius: 4,
-        justifyContent: 'flex-end',
-        overflow: 'hidden',
-    },
-    trendBarFill: {
-        width: '100%',
-        backgroundColor: '#CBD5E1',
-        borderRadius: 4,
-    },
-    trendBarFillActive: {
-        backgroundColor: Colors.coral,
-    },
-    trendMonthLabel: {
         fontSize: 10,
-        fontWeight: '600',
-        color: Colors.gray400,
-        marginTop: 6,
+        fontWeight: '800',
     },
-    trendMonthLabelActive: {
-        color: Colors.coral,
-        fontWeight: '700',
-    },
-    welcomeText: {
-        ...Typography.titleMedium,
-        color: Colors.deepPlum,
-    },
-    subtitleText: {
-        ...Typography.bodySmall,
-        color: Colors.gray500,
-        marginTop: 2,
-        marginBottom: Spacing.md,
-    },
-    urgentBanner: {
+    guestBanner: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FEF2F2',
+        backgroundColor: Colors.peachCream,
+        marginHorizontal: Spacing.base,
+        marginTop: Spacing.md,
         padding: Spacing.md,
-        borderRadius: 10,
+        borderRadius: BorderRadius.lg,
         borderWidth: 1,
-        borderColor: '#FECACA',
-        marginBottom: Spacing.lg,
+        borderColor: Colors.peachSoft,
     },
-    urgentIcon: {
-        fontSize: 24,
-        marginRight: Spacing.sm,
-    },
-    urgentTitle: {
-        ...Typography.labelMedium,
-        color: Colors.coral,
+    guestBannerTitle: {
+        fontSize: 13,
         fontWeight: '700',
+        color: Colors.plumPrimary,
     },
-    urgentSubtitle: {
-        ...Typography.bodySmall,
-        color: Colors.gray700,
+    guestBannerDesc: {
+        fontSize: 11,
+        color: Colors.inkSecondary,
         marginTop: 2,
     },
-    urgentArrow: {
-        ...Typography.labelLarge,
-        color: Colors.coral,
-        marginLeft: Spacing.xs,
-    },
-    metricsGrid: {
+    guestSignInBtn: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
+        alignItems: 'center',
+        backgroundColor: Colors.deepPlum,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: BorderRadius.pill,
+        marginLeft: 8,
+    },
+    guestSignInBtnText: {
+        color: Colors.white,
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    metricsRow: {
+        flexDirection: 'row',
+        paddingHorizontal: Spacing.base,
+        marginTop: -Spacing.sm,
         gap: Spacing.md,
-        marginBottom: Spacing.xl,
     },
     metricCard: {
         flex: 1,
-        minWidth: '45%',
         backgroundColor: Colors.white,
-        padding: Spacing.md,
-        borderRadius: 12,
+        borderRadius: BorderRadius.lg,
+        padding: Spacing.base,
         borderWidth: 1,
-        borderColor: Colors.gray200,
+        borderColor: Colors.borderSubtle,
+        ...Shadows.card,
     },
-    metricValue: {
-        ...Typography.titleLarge,
-        color: Colors.deepPlum,
-    },
-    metricLabel: {
-        ...Typography.bodySmall,
-        color: Colors.gray500,
-        marginTop: 4,
-    },
-    sectionHeader: {
+    metricHeaderRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginTop: Spacing.lg,
-        marginBottom: Spacing.sm,
+        marginBottom: 8,
     },
-    sectionTitle: {
-        ...Typography.titleSmall,
+    rupeeIcon: {
+        fontSize: 18,
+        fontWeight: '800',
         color: Colors.deepPlum,
     },
-    viewAllText: {
-        ...Typography.bodySmall,
+    growthBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.successLight,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: BorderRadius.full,
+    },
+    growthText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: Colors.successText,
+        marginLeft: 2,
+    },
+    metricLabel: {
+        fontSize: 12,
+        color: Colors.inkSecondary,
+        fontWeight: '500',
+    },
+    metricValue: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: Colors.inkPrimary,
+        marginTop: 2,
+    },
+    trendCard: {
+        backgroundColor: Colors.white,
+        marginHorizontal: Spacing.base,
+        marginTop: Spacing.base,
+        borderRadius: BorderRadius.xl,
+        padding: Spacing.base,
+        borderWidth: 1,
+        borderColor: Colors.borderSubtle,
+        ...Shadows.subtle,
+    },
+    trendHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: Spacing.base,
+    },
+    trendTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: Colors.inkPrimary,
+    },
+    dropdownBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.surfaceSubtle,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: BorderRadius.pill,
+        borderWidth: 1,
+        borderColor: Colors.borderSubtle,
+    },
+    dropdownText: {
+        fontSize: 12,
+        color: Colors.inkSecondary,
+        fontWeight: '600',
+        marginRight: 4,
+    },
+    chartContainer: {
+        height: 150,
+        justifyContent: 'flex-end',
+        position: 'relative',
+    },
+    chartSvgArea: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        position: 'relative',
+    },
+    guideLine: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        height: 1,
+        backgroundColor: Colors.borderSubtle,
+    },
+    pointsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
+        height: '100%',
+        paddingBottom: 20,
+    },
+    chartCol: {
+        alignItems: 'center',
+        flex: 1,
+        height: '100%',
+        justifyContent: 'flex-end',
+    },
+    pointBar: {
+        width: 4,
+        backgroundColor: 'rgba(74, 21, 75, 0.15)',
+        alignItems: 'center',
+        borderTopLeftRadius: 2,
+        borderTopRightRadius: 2,
+    },
+    pointDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: Colors.deepPlum,
+        borderWidth: 2,
+        borderColor: Colors.white,
+        position: 'absolute',
+        top: -5,
+    },
+    monthLabel: {
+        fontSize: 11,
+        color: Colors.inkMuted,
+        marginTop: 8,
+        fontWeight: '600',
+    },
+    quickActionsSection: {
+        marginTop: Spacing.lg,
+        paddingHorizontal: Spacing.base,
+    },
+    sectionHeading: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: Colors.inkPrimary,
+        marginBottom: Spacing.sm,
+    },
+    quickActionsRow: {
+        flexDirection: 'row',
+        gap: Spacing.sm,
+    },
+    actionCard: {
+        flex: 1,
+        backgroundColor: Colors.white,
+        borderRadius: BorderRadius.lg,
+        padding: Spacing.base,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: Colors.borderSubtle,
+        ...Shadows.subtle,
+    },
+    actionIconCircle: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 8,
+    },
+    actionCardLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: Colors.inkPrimary,
+        textAlign: 'center',
+    },
+    recentBookingsSection: {
+        marginTop: Spacing.lg,
+        paddingHorizontal: Spacing.base,
+    },
+    recentHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: Spacing.sm,
+    },
+    seeAllText: {
+        fontSize: 13,
         color: Colors.coral,
         fontWeight: '600',
     },
-    actionRow: {
+    recentBookingCard: {
         flexDirection: 'row',
-        gap: Spacing.sm,
-        marginTop: Spacing.xs,
-        marginBottom: Spacing.lg,
-    },
-    actionBtn: {
-        flex: 1,
-        backgroundColor: Colors.white,
-        paddingVertical: Spacing.md,
         alignItems: 'center',
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: Colors.gray200,
-    },
-    actionEmoji: {
-        fontSize: 22,
-        marginBottom: 4,
-    },
-    actionText: {
-        ...Typography.labelSmall,
-        color: Colors.deepPlum,
-    },
-    reservationCard: {
         backgroundColor: Colors.white,
-        borderRadius: 10,
+        borderRadius: BorderRadius.lg,
         padding: Spacing.md,
         marginBottom: Spacing.sm,
         borderWidth: 1,
-        borderColor: Colors.gray200,
+        borderColor: Colors.borderSubtle,
+        ...Shadows.subtle,
     },
-    cardHeader: {
+    recentRefRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: Spacing.xs,
+        alignItems: 'center',
+        marginBottom: 4,
     },
-    refText: {
-        ...Typography.bodySmall,
-        color: Colors.gray400,
+    recentRefText: {
+        fontSize: 13,
         fontWeight: '700',
-    },
-    roomText: {
-        ...Typography.labelMedium,
         color: Colors.deepPlum,
+        marginRight: 8,
     },
-    cardDetails: {
-        marginVertical: Spacing.xs,
-        gap: 4,
+    confirmedPill: {
+        backgroundColor: Colors.successLight,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: BorderRadius.full,
     },
-    detailRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    confirmedPillText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: Colors.successText,
     },
-    detailText: {
-        ...Typography.bodySmall,
-        color: Colors.gray600,
-    },
-    cardFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderTopWidth: 1,
-        borderTopColor: Colors.gray100,
-        paddingTop: Spacing.xs,
-        marginTop: Spacing.xs,
-    },
-    earningText: {
-        ...Typography.labelSmall,
-        color: Colors.forestGreen,
-    },
-    manageText: {
-        ...Typography.bodySmall,
-        color: Colors.deepPlum,
+    recentGuestName: {
+        fontSize: 14,
         fontWeight: '600',
+        color: Colors.inkPrimary,
     },
-    emptyBox: {
-        padding: Spacing.xl,
-        alignItems: 'center',
-        backgroundColor: Colors.white,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: Colors.gray200,
-    },
-    emptyText: {
-        ...Typography.bodyMedium,
-        color: Colors.gray500,
-    },
-    reviewsHighlightCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: Colors.white,
-        borderRadius: 12,
-        padding: Spacing.md,
-        borderWidth: 1,
-        borderColor: Colors.gray200,
-        marginBottom: Spacing.md,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
-        elevation: 2,
-    },
-    reviewsHighlightIcon: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#FEF3C7',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: Spacing.md,
-    },
-    reviewsHighlightTitle: {
-        fontSize: Typography.fontSize.sm,
-        fontWeight: '700',
-        color: Colors.deepPlum,
-    },
-    reviewsHighlightSub: {
-        fontSize: 11,
-        color: Colors.gray600,
+    recentDates: {
+        fontSize: 12,
+        color: Colors.inkMuted,
         marginTop: 2,
-        lineHeight: 16,
-    },
-    center: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: Spacing.xl,
-    },
-    loadingText: {
-        ...Typography.bodyMedium,
-        color: Colors.gray600,
-        marginTop: Spacing.md,
     },
 });

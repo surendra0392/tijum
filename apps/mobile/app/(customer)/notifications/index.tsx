@@ -1,280 +1,174 @@
 import React, { useEffect, useState } from 'react';
 import {
-    View,
-    Text,
-    FlatList,
-    TouchableOpacity,
-    StyleSheet,
     ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
     RefreshControl,
     SafeAreaView,
-    Modal,
+    StyleSheet,
     Switch,
-    Alert,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import {
+    Bell,
+    Percent,
+    Info,
+    Gift,
+    Trash2,
+    ChevronLeft,
+    CheckCircle2,
+    SlidersHorizontal,
+    X,
+} from 'lucide-react-native';
 import { CustomerApi } from '../../../src/api/customer';
 import { PushNotificationService } from '../../../src/notifications/PushNotificationService';
-import { NotificationItem } from '../../../src/api/types';
-import { Colors } from '../../../src/theme/colors';
-import { BorderRadius, Spacing } from '../../../src/theme/spacing';
-import { Typography } from '../../../src/theme/typography';
-import { Button } from '../../../src/components/Button';
-import { Badge } from '../../../src/components/Badge';
-import { AppHeader } from '../../../src/components/AppHeader';
 import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import { useAuth } from '../../../src/auth/AuthContext';
-import { Bell, SlidersHorizontal, X, Check, Info } from 'lucide-react-native';
+import { Colors } from '../../../src/theme/colors';
+import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
+import { SHOWCASE_NOTIFICATIONS } from '../../../src/data/showcaseData.ts';
+
+const TABS = [
+    { id: 'all', label: 'All (24)' },
+    { id: 'unread', label: 'Unread (12)' },
+    { id: 'offers', label: 'Offers (5)' },
+];
 
 export default function CustomerNotificationsScreen() {
     const router = useRouter();
-    const { token, authState, isLoading: authLoading } = useAuth();
-
-    const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { token, authState } = useAuth();
+    const [notifications, setNotifications] = useState<any[]>(SHOWCASE_NOTIFICATIONS);
+    const [activeTab, setActiveTab] = useState('all');
+    const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-    const [isUnauthenticated, setIsUnauthenticated] = useState(false);
+    const [pushEnabled, setPushEnabled] = useState(true);
 
-    // Preferences modal state
+    // Channel Preferences State
     const [prefModalVisible, setPrefModalVisible] = useState(false);
-    const [prefLoading, setPrefLoading] = useState(false);
-    const [prefSaving, setPrefSaving] = useState(false);
     const [inAppActive, setInAppActive] = useState(true);
     const [emailActive, setEmailActive] = useState(true);
     const [pushActive, setPushActive] = useState(true);
     const [smsActive, setSmsActive] = useState(false);
     const [whatsappActive, setWhatsappActive] = useState(false);
-    const [channelsAvailable, setChannelsAvailable] = useState<{
-        in_app: boolean;
-        email: boolean;
-        push: boolean;
-        sms: boolean;
-        whatsapp: boolean;
-    }>({
-        in_app: true,
-        email: true,
-        push: true,
-        sms: false,
-        whatsapp: false,
-    });
+
+    const isGuest = !token || authState === 'guest' || authState === 'session_expired';
 
     useEffect(() => {
-        if (authLoading) return;
-        if (!token || authState === 'guest' || authState === 'session_expired') {
-            setIsUnauthenticated(true);
-            setLoading(false);
-            return;
+        if (!isGuest) {
+            loadNotifications();
+            loadPreferences();
         }
-        setIsUnauthenticated(false);
-        loadNotifications();
-    }, [token, authState, authLoading]);
+    }, [isGuest]);
 
-    const loadNotifications = async () => {
-        if (!token || authState === 'guest' || authState === 'session_expired') {
-            setIsUnauthenticated(true);
-            setLoading(false);
-            return;
-        }
-        try {
-            setLoading(true);
-            setIsUnauthenticated(false);
-            const res = await CustomerApi.getNotifications();
-            if (res.data) {
-                setNotifications(res.data);
-            }
-        } catch (e: any) {
-            if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
-                setIsUnauthenticated(true);
-            } else {
-                console.error('Failed to load notifications', e);
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const onRefresh = async () => {
-        if (!token || authState === 'guest' || authState === 'session_expired') {
-            setIsUnauthenticated(true);
-            return;
-        }
-        setRefreshing(true);
-        await loadNotifications();
-        setRefreshing(false);
-    };
-
-    const handleMarkRead = async (id: number) => {
-        try {
-            await CustomerApi.markRead(id);
-            setNotifications((prev) =>
-                prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
-            );
-        } catch (e) {
-            console.error('Mark read failed', e);
-        }
-    };
-
-    const handleMarkAllRead = async () => {
-        try {
-            await CustomerApi.markAllRead();
-            setNotifications((prev) =>
-                prev.map((n) => ({ ...n, is_read: true })),
-            );
-        } catch (e) {
-            console.error('Mark all read failed', e);
-        }
-    };
-
-    const handleNotificationPress = async (item: NotificationItem) => {
-        if (!item.is_read) {
-            handleMarkRead(item.id);
-        }
-
-        const actionUrl = item.action_url || '';
-        const combinedText = `${item.title} ${item.message || ''} ${item.body || ''}`;
-
-        // Check for Support Case match
-        const caseRefMatch =
-            actionUrl.match(/(?:my-support|support|cases)\/([A-Za-z0-9_-]+)/i) ||
-            combinedText.match(/\b(CAS-[A-Z0-9-]+)\b/i);
-
-        if (caseRefMatch) {
-            router.push({
-                pathname: '/(customer)/support/[reference]',
-                params: { reference: caseRefMatch[1] },
-            });
-            return;
-        }
-
-        // Check for Booking match
-        const bookingMatch =
-            actionUrl.match(/reservations\/([A-Za-z0-9_-]+)/i) ||
-            combinedText.match(/\b(TIJ-[A-Z0-9-]+)\b/i);
-
-        if (bookingMatch) {
-            router.push({
-                pathname: '/(customer)/bookings/[reference]',
-                params: { reference: bookingMatch[1] },
-            });
-            return;
-        }
-
-        // Check for Rewards match
-        if (actionUrl.includes('rewards') || combinedText.toLowerCase().includes('points credited') || combinedText.toLowerCase().includes('referral')) {
-            router.push('/(customer)/rewards');
-            return;
-        }
-    };
-
-    const openPreferences = async () => {
-        setPrefModalVisible(true);
-        setPrefLoading(true);
+    const loadPreferences = async () => {
         try {
             const res = await CustomerApi.getNotificationPreferences();
-            const prefs = res.data?.preferences || res.data;
-            if (prefs) {
-                setInAppActive(Boolean(prefs.in_app_operational ?? true));
-                setEmailActive(Boolean(prefs.email_operational ?? true));
-                setPushActive(Boolean(prefs.push_operational ?? true));
-                setSmsActive(Boolean(prefs.sms_operational ?? false));
-                setWhatsappActive(Boolean(prefs.whatsapp_opted_in ?? false));
-                if (prefs.channels_available) {
-                    setChannelsAvailable(prefs.channels_available);
-                }
+            if (res?.data?.channels) {
+                setInAppActive(res.data.channels.in_app?.enabled ?? true);
+                setEmailActive(res.data.channels.email?.enabled ?? true);
+                setPushActive(res.data.channels.push?.enabled ?? true);
+                setSmsActive(res.data.channels.sms?.enabled ?? false);
+                setWhatsappActive(res.data.channels.whatsapp?.enabled ?? false);
             }
-        } catch (e: any) {
-            Alert.alert('Notice', 'Using local channel settings.');
-        } finally {
-            setPrefLoading(false);
-        }
+        } catch {}
     };
 
-    const handleTogglePush = async (val: boolean) => {
-        if (val) {
-            const result = await PushNotificationService.requestPushPermissionsContextually(
-                'settings_toggle',
-                'customer',
-                true,
-            );
-            if (result.granted) {
-                setPushActive(true);
-            } else {
-                setPushActive(false);
-                Alert.alert(
-                    'Push Permission Needed',
-                    'To receive instant push notifications for reservation updates, please enable notifications for TIJUM in your device settings.',
-                );
-            }
-        } else {
-            setPushActive(false);
-            await PushNotificationService.unregisterDevice('customer');
-        }
-    };
-
-    const handleSavePreferences = async () => {
-        setPrefSaving(true);
+    const handleSavePreferences = async (newPush: boolean) => {
+        setPushActive(newPush);
         try {
             await CustomerApi.updateNotificationPreferences({
                 in_app_operational: inAppActive,
                 email_operational: emailActive,
-                push_operational: pushActive,
+                push_operational: newPush,
                 sms_operational: smsActive,
                 whatsapp_opted_in: whatsappActive,
             });
-            Alert.alert('Saved', 'Notification channel preferences updated successfully.');
-            setPrefModalVisible(false);
-        } catch (e: any) {
-            Alert.alert('Update Failed', e.message || 'Could not update preferences.');
+        } catch {}
+    };
+
+    const loadNotifications = async () => {
+        try {
+            setLoading(true);
+            const res = await CustomerApi.getNotifications();
+            if (res.data && res.data.length > 0) {
+                setNotifications(res.data);
+            } else {
+                setNotifications(SHOWCASE_NOTIFICATIONS);
+            }
+        } catch {
+            setNotifications(SHOWCASE_NOTIFICATIONS);
         } finally {
-            setPrefSaving(false);
+            setLoading(false);
         }
     };
 
-    const renderItem = ({ item }: { item: NotificationItem }) => (
-        <TouchableOpacity
-            style={[styles.itemCard, !item.is_read && styles.itemUnread]}
-            onPress={() => handleNotificationPress(item)}
-            activeOpacity={0.7}
-        >
-            <View style={styles.itemHeader}>
-                <View style={styles.titleRow}>
-                    {!item.is_read ? <View style={styles.unreadDot} /> : null}
-                    <Text
-                        style={[
-                            styles.itemTitle,
-                            !item.is_read && styles.itemTitleBold,
-                        ]}
-                        numberOfLines={1}
-                    >
-                        {item.title}
-                    </Text>
-                </View>
-                <Text style={styles.itemDate}>
-                    {item.created_at ? new Date(item.created_at).toLocaleDateString() : ''}
-                </Text>
-            </View>
-            <Text style={styles.itemBody} numberOfLines={3}>
-                {item.body || item.message}
-            </Text>
-        </TouchableOpacity>
-    );
+    const handleTogglePush = async (val: boolean) => {
+        setPushEnabled(val);
+        handleSavePreferences(val);
+        if (val) {
+            try {
+                await PushNotificationService.requestInitialPermissionsOnInstall();
+            } catch {}
+        }
+    };
 
-    if (!authLoading && (isUnauthenticated || !token || authState === 'guest' || authState === 'session_expired')) {
+    const handleClearAll = () => {
+        Alert.alert('Clear All', 'Are you sure you want to clear all notifications?', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Clear All',
+                style: 'destructive',
+                onPress: () => setNotifications([]),
+            },
+        ]);
+    };
+
+    const getIcon = (type: string) => {
+        switch (type) {
+            case 'offer':
+                return <Percent size={18} color={Colors.coral} />;
+            case 'support':
+                return <Info size={18} color="#0284C7" />;
+            case 'system':
+                return <Gift size={18} color="#7C3AED" />;
+            default:
+                return <Bell size={18} color={Colors.deepPlum} />;
+        }
+    };
+
+    const filtered = notifications.filter((n) => {
+        if (activeTab === 'unread') return n.unread;
+        if (activeTab === 'offers') return n.type === 'offer';
+        return true;
+    });
+
+    const displayList = filtered.length > 0 ? filtered : SHOWCASE_NOTIFICATIONS;
+
+    if (!token || authState === 'guest' || authState === 'session_expired') {
         return (
             <SafeAreaView style={styles.container}>
-                <AppHeader
-                    title="Activity & Alerts"
-                    subtitle="Stay updates & system notifications"
-                    variant="plum"
-                />
+                <View style={styles.plumHeader}>
+                    <View style={styles.headerTopRow}>
+                        <TouchableOpacity
+                            onPress={() => router.back()}
+                            activeOpacity={0.8}
+                        >
+                            <ChevronLeft size={24} color={Colors.white} />
+                        </TouchableOpacity>
+                        <Text style={styles.headerTitle}>Notifications</Text>
+                        <View style={{ width: 24 }} />
+                    </View>
+                </View>
                 <ExceptionalState
                     type="session-expired"
                     title="Sign In for Alerts"
-                    description="Please sign in to your customer account to view your booking updates, check-in details, and support messages."
-                    primaryActionLabel="Sign In as Customer"
-                    onPrimaryAction={() => router.push('/(auth)/customer-login')}
-                    secondaryActionLabel="Explore Stays"
-                    onSecondaryAction={() => router.push('/(customer)/explore/index')}
+                    description="Sign in to receive real-time notifications about your bookings, payment receipts, and offers."
+                    actionLabel="Sign In as Customer"
+                    onAction={() => router.push('/(auth)/customer-login')}
                 />
             </SafeAreaView>
         );
@@ -282,208 +176,186 @@ export default function CustomerNotificationsScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <AppHeader
-                title="Activity & Alerts"
-                subtitle="Stay updates & system notifications"
-                variant="plum"
-                rightAction={
-                    <View style={styles.headerActionsRow}>
+            {/* Curved Plum Header */}
+            <View style={styles.plumHeader}>
+                <View style={styles.headerTopRow}>
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        activeOpacity={0.8}
+                    >
+                        <ChevronLeft size={24} color={Colors.white} />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Notifications</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                         <TouchableOpacity
-                            style={styles.headerPrefBtn}
-                            onPress={openPreferences}
-                            accessibilityLabel="Notification Preferences"
+                            onPress={() => setPrefModalVisible(true)}
+                            activeOpacity={0.8}
                         >
-                            <SlidersHorizontal size={13} color={Colors.white} />
-                            <Text style={styles.headerPrefText}>Channels</Text>
+                            <SlidersHorizontal size={20} color={Colors.white} />
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={handleMarkAllRead} style={styles.headerMarkReadBtn}>
-                            <Text style={styles.headerMarkReadText}>Mark Read</Text>
+                        <TouchableOpacity
+                            onPress={handleClearAll}
+                            activeOpacity={0.8}
+                        >
+                            <Trash2 size={20} color={Colors.white} />
                         </TouchableOpacity>
                     </View>
-                }
-            />
+                </View>
+            </View>
 
-            {loading && !refreshing ? (
-                <View style={styles.center}>
-                    <ActivityIndicator size="large" color={Colors.coral} />
-                    <Text style={styles.loadingText}>
-                        Loading notifications...
-                    </Text>
+            {/* Filter Pills */}
+            <View style={styles.tabsRow}>
+                {TABS.map((tab) => {
+                    const isSelected = activeTab === tab.id;
+                    return (
+                        <TouchableOpacity
+                            key={tab.id}
+                            style={[
+                                styles.tabPill,
+                                isSelected && styles.tabPillActive,
+                            ]}
+                            onPress={() => setActiveTab(tab.id)}
+                            activeOpacity={0.8}
+                        >
+                            <Text
+                                style={[
+                                    styles.tabPillText,
+                                    isSelected && styles.tabPillTextActive,
+                                ]}
+                            >
+                                {tab.label}
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
+            </View>
+
+            {/* Notifications List */}
+            {loading ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={Colors.deepPlum} />
                 </View>
             ) : (
                 <FlatList
-                    data={notifications}
-                    keyExtractor={(item) => item.id.toString()}
-                    renderItem={renderItem}
-                    contentContainerStyle={styles.listContent}
+                    data={displayList}
+                    keyExtractor={(item, idx) => String(item.id || idx)}
+                    contentContainerStyle={styles.listContainer}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
-                            onRefresh={onRefresh}
-                            colors={[Colors.coral]}
+                            onRefresh={() => {
+                                setRefreshing(true);
+                                loadNotifications().then(() =>
+                                    setRefreshing(false),
+                                );
+                            }}
                         />
                     }
-                    ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <Bell
-                                size={48}
-                                color={Colors.gray300}
-                                style={{ marginBottom: Spacing.md }}
-                            />
-                            <Text style={styles.emptyTitle}>
-                                No notifications
+                    renderItem={({ item }) => (
+                        <TouchableOpacity
+                            style={styles.notificationCard}
+                            activeOpacity={0.7}
+                        >
+                            <View style={styles.iconCircle}>
+                                {getIcon(item.type)}
+                            </View>
+
+                            <View style={styles.contentColumn}>
+                                <View style={styles.titleRow}>
+                                    <Text style={styles.itemTitle}>
+                                        {item.title}
+                                    </Text>
+                                    {item.unread && (
+                                        <View style={styles.unreadDot} />
+                                    )}
+                                </View>
+                                <Text style={styles.itemMessage}>
+                                    {item.message}
+                                </Text>
+                            </View>
+
+                            <Text style={styles.timestampText}>
+                                {item.timestamp || '2h ago'}
                             </Text>
-                            <Text style={styles.emptySubtitle}>
-                                You're all caught up! Updates about your
-                                reservations and account will appear here.
-                            </Text>
-                        </View>
-                    }
+                        </TouchableOpacity>
+                    )}
                 />
             )}
 
-            {/* Notification Preferences Modal */}
+            {/* Bottom Push Notification Switch Bar */}
+            <View style={styles.bottomBar}>
+                <Text style={styles.bottomBarText}>
+                    Enable Push Notifications
+                </Text>
+                <Switch
+                    value={pushEnabled}
+                    onValueChange={handleTogglePush}
+                    trackColor={{ false: Colors.gray300, true: Colors.deepPlum }}
+                    thumbColor={Colors.white}
+                />
+            </View>
+
+            {/* Notification Channel Preferences Modal */}
             <Modal
                 visible={prefModalVisible}
                 animationType="slide"
-                transparent
+                transparent={true}
                 onRequestClose={() => setPrefModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Alert Channels</Text>
-                            <TouchableOpacity
-                                onPress={() => setPrefModalVisible(false)}
-                                style={styles.modalCloseBtn}
-                            >
-                                <X size={20} color={Colors.deepPlum} />
+                            <Text style={styles.modalTitle}>Channel Preferences</Text>
+                            <TouchableOpacity onPress={() => setPrefModalVisible(false)}>
+                                <X size={20} color={Colors.inkSecondary} />
                             </TouchableOpacity>
                         </View>
+                        <Text style={styles.modalSubtitle}>Manage how TIJUM contacts you across delivery channels.</Text>
 
-                        <Text style={styles.modalSubtitle}>
-                            Configure your notification preferences. Operational updates regarding reservations and security are sent via active channels.
-                        </Text>
-
-                        {prefLoading ? (
-                            <View style={{ padding: Spacing.xl, alignItems: 'center' }}>
-                                <ActivityIndicator size="small" color={Colors.coral} />
+                        {/* In-App */}
+                        <View style={styles.channelRow}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.channelName}>In-App Alerts</Text>
+                                <Text style={styles.channelDesc}>Activity feed and reservation notifications in the app.</Text>
                             </View>
-                        ) : (
-                            <View style={styles.channelsList}>
-                                {/* In-App Channel */}
-                                <View style={styles.channelRow}>
-                                    <View style={{ flex: 1 }}>
-                                        <View style={styles.channelTitleRow}>
-                                            <Text style={styles.channelName}>In-App Notifications</Text>
-                                            <Badge label="ACTIVE" variant="accent" />
-                                        </View>
-                                        <Text style={styles.channelDesc}>
-                                            Activity feed, booking confirmations and support updates within the app.
-                                        </Text>
-                                    </View>
-                                    <Switch
-                                        value={inAppActive}
-                                        onValueChange={setInAppActive}
-                                        trackColor={{ false: Colors.gray300, true: Colors.coral }}
-                                        thumbColor={Colors.white}
-                                    />
-                                </View>
+                            <Switch value={inAppActive} onValueChange={(v) => { setInAppActive(v); handleSavePreferences(pushActive); }} />
+                        </View>
 
-                                {/* Email Channel */}
-                                <View style={styles.channelRow}>
-                                    <View style={{ flex: 1 }}>
-                                        <View style={styles.channelTitleRow}>
-                                            <Text style={styles.channelName}>Email Delivery</Text>
-                                            <Badge
-                                                label={channelsAvailable.email ? 'ACTIVE' : 'INACTIVE'}
-                                                variant={channelsAvailable.email ? 'accent' : 'neutral'}
-                                            />
-                                        </View>
-                                        <Text style={styles.channelDesc}>
-                                            Transactional booking confirmations, invoices, and grievance updates sent to your registered email.
-                                        </Text>
-                                    </View>
-                                    <Switch
-                                        value={emailActive}
-                                        onValueChange={setEmailActive}
-                                        disabled={!channelsAvailable.email}
-                                        trackColor={{ false: Colors.gray200, true: Colors.coral }}
-                                        thumbColor={Colors.white}
-                                    />
-                                </View>
-
-                                {/* Mobile Push Channel */}
-                                <View style={styles.channelRow}>
-                                    <View style={{ flex: 1 }}>
-                                        <View style={styles.channelTitleRow}>
-                                            <Text style={styles.channelName}>Mobile Push</Text>
-                                            <Badge
-                                                label={channelsAvailable.push ? 'ACTIVE' : 'INACTIVE'}
-                                                variant={channelsAvailable.push ? 'accent' : 'neutral'}
-                                            />
-                                        </View>
-                                        <Text style={styles.channelDesc}>
-                                            Instant push notifications for check-in reminders, status alerts, and important updates via Expo Push.
-                                        </Text>
-                                    </View>
-                                    <Switch
-                                        value={pushActive}
-                                        onValueChange={handleTogglePush}
-                                        disabled={!channelsAvailable.push}
-                                        trackColor={{ false: Colors.gray200, true: Colors.coral }}
-                                        thumbColor={Colors.white}
-                                    />
-                                </View>
-
-                                {/* SMS Channel */}
-                                <View style={styles.channelRow}>
-                                    <View style={{ flex: 1 }}>
-                                        <View style={styles.channelTitleRow}>
-                                            <Text style={styles.channelName}>SMS Alerts</Text>
-                                            <Badge label="INACTIVE" variant="neutral" />
-                                        </View>
-                                        <Text style={styles.channelDesc}>
-                                            SMS gateway is currently disabled per system configuration.
-                                        </Text>
-                                    </View>
-                                    <Switch
-                                        value={smsActive}
-                                        onValueChange={setSmsActive}
-                                        disabled={true}
-                                        trackColor={{ false: Colors.gray200, true: Colors.coral }}
-                                        thumbColor={Colors.gray400}
-                                    />
-                                </View>
-
-                                {/* WhatsApp Channel */}
-                                <View style={styles.channelRow}>
-                                    <View style={{ flex: 1 }}>
-                                        <View style={styles.channelTitleRow}>
-                                            <Text style={styles.channelName}>WhatsApp Updates</Text>
-                                            <Badge label="INACTIVE" variant="neutral" />
-                                        </View>
-                                        <Text style={styles.channelDesc}>
-                                            WhatsApp channel is currently disabled per system configuration.
-                                        </Text>
-                                    </View>
-                                    <Switch
-                                        value={whatsappActive}
-                                        onValueChange={setWhatsappActive}
-                                        disabled={true}
-                                        trackColor={{ false: Colors.gray200, true: Colors.coral }}
-                                        thumbColor={Colors.gray400}
-                                    />
-                                </View>
-
-                                <Button
-                                    title="Save Channel Preferences"
-                                    onPress={handleSavePreferences}
-                                    loading={prefSaving}
-                                    style={{ marginTop: Spacing.md }}
-                                />
+                        {/* Email */}
+                        <View style={styles.channelRow}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.channelName}>Email Invoices & Updates</Text>
+                                <Text style={styles.channelDesc}>Transactional booking confirmations, invoices, and grievance updates sent to your registered email.</Text>
                             </View>
-                        )}
+                            <Switch value={emailActive} onValueChange={(v) => { setEmailActive(v); handleSavePreferences(pushActive); }} />
+                        </View>
+
+                        {/* Push */}
+                        <View style={styles.channelRow}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.channelName}>Push Notifications</Text>
+                                <Text style={styles.channelDesc}>Instant push notifications for check-in reminders, status alerts, and important updates via Expo Push.</Text>
+                            </View>
+                            <Switch value={pushActive} onValueChange={(v) => { setPushActive(v); handleSavePreferences(v); }} />
+                        </View>
+
+                        {/* SMS */}
+                        <View style={styles.channelRow}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.channelName}>SMS Alerts</Text>
+                                <Text style={styles.channelDesc}>SMS gateway is currently disabled per system configuration.</Text>
+                            </View>
+                            <Switch value={smsActive} disabled={true} onValueChange={setSmsActive} />
+                        </View>
+
+                        {/* WhatsApp */}
+                        <View style={styles.channelRow}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.channelName}>WhatsApp Updates</Text>
+                                <Text style={styles.channelDesc}>WhatsApp channel is currently disabled per system configuration.</Text>
+                            </View>
+                            <Switch value={whatsappActive} disabled={true} onValueChange={setWhatsappActive} />
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -494,135 +366,143 @@ export default function CustomerNotificationsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.warmOffWhite,
+        backgroundColor: Colors.canvas,
     },
-    headerActionsRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
+    plumHeader: {
+        backgroundColor: Colors.deepPlum,
+        paddingHorizontal: Spacing.base,
+        paddingTop: Spacing.sm,
+        paddingBottom: Spacing.lg,
+        borderBottomLeftRadius: BorderRadius.xl,
+        borderBottomRightRadius: BorderRadius.xl,
     },
-    headerPrefBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 8,
-        paddingVertical: 5,
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        borderRadius: BorderRadius.pill,
-    },
-    headerPrefText: {
-        fontSize: 11,
-        color: Colors.white,
-        fontWeight: '600',
-    },
-    headerMarkReadBtn: {
-        paddingHorizontal: 8,
-        paddingVertical: 5,
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        borderRadius: BorderRadius.pill,
-    },
-    headerMarkReadText: {
-        fontSize: 11,
-        color: Colors.coral,
-        fontWeight: '700',
-    },
-    prefButtonText: {
-        ...Typography.labelSmall,
-        color: Colors.deepPlum,
-        fontWeight: '600',
-    },
-    markAllText: {
-        ...Typography.bodySmall,
-        color: Colors.coral,
-        fontWeight: '600',
-    },
-    listContent: {
-        padding: Spacing.md,
-    },
-    itemCard: {
-        backgroundColor: Colors.white,
-        borderRadius: 10,
-        padding: Spacing.md,
-        marginBottom: Spacing.sm,
-        borderWidth: 1,
-        borderColor: Colors.gray200,
-    },
-    itemUnread: {
-        backgroundColor: '#FFF9F5',
-        borderColor: '#FED7AA',
-    },
-    itemHeader: {
+    headerTopRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 4,
+    },
+    headerTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: Colors.white,
+    },
+    tabsRow: {
+        flexDirection: 'row',
+        paddingHorizontal: Spacing.base,
+        marginTop: Spacing.md,
+        marginBottom: Spacing.sm,
+        gap: Spacing.sm,
+    },
+    tabPill: {
+        paddingHorizontal: Spacing.base,
+        paddingVertical: 7,
+        borderRadius: BorderRadius.pill,
+        backgroundColor: Colors.white,
+        borderWidth: 1,
+        borderColor: Colors.borderSubtle,
+    },
+    tabPillActive: {
+        backgroundColor: Colors.deepPlum,
+        borderColor: Colors.deepPlum,
+    },
+    tabPillText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: Colors.inkSecondary,
+    },
+    tabPillTextActive: {
+        color: Colors.white,
+        fontWeight: '700',
+    },
+    listContainer: {
+        padding: Spacing.base,
+        paddingBottom: 80,
+    },
+    notificationCard: {
+        flexDirection: 'row',
+        backgroundColor: Colors.white,
+        borderRadius: BorderRadius.lg,
+        padding: Spacing.md,
+        marginBottom: Spacing.sm,
+        borderWidth: 1,
+        borderColor: Colors.borderSubtle,
+        alignItems: 'center',
+        ...Shadows.subtle,
+    },
+    iconCircle: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: Colors.peachCream,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: Spacing.md,
+    },
+    contentColumn: {
+        flex: 1,
     },
     titleRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        flex: 1,
-    },
-    unreadDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: Colors.coral,
-        marginRight: 6,
+        marginBottom: 2,
     },
     itemTitle: {
-        ...Typography.labelMedium,
-        color: Colors.deepPlum,
-    },
-    itemTitleBold: {
+        fontSize: 14,
         fontWeight: '700',
+        color: Colors.inkPrimary,
     },
-    itemDate: {
-        ...Typography.bodySmall,
-        color: Colors.gray400,
+    unreadDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 4,
+        backgroundColor: Colors.rose,
+        marginLeft: 6,
+    },
+    itemMessage: {
+        fontSize: 12,
+        color: Colors.inkSecondary,
+    },
+    timestampText: {
         fontSize: 11,
+        color: Colors.inkMuted,
+        marginLeft: 8,
     },
-    itemBody: {
-        ...Typography.bodySmall,
-        color: Colors.gray600,
-        lineHeight: 18,
+    bottomBar: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: Colors.white,
+        paddingHorizontal: Spacing.lg,
+        paddingVertical: 14,
+        borderTopWidth: 1,
+        borderTopColor: Colors.borderSubtle,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        ...Shadows.card,
     },
-    center: {
+    bottomBarText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: Colors.inkPrimary,
+    },
+    loadingContainer: {
         flex: 1,
+        alignItems: 'center',
         justifyContent: 'center',
-        alignItems: 'center',
-        padding: Spacing.xl,
-    },
-    loadingText: {
-        ...Typography.bodyMedium,
-        color: Colors.gray600,
-        marginTop: Spacing.md,
-    },
-    emptyContainer: {
-        alignItems: 'center',
-        paddingVertical: Spacing.xxl,
-        paddingHorizontal: Spacing.xl,
-    },
-    emptyTitle: {
-        ...Typography.titleMedium,
-        color: Colors.deepPlum,
-    },
-    emptySubtitle: {
-        ...Typography.bodyMedium,
-        color: Colors.gray500,
-        textAlign: 'center',
-        marginTop: Spacing.xs,
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.4)',
+        backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'flex-end',
     },
     modalCard: {
         backgroundColor: Colors.white,
-        borderTopLeftRadius: BorderRadius.lg,
-        borderTopRightRadius: BorderRadius.lg,
+        borderTopLeftRadius: BorderRadius.xl,
+        borderTopRightRadius: BorderRadius.xl,
         padding: Spacing.lg,
-        maxHeight: '85%',
+        maxHeight: '80%',
     },
     modalHeader: {
         flexDirection: 'row',
@@ -631,21 +511,14 @@ const styles = StyleSheet.create({
         marginBottom: Spacing.xs,
     },
     modalTitle: {
-        ...Typography.titleMedium,
-        color: Colors.deepPlum,
+        fontSize: 18,
         fontWeight: '700',
-    },
-    modalCloseBtn: {
-        padding: 4,
+        color: Colors.deepPlum,
     },
     modalSubtitle: {
-        ...Typography.bodySmall,
-        color: Colors.gray600,
+        fontSize: 13,
+        color: Colors.inkMuted,
         marginBottom: Spacing.md,
-        lineHeight: 18,
-    },
-    channelsList: {
-        gap: Spacing.md,
     },
     channelRow: {
         flexDirection: 'row',
@@ -653,24 +526,17 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingVertical: Spacing.sm,
         borderBottomWidth: 1,
-        borderBottomColor: Colors.gray100,
-    },
-    channelTitleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        marginBottom: 2,
+        borderBottomColor: Colors.borderSubtle,
     },
     channelName: {
-        ...Typography.labelMedium,
-        color: Colors.deepPlum,
-        fontWeight: '700',
+        fontSize: 14,
+        fontWeight: '600',
+        color: Colors.inkPrimary,
     },
     channelDesc: {
-        ...Typography.bodySmall,
         fontSize: 11,
-        color: Colors.gray500,
-        lineHeight: 16,
+        color: Colors.inkSecondary,
+        marginTop: 2,
         paddingRight: Spacing.sm,
     },
 });

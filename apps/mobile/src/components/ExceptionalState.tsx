@@ -33,6 +33,8 @@ interface ExceptionalStateProps {
     countdownSeconds?: number;
     primaryActionLabel?: string;
     onPrimaryAction?: () => void;
+    actionLabel?: string;
+    onAction?: () => void;
     secondaryActionLabel?: string;
     onSecondaryAction?: () => void;
     style?: ViewStyle;
@@ -45,6 +47,8 @@ export function ExceptionalState({
     countdownSeconds,
     primaryActionLabel,
     onPrimaryAction,
+    actionLabel,
+    onAction,
     secondaryActionLabel,
     onSecondaryAction,
     style,
@@ -153,14 +157,14 @@ export function ExceptionalState({
             ) : null}
 
             <View style={styles.buttonContainer}>
-                {onPrimaryAction ? (
+                {onPrimaryAction || onAction ? (
                     <TouchableOpacity
                         style={styles.primaryButton}
-                        onPress={onPrimaryAction}
+                        onPress={onPrimaryAction || onAction}
                         activeOpacity={0.8}
                     >
                         <Text style={styles.primaryButtonText}>
-                            {primaryActionLabel || config.defaultPrimary}
+                            {primaryActionLabel || actionLabel || config.defaultPrimary}
                         </Text>
                     </TouchableOpacity>
                 ) : null}

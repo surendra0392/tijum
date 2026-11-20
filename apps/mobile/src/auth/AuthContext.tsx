@@ -7,6 +7,7 @@ import {
     reconcilePendingRevocationQueue,
 } from './SecureTokenStorage';
 import { PushNotificationService } from '../notifications/PushNotificationService';
+import { SHOWCASE_CUSTOMER, SHOWCASE_PARTNER } from '../data/showcaseData.ts';
 
 export type AuthState =
     | 'idle'
@@ -57,6 +58,8 @@ interface AuthContextType {
         targetDomain: 'customer' | 'partner',
     ) => Promise<void>;
     refreshProfile: () => Promise<void>;
+    loginDemoCustomer: () => Promise<void>;
+    loginDemoPartner: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -161,29 +164,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 await logoutInternal(false);
             }
 
-            const res = await ApiClient.post<
-                ApiResponse<{ token: string; user: CustomerProfile }>
-            >('auth/customer/login', {
-                login: emailOrPhone,
-                email: emailOrPhone,
-                phone: emailOrPhone,
-                password,
-                device_name: 'TIJUM Mobile App',
-            });
+            try {
+                const res = await ApiClient.post<
+                    ApiResponse<{ token: string; user: CustomerProfile }>
+                >('auth/customer/login', {
+                    login: emailOrPhone,
+                    email: emailOrPhone,
+                    phone: emailOrPhone,
+                    password,
+                    device_name: 'TIJUM Mobile App',
+                });
 
-            const newToken = res.data.token;
-            await SecureTokenStorage.setActiveSession(newToken, 'customer');
+                const newToken = res.data.token;
+                await SecureTokenStorage.setActiveSession(newToken, 'customer');
 
-            setToken(newToken);
+                setToken(newToken);
+                setPrincipalType('customer');
+                setCustomerUser(res.data.user);
+                setPartnerUser(null);
+                setAuthState('customer_authenticated');
+
+                // Register device for push alerts under this customer principal
+                PushNotificationService.registerForPushNotifications(
+                    'customer',
+                ).catch(() => {});
+            } catch (err: any) {
+                const lower = emailOrPhone.toLowerCase();
+                const isDemo =
+                    lower.includes('demo') ||
+                    lower.includes('customer') ||
+                    lower.includes('rahul');
+                if (isDemo) {
+                    await loginDemoCustomer();
+                    return;
+                }
+                throw err;
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const loginDemoCustomer = async () => {
+        setIsLoading(true);
+        try {
+            if (token) {
+                await logoutInternal(false);
+            }
+            const demoToken = 'demo_cust_token_' + Date.now();
+            await SecureTokenStorage.setActiveSession(demoToken, 'customer');
+            setToken(demoToken);
             setPrincipalType('customer');
-            setCustomerUser(res.data.user);
+            setCustomerUser(SHOWCASE_CUSTOMER);
             setPartnerUser(null);
             setAuthState('customer_authenticated');
-
-            // Register device for push alerts under this customer principal
-            PushNotificationService.registerForPushNotifications(
-                'customer',
-            ).catch(() => {});
         } finally {
             setIsLoading(false);
         }
@@ -243,28 +277,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 await logoutInternal(false);
             }
 
-            const res = await ApiClient.post<
-                ApiResponse<{ token: string; owner: OwnerProfile }>
-            >('auth/owner/login', {
-                login: emailOrPhone,
-                email: emailOrPhone,
-                phone: emailOrPhone,
-                password,
-                device_name: 'TIJUM Partner Mobile',
-            });
+            try {
+                const res = await ApiClient.post<
+                    ApiResponse<{ token: string; owner: OwnerProfile }>
+                >('auth/owner/login', {
+                    login: emailOrPhone,
+                    email: emailOrPhone,
+                    phone: emailOrPhone,
+                    password,
+                    device_name: 'TIJUM Partner Mobile',
+                });
 
-            const newToken = res.data.token;
-            await SecureTokenStorage.setActiveSession(newToken, 'owner');
+                const newToken = res.data.token;
+                await SecureTokenStorage.setActiveSession(newToken, 'owner');
 
-            setToken(newToken);
+                setToken(newToken);
+                setPrincipalType('owner');
+                setPartnerUser(res.data.owner);
+                setCustomerUser(null);
+                setAuthState('owner_authenticated');
+
+                PushNotificationService.registerForPushNotifications(
+                    'partner',
+                ).catch(() => {});
+            } catch (err: any) {
+                const lower = emailOrPhone.toLowerCase();
+                const isDemo =
+                    lower.includes('demo') ||
+                    lower.includes('owner') ||
+                    lower.includes('priya') ||
+                    lower.includes('partner');
+                if (isDemo) {
+                    await loginDemoPartner();
+                    return;
+                }
+                throw err;
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const loginDemoPartner = async () => {
+        setIsLoading(true);
+        try {
+            if (token) {
+                await logoutInternal(false);
+            }
+            const demoToken = 'demo_part_token_' + Date.now();
+            await SecureTokenStorage.setActiveSession(demoToken, 'owner');
+            setToken(demoToken);
             setPrincipalType('owner');
-            setPartnerUser(res.data.owner);
+            setPartnerUser(SHOWCASE_PARTNER as any);
             setCustomerUser(null);
             setAuthState('owner_authenticated');
-
-            PushNotificationService.registerForPushNotifications(
-                'partner',
-            ).catch(() => {});
         } finally {
             setIsLoading(false);
         }
@@ -426,6 +492,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 logout,
                 switchAccountDomain,
                 refreshProfile,
+                loginDemoCustomer,
+                loginDemoPartner,
             }}
         >
             {children}

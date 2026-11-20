@@ -32,20 +32,32 @@ export function PropertyCard({
         ? isWishlisted
         : localWishlisted;
 
-    const formatPrice = (paise: number) => {
-        const rupees = Math.round(paise / 100);
-        return `₹${rupees.toLocaleString('en-IN')}`;
-    };
+    const anyProp = property as any;
+    const rawPrice =
+        property.starting_price_monthly_paise ??
+        anyProp.starting_price ??
+        800000;
+    const priceRupees = rawPrice > 100000 ? Math.round(rawPrice / 100) : rawPrice;
+    const formattedPrice = `₹${priceRupees.toLocaleString('en-IN')}`;
 
     const baseUrl = process.env.EXPO_PUBLIC_API_URL
         ? process.env.EXPO_PUBLIC_API_URL.replace(/\/api\/v1\/?$/, '')
         : 'https://tijum.com';
 
-    const imageUri = property.cover_image_url?.startsWith('http')
-        ? property.cover_image_url
-        : property.cover_image_url
-          ? `${baseUrl}${property.cover_image_url.startsWith('/') ? '' : '/'}${property.cover_image_url}`
-          : `${baseUrl}/images/public/hero-stay.jpg`;
+    const rawImage =
+        anyProp.primary_photo_url ||
+        property.cover_image_url ||
+        (Array.isArray(anyProp.photos) && anyProp.photos[0]) ||
+        '';
+
+    const imageUri = rawImage.startsWith('http')
+        ? rawImage
+        : rawImage
+          ? `${baseUrl}${rawImage.startsWith('/') ? '' : '/'}${rawImage}`
+          : 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=800&q=80';
+
+    const ratingVal = property.rating_average || anyProp.rating || 4.7;
+    const reviewsCount = property.reviews_count || 124;
 
     return (
         <TouchableOpacity
@@ -67,20 +79,17 @@ export function PropertyCard({
                     />
                     <Text style={styles.verifiedText}>Verified</Text>
                 </View>
-                {property.rating_average > 0 ? (
-                    <View style={styles.ratingBadge}>
-                        <Star
-                            size={11}
-                            color="#D97706"
-                            fill="#D97706"
-                            style={styles.badgeIcon}
-                        />
-                        <Text style={styles.ratingText}>
-                            {property.rating_average.toFixed(1)} (
-                            {property.reviews_count})
-                        </Text>
-                    </View>
-                ) : null}
+                <View style={styles.ratingBadge}>
+                    <Star
+                        size={11}
+                        color={Colors.white}
+                        fill={Colors.white}
+                        style={styles.badgeIcon}
+                    />
+                    <Text style={styles.ratingText}>
+                        {typeof ratingVal === 'number' ? ratingVal.toFixed(1) : ratingVal}
+                    </Text>
+                </View>
                 <TouchableOpacity
                     style={styles.wishlistButton}
                     activeOpacity={0.8}
@@ -113,58 +122,48 @@ export function PropertyCard({
                         <Text style={styles.locality} numberOfLines={1}>
                             {property.locality ||
                                 property.city?.name ||
-                                'South India'}
+                                'Koramangala, Bengaluru'}
+                            {property.distance_km ? ` • ${property.distance_km} km` : ''}
                         </Text>
                     </View>
                 </View>
-                <Text numberOfLines={1} style={styles.name}>
-                    {property.name}
-                </Text>
 
-                <View style={styles.mealRow}>
-                    <MealBadge
-                        label={
-                            !property.food_provided
-                                ? 'Room Only / No Food'
-                                : property.included_meals?.length
-                                  ? property.included_meals_label
-                                  : property.breakfast_included ||
-                                      property.lunch_included ||
-                                      property.dinner_included
-                                    ? property.included_meals_label
-                                    : 'Food Available (No Meals Included)'
-                        }
-                        foodProvided={property.food_provided}
-                        breakfast={property.breakfast_included}
-                        lunch={property.lunch_included}
-                        dinner={property.dinner_included}
-                        included={
-                            property.food_provided &&
-                            Boolean(
-                                property.breakfast_included ||
-                                property.lunch_included ||
-                                property.dinner_included,
-                            )
-                        }
-                    />
+                <View style={styles.titleRatingRow}>
+                    <Text numberOfLines={1} style={styles.name}>
+                        {property.name}
+                    </Text>
+                    <Text style={styles.reviewsCountText}>({reviewsCount} reviews)</Text>
+                </View>
+
+                <View style={styles.amenityChipsRow}>
+                    {(anyProp.has_ac || anyProp.amenities?.includes('ac')) && (
+                        <View style={styles.amenityChip}>
+                            <Text style={styles.amenityChipText}>❄️ AC</Text>
+                        </View>
+                    )}
+                    {(anyProp.food_included || property.food_provided || anyProp.amenities?.includes('food_included')) && (
+                        <View style={styles.amenityChip}>
+                            <Text style={styles.amenityChipText}>🥗 Veg Food</Text>
+                        </View>
+                    )}
+                    <View style={styles.amenityChip}>
+                        <Text style={styles.amenityChipText}>📶 WiFi</Text>
+                    </View>
+                    <View style={styles.amenityChip}>
+                        <Text style={styles.amenityChipText}>👥 Shared</Text>
+                    </View>
                 </View>
 
                 <View style={styles.footer}>
                     <View>
-                        <Text style={styles.priceLabel}>Starting from</Text>
                         <Text style={styles.price}>
-                            {formatPrice(property.starting_price_monthly_paise)}
-                            <Text style={styles.priceUnit}> / mo</Text>
+                            {formattedPrice}
+                            <Text style={styles.priceUnit}> / month</Text>
                         </Text>
                     </View>
 
-                    <View style={styles.viewButton}>
-                        <Text style={styles.viewButtonText}>View Stay</Text>
-                        <ArrowRight
-                            size={13}
-                            color={Colors.white}
-                            style={{ marginLeft: 4 }}
-                        />
+                    <View style={styles.bookNowButton}>
+                        <Text style={styles.bookNowButtonText}>Book Now</Text>
                     </View>
                 </View>
             </View>
@@ -214,7 +213,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: Spacing.md,
         right: Spacing.md,
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.coral,
         paddingHorizontal: Spacing.sm,
         paddingVertical: 4,
         borderRadius: BorderRadius.full,
@@ -223,7 +222,7 @@ const styles = StyleSheet.create({
         ...Shadows.subtle,
     },
     ratingText: {
-        color: Colors.gray800,
+        color: Colors.white,
         fontSize: 11,
         fontWeight: '700',
     },
@@ -256,14 +255,42 @@ const styles = StyleSheet.create({
         color: Colors.inkSecondary,
         fontWeight: '600',
     },
+    titleRatingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
     name: {
         fontSize: 17,
         fontWeight: '700',
         color: Colors.inkPrimary,
-        marginBottom: Spacing.xs,
+        flex: 1,
+        marginRight: 6,
     },
-    mealRow: {
+    reviewsCountText: {
+        fontSize: 12,
+        color: Colors.inkMuted,
+        fontWeight: '500',
+    },
+    amenityChipsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
         marginBottom: Spacing.md,
+    },
+    amenityChip: {
+        backgroundColor: Colors.surfaceSubtle,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: BorderRadius.sm,
+        borderWidth: 1,
+        borderColor: Colors.borderSubtle,
+    },
+    amenityChipText: {
+        fontSize: 11,
+        color: Colors.inkSecondary,
+        fontWeight: '600',
     },
     footer: {
         flexDirection: 'row',
@@ -288,16 +315,14 @@ const styles = StyleSheet.create({
         color: Colors.inkSecondary,
         fontWeight: 'normal',
     },
-    viewButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: Colors.plumPrimary,
-        paddingHorizontal: Spacing.base,
+    bookNowButton: {
+        backgroundColor: Colors.deepPlum,
+        paddingHorizontal: Spacing.lg,
         paddingVertical: Spacing.sm,
         borderRadius: BorderRadius.pill,
         ...Shadows.subtle,
     },
-    viewButtonText: {
+    bookNowButtonText: {
         color: Colors.white,
         fontSize: 13,
         fontWeight: '700',

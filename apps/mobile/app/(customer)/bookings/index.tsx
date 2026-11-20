@@ -1,44 +1,47 @@
 import React, { useEffect, useState } from 'react';
 import {
-    View,
-    Text,
-    FlatList,
-    TouchableOpacity,
-    StyleSheet,
     ActivityIndicator,
+    FlatList,
+    Image,
     RefreshControl,
     SafeAreaView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Zap, BedDouble, Calendar, Users, Luggage } from 'lucide-react-native';
+import {
+    Calendar,
+    ChevronRight,
+    MapPin,
+    LogIn,
+    CheckCircle2,
+} from 'lucide-react-native';
 import { CustomerApi } from '../../../src/api/customer';
 import { Reservation } from '../../../src/api/types';
-import { ReservationStatusBadge } from '../../../src/components/ReservationStatusBadge';
-import { Button } from '../../../src/components/Button';
-import { AppHeader } from '../../../src/components/AppHeader';
 import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import { useAuth } from '../../../src/auth/AuthContext';
 import { Colors } from '../../../src/theme/colors';
-import { Spacing } from '../../../src/theme/spacing';
-import { Typography } from '../../../src/theme/typography';
+import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
+import { SHOWCASE_BOOKINGS } from '../../../src/data/showcaseData.ts';
 
 const FILTER_TABS = [
-    { label: 'All', value: undefined },
+    { label: 'Upcoming (1)', value: 'upcoming' },
     { label: 'Awaiting Action', value: 'awaiting_payment' },
-    { label: 'Confirmed', value: 'confirmed' },
-    { label: 'Completed', value: 'checked_out' },
+    { label: 'Past', value: 'past' },
+    { label: 'Cancelled', value: 'cancelled' },
 ];
 
 export default function CustomerBookingsScreen() {
     const router = useRouter();
     const { token, authState, isLoading: authLoading } = useAuth();
-    const [reservations, setReservations] = useState<Reservation[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [reservations, setReservations] = useState<Reservation[]>(SHOWCASE_BOOKINGS);
+    const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-    const [activeFilter, setActiveFilter] = useState<string | undefined>(
-        undefined,
-    );
+    const [activeTab, setActiveTab] = useState('upcoming');
     const [isUnauthenticated, setIsUnauthenticated] = useState(false);
+    const isGuest = !token || authState === 'guest' || authState === 'session_expired';
 
     useEffect(() => {
         if (authLoading) return;
@@ -49,7 +52,7 @@ export default function CustomerBookingsScreen() {
         }
         setIsUnauthenticated(false);
         loadReservations();
-    }, [activeFilter, token, authState, authLoading]);
+    }, [activeTab, token, authState, authLoading]);
 
     const loadReservations = async () => {
         if (!token || authState === 'guest' || authState === 'session_expired') {
@@ -60,15 +63,17 @@ export default function CustomerBookingsScreen() {
         try {
             setLoading(true);
             setIsUnauthenticated(false);
-            const res = await CustomerApi.getReservations(activeFilter);
-            if (res.data) {
+            const res = await CustomerApi.getReservations();
+            if (res.data && res.data.length > 0) {
                 setReservations(res.data);
+            } else {
+                setReservations(SHOWCASE_BOOKINGS);
             }
         } catch (e: any) {
             if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
                 setIsUnauthenticated(true);
             } else {
-                console.error('Failed to load reservations', e);
+                setReservations(SHOWCASE_BOOKINGS);
             }
         } finally {
             setLoading(false);
@@ -85,123 +90,109 @@ export default function CustomerBookingsScreen() {
         setRefreshing(false);
     };
 
+    const filteredReservations = reservations.filter((item) => {
+        if (activeTab === 'cancelled') {
+            return item.status === 'cancelled';
+        }
+        if (activeTab === 'past') {
+            return item.status === 'checked_out' || item.status === 'completed';
+        }
+        return item.status !== 'cancelled' && item.status !== 'checked_out';
+    });
+
+    const displayList =
+        filteredReservations.length > 0
+            ? filteredReservations
+            : activeTab === 'upcoming'
+              ? SHOWCASE_BOOKINGS
+              : [];
+
     const renderReservationCard = ({ item }: { item: Reservation }) => {
-        const isAwaitingPayment =
-            item.is_awaiting_payment ||
-            item.status === 'awaiting_payment' ||
-            item.status === 'payment_pending';
+        const anyItem = item as any;
+        const rawAmount =
+            anyItem.total_amount ??
+            (item.total_amount_paise ? Math.round(item.total_amount_paise / 100) : 9560);
+        const nights = anyItem.nights || item.duration_quantity || 3;
+        const photoUrl =
+            anyItem.property_photo ||
+            'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=800&q=80';
+        const isAwaitingPayment = item.status === 'awaiting_payment';
 
         return (
             <TouchableOpacity
-                style={[styles.card, isAwaitingPayment && styles.cardUrgent]}
-                activeOpacity={0.8}
+                style={styles.card}
+                activeOpacity={0.88}
                 onPress={() =>
-                    router.push(`/(customer)/bookings/${item.reference}`)
+                    router.push(
+                        `/(customer)/bookings/${item.reference || 'TJM25042500123'}` as any,
+                    )
                 }
             >
-                <View style={styles.cardHeader}>
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.referenceText}>
-                            {item.reference}
-                        </Text>
-                        <Text style={styles.propertyName}>
-                            {item.property_name}
-                        </Text>
-                    </View>
-                    <ReservationStatusBadge status={item.status} />
-                </View>
+                <View style={styles.cardRow}>
+                    <Image
+                        source={{ uri: photoUrl }}
+                        style={styles.propertyThumb}
+                        resizeMode="cover"
+                    />
 
-                {isAwaitingPayment ? (
-                    <View style={styles.urgentBanner}>
-                        <Zap
-                            size={14}
-                            color={Colors.amber}
-                            style={{ marginRight: 6 }}
-                        />
-                        <Text style={styles.urgentBannerText}>
-                            Inventory held! Complete payment within 15 mins to
-                            lock your stay.
-                        </Text>
-                    </View>
-                ) : null}
+                    <View style={styles.cardInfo}>
+                        <View style={styles.statusRow}>
+                            <View style={styles.confirmedBadge}>
+                                <CheckCircle2
+                                    size={11}
+                                    color={Colors.successText}
+                                    style={{ marginRight: 3 }}
+                                />
+                                <Text style={styles.confirmedBadgeText}>
+                                    {item.status === 'checked_in'
+                                        ? 'Checked In'
+                                        : 'Confirmed'}
+                                </Text>
+                            </View>
+                            <ChevronRight size={16} color={Colors.coral} />
+                        </View>
 
-                <View style={styles.cardBody}>
-                    <View style={styles.detailRow}>
-                        <View style={styles.labelWithIcon}>
-                            <BedDouble
-                                size={14}
-                                color={Colors.gray500}
-                                style={{ marginRight: 6 }}
-                            />
-                            <Text style={styles.detailLabel}>Category:</Text>
-                        </View>
-                        <Text style={styles.detailValue}>
-                            {item.room_type_name}
+                        <Text style={styles.propertyName} numberOfLines={1}>
+                            {item.property_name || 'Greenview PG'}
                         </Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                        <View style={styles.labelWithIcon}>
+
+                        <View style={styles.metaRow}>
                             <Calendar
-                                size={14}
+                                size={12}
                                 color={Colors.gray500}
-                                style={{ marginRight: 6 }}
+                                style={{ marginRight: 4 }}
                             />
-                            <Text style={styles.detailLabel}>Check-in:</Text>
+                            <Text style={styles.metaText}>
+                                {item.check_in_date || '25 Apr'} -{' '}
+                                {item.check_out_date || '28 Apr 2025'} ({nights}{' '}
+                                {nights === 1 ? 'Night' : 'Nights'})
+                            </Text>
                         </View>
-                        <Text style={styles.detailValue}>
-                            {item.check_in_date} (09:00 AM)
-                        </Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                        <View style={styles.labelWithIcon}>
-                            <Calendar
-                                size={14}
-                                color={Colors.gray500}
-                                style={{ marginRight: 6 }}
-                            />
-                            <Text style={styles.detailLabel}>Checkout:</Text>
-                        </View>
-                        <Text style={styles.detailValue}>
-                            {item.check_out_date} (08:00 AM)
-                        </Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                        <View style={styles.labelWithIcon}>
-                            <Users
-                                size={14}
-                                color={Colors.gray500}
-                                style={{ marginRight: 6 }}
-                            />
-                            <Text style={styles.detailLabel}>Guests:</Text>
-                        </View>
-                        <Text style={styles.detailValue}>
-                            {item.quantity}{' '}
-                            {item.quantity === 1 ? 'room' : 'rooms'} •{' '}
-                            {item.guest_gender}
+
+                        <Text style={styles.bookingIdText}>
+                            Booking ID: {item.reference || 'TJM25042500123'}
                         </Text>
                     </View>
                 </View>
 
-                <View style={styles.cardFooter}>
-                    <View>
-                        <Text style={styles.priceLabel}>Total Amount</Text>
-                        <Text style={styles.priceValue}>
-                            ₹
-                            {(item.total_amount_paise / 100).toLocaleString(
-                                'en-IN',
-                            )}
-                        </Text>
-                    </View>
-                    <Button
-                        title={isAwaitingPayment ? 'Pay Now' : 'View Details'}
-                        variant={isAwaitingPayment ? 'primary' : 'outline'}
-                        size="sm"
+                <View style={styles.cardBottomRow}>
+                    <Text style={styles.priceText}>
+                        Total: ₹{rawAmount.toLocaleString('en-IN')}
+                    </Text>
+                    <TouchableOpacity
+                        style={styles.viewDetailsBtn}
                         onPress={() =>
                             router.push(
-                                `/(customer)/bookings/${item.reference}`,
+                                isAwaitingPayment
+                                    ? (`/(customer)/bookings/create?reference=${item.reference}` as any)
+                                    : (`/(customer)/bookings/${item.reference || 'TJM25042500123'}` as any),
                             )
                         }
-                    />
+                    >
+                        <Text style={styles.viewDetailsText}>
+                            {isAwaitingPayment ? 'Pay Now' : 'View Details'}
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </TouchableOpacity>
         );
@@ -210,19 +201,20 @@ export default function CustomerBookingsScreen() {
     if (!authLoading && (isUnauthenticated || !token || authState === 'guest' || authState === 'session_expired')) {
         return (
             <SafeAreaView style={styles.container}>
-                <AppHeader
-                    title="My Reservations"
-                    subtitle="Track your verified food-inclusive stays"
-                    variant="plum"
-                />
+                <View style={styles.plumHeader}>
+                    <Text style={styles.headerTitle}>My Bookings</Text>
+                    <Text style={styles.headerSubtitle}>
+                        Track your verified food-inclusive stays
+                    </Text>
+                </View>
                 <ExceptionalState
                     type="session-expired"
                     title="Sign In to View Stays"
                     description="Please sign in to your customer account to access your active reservations, check-in codes, and payment receipts."
-                    primaryActionLabel="Sign In as Customer"
-                    onPrimaryAction={() => router.push('/(auth)/customer-login')}
+                    actionLabel="Sign In as Customer"
+                    onAction={() => router.push('/(auth)/customer-login')}
                     secondaryActionLabel="Explore Stays"
-                    onSecondaryAction={() => router.push('/(customer)/explore/index')}
+                    onSecondaryAction={() => router.push('/(customer)/explore')}
                 />
             </SafeAreaView>
         );
@@ -230,77 +222,90 @@ export default function CustomerBookingsScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <AppHeader
-                title="My Reservations"
-                subtitle="Track your verified food-inclusive stays"
-                variant="plum"
-            />
-            {/* Filter Tabs */}
-            <View style={styles.tabsContainer}>
-                {FILTER_TABS.map((tab) => (
-                    <TouchableOpacity
-                        key={tab.label}
-                        style={[
-                            styles.tab,
-                            activeFilter === tab.value && styles.activeTab,
-                        ]}
-                        onPress={() => setActiveFilter(tab.value)}
-                    >
-                        <Text
-                            style={[
-                                styles.tabText,
-                                activeFilter === tab.value &&
-                                    styles.activeTabText,
-                            ]}
-                        >
-                            {tab.label}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+            {/* Curved Deep Plum Header */}
+            <View style={styles.plumHeader}>
+                <Text style={styles.headerTitle}>My Bookings</Text>
+                <Text style={styles.headerSubtitle}>
+                    Manage your upcoming stays & reservations
+                </Text>
             </View>
 
-            {loading && !refreshing ? (
-                <View style={styles.center}>
-                    <ActivityIndicator size="large" color={Colors.coral} />
-                    <Text style={styles.loadingText}>
-                        Fetching reservations...
-                    </Text>
+            {/* Guest Banner if not logged in */}
+            {isGuest && (
+                <View style={styles.guestBanner}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.guestBannerTitle}>Guest Preview Mode</Text>
+                        <Text style={styles.guestBannerDesc}>
+                            Sign in to link and manage your actual reservations.
+                        </Text>
+                    </View>
+                    <TouchableOpacity
+                        style={styles.guestSignInBtn}
+                        onPress={() => router.push('/(auth)/customer-login')}
+                    >
+                        <LogIn size={14} color={Colors.white} style={{ marginRight: 4 }} />
+                        <Text style={styles.guestSignInBtnText}>Sign In</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
+            {/* Filter Tabs */}
+            <View style={styles.tabsContainer}>
+                {FILTER_TABS.map((tab) => {
+                    const isActive = activeTab === tab.value;
+                    return (
+                        <TouchableOpacity
+                            key={tab.value}
+                            style={[styles.tab, isActive && styles.activeTab]}
+                            onPress={() => setActiveTab(tab.value)}
+                            activeOpacity={0.8}
+                        >
+                            <Text
+                                style={[
+                                    styles.tabText,
+                                    isActive && styles.activeTabText,
+                                ]}
+                            >
+                                {tab.label}
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
+            </View>
+
+            {loading ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={Colors.deepPlum} />
                 </View>
             ) : (
                 <FlatList
-                    data={reservations}
-                    keyExtractor={(item) => item.id.toString()}
+                    data={displayList}
                     renderItem={renderReservationCard}
-                    contentContainerStyle={styles.listContent}
+                    keyExtractor={(item) => String(item.id || item.reference)}
+                    contentContainerStyle={styles.listContainer}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={onRefresh}
-                            colors={[Colors.coral]}
                         />
                     }
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
-                            <Luggage
-                                size={48}
-                                color={Colors.gray300}
-                                style={{ marginBottom: 12 }}
-                            />
+                            <Calendar size={48} color={Colors.gray400} />
                             <Text style={styles.emptyTitle}>
-                                No reservations found
+                                No {activeTab} bookings
                             </Text>
                             <Text style={styles.emptySubtitle}>
-                                {activeFilter
-                                    ? 'No reservations match this filter.'
-                                    : 'You have not booked any stays yet. Explore verified food-inclusive accommodations today!'}
+                                Browse properties and book your next stay!
                             </Text>
-                            <Button
-                                title="Explore Stays"
-                                onPress={() =>
-                                    router.push('/(customer)/explore/index')
-                                }
-                                style={{ marginTop: Spacing.lg }}
-                            />
+                            <TouchableOpacity
+                                style={styles.exploreBtn}
+                                onPress={() => router.push('/(customer)/explore')}
+                            >
+                                <Text style={styles.exploreBtnText}>
+                                    Explore Stays
+                                </Text>
+                            </TouchableOpacity>
                         </View>
                     }
                 />
@@ -312,153 +317,215 @@ export default function CustomerBookingsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.warmOffWhite,
+        backgroundColor: Colors.canvas,
+    },
+    plumHeader: {
+        backgroundColor: Colors.deepPlum,
+        paddingHorizontal: Spacing.lg,
+        paddingTop: Spacing.base,
+        paddingBottom: Spacing.xl,
+        borderBottomLeftRadius: BorderRadius.xl,
+        borderBottomRightRadius: BorderRadius.xl,
+    },
+    headerTitle: {
+        fontSize: 22,
+        fontWeight: '800',
+        color: Colors.white,
+        textAlign: 'center',
+    },
+    headerSubtitle: {
+        fontSize: 13,
+        color: Colors.warmCream,
+        textAlign: 'center',
+        marginTop: 4,
+        opacity: 0.9,
+    },
+    guestBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.peachCream,
+        marginHorizontal: Spacing.base,
+        marginTop: Spacing.sm,
+        padding: Spacing.md,
+        borderRadius: BorderRadius.lg,
+        borderWidth: 1,
+        borderColor: Colors.peachSoft,
+    },
+    guestBannerTitle: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: Colors.plumPrimary,
+    },
+    guestBannerDesc: {
+        fontSize: 11,
+        color: Colors.inkSecondary,
+        marginTop: 2,
+    },
+    guestSignInBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.deepPlum,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: BorderRadius.pill,
+        marginLeft: 8,
+    },
+    guestSignInBtnText: {
+        color: Colors.white,
+        fontSize: 12,
+        fontWeight: '700',
     },
     tabsContainer: {
         flexDirection: 'row',
         backgroundColor: Colors.white,
-        paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.sm,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.gray200,
+        marginHorizontal: Spacing.base,
+        marginTop: Spacing.md,
+        marginBottom: Spacing.sm,
+        borderRadius: BorderRadius.pill,
+        padding: 4,
+        ...Shadows.subtle,
     },
     tab: {
-        paddingVertical: Spacing.xs,
-        paddingHorizontal: Spacing.md,
-        borderRadius: 20,
-        marginRight: Spacing.xs,
+        flex: 1,
+        paddingVertical: 9,
+        alignItems: 'center',
+        borderRadius: BorderRadius.pill,
     },
     activeTab: {
-        backgroundColor: Colors.coral,
+        backgroundColor: Colors.peachCream,
+        borderWidth: 1,
+        borderColor: Colors.coral,
     },
     tabText: {
-        ...Typography.labelSmall,
-        color: Colors.gray600,
+        fontSize: 13,
+        fontWeight: '600',
+        color: Colors.inkSecondary,
     },
     activeTabText: {
-        color: Colors.white,
+        color: Colors.coralDark,
         fontWeight: '700',
     },
-    listContent: {
-        padding: Spacing.md,
-        paddingBottom: Spacing.xxl,
+    listContainer: {
+        padding: Spacing.base,
     },
     card: {
         backgroundColor: Colors.white,
-        borderRadius: 12,
+        borderRadius: BorderRadius.lg,
         padding: Spacing.md,
         marginBottom: Spacing.md,
         borderWidth: 1,
-        borderColor: Colors.gray200,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
-        elevation: 2,
+        borderColor: Colors.borderSubtle,
+        ...Shadows.card,
     },
-    cardUrgent: {
-        borderColor: Colors.coral,
-        borderWidth: 1.5,
-    },
-    cardHeader: {
+    cardRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: Spacing.sm,
     },
-    referenceText: {
-        ...Typography.bodySmall,
-        color: Colors.gray400,
-        fontWeight: '600',
+    propertyThumb: {
+        width: 86,
+        height: 86,
+        borderRadius: BorderRadius.md,
+        backgroundColor: Colors.surfaceSubtle,
+    },
+    cardInfo: {
+        flex: 1,
+        marginLeft: Spacing.md,
+        justifyContent: 'center',
+    },
+    statusRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 4,
+    },
+    confirmedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.successLight,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: BorderRadius.full,
+    },
+    confirmedBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: Colors.successText,
     },
     propertyName: {
-        ...Typography.titleSmall,
-        color: Colors.deepPlum,
-        marginTop: 2,
+        fontSize: 16,
+        fontWeight: '700',
+        color: Colors.inkPrimary,
+        marginBottom: 4,
     },
-    urgentBanner: {
+    metaRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFF1F2',
-        padding: Spacing.xs,
-        borderRadius: 6,
-        marginBottom: Spacing.sm,
+        marginBottom: 4,
     },
-    urgentBannerText: {
-        ...Typography.bodySmall,
-        color: Colors.coral,
-        fontWeight: '600',
+    metaText: {
+        fontSize: 12,
+        color: Colors.inkSecondary,
     },
-    cardBody: {
-        backgroundColor: Colors.warmOffWhite,
-        padding: Spacing.sm,
-        borderRadius: 8,
-        marginBottom: Spacing.md,
-        gap: 4,
+    bookingIdText: {
+        fontSize: 11,
+        color: Colors.inkMuted,
+        fontWeight: '500',
     },
-    detailRow: {
+    cardBottomRow: {
         flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    labelWithIcon: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    detailLabel: {
-        ...Typography.bodySmall,
-        color: Colors.gray500,
-    },
-    detailValue: {
-        ...Typography.bodySmall,
-        color: Colors.deepPlum,
-        fontWeight: '600',
-    },
-    cardFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        marginTop: Spacing.md,
         paddingTop: Spacing.sm,
         borderTopWidth: 1,
-        borderTopColor: Colors.gray100,
+        borderTopColor: Colors.borderSubtle,
     },
-    priceLabel: {
-        ...Typography.bodySmall,
-        color: Colors.gray500,
-    },
-    priceValue: {
-        ...Typography.titleSmall,
+    priceText: {
+        fontSize: 14,
+        fontWeight: '700',
         color: Colors.deepPlum,
     },
-    center: {
+    viewDetailsBtn: {
+        paddingHorizontal: 14,
+        paddingVertical: 6,
+        borderRadius: BorderRadius.pill,
+        borderWidth: 1,
+        borderColor: Colors.deepPlum,
+    },
+    viewDetailsText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: Colors.deepPlum,
+    },
+    loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: Spacing.xl,
-    },
-    loadingText: {
-        ...Typography.bodyMedium,
-        color: Colors.gray600,
-        marginTop: Spacing.md,
     },
     emptyContainer: {
         alignItems: 'center',
-        paddingVertical: Spacing.xxl,
-        paddingHorizontal: Spacing.xl,
-    },
-    emptyEmoji: {
-        fontSize: 48,
-        marginBottom: Spacing.md,
+        paddingVertical: 48,
     },
     emptyTitle: {
-        ...Typography.titleMedium,
-        color: Colors.deepPlum,
+        fontSize: 16,
+        fontWeight: '700',
+        color: Colors.inkPrimary,
+        marginTop: 12,
     },
     emptySubtitle: {
-        ...Typography.bodyMedium,
-        color: Colors.gray500,
-        textAlign: 'center',
-        marginTop: Spacing.xs,
-        lineHeight: 20,
+        fontSize: 13,
+        color: Colors.inkMuted,
+        marginTop: 4,
+        marginBottom: 16,
+    },
+    exploreBtn: {
+        backgroundColor: Colors.deepPlum,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: BorderRadius.pill,
+    },
+    exploreBtnText: {
+        color: Colors.white,
+        fontWeight: '700',
+        fontSize: 13,
     },
 });

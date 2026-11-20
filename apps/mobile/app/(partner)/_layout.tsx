@@ -1,12 +1,12 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import {
-    LayoutDashboard,
-    ClipboardList,
+    Home,
     Building2,
+    ClipboardList,
+    User,
     IndianRupee,
     Bell,
-    UserCheck,
 } from 'lucide-react-native';
 import { Colors } from '../../src/theme/colors';
 
@@ -39,10 +39,20 @@ export default function PartnerTabsLayout() {
             <Tabs.Screen
                 name="dashboard"
                 options={{
-                    title: 'Dashboard',
+                    title: 'Home',
                     headerShown: false,
                     tabBarIcon: ({ color }: { color: string }) => (
-                        <LayoutDashboard size={20} color={color} />
+                        <Home size={20} color={color} />
+                    ),
+                }}
+            />
+            <Tabs.Screen
+                name="properties/index"
+                options={{
+                    title: 'Properties',
+                    headerShown: false,
+                    tabBarIcon: ({ color }: { color: string }) => (
+                        <Building2 size={20} color={color} />
                     ),
                 }}
             />
@@ -57,43 +67,27 @@ export default function PartnerTabsLayout() {
                 }}
             />
             <Tabs.Screen
-                name="properties/index"
+                name="account"
                 options={{
-                    title: 'Stays',
+                    title: 'Profile',
                     headerShown: false,
                     tabBarIcon: ({ color }: { color: string }) => (
-                        <Building2 size={20} color={color} />
+                        <User size={20} color={color} />
                     ),
                 }}
             />
             <Tabs.Screen
                 name="settlements/index"
                 options={{
-                    title: 'Finances',
+                    href: null,
                     headerShown: false,
-                    tabBarIcon: ({ color }: { color: string }) => (
-                        <IndianRupee size={20} color={color} />
-                    ),
                 }}
             />
             <Tabs.Screen
                 name="notifications/index"
                 options={{
-                    title: 'Alerts',
+                    href: null,
                     headerShown: false,
-                    tabBarIcon: ({ color }: { color: string }) => (
-                        <Bell size={20} color={color} />
-                    ),
-                }}
-            />
-            <Tabs.Screen
-                name="account"
-                options={{
-                    title: 'Account',
-                    headerShown: false,
-                    tabBarIcon: ({ color }: { color: string }) => (
-                        <UserCheck size={20} color={color} />
-                    ),
                 }}
             />
             <Tabs.Screen

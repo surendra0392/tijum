@@ -1,507 +1,431 @@
 import React, { useEffect, useState } from 'react';
 import {
-    View,
-    Text,
-    ScrollView,
-    StyleSheet,
     ActivityIndicator,
     Alert,
-    TouchableOpacity,
-    SafeAreaView,
     Linking,
+    Modal,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { CustomerApi } from '../../../src/api/customer';
-import { PublicApi } from '../../../src/api/public';
-import { useAuth } from '../../../src/auth/AuthContext';
-import { Colors } from '../../../src/theme/colors';
-import { BorderRadius, Spacing } from '../../../src/theme/spacing';
-import { Typography } from '../../../src/theme/typography';
-import { Input } from '../../../src/components/Input';
-import { Button } from '../../../src/components/Button';
-import { Badge } from '../../../src/components/Badge';
 import {
     ShieldCheck,
-    UtensilsCrossed,
-    BedDouble,
-    RefreshCw,
-    AlertTriangle,
     MessageSquare,
     Phone,
     Mail,
     Clock,
-    Send,
     ChevronRight,
+    HelpCircle,
+    X,
+    Send,
+    CheckCircle2,
+    AlertTriangle,
 } from 'lucide-react-native';
-
-const CATEGORIES = [
-    {
-        label: 'Food Not Provided / Quality',
-        value: 'food_inclusions',
-        Icon: UtensilsCrossed,
-    },
-    {
-        label: 'Room / Amenity Discrepancy',
-        value: 'room_condition',
-        Icon: BedDouble,
-    },
-    {
-        label: 'Request Emergency Relocation',
-        value: 'relocation',
-        Icon: RefreshCw,
-    },
-    { label: 'Safety / Host Dispute', value: 'safety', Icon: AlertTriangle },
-    { label: 'General Grievance', value: 'other', Icon: MessageSquare },
-];
-
-const INQUIRY_SUBJECTS = [
-    { label: 'Booking Assistance', value: 'booking' },
-    { label: 'Host Partnership', value: 'partner' },
-    { label: 'General Inquiry', value: 'general' },
-];
+import { CustomerApi } from '../../../src/api/customer';
+import { PublicApi } from '../../../src/api/public';
+import { useAuth } from '../../../src/auth/AuthContext';
+import { Colors } from '../../../src/theme/colors';
+import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
+import { SHOWCASE_CASES } from '../../../src/data/showcaseData.ts';
 
 export default function CustomerSupportScreen() {
     const router = useRouter();
     const { booking_reference } = useLocalSearchParams<{
         booking_reference?: string;
     }>();
-    const { user } = useAuth();
+    const { user, token, authState } = useAuth();
 
-    const [activeTab, setActiveTab] = useState<'grievance' | 'inquiry'>(
-        booking_reference ? 'grievance' : 'inquiry',
-    );
+    const [cases, setCases] = useState<any[]>(SHOWCASE_CASES);
+    const [loading, setLoading] = useState(false);
+    const [modalVisible, setModalVisible] = useState(false);
+    const [slaModalVisible, setSlaModalVisible] = useState(false);
 
-    // Grievance State
-    const [cases, setCases] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
+    // New Request Form State
     const [bookingRef, setBookingRef] = useState(booking_reference || '');
-    const [selectedCategory, setSelectedCategory] = useState('food_inclusions');
+    const [category, setCategory] = useState('food_inclusions');
     const [description, setDescription] = useState('');
+    const [submitting, setSubmitting] = useState(false);
 
-    // Contact Inquiry State
-    const [contactName, setContactName] = useState(user?.name || '');
-    const [contactEmail, setContactEmail] = useState(user?.email || '');
-    const [contactMobile, setContactMobile] = useState(user?.phone || '');
-    const [contactSubject, setContactSubject] = useState<'booking' | 'partner' | 'general'>('booking');
-    const [contactMessage, setContactMessage] = useState('');
-    const [inquirySubmitting, setInquirySubmitting] = useState(false);
+    const isGuest = !token || authState === 'guest' || authState === 'session_expired';
 
     useEffect(() => {
-        loadCases();
-    }, []);
-
-    useEffect(() => {
-        if (user) {
-            if (!contactName && user.name) setContactName(user.name);
-            if (!contactEmail && user.email) setContactEmail(user.email);
-            if (!contactMobile && user.phone) setContactMobile(user.phone);
+        if (!isGuest) {
+            loadCases();
         }
-    }, [user]);
+    }, [isGuest]);
 
     const loadCases = async () => {
         try {
             setLoading(true);
             const res = await CustomerApi.getCases();
-            if (res.data) {
+            if (res.data && res.data.length > 0) {
                 setCases(res.data);
+            } else {
+                setCases(SHOWCASE_CASES);
             }
-        } catch (e) {
-            console.error('Failed to load support cases', e);
+        } catch {
+            setCases(SHOWCASE_CASES);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleGrievanceSubmit = async () => {
+    const handleCreateCase = async () => {
         if (!bookingRef.trim()) {
             Alert.alert('Required', 'Please enter your booking reference.');
             return;
         }
         if (!description.trim()) {
-            Alert.alert(
-                'Required',
-                'Please describe the problem you encountered.',
-            );
+            Alert.alert('Required', 'Please enter a description of the issue.');
             return;
         }
 
         try {
             setSubmitting(true);
-            const res = await CustomerApi.createCase({
+            await CustomerApi.createCase({
                 booking_reference: bookingRef.trim(),
-                category: selectedCategory,
+                category,
                 description: description.trim(),
             });
 
-            if (res.data) {
-                Alert.alert(
-                    'Grievance Lodged',
-                    'Our Customer Protection desk will acknowledge your grievance within 48 hours and resolve it within 30 days pursuant to the TIJUM Grievance Redressal Policy.',
-                );
-                setDescription('');
-                loadCases();
-            }
-        } catch (e: any) {
             Alert.alert(
-                'Submission Error',
-                e.message || 'Failed to submit grievance.',
+                'Request Submitted',
+                'Your support case has been submitted. First-action SLA will trigger automatically.',
             );
+            setModalVisible(false);
+            setDescription('');
+            loadCases();
+        } catch (e: any) {
+            Alert.alert('Error', e.message || 'Failed to submit request.');
         } finally {
             setSubmitting(false);
         }
     };
 
-    const handleInquirySubmit = async () => {
-        if (!contactName.trim()) {
-            Alert.alert('Required', 'Please provide your name.');
-            return;
-        }
-        if (!contactEmail.trim() || !contactEmail.includes('@')) {
-            Alert.alert('Required', 'Please provide a valid email address.');
-            return;
-        }
-        if (!contactMobile.trim()) {
-            Alert.alert('Required', 'Please provide your mobile phone number.');
-            return;
-        }
-        if (!contactMessage.trim()) {
-            Alert.alert('Required', 'Please enter your message or question.');
-            return;
-        }
-
-        try {
-            setInquirySubmitting(true);
-            await PublicApi.submitContact({
-                name: contactName.trim(),
-                email: contactEmail.trim(),
-                mobile: contactMobile.trim(),
-                subject: contactSubject,
-                message: contactMessage.trim(),
-            });
-
-            Alert.alert(
-                'Inquiry Received',
-                'Thank you for reaching out to TIJUM! Our support desk has received your message and will respond within 4 hours during operational hours.',
-            );
-            setContactMessage('');
-        } catch (e: any) {
-            Alert.alert(
-                'Inquiry Failed',
-                e.message || 'Could not send message. Please contact via phone or email.',
-            );
-        } finally {
-            setInquirySubmitting(false);
-        }
-    };
-
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                {/* Official Channels & Direct Helpline Header */}
-                <View style={styles.touchpointsCard}>
-                    <View style={styles.touchpointsHeader}>
-                        <Clock size={16} color={Colors.deepPlum} style={{ marginRight: 6 }} />
-                        <Text style={styles.touchpointsTitle}>Official Helpline & Touchpoints</Text>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+            >
+                {/* Curved Plum Header */}
+                <View style={styles.plumHeader}>
+                    <Text style={styles.headerTitle}>Support & Protection</Text>
+                    <Text style={styles.headerSubtitle}>
+                        Your safety, comfort, and satisfaction guaranteed
+                    </Text>
+                </View>
+
+                {/* Hero Illustration Card */}
+                <View style={styles.heroCard}>
+                    <View style={styles.shieldWrapper}>
+                        <View style={styles.shieldBackgroundCircle}>
+                            <ShieldCheck size={48} color={Colors.success} />
+                        </View>
                     </View>
-                    <Text style={styles.touchpointsSubtitle}>
+
+                    <Text style={styles.heroTitle}>We're here to help!</Text>
+                    <Text style={styles.heroSubtitle}>
+                        Raise a support request or track your existing case.
+                    </Text>
+
+                    <View style={styles.heroActionButtons}>
+                        <TouchableOpacity
+                            style={styles.primaryPlumButton}
+                            onPress={() => setModalVisible(true)}
+                            activeOpacity={0.85}
+                        >
+                            <Text style={styles.primaryPlumButtonText}>
+                                Raise a Request
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.secondaryOutlineButton}
+                            onPress={() => {
+                                if (cases.length > 0) {
+                                    router.push(`/(customer)/support/${cases[0].reference}` as any);
+                                } else {
+                                    Alert.alert('No Cases', 'You do not have any open cases yet.');
+                                }
+                            }}
+                            activeOpacity={0.85}
+                        >
+                            <Text style={styles.secondaryOutlineButtonText}>
+                                My Cases
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Your Cases Section */}
+                <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionHeading}>Your Cases</Text>
+                    <TouchableOpacity
+                        onPress={() => {
+                            if (cases.length > 0) {
+                                router.push(`/(customer)/support/${cases[0].reference}` as any);
+                            }
+                        }}
+                    >
+                        <Text style={styles.seeAllText}>See All &gt;</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {cases.map((c) => (
+                    <TouchableOpacity
+                        key={c.id || c.reference}
+                        style={styles.caseCard}
+                        onPress={() =>
+                            router.push(
+                                `/(customer)/support/${c.reference || 'CP-20250428-001'}` as any,
+                            )
+                        }
+                        activeOpacity={0.88}
+                    >
+                        <View style={styles.caseCardHeader}>
+                            <Text style={styles.caseRefText}>
+                                {c.reference || '#CP-20250428-001'}
+                            </Text>
+                            <View style={styles.inProgressBadge}>
+                                <Text style={styles.inProgressBadgeText}>
+                                    {c.status_label || 'In Progress'}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <Text style={styles.caseCategoryText}>
+                            {c.category === 'food_inclusions'
+                                ? 'Food Inclusions / Meal Quality'
+                                : c.category || 'Booking Issue'}
+                        </Text>
+                        <Text style={styles.caseDateText}>
+                            {c.created_at || '28 Apr 2025 • 2:30 PM'}
+                        </Text>
+
+                        <View style={styles.caseDivider} />
+
+                        <View style={styles.caseFooter}>
+                            <Text style={styles.viewDetailsText}>
+                                View Details &gt;
+                            </Text>
+                        </View>
+                    </TouchableOpacity>
+                ))}
+
+                {/* Quick Navigation Links */}
+                <View style={styles.menuLinksCard}>
+                    <TouchableOpacity
+                        style={styles.menuLinkItem}
+                        onPress={() => setSlaModalVisible(true)}
+                        activeOpacity={0.7}
+                    >
+                        <View style={styles.menuLinkLeft}>
+                            <Clock size={18} color={Colors.coral} />
+                            <Text style={styles.menuLinkLabel}>
+                                Customer Protection SLAs
+                            </Text>
+                        </View>
+                        <ChevronRight size={16} color={Colors.gray400} />
+                    </TouchableOpacity>
+
+                    <View style={styles.menuLinkDivider} />
+
+                    <TouchableOpacity
+                        style={styles.menuLinkItem}
+                        onPress={() =>
+                            Alert.alert(
+                                'Help & FAQs',
+                                'Browse common questions and troubleshooting guides on tijum.com/faqs.',
+                            )
+                        }
+                        activeOpacity={0.7}
+                    >
+                        <View style={styles.menuLinkLeft}>
+                            <HelpCircle size={18} color={Colors.coral} />
+                            <Text style={styles.menuLinkLabel}>Help & FAQs</Text>
+                        </View>
+                        <ChevronRight size={16} color={Colors.gray400} />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Contact Helpline Touchpoints */}
+                <View style={styles.helplineCard}>
+                    <Text style={styles.helplineTitle}>Official Support Helpline</Text>
+                    <Text style={styles.helplineSubtitle}>
                         Operational Hours: 9:00 AM – 9:00 PM IST (Mon–Sat)
                     </Text>
 
-                    <View style={styles.touchpointButtonsRow}>
+                    <View style={styles.helplineButtonsRow}>
                         <TouchableOpacity
-                            style={[styles.touchpointBtn, styles.callBtn]}
+                            style={[styles.helplineBtn, styles.callBtn]}
                             onPress={() => Linking.openURL('tel:+918142334033')}
                             activeOpacity={0.8}
                         >
-                            <Phone size={16} color="#1E40AF" style={{ marginRight: 6 }} />
-                            <Text style={styles.callBtnText}>Call Helpline (+91 81423 34033)</Text>
+                            <Phone size={15} color="#1E40AF" style={{ marginRight: 6 }} />
+                            <Text style={styles.callBtnText}>Call Helpline</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.touchpointBtn, styles.emailBtn]}
+                            style={[styles.helplineBtn, styles.emailBtn]}
                             onPress={() => Linking.openURL('mailto:support@tijum.com')}
                             activeOpacity={0.8}
                         >
-                            <Mail size={16} color="#9A3412" style={{ marginRight: 6 }} />
-                            <Text style={styles.emailBtnText}>Email Desk (support@tijum.com)</Text>
+                            <Mail size={15} color="#9A3412" style={{ marginRight: 6 }} />
+                            <Text style={styles.emailBtnText}>Email Desk</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
+            </ScrollView>
 
-                {/* Tab Navigation */}
-                <View style={styles.tabContainer}>
-                    <TouchableOpacity
-                        style={[styles.tabButton, activeTab === 'inquiry' && styles.tabButtonActive]}
-                        onPress={() => setActiveTab('inquiry')}
-                        activeOpacity={0.8}
-                    >
-                        <MessageSquare
-                            size={16}
-                            color={activeTab === 'inquiry' ? Colors.coral : Colors.gray500}
-                            style={{ marginRight: 6 }}
-                        />
-                        <Text
-                            style={[
-                                styles.tabText,
-                                activeTab === 'inquiry' && styles.tabTextActive,
-                            ]}
-                        >
-                            Contact Inquiry
-                        </Text>
-                    </TouchableOpacity>
+            {/* Raise Request Modal */}
+            <Modal
+                visible={modalVisible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Raise a Support Request</Text>
+                            <TouchableOpacity onPress={() => setModalVisible(false)}>
+                                <X size={20} color={Colors.gray600} />
+                            </TouchableOpacity>
+                        </View>
 
-                    <TouchableOpacity
-                        style={[styles.tabButton, activeTab === 'grievance' && styles.tabButtonActive]}
-                        onPress={() => setActiveTab('grievance')}
-                        activeOpacity={0.8}
-                    >
-                        <ShieldCheck
-                            size={16}
-                            color={activeTab === 'grievance' ? Colors.coral : Colors.gray500}
-                            style={{ marginRight: 6 }}
-                        />
-                        <Text
-                            style={[
-                                styles.tabText,
-                                activeTab === 'grievance' && styles.tabTextActive,
-                            ]}
-                        >
-                            Booking Grievance
-                        </Text>
-                    </TouchableOpacity>
-                </View>
+                        <ScrollView style={styles.modalBody}>
+                            <Text style={styles.inputLabel}>Booking Reference *</Text>
+                            <TextInput
+                                style={styles.textInput}
+                                placeholder="e.g. TJM25042500123"
+                                value={bookingRef}
+                                onChangeText={setBookingRef}
+                            />
 
-                {activeTab === 'inquiry' ? (
-                    <View style={styles.contentPadding}>
-                        <Text style={styles.sectionTitle}>Send an Inquiry</Text>
-                        <Text style={styles.sectionSubtitle}>
-                            Have questions about booking, property amenities, or partner registrations? Let us know.
-                        </Text>
-
-                        <Input
-                            label="Your Name"
-                            value={contactName}
-                            onChangeText={setContactName}
-                            placeholder="Enter your full name"
-                        />
-
-                        <Input
-                            label="Email Address"
-                            value={contactEmail}
-                            onChangeText={setContactEmail}
-                            placeholder="name@example.com"
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                        />
-
-                        <Input
-                            label="Mobile Number"
-                            value={contactMobile}
-                            onChangeText={setContactMobile}
-                            placeholder="+91 98765 43210"
-                            keyboardType="phone-pad"
-                        />
-
-                        <Text style={styles.fieldLabel}>Topic / Subject</Text>
-                        <View style={styles.subjectRow}>
-                            {INQUIRY_SUBJECTS.map((sub) => {
-                                const isSelected = contactSubject === sub.value;
-                                return (
+                            <Text style={styles.inputLabel}>Category *</Text>
+                            <View style={styles.categoryRadioGroup}>
+                                {[
+                                    { id: 'food_inclusions', label: 'Food & Meals' },
+                                    { id: 'room_condition', label: 'Room Condition' },
+                                    { id: 'safety', label: 'Safety & Grievance' },
+                                ].map((cat) => (
                                     <TouchableOpacity
-                                        key={sub.value}
+                                        key={cat.id}
                                         style={[
-                                            styles.subjectChip,
-                                            isSelected && styles.subjectChipActive,
+                                            styles.categoryRadioBtn,
+                                            category === cat.id && styles.categoryRadioBtnActive,
                                         ]}
-                                        onPress={() => setContactSubject(sub.value as any)}
-                                        activeOpacity={0.8}
+                                        onPress={() => setCategory(cat.id)}
                                     >
                                         <Text
                                             style={[
-                                                styles.subjectChipText,
-                                                isSelected && styles.subjectChipTextActive,
+                                                styles.categoryRadioBtnText,
+                                                category === cat.id &&
+                                                    styles.categoryRadioBtnTextActive,
                                             ]}
                                         >
-                                            {sub.label}
+                                            {cat.label}
                                         </Text>
                                     </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-
-                        <Input
-                            label="Your Message"
-                            value={contactMessage}
-                            onChangeText={setContactMessage}
-                            placeholder="Write your question, dates, or assistance details..."
-                            multiline
-                            numberOfLines={4}
-                        />
-
-                        <Button
-                            title="Send Inquiry Message"
-                            loading={inquirySubmitting}
-                            onPress={handleInquirySubmit}
-                            style={{ marginTop: Spacing.sm }}
-                        />
-                    </View>
-                ) : (
-                    <>
-                        {/* Protection Banner */}
-                        <View style={styles.banner}>
-                            <ShieldCheck
-                                size={26}
-                                color="#166534"
-                                style={{ marginRight: Spacing.sm }}
-                            />
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.bannerTitle}>
-                                    TIJUM Customer Protection
-                                </Text>
-                                <Text style={styles.bannerText}>
-                                    Every booking is covered by our Verified Food &
-                                    Accommodation Guarantee. If meals are skipped or
-                                    rooms differ materially, we provide relocation or
-                                    refunds.
-                                </Text>
-                            </View>
-                        </View>
-
-                        <View style={styles.contentPadding}>
-                            {/* New Grievance Form */}
-                            <Text style={styles.sectionTitle}>Lodge a Stay Grievance</Text>
-                            <Input
-                                label="Booking Reference"
-                                value={bookingRef}
-                                onChangeText={setBookingRef}
-                                placeholder="e.g. TIJ-202611-ABCD"
-                            />
-
-                            <Text style={styles.fieldLabel}>Issue Category</Text>
-                            <View style={styles.categoryWrap}>
-                                {CATEGORIES.map((cat) => {
-                                    const isSelected = selectedCategory === cat.value;
-                                    const CategoryIcon = cat.Icon;
-                                    return (
-                                        <TouchableOpacity
-                                            key={cat.value}
-                                            style={[
-                                                styles.categoryChip,
-                                                isSelected && styles.categoryChipActive,
-                                            ]}
-                                            onPress={() =>
-                                                setSelectedCategory(cat.value)
-                                            }
-                                        >
-                                            <CategoryIcon
-                                                size={14}
-                                                color={
-                                                    isSelected
-                                                        ? Colors.coral
-                                                        : Colors.gray600
-                                                }
-                                                style={{ marginRight: 6 }}
-                                            />
-                                            <Text
-                                                style={[
-                                                    styles.categoryText,
-                                                    isSelected &&
-                                                        styles.categoryTextActive,
-                                                ]}
-                                            >
-                                                {cat.label}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
+                                ))}
                             </View>
 
-                            <Input
-                                label="Detailed Description"
-                                value={description}
-                                onChangeText={setDescription}
-                                placeholder="Please explain what happened, including dates and meal times if applicable..."
+                            <Text style={styles.inputLabel}>Description *</Text>
+                            <TextInput
+                                style={[styles.textInput, styles.textArea]}
+                                placeholder="Describe the issue in detail..."
                                 multiline
                                 numberOfLines={4}
+                                value={description}
+                                onChangeText={setDescription}
                             />
 
-                            <Button
-                                title="Submit Protection Ticket"
-                                loading={submitting}
-                                onPress={handleGrievanceSubmit}
-                                style={{ marginTop: Spacing.sm }}
-                            />
+                            <TouchableOpacity
+                                style={styles.submitModalBtn}
+                                onPress={handleCreateCase}
+                                disabled={submitting}
+                            >
+                                {submitting ? (
+                                    <ActivityIndicator size="small" color={Colors.white} />
+                                ) : (
+                                    <Text style={styles.submitModalBtnText}>
+                                        Submit Request
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
 
-                            {/* Past Support Cases */}
-                            <View style={styles.divider} />
-                            <Text style={styles.sectionTitle}>
-                                Your Grievance History
+            {/* SLA Policy Modal */}
+            <Modal
+                visible={slaModalVisible}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setSlaModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Customer Protection SLAs</Text>
+                            <TouchableOpacity onPress={() => setSlaModalVisible(false)}>
+                                <X size={20} color={Colors.gray600} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.modalBody}>
+                            <Text style={styles.slaSectionTitle}>
+                                Internal First-Action Targets:
+                            </Text>
+                            <View style={styles.slaRow}>
+                                <Text style={styles.slaPriorityUrgent}>Urgent:</Text>
+                                <Text style={styles.slaDuration}>2 Hours</Text>
+                            </View>
+                            <View style={styles.slaRow}>
+                                <Text style={styles.slaPriorityHigh}>High:</Text>
+                                <Text style={styles.slaDuration}>4 Hours</Text>
+                            </View>
+                            <View style={styles.slaRow}>
+                                <Text style={styles.slaPriorityMedium}>Medium:</Text>
+                                <Text style={styles.slaDuration}>24 Hours</Text>
+                            </View>
+                            <View style={styles.slaRow}>
+                                <Text style={styles.slaPriorityLow}>Low:</Text>
+                                <Text style={styles.slaDuration}>48 Hours</Text>
+                            </View>
+
+                            <View style={styles.caseDivider} />
+
+                            <Text style={styles.slaSectionTitle}>
+                                Statutory Redressal Timelines:
+                            </Text>
+                            <Text style={styles.slaStatutoryText}>
+                                We acknowledge your grievance within 48 hours and resolve it within 30 days in accordance with statutory consumer protection regulations.
+                            </Text>
+                            <Text style={styles.slaStatutoryText}>
+                                • Acknowledgement within 48 hours
+                            </Text>
+                            <Text style={styles.slaStatutoryText}>
+                                • Resolution within 30 days
                             </Text>
 
-                            {loading ? (
-                                <ActivityIndicator size="small" color={Colors.coral} />
-                            ) : cases.length > 0 ? (
-                                cases.map((c) => (
-                                    <TouchableOpacity
-                                        key={c.id || c.reference}
-                                        style={styles.caseCard}
-                                        onPress={() =>
-                                            router.push({
-                                                pathname: '/(customer)/support/[reference]',
-                                                params: { reference: c.reference },
-                                            })
-                                        }
-                                        activeOpacity={0.8}
-                                    >
-                                        <View style={styles.rowBetween}>
-                                            <Text style={styles.caseRef}>
-                                                {c.reference}
-                                            </Text>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                <Badge
-                                                    label={c.status}
-                                                    variant={
-                                                        c.status === 'resolved'
-                                                            ? 'accent'
-                                                            : 'secondary'
-                                                    }
-                                                />
-                                                <ChevronRight size={16} color={Colors.gray400} />
-                                            </View>
-                                        </View>
-                                        <Text style={styles.caseCategory}>
-                                            Category: {c.category} • Priority: {(c.priority || 'standard').toUpperCase()}
-                                        </Text>
-                                        <Text style={styles.caseDesc} numberOfLines={2}>
-                                            {c.description}
-                                        </Text>
-                                        {c.resolution_notes ? (
-                                            <View style={styles.resolutionBox}>
-                                                <Text style={styles.resolutionTitle}>
-                                                    Support Team Update:
-                                                </Text>
-                                                <Text style={styles.resolutionText} numberOfLines={2}>
-                                                    {c.resolution_notes}
-                                                </Text>
-                                            </View>
-                                        ) : null}
-                                        <View style={styles.viewTimelineRow}>
-                                            <Text style={styles.viewTimelineText}>
-                                                View Case & Messages →
-                                            </Text>
-                                        </View>
-                                    </TouchableOpacity>
-                                ))
-                            ) : (
-                                <Text style={styles.emptyText}>
-                                    No previous grievances filed.
-                                </Text>
-                            )}
+                            <TouchableOpacity
+                                style={[styles.submitModalBtn, { marginTop: Spacing.lg }]}
+                                onPress={() => setSlaModalVisible(false)}
+                            >
+                                <Text style={styles.submitModalBtnText}>Got it</Text>
+                            </TouchableOpacity>
                         </View>
-                    </>
-                )}
-            </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -509,54 +433,234 @@ export default function CustomerSupportScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.canvas,
     },
     scrollContent: {
         paddingBottom: Spacing.xxl,
     },
-    touchpointsCard: {
-        backgroundColor: Colors.warmOffWhite,
-        padding: Spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.gray200,
+    plumHeader: {
+        backgroundColor: Colors.deepPlum,
+        paddingHorizontal: Spacing.lg,
+        paddingTop: Spacing.base,
+        paddingBottom: Spacing.xl,
+        borderBottomLeftRadius: BorderRadius.xl,
+        borderBottomRightRadius: BorderRadius.xl,
     },
-    touchpointsHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 2,
-    },
-    touchpointsTitle: {
-        ...Typography.labelMedium,
-        color: Colors.deepPlum,
+    headerTitle: {
+        fontSize: 22,
         fontWeight: '800',
+        color: Colors.white,
+        textAlign: 'center',
     },
-    touchpointsSubtitle: {
-        ...Typography.bodySmall,
-        fontSize: 11,
-        color: Colors.gray600,
+    headerSubtitle: {
+        fontSize: 13,
+        color: Colors.warmCream,
+        textAlign: 'center',
+        marginTop: 4,
+        opacity: 0.9,
+    },
+    heroCard: {
+        backgroundColor: Colors.white,
+        marginHorizontal: Spacing.base,
+        marginTop: -Spacing.md,
+        borderRadius: BorderRadius.xl,
+        padding: Spacing.lg,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: Colors.borderSubtle,
+        ...Shadows.card,
+    },
+    shieldWrapper: {
+        marginBottom: Spacing.md,
+    },
+    shieldBackgroundCircle: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: Colors.peachCream,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: Colors.peachSoft,
+    },
+    heroTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: Colors.inkPrimary,
+    },
+    heroSubtitle: {
+        fontSize: 13,
+        color: Colors.inkSecondary,
+        textAlign: 'center',
+        marginTop: 4,
+        marginBottom: Spacing.base,
+    },
+    heroActionButtons: {
+        width: '100%',
+        gap: Spacing.sm,
+    },
+    primaryPlumButton: {
+        backgroundColor: Colors.deepPlum,
+        paddingVertical: 13,
+        borderRadius: BorderRadius.pill,
+        alignItems: 'center',
+        width: '100%',
+    },
+    primaryPlumButtonText: {
+        color: Colors.white,
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    secondaryOutlineButton: {
+        backgroundColor: Colors.white,
+        borderWidth: 1.5,
+        borderColor: Colors.deepPlum,
+        paddingVertical: 12,
+        borderRadius: BorderRadius.pill,
+        alignItems: 'center',
+        width: '100%',
+    },
+    secondaryOutlineButtonText: {
+        color: Colors.deepPlum,
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    sectionHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginHorizontal: Spacing.base,
+        marginTop: Spacing.lg,
         marginBottom: Spacing.sm,
     },
-    touchpointButtonsRow: {
-        flexDirection: 'row',
-        gap: Spacing.xs,
-        flexWrap: 'wrap',
+    sectionHeading: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: Colors.inkPrimary,
     },
-    touchpointBtn: {
+    seeAllText: {
+        fontSize: 13,
+        color: Colors.coral,
+        fontWeight: '600',
+    },
+    caseCard: {
+        backgroundColor: Colors.white,
+        marginHorizontal: Spacing.base,
+        marginBottom: Spacing.md,
+        borderRadius: BorderRadius.lg,
+        padding: Spacing.md,
+        borderWidth: 1,
+        borderColor: Colors.borderSubtle,
+        ...Shadows.subtle,
+    },
+    caseCardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    caseRefText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: Colors.deepPlum,
+    },
+    inProgressBadge: {
+        backgroundColor: '#FFF3E0',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: BorderRadius.full,
+    },
+    inProgressBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#E65100',
+    },
+    caseCategoryText: {
+        fontSize: 13,
+        color: Colors.inkPrimary,
+        fontWeight: '600',
+        marginBottom: 2,
+    },
+    caseDateText: {
+        fontSize: 11,
+        color: Colors.inkMuted,
+    },
+    caseDivider: {
+        height: 1,
+        backgroundColor: Colors.borderSubtle,
+        marginVertical: Spacing.sm,
+    },
+    caseFooter: {
+        alignItems: 'flex-end',
+    },
+    viewDetailsText: {
+        fontSize: 12,
+        color: Colors.coral,
+        fontWeight: '700',
+    },
+    menuLinksCard: {
+        backgroundColor: Colors.white,
+        marginHorizontal: Spacing.base,
+        marginTop: Spacing.sm,
+        borderRadius: BorderRadius.lg,
+        borderWidth: 1,
+        borderColor: Colors.borderSubtle,
+        ...Shadows.subtle,
+    },
+    menuLinkItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: Spacing.base,
+        paddingVertical: 14,
+    },
+    menuLinkLeft: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: Spacing.sm,
-        paddingVertical: 7,
-        borderRadius: BorderRadius.full,
+    },
+    menuLinkLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: Colors.inkPrimary,
+        marginLeft: Spacing.md,
+    },
+    menuLinkDivider: {
+        height: 1,
+        backgroundColor: Colors.borderSubtle,
+        marginHorizontal: Spacing.base,
+    },
+    helplineCard: {
+        backgroundColor: Colors.peachCream,
+        marginHorizontal: Spacing.base,
+        marginTop: Spacing.lg,
+        padding: Spacing.base,
+        borderRadius: BorderRadius.lg,
         borderWidth: 1,
+        borderColor: Colors.peachSoft,
     },
-    whatsappBtn: {
-        backgroundColor: '#F0FDF4',
-        borderColor: '#BBF7D0',
-    },
-    whatsappBtnText: {
-        fontSize: 12,
+    helplineTitle: {
+        fontSize: 14,
         fontWeight: '700',
-        color: '#166534',
+        color: Colors.plumPrimary,
+    },
+    helplineSubtitle: {
+        fontSize: 12,
+        color: Colors.inkSecondary,
+        marginTop: 2,
+        marginBottom: Spacing.md,
+    },
+    helplineButtonsRow: {
+        flexDirection: 'row',
+        gap: Spacing.sm,
+    },
+    helplineBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        borderRadius: BorderRadius.pill,
+        borderWidth: 1,
     },
     callBtn: {
         backgroundColor: '#EFF6FF',
@@ -576,190 +680,131 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#9A3412',
     },
-    tabContainer: {
-        flexDirection: 'row',
-        backgroundColor: Colors.warmOffWhite,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.gray200,
-    },
-    tabButton: {
+    modalOverlay: {
         flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: Spacing.md,
-        borderBottomWidth: 2,
-        borderBottomColor: 'transparent',
+        backgroundColor: 'rgba(0, 0, 0, 0.45)',
+        justifyContent: 'flex-end',
     },
-    tabButtonActive: {
-        borderBottomColor: Colors.coral,
+    modalContainer: {
         backgroundColor: Colors.white,
-    },
-    tabText: {
-        ...Typography.labelMedium,
-        color: Colors.gray500,
-        fontWeight: '600',
-    },
-    tabTextActive: {
-        color: Colors.coral,
-        fontWeight: '700',
-    },
-    banner: {
-        backgroundColor: '#F0FDF4',
-        padding: Spacing.md,
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderBottomWidth: 1,
-        borderBottomColor: '#DCFCE7',
-    },
-    bannerTitle: {
-        ...Typography.labelMedium,
-        color: '#166534',
-        fontWeight: '700',
-    },
-    bannerText: {
-        ...Typography.bodySmall,
-        color: '#15803D',
-        marginTop: 2,
-        lineHeight: 18,
-    },
-    contentPadding: {
+        borderTopLeftRadius: BorderRadius.xl,
+        borderTopRightRadius: BorderRadius.xl,
         padding: Spacing.lg,
+        maxHeight: '85%',
     },
-    sectionTitle: {
-        ...Typography.titleSmall,
-        color: Colors.deepPlum,
-        marginBottom: 4,
-    },
-    sectionSubtitle: {
-        ...Typography.bodySmall,
-        color: Colors.gray600,
-        marginBottom: Spacing.md,
-    },
-    fieldLabel: {
-        ...Typography.labelSmall,
-        color: Colors.deepPlum,
-        marginBottom: Spacing.xs,
-        marginTop: Spacing.xs,
-    },
-    subjectRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: Spacing.xs,
-        marginBottom: Spacing.md,
-    },
-    subjectChip: {
-        paddingHorizontal: Spacing.md,
-        paddingVertical: 7,
-        borderRadius: BorderRadius.full,
-        backgroundColor: Colors.warmOffWhite,
-        borderWidth: 1,
-        borderColor: Colors.gray300,
-    },
-    subjectChipActive: {
-        backgroundColor: '#FEF2F2',
-        borderColor: Colors.coral,
-    },
-    subjectChipText: {
-        fontSize: 12,
-        color: Colors.gray700,
-        fontWeight: '600',
-    },
-    subjectChipTextActive: {
-        color: Colors.coral,
-        fontWeight: '700',
-    },
-    categoryWrap: {
-        gap: Spacing.xs,
-        marginBottom: Spacing.md,
-    },
-    categoryChip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: Spacing.sm,
-        paddingHorizontal: Spacing.md,
-        borderRadius: 8,
-        backgroundColor: Colors.warmOffWhite,
-        borderWidth: 1,
-        borderColor: Colors.gray200,
-    },
-    categoryChipActive: {
-        backgroundColor: '#FEF2F2',
-        borderColor: Colors.coral,
-    },
-    categoryText: {
-        ...Typography.bodySmall,
-        color: Colors.gray700,
-    },
-    categoryTextActive: {
-        color: Colors.coral,
-        fontWeight: '700',
-    },
-    divider: {
-        height: 1,
-        backgroundColor: Colors.gray200,
-        marginVertical: Spacing.xl,
-    },
-    caseCard: {
-        backgroundColor: Colors.warmOffWhite,
-        borderRadius: 8,
-        padding: Spacing.md,
-        marginBottom: Spacing.sm,
-        borderWidth: 1,
-        borderColor: Colors.gray200,
-    },
-    rowBetween: {
+    modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 4,
+        marginBottom: Spacing.base,
     },
-    caseRef: {
-        ...Typography.labelSmall,
-        color: Colors.deepPlum,
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: Colors.inkPrimary,
     },
-    caseCategory: {
-        ...Typography.bodySmall,
-        color: Colors.gray600,
-        fontWeight: '600',
+    modalBody: {
+        paddingBottom: Spacing.lg,
     },
-    caseDesc: {
-        ...Typography.bodySmall,
-        color: Colors.gray700,
-        marginTop: 4,
-    },
-    resolutionBox: {
-        marginTop: Spacing.sm,
-        padding: Spacing.sm,
-        backgroundColor: Colors.white,
-        borderRadius: 6,
-        borderLeftWidth: 3,
-        borderLeftColor: '#166534',
-    },
-    resolutionTitle: {
-        ...Typography.labelSmall,
-        color: '#166534',
-    },
-    resolutionText: {
-        ...Typography.bodySmall,
-        color: Colors.gray600,
-        marginTop: 2,
-    },
-    emptyText: {
-        ...Typography.bodyMedium,
-        color: Colors.gray500,
-        fontStyle: 'italic',
-    },
-    viewTimelineRow: {
-        marginTop: Spacing.xs,
-        paddingTop: Spacing.xs,
-        borderTopWidth: 1,
-        borderTopColor: Colors.gray200,
-        alignItems: 'flex-end',
-    },
-    viewTimelineText: {
-        ...Typography.labelSmall,
-        color: Colors.coral,
+    inputLabel: {
+        fontSize: 12,
         fontWeight: '700',
+        color: Colors.inkSecondary,
+        marginBottom: 4,
+        marginTop: Spacing.sm,
+    },
+    textInput: {
+        backgroundColor: Colors.surfaceSubtle,
+        borderWidth: 1,
+        borderColor: Colors.borderSubtle,
+        borderRadius: BorderRadius.md,
+        paddingHorizontal: Spacing.md,
+        paddingVertical: 10,
+        fontSize: 13,
+        color: Colors.inkPrimary,
+    },
+    textArea: {
+        height: 80,
+        textAlignVertical: 'top',
+    },
+    categoryRadioGroup: {
+        flexDirection: 'row',
+        gap: Spacing.xs,
+        marginBottom: Spacing.sm,
+    },
+    categoryRadioBtn: {
+        flex: 1,
+        paddingVertical: 8,
+        borderRadius: BorderRadius.pill,
+        borderWidth: 1,
+        borderColor: Colors.borderSubtle,
+        alignItems: 'center',
+        backgroundColor: Colors.surfaceSubtle,
+    },
+    categoryRadioBtnActive: {
+        backgroundColor: Colors.peachCream,
+        borderColor: Colors.coral,
+    },
+    categoryRadioBtnText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: Colors.inkSecondary,
+    },
+    categoryRadioBtnTextActive: {
+        color: Colors.coralDark,
+        fontWeight: '700',
+    },
+    submitModalBtn: {
+        backgroundColor: Colors.deepPlum,
+        paddingVertical: 12,
+        borderRadius: BorderRadius.pill,
+        alignItems: 'center',
+        marginTop: Spacing.base,
+    },
+    submitModalBtnText: {
+        color: Colors.white,
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    slaSectionTitle: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: Colors.inkPrimary,
+        marginBottom: 6,
+    },
+    slaRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 4,
+    },
+    slaPriorityUrgent: {
+        color: '#DC2626',
+        fontWeight: '700',
+        fontSize: 13,
+    },
+    slaPriorityHigh: {
+        color: '#EA580C',
+        fontWeight: '700',
+        fontSize: 13,
+    },
+    slaPriorityMedium: {
+        color: '#D97706',
+        fontWeight: '600',
+        fontSize: 13,
+    },
+    slaPriorityLow: {
+        color: '#16A34A',
+        fontWeight: '600',
+        fontSize: 13,
+    },
+    slaDuration: {
+        fontWeight: '700',
+        color: Colors.inkPrimary,
+        fontSize: 13,
+    },
+    slaStatutoryText: {
+        fontSize: 12,
+        color: Colors.inkSecondary,
+        marginVertical: 2,
     },
 });

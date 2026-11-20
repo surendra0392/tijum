@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Search, Luggage, Bell, User } from 'lucide-react-native';
+import { Home, Calendar, Headset, User } from 'lucide-react-native';
 import { Colors } from '../../src/theme/colors';
 
 export default function CustomerTabsLayout() {
@@ -32,41 +32,48 @@ export default function CustomerTabsLayout() {
             <Tabs.Screen
                 name="explore/index"
                 options={{
-                    title: 'Explore',
+                    title: 'Home',
                     headerShown: false,
                     tabBarIcon: ({ color }: { color: string }) => (
-                        <Search size={20} color={color} />
+                        <Home size={20} color={color} />
                     ),
                 }}
             />
             <Tabs.Screen
                 name="bookings/index"
                 options={{
-                    title: 'My Stays',
+                    title: 'Bookings',
                     headerShown: false,
                     tabBarIcon: ({ color }: { color: string }) => (
-                        <Luggage size={20} color={color} />
+                        <Calendar size={20} color={color} />
                     ),
                 }}
             />
             <Tabs.Screen
-                name="notifications/index"
+                name="support/index"
                 options={{
-                    title: 'Alerts',
+                    title: 'Support',
                     headerShown: false,
                     tabBarIcon: ({ color }: { color: string }) => (
-                        <Bell size={20} color={color} />
+                        <Headset size={20} color={color} />
                     ),
                 }}
             />
             <Tabs.Screen
                 name="profile/index"
                 options={{
-                    title: 'Account',
+                    title: 'Profile',
                     headerShown: false,
                     tabBarIcon: ({ color }: { color: string }) => (
                         <User size={20} color={color} />
                     ),
+                }}
+            />
+            <Tabs.Screen
+                name="notifications/index"
+                options={{
+                    href: null,
+                    headerShown: false,
                 }}
             />
             <Tabs.Screen
@@ -88,13 +95,6 @@ export default function CustomerTabsLayout() {
                 options={{
                     href: null,
                     headerTitle: 'Confirm Booking',
-                }}
-            />
-            <Tabs.Screen
-                name="support/index"
-                options={{
-                    href: null,
-                    headerTitle: 'Customer Protection & Support',
                 }}
             />
             <Tabs.Screen

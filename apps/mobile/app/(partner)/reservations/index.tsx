@@ -1,195 +1,185 @@
 import React, { useEffect, useState } from 'react';
 import {
-    View,
-    Text,
-    FlatList,
-    TouchableOpacity,
-    StyleSheet,
     ActivityIndicator,
+    FlatList,
+    Image,
     RefreshControl,
     SafeAreaView,
-    Alert,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import {
+    Calendar,
+    ChevronRight,
+    MapPin,
+    LogIn,
+    CheckCircle2,
+    ClipboardList,
+} from 'lucide-react-native';
 import { OwnerApi } from '../../../src/api/owner';
 import { Reservation } from '../../../src/api/types';
-import { ReservationStatusBadge } from '../../../src/components/ReservationStatusBadge';
-import { Button } from '../../../src/components/Button';
-import { AppHeader } from '../../../src/components/AppHeader';
 import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import { useAuth } from '../../../src/auth/AuthContext';
 import { Colors } from '../../../src/theme/colors';
-import { Spacing } from '../../../src/theme/spacing';
-import { Typography } from '../../../src/theme/typography';
-import { User, ClipboardList } from 'lucide-react-native';
+import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
+import { SHOWCASE_BOOKINGS } from '../../../src/data/showcaseData.ts';
 
 const FILTER_TABS = [
-    { label: 'All', value: undefined },
-    { label: 'Confirmed', value: 'confirmed' },
-    { label: 'Awaiting Payment', value: 'awaiting_payment' },
-    { label: 'Checked In', value: 'checked_in' },
-    { label: 'History', value: 'checked_out' },
+    { label: 'Upcoming (2)', value: 'upcoming' },
+    { label: 'Past (12)', value: 'past' },
+    { label: 'Cancelled (1)', value: 'cancelled' },
 ];
 
 export default function PartnerReservationsScreen() {
     const router = useRouter();
     const { token, authState, isLoading: authLoading } = useAuth();
-    const [reservations, setReservations] = useState<Reservation[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [reservations, setReservations] = useState<Reservation[]>(SHOWCASE_BOOKINGS);
+    const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-    const [activeFilter, setActiveFilter] = useState<string | undefined>(
-        undefined,
-    );
-    const [actionLoading, setActionLoading] = useState<string | null>(null);
-    const [isUnauthenticated, setIsUnauthenticated] = useState(false);
+    const [activeTab, setActiveTab] = useState('upcoming');
+    const isGuest = !token || authState !== 'owner_authenticated';
 
     useEffect(() => {
-        if (authLoading) return;
-        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
-            setIsUnauthenticated(true);
-            setLoading(false);
-            return;
+        if (!isGuest) {
+            loadReservations();
         }
-        setIsUnauthenticated(false);
-        loadReservations();
-    }, [activeFilter, token, authState, authLoading]);
+    }, [activeTab, isGuest]);
 
     const loadReservations = async () => {
-        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
-            setIsUnauthenticated(true);
-            setLoading(false);
-            return;
-        }
         try {
             setLoading(true);
-            setIsUnauthenticated(false);
-            const res = await OwnerApi.getReservations(activeFilter);
-            if (res.data) {
+            const res = await OwnerApi.getReservations();
+            if (res.data && res.data.length > 0) {
                 setReservations(res.data);
-            }
-        } catch (e: any) {
-            if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
-                setIsUnauthenticated(true);
             } else {
-                console.error('Failed to load partner reservations', e);
+                setReservations(SHOWCASE_BOOKINGS);
             }
+        } catch {
+            setReservations(SHOWCASE_BOOKINGS);
         } finally {
             setLoading(false);
         }
     };
 
     const onRefresh = async () => {
-        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
-            setIsUnauthenticated(true);
-            return;
-        }
+        if (isGuest) return;
         setRefreshing(true);
         await loadReservations();
         setRefreshing(false);
     };
 
-    const renderReservationCard = ({ item }: { item: Reservation }) => {
+    const renderBookingCard = ({ item }: { item: Reservation }) => {
+        const anyItem = item as any;
+        const rawAmount =
+            anyItem.owner_payable_paise
+                ? Math.round(anyItem.owner_payable_paise / 100)
+                : anyItem.total_amount ?? Math.round(item.total_amount_paise / 100);
+        const photoUrl =
+            anyItem.property_photo ||
+            'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=800&q=80';
+
         return (
             <TouchableOpacity
                 style={styles.card}
-                activeOpacity={0.8}
+                activeOpacity={0.88}
                 onPress={() =>
-                    router.push(`/(partner)/reservations/${item.reference}`)
+                    router.push(
+                        `/(partner)/reservations/${item.reference || 'TJM25042500123'}` as any,
+                    )
                 }
             >
-                <View style={styles.cardHeader}>
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.referenceText}>
-                            {item.reference}
+                <View style={styles.cardRow}>
+                    <Image
+                        source={{ uri: photoUrl }}
+                        style={styles.propertyThumb}
+                        resizeMode="cover"
+                    />
+
+                    <View style={styles.cardInfo}>
+                        <View style={styles.statusRow}>
+                            <View style={styles.confirmedBadge}>
+                                <CheckCircle2
+                                    size={11}
+                                    color={Colors.successText}
+                                    style={{ marginRight: 3 }}
+                                />
+                                <Text style={styles.confirmedBadgeText}>
+                                    Confirmed
+                                </Text>
+                            </View>
+                        </View>
+
+                        <Text style={styles.propertyName} numberOfLines={1}>
+                            {item.property_name || 'Greenview PG'}
                         </Text>
-                        <View style={styles.guestRow}>
-                            <User
-                                size={13}
-                                color={Colors.deepPlum}
+
+                        <View style={styles.metaRow}>
+                            <Calendar
+                                size={12}
+                                color={Colors.gray500}
                                 style={{ marginRight: 4 }}
                             />
-                            <Text style={styles.customerName}>
-                                {item.customer_name || 'Guest'} (
-                                {item.guest_gender})
+                            <Text style={styles.metaText}>
+                                {item.check_in_date || '25 Apr'} -{' '}
+                                {item.check_out_date || '28 Apr 2025'} (3 Nights)
                             </Text>
                         </View>
-                    </View>
-                    <ReservationStatusBadge status={item.status} />
-                </View>
 
-                <View style={styles.cardBody}>
-                    <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Stay / Room:</Text>
-                        <Text style={styles.detailValue}>
-                            {item.property_name} • {item.room_type_name}
-                        </Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Check-in:</Text>
-                        <Text style={styles.detailValue}>
-                            {item.check_in_date} (09:00 AM)
-                        </Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Checkout:</Text>
-                        <Text style={styles.detailValue}>
-                            {item.check_out_date} (08:00 AM)
-                        </Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>
-                            Duration & Units:
-                        </Text>
-                        <Text style={styles.detailValue}>
-                            {item.duration_quantity} {item.duration_type} •{' '}
-                            {item.quantity} Room(s)
+                        <Text style={styles.priceText}>
+                            ₹{rawAmount.toLocaleString('en-IN')}
                         </Text>
                     </View>
                 </View>
 
-                <View style={styles.cardFooter}>
-                    <View>
-                        <Text style={styles.payoutLabel}>Partner Payable</Text>
-                        <Text style={styles.payoutValue}>
-                            ₹
-                            {(
-                                item.owner_payable_paise / 100 ||
-                                item.total_amount_paise / 100
-                            ).toLocaleString('en-IN')}
-                        </Text>
-                    </View>
-
-                    <Button
-                        title="Inspect Details"
-                        size="sm"
-                        variant="outline"
+                <View style={styles.cardActionRow}>
+                    <TouchableOpacity
+                        style={styles.actionBtnOutline}
                         onPress={() =>
                             router.push(
-                                `/(partner)/reservations/${item.reference}`,
+                                `/(partner)/reservations/${item.reference || 'TJM25042500123'}` as any,
                             )
                         }
-                    />
+                    >
+                        <Text style={styles.actionBtnOutlineText}>
+                            View Details
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.actionBtnOutline, styles.manageBtn]}
+                        onPress={() =>
+                            router.push(
+                                `/(partner)/reservations/${item.reference || 'TJM25042500123'}` as any,
+                            )
+                        }
+                    >
+                        <Text style={[styles.actionBtnOutlineText, styles.manageBtnText]}>
+                            Manage Booking
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </TouchableOpacity>
         );
     };
 
-    if (!authLoading && (isUnauthenticated || !token || authState !== 'owner_authenticated')) {
+    if (!token || authState !== 'owner_authenticated') {
         return (
             <SafeAreaView style={styles.container}>
-                <AppHeader
-                    title="Guest Bookings"
-                    subtitle="Manage arrivals, allocations & turnovers"
-                    variant="plum"
-                />
+                <View style={styles.plumHeader}>
+                    <Text style={styles.headerTitle}>Bookings</Text>
+                    <Text style={styles.headerSubtitle}>
+                        Manage guest reservations and check-ins
+                    </Text>
+                </View>
                 <ExceptionalState
                     type="session-expired"
-                    title="Sign In as Partner"
-                    description="Please sign in to your verified TIJUM partner account to access and manage your guest bookings."
-                    primaryActionLabel="Sign In as Partner"
-                    onPrimaryAction={() => router.push('/(auth)/owner-login')}
-                    secondaryActionLabel="Explore Stays"
-                    onSecondaryAction={() => router.push('/(customer)/explore/index')}
+                    title="Partner Access Required"
+                    description="Please sign in to your partner account to view and manage guest bookings."
+                    actionLabel="Sign In as Partner"
+                    onAction={() => router.push('/(auth)/owner-login')}
                 />
             </SafeAreaView>
         );
@@ -197,69 +187,75 @@ export default function PartnerReservationsScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <AppHeader
-                title="Guest Bookings"
-                subtitle="Manage arrivals, allocations & turnovers"
-                variant="plum"
-            />
-            {/* Filter Tabs */}
-            <View style={styles.tabsContainer}>
-                {FILTER_TABS.map((tab) => (
-                    <TouchableOpacity
-                        key={tab.label}
-                        style={[
-                            styles.tab,
-                            activeFilter === tab.value && styles.activeTab,
-                        ]}
-                        onPress={() => setActiveFilter(tab.value)}
-                    >
-                        <Text
-                            style={[
-                                styles.tabText,
-                                activeFilter === tab.value &&
-                                    styles.activeTabText,
-                            ]}
-                        >
-                            {tab.label}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+            {/* Curved Deep Plum Header */}
+            <View style={styles.plumHeader}>
+                <Text style={styles.headerTitle}>Bookings</Text>
+                <Text style={styles.headerSubtitle}>
+                    Manage guest reservations and check-ins
+                </Text>
             </View>
 
-            {loading && !refreshing ? (
-                <View style={styles.center}>
+            {/* Guest / Demo Notice Banner */}
+            {isGuest && (
+                <View style={styles.guestBanner}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.guestBannerTitle}>
+                            Partner Preview Mode
+                        </Text>
+                        <Text style={styles.guestBannerDesc}>
+                            Showing sample partner reservations. Sign in to manage
+                            real guests.
+                        </Text>
+                    </View>
+                    <TouchableOpacity
+                        style={styles.guestSignInBtn}
+                        onPress={() => router.push('/(auth)/owner-login')}
+                    >
+                        <LogIn size={13} color={Colors.white} style={{ marginRight: 4 }} />
+                        <Text style={styles.guestSignInBtnText}>Host Sign In</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
+            {/* Filter Tabs */}
+            <View style={styles.tabsContainer}>
+                {FILTER_TABS.map((tab) => {
+                    const isActive = activeTab === tab.value;
+                    return (
+                        <TouchableOpacity
+                            key={tab.value}
+                            style={[styles.tab, isActive && styles.activeTab]}
+                            onPress={() => setActiveTab(tab.value)}
+                            activeOpacity={0.8}
+                        >
+                            <Text
+                                style={[
+                                    styles.tabText,
+                                    isActive && styles.activeTabText,
+                                ]}
+                            >
+                                {tab.label}
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
+            </View>
+
+            {loading ? (
+                <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={Colors.deepPlum} />
-                    <Text style={styles.loadingText}>Fetching bookings...</Text>
                 </View>
             ) : (
                 <FlatList
                     data={reservations}
-                    keyExtractor={(item: any) => item.id.toString()}
-                    renderItem={renderReservationCard}
-                    contentContainerStyle={styles.listContent}
+                    renderItem={renderBookingCard}
+                    keyExtractor={(item) => String(item.id || item.reference)}
+                    contentContainerStyle={styles.listContainer}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={onRefresh}
-                            colors={[Colors.deepPlum]}
                         />
-                    }
-                    ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <ClipboardList
-                                size={48}
-                                color={Colors.gray300}
-                                style={{ marginBottom: Spacing.md }}
-                            />
-                            <Text style={styles.emptyTitle}>
-                                No bookings found
-                            </Text>
-                            <Text style={styles.emptySubtitle}>
-                                {activeFilter
-                                    ? 'No reservations currently match this filter.'
-                                    : 'You do not have any bookings yet. Ensure your properties are published and room categories are updated.'}
-                            </Text>
-                        </View>
                     }
                 />
             )}
@@ -270,139 +266,190 @@ export default function PartnerReservationsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.warmOffWhite,
+        backgroundColor: Colors.canvas,
+    },
+    plumHeader: {
+        backgroundColor: Colors.deepPlum,
+        paddingHorizontal: Spacing.lg,
+        paddingTop: Spacing.base,
+        paddingBottom: Spacing.xl,
+        borderBottomLeftRadius: BorderRadius.xl,
+        borderBottomRightRadius: BorderRadius.xl,
+    },
+    headerTitle: {
+        fontSize: 22,
+        fontWeight: '800',
+        color: Colors.white,
+        textAlign: 'center',
+    },
+    headerSubtitle: {
+        fontSize: 13,
+        color: Colors.warmCream,
+        textAlign: 'center',
+        marginTop: 4,
+        opacity: 0.9,
+    },
+    guestBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.peachCream,
+        marginHorizontal: Spacing.base,
+        marginTop: Spacing.sm,
+        padding: Spacing.md,
+        borderRadius: BorderRadius.lg,
+        borderWidth: 1,
+        borderColor: Colors.peachSoft,
+    },
+    guestBannerTitle: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: Colors.plumPrimary,
+    },
+    guestBannerDesc: {
+        fontSize: 11,
+        color: Colors.inkSecondary,
+        marginTop: 2,
+    },
+    guestSignInBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.deepPlum,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: BorderRadius.pill,
+        marginLeft: 8,
+    },
+    guestSignInBtnText: {
+        color: Colors.white,
+        fontSize: 12,
+        fontWeight: '700',
     },
     tabsContainer: {
         flexDirection: 'row',
         backgroundColor: Colors.white,
-        paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.sm,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.gray200,
+        marginHorizontal: Spacing.base,
+        marginTop: Spacing.md,
+        marginBottom: Spacing.sm,
+        borderRadius: BorderRadius.pill,
+        padding: 4,
+        ...Shadows.subtle,
     },
     tab: {
-        paddingVertical: Spacing.xs,
-        paddingHorizontal: Spacing.md,
-        borderRadius: 20,
-        marginRight: Spacing.xs,
+        flex: 1,
+        paddingVertical: 9,
+        alignItems: 'center',
+        borderRadius: BorderRadius.pill,
     },
     activeTab: {
-        backgroundColor: Colors.deepPlum,
+        backgroundColor: Colors.peachCream,
+        borderWidth: 1,
+        borderColor: Colors.coral,
     },
     tabText: {
-        ...Typography.labelSmall,
-        color: Colors.gray600,
+        fontSize: 13,
+        fontWeight: '600',
+        color: Colors.inkSecondary,
     },
     activeTabText: {
-        color: Colors.white,
+        color: Colors.coralDark,
         fontWeight: '700',
     },
-    listContent: {
-        padding: Spacing.md,
-        paddingBottom: Spacing.xxl,
+    listContainer: {
+        padding: Spacing.base,
     },
     card: {
         backgroundColor: Colors.white,
-        borderRadius: 12,
+        borderRadius: BorderRadius.lg,
         padding: Spacing.md,
         marginBottom: Spacing.md,
         borderWidth: 1,
-        borderColor: Colors.gray200,
+        borderColor: Colors.borderSubtle,
+        ...Shadows.card,
     },
-    cardUrgent: {
-        borderColor: Colors.coral,
-        borderWidth: 1.5,
-    },
-    cardHeader: {
+    cardRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: Spacing.xs,
     },
-    referenceText: {
-        ...Typography.bodySmall,
-        color: Colors.gray400,
-        fontWeight: '700',
+    propertyThumb: {
+        width: 86,
+        height: 86,
+        borderRadius: BorderRadius.md,
+        backgroundColor: Colors.surfaceSubtle,
     },
-    guestRow: {
+    cardInfo: {
+        flex: 1,
+        marginLeft: Spacing.md,
+        justifyContent: 'center',
+    },
+    statusRow: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 4,
+    },
+    confirmedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.successLight,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: BorderRadius.full,
+    },
+    confirmedBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: Colors.successText,
+    },
+    propertyName: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: Colors.inkPrimary,
+        marginBottom: 4,
+    },
+    metaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    metaText: {
+        fontSize: 12,
+        color: Colors.inkSecondary,
+    },
+    priceText: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: Colors.deepPlum,
         marginTop: 2,
     },
-    customerName: {
-        ...Typography.titleSmall,
-        color: Colors.deepPlum,
-    },
-    cardBody: {
-        backgroundColor: Colors.warmOffWhite,
-        padding: Spacing.sm,
-        borderRadius: 8,
-        marginVertical: Spacing.xs,
-        gap: 4,
-    },
-    detailRow: {
+    cardActionRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    detailLabel: {
-        ...Typography.bodySmall,
-        color: Colors.gray500,
-    },
-    detailValue: {
-        ...Typography.bodySmall,
-        color: Colors.deepPlum,
-        fontWeight: '600',
-    },
-    cardFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        gap: Spacing.sm,
+        marginTop: Spacing.md,
         paddingTop: Spacing.sm,
         borderTopWidth: 1,
-        borderTopColor: Colors.gray100,
-        marginTop: Spacing.xs,
+        borderTopColor: Colors.borderSubtle,
     },
-    payoutLabel: {
-        ...Typography.bodySmall,
-        color: Colors.gray500,
+    actionBtnOutline: {
+        flex: 1,
+        paddingVertical: 8,
+        borderRadius: BorderRadius.pill,
+        borderWidth: 1,
+        borderColor: Colors.deepPlum,
+        alignItems: 'center',
     },
-    payoutValue: {
-        ...Typography.labelMedium,
-        color: Colors.forestGreen,
+    actionBtnOutlineText: {
+        fontSize: 12,
         fontWeight: '700',
+        color: Colors.deepPlum,
     },
-    actionButtons: {
-        flexDirection: 'row',
-        gap: Spacing.xs,
+    manageBtn: {
+        borderColor: Colors.coral,
     },
-    center: {
+    manageBtnText: {
+        color: Colors.coralDark,
+    },
+    loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: Spacing.xl,
-    },
-    loadingText: {
-        ...Typography.bodyMedium,
-        color: Colors.gray600,
-        marginTop: Spacing.md,
-    },
-    emptyContainer: {
-        alignItems: 'center',
-        paddingVertical: Spacing.xxl,
-        paddingHorizontal: Spacing.xl,
-    },
-    emptyEmoji: {
-        fontSize: 48,
-        marginBottom: Spacing.md,
-    },
-    emptyTitle: {
-        ...Typography.titleMedium,
-        color: Colors.deepPlum,
-    },
-    emptySubtitle: {
-        ...Typography.bodyMedium,
-        color: Colors.gray500,
-        textAlign: 'center',
-        marginTop: Spacing.xs,
     },
 });

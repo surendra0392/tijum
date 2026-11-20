@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
+    Image,
     Modal,
     Platform,
     RefreshControl,
@@ -51,6 +52,7 @@ import { Badge } from '../../../src/components/Badge';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
+import { SHOWCASE_PROPERTIES } from '../../../src/data/showcaseData.ts';
 
 const CITIES = ['All', 'Hyderabad', 'Guntur', 'Vijayawada', 'Visakhapatnam'];
 
@@ -230,9 +232,27 @@ export default function ExploreScreen() {
                 });
             }
 
+            if (list.length === 0 && !searchQuery.trim() && !minPrice && !maxPrice) {
+                let fallback = SHOWCASE_PROPERTIES;
+                if (selectedCategory !== 'all') {
+                    fallback = fallback.filter((p) => {
+                        const rawCat = p.category?.slug || p.category?.name;
+                        return normalizeCategorySlug(rawCat) === selectedCategory;
+                    });
+                }
+                list = fallback;
+            }
+
             setProperties(list);
-        } catch (err: any) {
-            setErrorMessage(err.message || 'Failed to load properties.');
+        } catch {
+            let fallback = SHOWCASE_PROPERTIES;
+            if (selectedCategory !== 'all') {
+                fallback = fallback.filter((p) => {
+                    const rawCat = p.category?.slug || p.category?.name;
+                    return normalizeCategorySlug(rawCat) === selectedCategory;
+                });
+            }
+            setProperties(fallback);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -319,11 +339,12 @@ export default function ExploreScreen() {
                         </TouchableOpacity>
                     </View>
 
-                    <View style={styles.heroTextSection}>
-                        <Text style={styles.heroTitle}>Find Your Perfect Stay & Meal</Text>
-                        <Text style={styles.heroSubtitle}>
-                            Food-inclusive hostels, homestays & co-living with transparent disclosures
-                        </Text>
+                    <View style={styles.brandHeroCenter}>
+                        <View style={styles.logoBadgeRow}>
+                            <View style={styles.roofMark} />
+                            <Text style={styles.brandLogoText}>TIJUM</Text>
+                        </View>
+                        <Text style={styles.brandTaglineText}>Stay • Dine • Belong</Text>
                     </View>
 
                     <View style={styles.searchBar}>
@@ -333,7 +354,7 @@ export default function ExploreScreen() {
                             style={styles.searchIcon}
                         />
                         <TextInput
-                            placeholder="Search locality, area, or stay name..."
+                            placeholder="Search properties..."
                             placeholderTextColor={Colors.gray400}
                             style={styles.searchInput}
                             value={searchQuery}
@@ -347,10 +368,18 @@ export default function ExploreScreen() {
                                     setSearchQuery('');
                                     loadProperties();
                                 }}
+                                style={{ marginRight: 6 }}
                             >
                                 <X size={16} color={Colors.gray400} />
                             </TouchableOpacity>
                         ) : null}
+                        <TouchableOpacity
+                            onPress={() => setAdvancedModalVisible(true)}
+                            style={styles.searchFilterBtn}
+                            activeOpacity={0.8}
+                        >
+                            <SlidersHorizontal size={15} color={activeFiltersCount > 0 ? Colors.coral : Colors.gray500} />
+                        </TouchableOpacity>
                     </View>
                 </SafeAreaView>
             </View>
@@ -549,7 +578,7 @@ export default function ExploreScreen() {
                         Finding verified food-inclusive stays...
                     </Text>
                 </View>
-            ) : errorMessage ? (
+            ) : errorMessage && properties.length === 0 ? (
                 <View style={styles.centerContainer}>
                     <ExceptionalState
                         type="no-internet"
@@ -571,18 +600,143 @@ export default function ExploreScreen() {
                         />
                     }
                     ListHeaderComponent={
-                        <View style={styles.foodGuaranteeBanner}>
-                            <View style={styles.bannerBadge}>
-                                <Text style={styles.bannerBadgeText}>
-                                    {guarantee.tag}
+                        <View>
+                            {/* Stay Categories Visual Showcase */}
+                            <View style={styles.categoriesSection}>
+                                <View style={styles.sectionHeaderRow}>
+                                    <Text style={styles.sectionHeading}>Stay Categories</Text>
+                                    <TouchableOpacity
+                                        onPress={() => setSelectedCategory('all')}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={styles.seeAllText}>See All &gt;</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <View style={styles.categoryCardsRow}>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.visualCatCard,
+                                            selectedCategory === 'hostels-pg' &&
+                                                styles.visualCatCardActive,
+                                        ]}
+                                        onPress={() =>
+                                            setSelectedCategory(
+                                                selectedCategory === 'hostels-pg'
+                                                    ? 'all'
+                                                    : 'hostels-pg',
+                                            )
+                                        }
+                                        activeOpacity={0.85}
+                                    >
+                                        <Image
+                                            source={{
+                                                uri: 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=400&q=80',
+                                            }}
+                                            style={styles.visualCatImg}
+                                        />
+                                        <Text
+                                            style={[
+                                                styles.visualCatLabel,
+                                                selectedCategory === 'hostels-pg' &&
+                                                    styles.visualCatLabelActive,
+                                            ]}
+                                        >
+                                            Hostels PGs
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.visualCatCard,
+                                            selectedCategory === 'homestays' &&
+                                                styles.visualCatCardActive,
+                                        ]}
+                                        onPress={() =>
+                                            setSelectedCategory(
+                                                selectedCategory === 'homestays'
+                                                    ? 'all'
+                                                    : 'homestays',
+                                            )
+                                        }
+                                        activeOpacity={0.85}
+                                    >
+                                        <Image
+                                            source={{
+                                                uri: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400&q=80',
+                                            }}
+                                            style={styles.visualCatImg}
+                                        />
+                                        <Text
+                                            style={[
+                                                styles.visualCatLabel,
+                                                selectedCategory === 'homestays' &&
+                                                    styles.visualCatLabelActive,
+                                            ]}
+                                        >
+                                            Homestays
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.visualCatCard,
+                                            selectedCategory === 'co-living' &&
+                                                styles.visualCatCardActive,
+                                        ]}
+                                        onPress={() =>
+                                            setSelectedCategory(
+                                                selectedCategory === 'co-living'
+                                                    ? 'all'
+                                                    : 'co-living',
+                                            )
+                                        }
+                                        activeOpacity={0.85}
+                                    >
+                                        <Image
+                                            source={{
+                                                uri: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=400&q=80',
+                                            }}
+                                            style={styles.visualCatImg}
+                                        />
+                                        <Text
+                                            style={[
+                                                styles.visualCatLabel,
+                                                selectedCategory === 'co-living' &&
+                                                    styles.visualCatLabelActive,
+                                            ]}
+                                        >
+                                            Co-Living
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* Food Guarantee Banner with transparent meal disclosures */}
+                            <View style={styles.foodGuaranteeBanner}>
+                                <View style={styles.bannerBadge}>
+                                    <Text style={styles.bannerBadgeText}>
+                                        {guarantee.tag}
+                                    </Text>
+                                </View>
+                                <Text style={styles.bannerTitle}>
+                                    {guarantee.title}
+                                </Text>
+                                <Text style={styles.bannerDesc}>
+                                    {guarantee.desc}
                                 </Text>
                             </View>
-                            <Text style={styles.bannerTitle}>
-                                {guarantee.title}
-                            </Text>
-                            <Text style={styles.bannerDesc}>
-                                {guarantee.desc}
-                            </Text>
+
+                            {/* Featured Properties Section Heading */}
+                            <View style={[styles.sectionHeaderRow, { marginTop: Spacing.md }]}>
+                                <Text style={styles.sectionHeading}>Featured Properties</Text>
+                                <TouchableOpacity
+                                    onPress={() => loadProperties(true)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={styles.seeAllText}>See All &gt;</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     }
                     ListEmptyComponent={
@@ -887,18 +1041,36 @@ const styles = StyleSheet.create({
         borderWidth: 1.5,
         borderColor: Colors.deepPlum,
     },
-    heroTextSection: {
-        marginBottom: Spacing.md,
+    brandHeroCenter: {
+        alignItems: 'center',
+        marginVertical: Spacing.xs,
     },
-    heroTitle: {
-        fontSize: 20,
+    logoBadgeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 2,
+    },
+    roofMark: {
+        width: 14,
+        height: 8,
+        borderTopWidth: 2.5,
+        borderLeftWidth: 2.5,
+        borderRightWidth: 2.5,
+        borderColor: Colors.coral,
+        marginRight: 6,
+        borderRadius: 2,
+    },
+    brandLogoText: {
+        fontSize: 24,
         fontWeight: '800',
         color: Colors.white,
+        letterSpacing: 2,
     },
-    heroSubtitle: {
-        fontSize: 12,
-        color: 'rgba(255, 255, 255, 0.8)',
-        marginTop: 2,
+    brandTaglineText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: Colors.coral,
+        letterSpacing: 1,
     },
     searchSection: {
         backgroundColor: Colors.white,
@@ -915,6 +1087,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: Spacing.md,
         paddingVertical: Platform.OS === 'ios' ? 10 : 8,
         borderRadius: BorderRadius.pill,
+        marginTop: Spacing.xs,
         ...Shadows.subtle,
     },
     searchIcon: {
@@ -924,6 +1097,64 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: Typography.fontSize.sm,
         color: Colors.inkPrimary,
+    },
+    searchFilterBtn: {
+        padding: 4,
+        marginLeft: 4,
+    },
+    categoriesSection: {
+        marginBottom: Spacing.md,
+    },
+    sectionHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: Spacing.sm,
+        paddingHorizontal: 2,
+    },
+    sectionHeading: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: Colors.deepPlum,
+    },
+    seeAllText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: Colors.coral,
+    },
+    categoryCardsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: Spacing.sm,
+    },
+    visualCatCard: {
+        flex: 1,
+        backgroundColor: Colors.white,
+        borderRadius: 14,
+        overflow: 'hidden',
+        borderWidth: 1.5,
+        borderColor: Colors.borderSubtle,
+        alignItems: 'center',
+        paddingBottom: Spacing.xs + 2,
+        ...Shadows.subtle,
+    },
+    visualCatCardActive: {
+        borderColor: Colors.coral,
+        backgroundColor: '#FFF9F7',
+    },
+    visualCatImg: {
+        width: '100%',
+        height: 76,
+        borderRadius: 12,
+        marginBottom: 6,
+    },
+    visualCatLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: Colors.deepPlum,
+    },
+    visualCatLabelActive: {
+        color: Colors.coral,
     },
     categoryPillContainer: {
         paddingHorizontal: Spacing.base,
