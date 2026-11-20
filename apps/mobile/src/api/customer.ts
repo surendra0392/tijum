@@ -159,8 +159,13 @@ export const CustomerApi = {
         category: string;
         description: string;
     }) => ApiClient.post<ApiResponse<any>>('customer/cases', data),
+    addCaseMessage: (reference: string, message: string) =>
+        ApiClient.post<ApiResponse<any>>(
+            `customer/cases/${reference}/messages`,
+            { message },
+        ),
 
-    // Notifications
+    // Notifications & Preferences
     getNotifications: (page: number = 1) =>
         ApiClient.get<ApiResponse<NotificationItem[]>>(
             'customer/notifications',
@@ -175,6 +180,18 @@ export const CustomerApi = {
     markAllRead: () =>
         ApiClient.post<ApiResponse<null>>(
             'customer/notifications/mark-all-read',
+        ),
+    getNotificationPreferences: () =>
+        ApiClient.get<ApiResponse<any>>('customer/notifications/preferences'),
+    updateNotificationPreferences: (data: {
+        in_app_operational?: boolean;
+        email_operational?: boolean;
+        sms_operational?: boolean;
+        whatsapp_opted_in?: boolean;
+    }) =>
+        ApiClient.put<ApiResponse<any>>(
+            'customer/notifications/preferences',
+            data,
         ),
 
     // Wishlist

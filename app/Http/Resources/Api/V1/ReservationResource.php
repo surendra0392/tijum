@@ -7,6 +7,7 @@ namespace App\Http\Resources\Api\V1;
 use App\Enums\PropertyGuestComposition;
 use App\Enums\ReservationStatus;
 use App\Models\Reservation;
+use App\Models\ReservationRefund;
 use App\Services\StayTimingPolicy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -120,6 +121,20 @@ class ReservationResource extends JsonResource
                 'accommodation_mode' => $this->roomType->accommodation_mode?->value ?? 'private',
                 'is_air_conditioned' => (bool) $this->roomType->is_air_conditioned,
             ] : null,
+            'refunds' => $this->relationLoaded('refunds')
+                ? $this->refunds->map(static fn (ReservationRefund $r): array => [
+                    'id' => $r->id,
+                    'amount_minor' => (int) $r->amount_minor,
+                    'currency' => $r->currency,
+                    'status' => $r->status->value,
+                    'status_label' => $r->status->label(),
+                    'reason' => $r->reason,
+                    'gateway_refund_id' => $r->gateway_refund_id,
+                    'utr' => (string) ($r->metadata['utr'] ?? $r->metadata['acquirer_data']['rrn'] ?? $r->gateway_refund_id ?? ''),
+                    'gateway_processed_at' => $r->gateway_processed_at?->toIso8601String(),
+                    'created_at' => $r->created_at->toIso8601String(),
+                ])->values()->all()
+                : [],
             'timing' => $timing,
         ];
     }

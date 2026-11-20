@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Customer;
 
+use App\Actions\Protection\AddCaseMessage;
 use App\Enums\CaseCategory;
 use App\Enums\CasePriority;
 use App\Enums\CaseStatus;
@@ -14,6 +15,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class CustomerProtectionController extends ApiController
 {
@@ -61,16 +63,60 @@ class CustomerProtectionController extends ApiController
             'category' => $case->category->value,
             'status' => $case->status->value,
             'priority' => $case->priority->value,
+            'property_name' => $case->property->name,
+            'booking_reference' => $case->reservation->booking_reference,
             'description' => $case->description,
             'resolution_summary' => $case->resolution_summary,
+            'sla_due_at' => $case->sla_due_at?->toIso8601String(),
             'created_at' => $case->created_at->toIso8601String(),
             'messages' => $case->messages->map(fn ($m) => [
                 'id' => $m->id,
                 'sender_type' => $m->sender_type,
+                'sender_name' => $m->sender_name,
                 'message' => $m->message,
                 'created_at' => $m->created_at->toIso8601String(),
             ]),
         ]);
+    }
+
+    public function addMessage(
+        Request $request,
+        string $reference,
+        AddCaseMessage $action,
+    ): JsonResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $case = CustomerProtectionCase::query()
+            ->where('case_reference', $reference)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if ($case === null) {
+            return $this->error("Support case '{$reference}' not found.", 'CASE_NOT_FOUND', 404);
+        }
+
+        $validated = $request->validate([
+            'message' => ['required', 'string', 'max:3000'],
+            'attachment' => ['nullable', 'file', 'max:10240'],
+        ]);
+
+        try {
+            $msg = $action->execute($case, $user, [
+                'message' => $validated['message'],
+                'attachment' => $request->file('attachment'),
+            ]);
+        } catch (ValidationException $e) {
+            return $this->error($e->getMessage(), 'VALIDATION_ERROR', 422, $e->errors());
+        }
+
+        return $this->success([
+            'id' => $msg->id,
+            'sender_type' => $msg->sender_type,
+            'sender_name' => $msg->sender_name,
+            'message' => $msg->message,
+            'created_at' => $msg->created_at->toIso8601String(),
+        ], 'Response submitted successfully.', 201);
     }
 
     public function store(Request $request): JsonResponse

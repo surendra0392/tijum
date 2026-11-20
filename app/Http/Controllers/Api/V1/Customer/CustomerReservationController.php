@@ -128,7 +128,7 @@ class CustomerReservationController extends ApiController
         $reservation = Reservation::query()
             ->where('booking_reference', $reference)
             ->where('user_id', $user->id)
-            ->with(['property.city', 'roomType', 'payments'])
+            ->with(['property.city', 'roomType', 'payments', 'refunds'])
             ->first();
 
         if ($reservation === null) {
@@ -160,7 +160,7 @@ class CustomerReservationController extends ApiController
         $this->lifecycle->cancel($user, $reservation, $reason);
 
         $reservation->refresh();
-        $reservation->loadMissing(['property.city', 'roomType']);
+        $reservation->loadMissing(['property.city', 'roomType', 'refunds']);
 
         return $this->success(new ReservationResource($reservation), 'Reservation cancelled successfully.');
     }

@@ -10,7 +10,7 @@ import {
     SafeAreaView,
     Linking,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CustomerApi } from '../../../src/api/customer';
 import { PublicApi } from '../../../src/api/public';
 import { useAuth } from '../../../src/auth/AuthContext';
@@ -27,11 +27,11 @@ import {
     RefreshCw,
     AlertTriangle,
     MessageSquare,
-    MessageCircle,
     Phone,
     Mail,
     Clock,
     Send,
+    ChevronRight,
 } from 'lucide-react-native';
 
 const CATEGORIES = [
@@ -61,6 +61,7 @@ const INQUIRY_SUBJECTS = [
 ];
 
 export default function CustomerSupportScreen() {
+    const router = useRouter();
     const { booking_reference } = useLocalSearchParams<{
         booking_reference?: string;
     }>();
@@ -187,7 +188,7 @@ export default function CustomerSupportScreen() {
         } catch (e: any) {
             Alert.alert(
                 'Inquiry Failed',
-                e.message || 'Could not send message. Please try contacting via WhatsApp or phone.',
+                e.message || 'Could not send message. Please contact via phone or email.',
             );
         } finally {
             setInquirySubmitting(false);
@@ -209,21 +210,12 @@ export default function CustomerSupportScreen() {
 
                     <View style={styles.touchpointButtonsRow}>
                         <TouchableOpacity
-                            style={[styles.touchpointBtn, styles.whatsappBtn]}
-                            onPress={() => Linking.openURL('https://wa.me/918142334033')}
-                            activeOpacity={0.8}
-                        >
-                            <MessageCircle size={16} color="#166534" style={{ marginRight: 6 }} />
-                            <Text style={styles.whatsappBtnText}>WhatsApp Chat</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
                             style={[styles.touchpointBtn, styles.callBtn]}
                             onPress={() => Linking.openURL('tel:+918142334033')}
                             activeOpacity={0.8}
                         >
                             <Phone size={16} color="#1E40AF" style={{ marginRight: 6 }} />
-                            <Text style={styles.callBtnText}>Call Helpline</Text>
+                            <Text style={styles.callBtnText}>Call Helpline (+91 81423 34033)</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -232,7 +224,7 @@ export default function CustomerSupportScreen() {
                             activeOpacity={0.8}
                         >
                             <Mail size={16} color="#9A3412" style={{ marginRight: 6 }} />
-                            <Text style={styles.emailBtnText}>Email Desk</Text>
+                            <Text style={styles.emailBtnText}>Email Desk (support@tijum.com)</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -451,27 +443,37 @@ export default function CustomerSupportScreen() {
                                 <ActivityIndicator size="small" color={Colors.coral} />
                             ) : cases.length > 0 ? (
                                 cases.map((c) => (
-                                    <View
+                                    <TouchableOpacity
                                         key={c.id || c.reference}
                                         style={styles.caseCard}
+                                        onPress={() =>
+                                            router.push({
+                                                pathname: '/(customer)/support/[reference]',
+                                                params: { reference: c.reference },
+                                            })
+                                        }
+                                        activeOpacity={0.8}
                                     >
                                         <View style={styles.rowBetween}>
                                             <Text style={styles.caseRef}>
                                                 {c.reference}
                                             </Text>
-                                            <Badge
-                                                label={c.status}
-                                                variant={
-                                                    c.status === 'resolved'
-                                                        ? 'accent'
-                                                        : 'secondary'
-                                                }
-                                            />
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                <Badge
+                                                    label={c.status}
+                                                    variant={
+                                                        c.status === 'resolved'
+                                                            ? 'accent'
+                                                            : 'secondary'
+                                                    }
+                                                />
+                                                <ChevronRight size={16} color={Colors.gray400} />
+                                            </View>
                                         </View>
                                         <Text style={styles.caseCategory}>
                                             Category: {c.category}
                                         </Text>
-                                        <Text style={styles.caseDesc}>
+                                        <Text style={styles.caseDesc} numberOfLines={2}>
                                             {c.description}
                                         </Text>
                                         {c.resolution_notes ? (
@@ -479,12 +481,17 @@ export default function CustomerSupportScreen() {
                                                 <Text style={styles.resolutionTitle}>
                                                     Support Team Update:
                                                 </Text>
-                                                <Text style={styles.resolutionText}>
+                                                <Text style={styles.resolutionText} numberOfLines={2}>
                                                     {c.resolution_notes}
                                                 </Text>
                                             </View>
                                         ) : null}
-                                    </View>
+                                        <View style={styles.viewTimelineRow}>
+                                            <Text style={styles.viewTimelineText}>
+                                                View Case & Messages →
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
                                 ))
                             ) : (
                                 <Text style={styles.emptyText}>
@@ -742,5 +749,17 @@ const styles = StyleSheet.create({
         ...Typography.bodyMedium,
         color: Colors.gray500,
         fontStyle: 'italic',
+    },
+    viewTimelineRow: {
+        marginTop: Spacing.xs,
+        paddingTop: Spacing.xs,
+        borderTopWidth: 1,
+        borderTopColor: Colors.gray200,
+        alignItems: 'flex-end',
+    },
+    viewTimelineText: {
+        ...Typography.labelSmall,
+        color: Colors.coral,
+        fontWeight: '700',
     },
 });

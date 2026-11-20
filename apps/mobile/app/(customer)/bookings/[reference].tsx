@@ -21,6 +21,7 @@ import {
     UtensilsCrossed,
     X,
     Zap,
+    RotateCcw,
 } from 'lucide-react-native';
 import { CustomerApi } from '../../../src/api/customer';
 import { Reservation } from '../../../src/api/types';
@@ -30,6 +31,7 @@ import { Typography } from '../../../src/theme/typography';
 import { ReservationStatusBadge } from '../../../src/components/ReservationStatusBadge';
 import { StayTimingBadge } from '../../../src/components/StayTimingBadge';
 import { MealBadge } from '../../../src/components/MealBadge';
+import { Badge } from '../../../src/components/Badge';
 import { Button } from '../../../src/components/Button';
 import { Input } from '../../../src/components/Input';
 import { RazorpayService } from '../../../src/payments/RazorpayService';
@@ -554,6 +556,119 @@ export default function ReservationDetailScreen() {
                             </View>
                         </View>
                     </View>
+
+                    {/* Cancellation & Refund Tracking */}
+                    {reservation.status === 'cancelled' ||
+                    ((reservation as any).refunds &&
+                        (reservation as any).refunds.length > 0) ? (
+                        <View style={styles.section}>
+                            <View style={styles.sectionHeaderRow}>
+                                <RotateCcw
+                                    size={18}
+                                    color={Colors.coral}
+                                    style={{ marginRight: 6 }}
+                                />
+                                <Text style={styles.sectionTitle}>
+                                    Cancellation & Refund Tracking
+                                </Text>
+                            </View>
+                            <View style={styles.refundCard}>
+                                <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>
+                                        Booking Status:
+                                    </Text>
+                                    <Badge label="CANCELLED" variant="secondary" />
+                                </View>
+                                {reservation.cancelled_at ? (
+                                    <View style={styles.infoRow}>
+                                        <Text style={styles.infoLabel}>
+                                            Cancelled On:
+                                        </Text>
+                                        <Text style={styles.infoValue}>
+                                            {new Date(
+                                                reservation.cancelled_at,
+                                            ).toLocaleDateString()}
+                                        </Text>
+                                    </View>
+                                ) : null}
+                                {reservation.cancellation_reason ? (
+                                    <View style={styles.infoRow}>
+                                        <Text style={styles.infoLabel}>
+                                            Reason:
+                                        </Text>
+                                        <Text style={styles.infoValue}>
+                                            {reservation.cancellation_reason}
+                                        </Text>
+                                    </View>
+                                ) : null}
+
+                                <View style={styles.refundDivider} />
+
+                                {(reservation as any).refunds &&
+                                (reservation as any).refunds.length > 0 ? (
+                                    (reservation as any).refunds.map(
+                                        (refItem: any) => (
+                                            <View
+                                                key={refItem.id}
+                                                style={styles.refundItemBox}
+                                            >
+                                                <View style={styles.rowBetween}>
+                                                    <Text
+                                                        style={styles.refundAmountText}
+                                                    >
+                                                        ₹
+                                                        {(
+                                                            refItem.amount_minor /
+                                                            100
+                                                        ).toLocaleString('en-IN')}
+                                                    </Text>
+                                                    <Badge
+                                                        label={(
+                                                            refItem.status_label ||
+                                                            refItem.status
+                                                        ).toUpperCase()}
+                                                        variant={
+                                                            refItem.status ===
+                                                            'processed'
+                                                                ? 'accent'
+                                                                : 'neutral'
+                                                        }
+                                                    />
+                                                </View>
+                                                {refItem.utr ? (
+                                                    <Text
+                                                        style={styles.refundUtrText}
+                                                    >
+                                                        Bank UTR / Ref: {refItem.utr}
+                                                    </Text>
+                                                ) : null}
+                                                <Text
+                                                    style={styles.refundDateText}
+                                                >
+                                                    Updated:{' '}
+                                                    {refItem.gateway_processed_at
+                                                        ? new Date(
+                                                              refItem.gateway_processed_at,
+                                                          ).toLocaleString()
+                                                        : new Date(
+                                                              refItem.created_at,
+                                                          ).toLocaleString()}
+                                                </Text>
+                                            </View>
+                                        ),
+                                    )
+                                ) : (
+                                    <View style={styles.refundNoticeBox}>
+                                        <Text style={styles.refundNoticeText}>
+                                            {(reservation as any).original_amount_paise > 0
+                                                ? 'Refund review initiated. Eligible amounts are processed to your original payment method in 5–7 banking days pursuant to our Cancellation Policy.'
+                                                : 'Reservation was cancelled prior to payment completion. No charges deducted.'}
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
+                    ) : null}
 
                     {/* Customer Protection Grievance Option */}
                     <View style={styles.section}>
@@ -1169,5 +1284,55 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
         color: Colors.gray700,
+    },
+    refundCard: {
+        backgroundColor: Colors.warmOffWhite,
+        borderRadius: BorderRadius.md,
+        padding: Spacing.md,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+    },
+    refundDivider: {
+        height: 1,
+        backgroundColor: Colors.gray200,
+        marginVertical: Spacing.sm,
+    },
+    refundItemBox: {
+        backgroundColor: Colors.white,
+        borderRadius: BorderRadius.sm,
+        padding: Spacing.sm,
+        marginBottom: Spacing.xs,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+    },
+    refundAmountText: {
+        ...Typography.labelMedium,
+        fontWeight: '700',
+        color: Colors.deepPlum,
+    },
+    refundUtrText: {
+        ...Typography.bodySmall,
+        fontSize: 11,
+        color: Colors.gray600,
+        marginTop: 3,
+    },
+    refundDateText: {
+        ...Typography.bodySmall,
+        fontSize: 10,
+        color: Colors.gray400,
+        marginTop: 2,
+    },
+    refundNoticeBox: {
+        padding: Spacing.sm,
+        backgroundColor: Colors.white,
+        borderRadius: BorderRadius.sm,
+        borderLeftWidth: 3,
+        borderLeftColor: Colors.coral,
+    },
+    refundNoticeText: {
+        ...Typography.bodySmall,
+        fontSize: 11,
+        color: Colors.gray700,
+        lineHeight: 16,
     },
 });

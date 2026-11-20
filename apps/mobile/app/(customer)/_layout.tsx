@@ -98,6 +98,13 @@ export default function CustomerTabsLayout() {
                 }}
             />
             <Tabs.Screen
+                name="support/[reference]"
+                options={{
+                    href: null,
+                    headerTitle: 'Case Details & Timeline',
+                }}
+            />
+            <Tabs.Screen
                 name="rewards/index"
                 options={{
                     href: null,

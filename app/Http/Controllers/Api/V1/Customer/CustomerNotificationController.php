@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\ApiController;
 use App\Http\Resources\Api\V1\NotificationDeliveryResource;
 use App\Models\NotificationDelivery;
 use App\Models\User;
+use App\Services\Notifications\NotificationPreferenceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -108,5 +109,45 @@ class CustomerNotificationController extends ApiController
         }, 3);
 
         return $this->success(null, 'All notifications marked as read.');
+    }
+
+    public function preferences(
+        Request $request,
+        NotificationPreferenceService $preferenceService,
+    ): JsonResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        return $this->success(
+            $preferenceService->getPreferences($user),
+            'Notification preferences retrieved successfully.'
+        );
+    }
+
+    public function updatePreferences(
+        Request $request,
+        NotificationPreferenceService $preferenceService,
+    ): JsonResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'in_app_operational' => ['nullable', 'boolean'],
+            'email_operational' => ['nullable', 'boolean'],
+            'sms_operational' => ['nullable', 'boolean'],
+            'whatsapp_opted_in' => ['nullable', 'boolean'],
+        ]);
+
+        $preferenceService->updatePreferences(
+            $user,
+            $validated,
+            $request->ip(),
+            $request->userAgent()
+        );
+
+        return $this->success(
+            $preferenceService->getPreferences($user),
+            'Notification preferences updated successfully.'
+        );
     }
 }

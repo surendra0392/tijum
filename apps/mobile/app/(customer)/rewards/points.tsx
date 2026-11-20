@@ -40,6 +40,7 @@ export default function PointsWalletScreen() {
     >('all');
     const [wallet, setWallet] = useState<PointsWallet | null>(null);
     const [ledger, setLedger] = useState<PointsLedgerItem[]>([]);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadData = async (isRefresh = false) => {
         if (isRefresh) {
@@ -47,84 +48,16 @@ export default function PointsWalletScreen() {
         } else {
             setLoading(true);
         }
+        setErrorMessage(null);
 
         try {
             const res = await RewardsApi.getPointsLedger();
             if (res.data) {
                 setWallet(res.data.wallet);
-                setLedger(res.data.ledger);
+                setLedger(res.data.ledger || []);
             }
-        } catch {
-            // Robust defaults
-            setWallet({
-                available_points: 1250,
-                pending_points: 300,
-                reserved_points: 0,
-                redeemed_points: 450,
-                expired_points: 0,
-                total_earned_points: 2000,
-                point_to_inr_rate: 0.25,
-                estimated_inr_value: 312.5,
-            });
-            setLedger([
-                {
-                    id: 1,
-                    transaction_type: 'earned_stay',
-                    transaction_type_label: 'Stay Completed',
-                    points: 500,
-                    direction: 'credit',
-                    status: 'completed',
-                    description: 'Stay completion bonus at Sri Lakshmi PG',
-                    booking_reference: 'TIJ-BK-88219',
-                    created_at: '2026-11-10 14:30',
-                    expires_at: '2027-11-10',
-                },
-                {
-                    id: 2,
-                    transaction_type: 'referral_bonus',
-                    transaction_type_label: 'Referral Bonus',
-                    points: 500,
-                    direction: 'credit',
-                    status: 'completed',
-                    description: 'Friend completed their first stay',
-                    created_at: '2026-11-05 09:15',
-                    expires_at: '2027-11-05',
-                },
-                {
-                    id: 3,
-                    transaction_type: 'redeemed_booking',
-                    transaction_type_label: 'Booking Discount',
-                    points: 200,
-                    direction: 'debit',
-                    status: 'completed',
-                    description: 'Redeemed at checkout for ₹50 discount',
-                    booking_reference: 'TIJ-BK-77102',
-                    created_at: '2026-10-28 18:20',
-                },
-                {
-                    id: 4,
-                    transaction_type: 'earned_stay',
-                    transaction_type_label: 'Pending Stay Reward',
-                    points: 300,
-                    direction: 'credit',
-                    status: 'pending',
-                    description:
-                        'Upcoming check-in stay points (credits on checkout)',
-                    booking_reference: 'TIJ-BK-99411',
-                    created_at: '2026-11-12 11:00',
-                },
-                {
-                    id: 5,
-                    transaction_type: 'redeemed_booking',
-                    transaction_type_label: 'Booking Discount',
-                    points: 250,
-                    direction: 'debit',
-                    status: 'completed',
-                    description: 'Redeemed on monthly hostel stay',
-                    booking_reference: 'TIJ-BK-55209',
-                    created_at: '2026-09-14 10:45',
-                },
-            ]);
+        } catch (err: any) {
+            setErrorMessage(err?.message || 'Failed to load points activity.');
         } finally {
             setLoading(false);
             setRefreshing(false);

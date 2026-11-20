@@ -124,10 +124,13 @@ Route::prefix('v1')->group(function (): void {
         Route::get('cases', [CustomerProtectionController::class, 'index'])->name('api.v1.customer.cases.index');
         Route::post('cases', [CustomerProtectionController::class, 'store'])->name('api.v1.customer.cases.store');
         Route::get('cases/{reference}', [CustomerProtectionController::class, 'show'])->name('api.v1.customer.cases.show');
+        Route::post('cases/{reference}/messages', [CustomerProtectionController::class, 'addMessage'])->name('api.v1.customer.cases.messages.store');
 
-        // In-App Notifications
+        // In-App Notifications & Communication Preferences
         Route::get('notifications', [CustomerNotificationController::class, 'index'])->name('api.v1.customer.notifications.index');
         Route::get('notifications/unread-count', [CustomerNotificationController::class, 'unreadCount'])->name('api.v1.customer.notifications.unread-count');
+        Route::get('notifications/preferences', [CustomerNotificationController::class, 'preferences'])->name('api.v1.customer.notifications.preferences');
+        Route::put('notifications/preferences', [CustomerNotificationController::class, 'updatePreferences'])->name('api.v1.customer.notifications.preferences.update');
         Route::post('notifications/{id}/read', [CustomerNotificationController::class, 'markRead'])->name('api.v1.customer.notifications.read');
         Route::post('notifications/mark-all-read', [CustomerNotificationController::class, 'markAllRead'])->name('api.v1.customer.notifications.mark-all-read');
 

@@ -8,6 +8,7 @@ import {
     Image,
     TouchableOpacity,
     SafeAreaView,
+    Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -22,6 +23,10 @@ import {
     Sparkles,
     Check,
     Star,
+    Images,
+    ChevronLeft,
+    ChevronRight,
+    X,
 } from 'lucide-react-native';
 import { PublicApi } from '../../../../src/api/public';
 import { PropertyDetail, RoomType } from '../../../../src/api/types';
@@ -41,6 +46,9 @@ export default function PropertyDetailScreen() {
     const [property, setProperty] = useState<PropertyDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [galleryModalVisible, setGalleryModalVisible] = useState(false);
+    const [activeGalleryIndex, setActiveGalleryIndex] = useState(0);
+    const [galleryCategory, setGalleryCategory] = useState<'all' | 'room' | 'dining' | 'exterior'>('all');
 
     useEffect(() => {
         if (slug) {
@@ -87,20 +95,58 @@ export default function PropertyDetailScreen() {
         );
     }
 
+    const galleryList =
+        property.gallery && property.gallery.length > 0
+            ? property.gallery
+            : property.cover_image_url
+            ? [
+                  {
+                      id: 1,
+                      url: property.cover_image_url,
+                      caption: property.name,
+                      is_primary: true,
+                  },
+              ]
+            : [];
+
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
-                {/* Cover Image */}
-                {property.cover_image_url ? (
-                    <Image
-                        source={{ uri: property.cover_image_url }}
-                        style={styles.coverImage}
-                    />
-                ) : (
-                    <View style={[styles.coverImage, styles.placeholderCover]}>
-                        <Building2 size={48} color={Colors.gray400} />
-                    </View>
-                )}
+                {/* Cover Image & Gallery Trigger */}
+                <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => {
+                        if (galleryList.length > 0) {
+                            setActiveGalleryIndex(0);
+                            setGalleryModalVisible(true);
+                        }
+                    }}
+                    style={styles.coverImageContainer}
+                >
+                    {property.cover_image_url ? (
+                        <Image
+                            source={{ uri: property.cover_image_url }}
+                            style={styles.coverImage}
+                        />
+                    ) : (
+                        <View style={[styles.coverImage, styles.placeholderCover]}>
+                            <Building2 size={48} color={Colors.gray400} />
+                        </View>
+                    )}
+                    {galleryList.length > 0 && (
+                        <View style={styles.galleryTriggerBadge}>
+                            <Images
+                                size={14}
+                                color={Colors.white}
+                                style={{ marginRight: 6 }}
+                            />
+                            <Text style={styles.galleryTriggerText}>
+                                {galleryList.length} Photo
+                                {galleryList.length > 1 ? 's' : ''}
+                            </Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
 
                 <View style={styles.contentPadding}>
                     {/* Header Title & Badges */}
@@ -541,6 +587,105 @@ export default function PropertyDetailScreen() {
                     style={{ paddingHorizontal: Spacing.xl }}
                 />
             </View>
+            {/* Photo Gallery Modal */}
+            <Modal
+                visible={galleryModalVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setGalleryModalVisible(false)}
+            >
+                <View style={styles.galleryModalOverlay}>
+                    {/* Gallery Header */}
+                    <View style={styles.galleryModalHeader}>
+                        <Text style={styles.galleryModalCount}>
+                            {galleryList.length > 0
+                                ? `${activeGalleryIndex + 1} / ${galleryList.length}`
+                                : '0 / 0'}
+                        </Text>
+                        <TouchableOpacity
+                            onPress={() => setGalleryModalVisible(false)}
+                            style={styles.galleryCloseBtn}
+                            accessibilityLabel="Close Gallery"
+                        >
+                            <X size={24} color={Colors.white} />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Main Photo Display with Navigation Arrows */}
+                    <View style={styles.galleryMainView}>
+                        {galleryList.length > 1 && (
+                            <TouchableOpacity
+                                style={[styles.galleryNavBtn, styles.galleryNavLeft]}
+                                onPress={() =>
+                                    setActiveGalleryIndex((prev) =>
+                                        prev > 0 ? prev - 1 : galleryList.length - 1,
+                                    )
+                                }
+                            >
+                                <ChevronLeft size={28} color={Colors.white} />
+                            </TouchableOpacity>
+                        )}
+
+                        {galleryList[activeGalleryIndex] ? (
+                            <Image
+                                source={{ uri: galleryList[activeGalleryIndex].url }}
+                                style={styles.galleryMainImage}
+                                resizeMode="contain"
+                            />
+                        ) : null}
+
+                        {galleryList.length > 1 && (
+                            <TouchableOpacity
+                                style={[styles.galleryNavBtn, styles.galleryNavRight]}
+                                onPress={() =>
+                                    setActiveGalleryIndex((prev) =>
+                                        prev < galleryList.length - 1 ? prev + 1 : 0,
+                                    )
+                                }
+                            >
+                                <ChevronRight size={28} color={Colors.white} />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+
+                    {/* Caption */}
+                    {galleryList[activeGalleryIndex]?.caption ? (
+                        <View style={styles.galleryCaptionBox}>
+                            <Text style={styles.galleryCaptionText}>
+                                {galleryList[activeGalleryIndex].caption}
+                            </Text>
+                        </View>
+                    ) : null}
+
+                    {/* Thumbnails Strip */}
+                    {galleryList.length > 1 && (
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.galleryThumbsScroll}
+                        >
+                            {galleryList.map((item, idx) => {
+                                const isActive = idx === activeGalleryIndex;
+                                return (
+                                    <TouchableOpacity
+                                        key={item.id || idx}
+                                        onPress={() => setActiveGalleryIndex(idx)}
+                                        style={[
+                                            styles.galleryThumb,
+                                            isActive && styles.galleryThumbActive,
+                                        ]}
+                                    >
+                                        <Image
+                                            source={{ uri: item.url }}
+                                            style={styles.galleryThumbImg}
+                                        />
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+                    )}
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -552,6 +697,27 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingBottom: 100,
+    },
+    coverImageContainer: {
+        position: 'relative',
+        width: '100%',
+        height: 240,
+    },
+    galleryTriggerBadge: {
+        position: 'absolute',
+        bottom: Spacing.sm,
+        right: Spacing.sm,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.65)',
+        paddingHorizontal: Spacing.sm,
+        paddingVertical: 5,
+        borderRadius: 9999,
+    },
+    galleryTriggerText: {
+        ...Typography.labelSmall,
+        color: Colors.white,
+        fontWeight: '700',
     },
     coverImage: {
         width: '100%',
@@ -826,5 +992,83 @@ const styles = StyleSheet.create({
         ...Typography.bodyMedium,
         color: Colors.coral,
         textAlign: 'center',
+    },
+    galleryModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.94)',
+        justifyContent: 'space-between',
+        paddingVertical: Spacing.xl,
+    },
+    galleryModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: Spacing.lg,
+        paddingTop: Spacing.md,
+    },
+    galleryModalCount: {
+        ...Typography.labelMedium,
+        color: Colors.white,
+        fontWeight: '700',
+    },
+    galleryCloseBtn: {
+        padding: Spacing.xs,
+    },
+    galleryMainView: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        position: 'relative',
+    },
+    galleryMainImage: {
+        width: '100%',
+        height: '80%',
+    },
+    galleryNavBtn: {
+        position: 'absolute',
+        zIndex: 10,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    galleryNavLeft: {
+        left: Spacing.md,
+    },
+    galleryNavRight: {
+        right: Spacing.md,
+    },
+    galleryCaptionBox: {
+        paddingHorizontal: Spacing.lg,
+        paddingVertical: Spacing.xs,
+        alignItems: 'center',
+    },
+    galleryCaptionText: {
+        ...Typography.bodySmall,
+        color: Colors.white,
+        textAlign: 'center',
+        opacity: 0.9,
+    },
+    galleryThumbsScroll: {
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.sm,
+        gap: Spacing.xs,
+    },
+    galleryThumb: {
+        width: 60,
+        height: 60,
+        borderRadius: 6,
+        overflow: 'hidden',
+        borderWidth: 2,
+        borderColor: 'transparent',
+    },
+    galleryThumbActive: {
+        borderColor: Colors.coral,
+    },
+    galleryThumbImg: {
+        width: '100%',
+        height: '100%',
     },
 });

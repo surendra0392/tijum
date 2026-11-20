@@ -33,6 +33,7 @@ export default function RewardsDashboardScreen() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [overview, setOverview] = useState<RewardsOverviewResponse | null>(
         null,
     );
@@ -43,73 +44,15 @@ export default function RewardsDashboardScreen() {
         } else {
             setLoading(true);
         }
+        setErrorMessage(null);
 
         try {
             const res = await RewardsApi.getOverview();
             if (res.data) {
                 setOverview(res.data);
             }
-        } catch {
-            // Provide fallback defaults if server rewards endpoint is in cold start
-            setOverview({
-                wallet: {
-                    available_points: 1250,
-                    pending_points: 300,
-                    reserved_points: 0,
-                    redeemed_points: 450,
-                    expired_points: 0,
-                    total_earned_points: 2000,
-                    point_to_inr_rate: 0.25,
-                    estimated_inr_value: 312.5,
-                },
-                referral_profile: {
-                    referral_code: 'TIJUM-PREMIUM',
-                    referral_link: 'https://tijum.com/r/TIJUM-PREMIUM',
-                    referrer_reward_points: 500,
-                    referee_reward_points: 250,
-                    total_referrals_count: 3,
-                    completed_referrals_count: 2,
-                    pending_referrals_count: 1,
-                    total_points_earned: 1000,
-                    pending_points_expected: 500,
-                },
-                active_coupons_count: 4,
-                expiring_soon_points: [
-                    { points: 150, expires_at: '2026-12-31' },
-                ],
-                recent_transactions: [
-                    {
-                        id: 101,
-                        transaction_type: 'earned_stay',
-                        transaction_type_label: 'Stay Completed',
-                        points: 500,
-                        direction: 'credit',
-                        status: 'completed',
-                        description: 'Completed stay at Sri Lakshmi PG',
-                        created_at: '2026-11-10',
-                    },
-                    {
-                        id: 102,
-                        transaction_type: 'referral_bonus',
-                        transaction_type_label: 'Referral Bonus',
-                        points: 500,
-                        direction: 'credit',
-                        status: 'completed',
-                        description: 'Friend completed their first stay',
-                        created_at: '2026-11-05',
-                    },
-                    {
-                        id: 103,
-                        transaction_type: 'redeemed_booking',
-                        transaction_type_label: 'Booking Discount',
-                        points: 200,
-                        direction: 'debit',
-                        status: 'completed',
-                        description: 'Redeemed on Hyderabad Co-Living stay',
-                        created_at: '2026-10-28',
-                    },
-                ],
-            });
+        } catch (err: any) {
+            setErrorMessage(err?.message || 'Failed to load rewards overview.');
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -119,6 +62,35 @@ export default function RewardsDashboardScreen() {
     useEffect(() => {
         loadRewards();
     }, []);
+
+    if (loading && !refreshing) {
+        return (
+            <SafeAreaView style={styles.safeArea}>
+                <View style={styles.center}>
+                    <ActivityIndicator size="large" color={Colors.coral} />
+                    <Text style={styles.loadingText}>Loading rewards profile...</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (errorMessage && !overview) {
+        return (
+            <SafeAreaView style={styles.safeArea}>
+                <View style={styles.center}>
+                    <Info size={40} color={Colors.textTertiary} />
+                    <Text style={styles.emptyTitle}>Rewards Unavailable</Text>
+                    <Text style={styles.emptySubtitle}>{errorMessage}</Text>
+                    <TouchableOpacity
+                        style={styles.retryBtn}
+                        onPress={() => loadRewards(false)}
+                    >
+                        <Text style={styles.retryBtnText}>Try Again</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     const wallet = overview?.wallet;
 
@@ -717,5 +689,40 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: Colors.gray600,
         lineHeight: 16,
+    },
+    center: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: Spacing.xl,
+    },
+    loadingText: {
+        marginTop: Spacing.sm,
+        fontSize: Typography.fontSize.sm,
+        color: Colors.textSecondary,
+    },
+    emptyTitle: {
+        fontSize: Typography.fontSize.md,
+        fontWeight: '700',
+        color: Colors.textPrimary,
+        marginTop: Spacing.sm,
+    },
+    emptySubtitle: {
+        fontSize: Typography.fontSize.xs,
+        color: Colors.textSecondary,
+        textAlign: 'center',
+        marginTop: 4,
+        marginBottom: Spacing.md,
+    },
+    retryBtn: {
+        backgroundColor: Colors.coral,
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.xs + 2,
+        borderRadius: BorderRadius.md,
+    },
+    retryBtnText: {
+        color: Colors.surface,
+        fontSize: Typography.fontSize.xs,
+        fontWeight: '700',
     },
 });

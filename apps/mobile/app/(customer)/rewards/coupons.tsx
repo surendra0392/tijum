@@ -43,6 +43,7 @@ export default function CouponsScreen() {
     >('all');
     const [coupons, setCoupons] = useState<CouponItem[]>([]);
     const [copiedCode, setCopiedCode] = useState<string | null>(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const loadCoupons = async (isRefresh = false) => {
         if (isRefresh) {
@@ -50,70 +51,15 @@ export default function CouponsScreen() {
         } else {
             setLoading(true);
         }
+        setErrorMessage(null);
 
         try {
             const res = await RewardsApi.getAvailableCoupons();
             if (res.data) {
                 setCoupons(res.data);
             }
-        } catch {
-            setCoupons([
-                {
-                    id: 1,
-                    code: 'TIJUMWELCOME',
-                    title: 'New Member Welcome Discount',
-                    description:
-                        'Get flat ₹500 off your first stay across all Hostels/PG, Homestays, and Co-Living spaces.',
-                    offer_type: 'fixed_amount',
-                    discount_amount_paise: 50000,
-                    min_subtotal_paise: 300000,
-                    funding_source: 'platform',
-                    expires_at: '2027-12-31',
-                    is_eligible: true,
-                },
-                {
-                    id: 2,
-                    code: 'COLIVING15',
-                    title: '15% Off Co-Living Spaces',
-                    description:
-                        'Enjoy 15% discount up to ₹1,000 on community living stays in Hyderabad and Vijayawada.',
-                    offer_type: 'percentage',
-                    discount_percentage: 15,
-                    max_discount_paise: 100000,
-                    min_subtotal_paise: 500000,
-                    applicable_category: 'co-living',
-                    funding_source: 'platform',
-                    expires_at: '2026-12-31',
-                    is_eligible: true,
-                },
-                {
-                    id: 3,
-                    code: 'HOMESTAYPOINTS',
-                    title: 'Homestay Weekend Reward',
-                    description:
-                        'Earn 500 extra loyalty points on 3+ day verified homestay reservations.',
-                    offer_type: 'points_reward',
-                    points_reward: 500,
-                    min_subtotal_paise: 250000,
-                    applicable_category: 'homestays',
-                    funding_source: 'platform',
-                    expires_at: '2027-01-31',
-                    is_eligible: true,
-                },
-                {
-                    id: 4,
-                    code: 'FESTIVAL750',
-                    title: 'Sankranti Festival Special',
-                    description:
-                        'Save flat ₹750 on monthly hostel stays across Guntur, Hyderabad, and Visakhapatnam.',
-                    offer_type: 'fixed_amount',
-                    discount_amount_paise: 75000,
-                    min_subtotal_paise: 600000,
-                    funding_source: 'split',
-                    expires_at: '2027-01-20',
-                    is_eligible: true,
-                },
-            ]);
+        } catch (err: any) {
+            setErrorMessage(err?.message || 'Failed to load coupons.');
         } finally {
             setLoading(false);
             setRefreshing(false);

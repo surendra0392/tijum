@@ -100,17 +100,8 @@ export default function CreateReservationScreen() {
                 }
             })
             .catch(() => {
-                setUserWallet({
-                    available_points: 1000,
-                    pending_points: 0,
-                    reserved_points: 0,
-                    redeemed_points: 0,
-                    expired_points: 0,
-                    total_earned_points: 1000,
-                    point_to_inr_rate: 0.25,
-                    estimated_inr_value: 250,
-                });
-                setPointsToRedeem(400);
+                setUserWallet(null);
+                setPointsToRedeem(0);
             });
     }, []);
 
@@ -140,103 +131,119 @@ export default function CreateReservationScreen() {
         }
     };
 
-    // Recalculate Quote whenever room, duration, or check-in changes
+    // Authoritative Backend Quote Calculation
     useEffect(() => {
         if (!property || !selectedRoomId) return;
+
+        let isCurrent = true;
+        const durCount = parseInt(durationQuantity, 10) || 1;
+        const count = parseInt(quantity, 10) || 1;
 
         const selectedRoom = property.room_types.find(
             (r: RoomType) => r.id === selectedRoomId,
         );
         if (!selectedRoom) return;
 
-        const count = parseInt(quantity, 10) || 1;
-        const durCount = parseInt(durationQuantity, 10) || 1;
+        const calculateAuthoritativeQuote = async () => {
+            try {
+                // Call backend quote endpoint to evaluate inventory availability & rate
+                const quoteRes = await CustomerApi.quoteReservation(property.id, {
+                    property_room_type_id: selectedRoomId,
+                    check_in_date: checkInDate,
+                    duration_type: durationType,
+                    duration_quantity: durCount,
+                    quantity: count,
+                });
 
-        let unitRatePaise = selectedRoom.price_daily_paise;
-        let days = durCount;
+                if (!isCurrent) return;
 
-        if (durationType === 'weekly') {
-            unitRatePaise = selectedRoom.price_weekly_paise;
-            days = durCount * 7;
-        } else if (durationType === 'monthly') {
-            unitRatePaise = selectedRoom.price_monthly_paise;
-            days = durCount * 30;
-        }
+                if (quoteRes.data && (quoteRes.data as any).quote) {
+                    const qData = (quoteRes.data as any).quote;
+                    const subtotalPaise = qData.base_amount_minor || qData.subtotal_minor || 0;
+                    const taxPaise = qData.tax_amount_minor || 0;
+                    const depositPaise = qData.deposit_amount_minor || (selectedRoom.deposit_paise || 0) * count;
+                    const checkOutDateStr = (quoteRes.data as any).check_out_date || qData.check_out_date || '';
 
-        // 1. Base Accommodation Subtotal
-        const baseAmount = unitRatePaise * durCount * count;
+                    let couponDiscount = 0;
+                    let pointsDiscount = 0;
+                    let pointsRedeemed = 0;
+                    let totalPaise = subtotalPaise + taxPaise + depositPaise;
+                    let pointsToEarn = Math.max(50, Math.round(subtotalPaise / 2000));
 
-        // 2. Coupon Discount (Order: Subtotal -> Coupon)
-        let couponDiscountPaise = 0;
-        if (appliedCoupon) {
-            couponDiscountPaise = Math.min(
-                appliedCoupon.discount_amount_paise,
-                baseAmount,
-            );
-        }
+                    if (appliedCoupon || (redeemPointsActive && pointsToRedeem > 0)) {
+                        try {
+                            const promoRes = await RewardsApi.quotePromotions({
+                                property_id: property.id,
+                                subtotal_paise: subtotalPaise,
+                                tax_amount_paise: taxPaise,
+                                deposit_amount_paise: depositPaise,
+                                coupon_code: appliedCoupon?.code,
+                                points_to_redeem: redeemPointsActive ? pointsToRedeem : 0,
+                            });
+                            if (promoRes.data) {
+                                couponDiscount = promoRes.data.coupon_discount_paise || 0;
+                                pointsDiscount = promoRes.data.points_discount_paise || 0;
+                                pointsRedeemed = promoRes.data.points_redeemed || 0;
+                                totalPaise = promoRes.data.final_payable_paise || totalPaise;
+                            }
+                        } catch {
+                            // Non-critical promotion fallback
+                        }
+                    }
 
-        const discountedSubtotal = Math.max(
-            0,
-            baseAmount - couponDiscountPaise,
-        );
+                    setQuote({
+                        base_amount_paise: subtotalPaise,
+                        coupon_discount_paise: couponDiscount,
+                        points_discount_paise: pointsDiscount,
+                        points_redeemed: pointsRedeemed,
+                        tax_amount_paise: taxPaise,
+                        deposit_amount_paise: depositPaise,
+                        total_amount_paise: totalPaise,
+                        points_to_earn: pointsToEarn,
+                        check_out_date: checkOutDateStr,
+                    });
+                }
+            } catch {
+                if (!isCurrent) return;
+                // Fallback computation matching Phase 09A integer minor rules if offline
+                let unitRatePaise = selectedRoom.price_daily_paise;
+                let days = durCount;
+                if (durationType === 'weekly') {
+                    unitRatePaise = selectedRoom.price_weekly_paise;
+                    days = durCount * 7;
+                } else if (durationType === 'monthly') {
+                    unitRatePaise = selectedRoom.price_monthly_paise;
+                    days = durCount * 30;
+                }
 
-        // 3. Tax
-        const taxAmount = 0;
+                const baseAmount = unitRatePaise * durCount * count;
+                const couponDiscountPaise = appliedCoupon ? Math.min(appliedCoupon.discount_amount_paise, baseAmount) : 0;
+                const depositAmount = (selectedRoom.deposit_paise || 0) * count;
+                const totalAmount = Math.max(0, baseAmount - couponDiscountPaise + depositAmount);
 
-        // 4. Points Redemption (Order: Subtotal - Coupon -> Tax -> Points)
-        let pointsDiscountPaise = 0;
-        let effectivePointsUsed = 0;
-        if (
-            redeemPointsActive &&
-            userWallet &&
-            userWallet.available_points > 0
-        ) {
-            const rate = userWallet.point_to_inr_rate || 0.25;
-            const requestedDiscountPaise = Math.round(
-                pointsToRedeem * rate * 100,
-            );
-            pointsDiscountPaise = Math.min(
-                requestedDiscountPaise,
-                discountedSubtotal,
-            );
-            effectivePointsUsed = Math.min(
-                pointsToRedeem,
-                Math.ceil(pointsDiscountPaise / (rate * 100)),
-            );
-        }
+                const inDate = new Date(checkInDate);
+                inDate.setDate(inDate.getDate() + days);
+                const outDateStr = inDate.toISOString().split('T')[0];
 
-        // 5. Security Deposit & Final Payable
-        const depositAmount = (selectedRoom.deposit_paise || 0) * count;
-        const totalAmount = Math.max(
-            0,
-            discountedSubtotal -
-                pointsDiscountPaise +
-                taxAmount +
-                depositAmount,
-        );
+                setQuote({
+                    base_amount_paise: baseAmount,
+                    coupon_discount_paise: couponDiscountPaise,
+                    points_discount_paise: 0,
+                    points_redeemed: 0,
+                    tax_amount_paise: 0,
+                    deposit_amount_paise: depositAmount,
+                    total_amount_paise: totalAmount,
+                    points_to_earn: Math.max(50, Math.round(baseAmount / 2000)),
+                    check_out_date: outDateStr,
+                });
+            }
+        };
 
-        // Points earned on completed stay (1 point per ₹20 spent on subtotal)
-        const pointsToEarn = Math.max(
-            50,
-            Math.round(discountedSubtotal / 2000),
-        );
+        calculateAuthoritativeQuote();
 
-        // Calculate checkout date
-        const inDate = new Date(checkInDate);
-        inDate.setDate(inDate.getDate() + days);
-        const outDateStr = inDate.toISOString().split('T')[0];
-
-        setQuote({
-            base_amount_paise: baseAmount,
-            coupon_discount_paise: couponDiscountPaise,
-            points_discount_paise: pointsDiscountPaise,
-            points_redeemed: effectivePointsUsed,
-            tax_amount_paise: taxAmount,
-            deposit_amount_paise: depositAmount,
-            total_amount_paise: totalAmount,
-            points_to_earn: pointsToEarn,
-            check_out_date: outDateStr,
-        });
+        return () => {
+            isCurrent = false;
+        };
     }, [
         property,
         selectedRoomId,
@@ -247,7 +254,6 @@ export default function CreateReservationScreen() {
         appliedCoupon,
         redeemPointsActive,
         pointsToRedeem,
-        userWallet,
     ]);
 
     const handleApplyCoupon = async () => {
@@ -302,33 +308,12 @@ export default function CreateReservationScreen() {
                     res.data?.message || 'Invalid or expired coupon code.',
                 );
             }
-        } catch {
-            const codeUpper = couponCode.trim().toUpperCase();
-            const subtotalPaise = quote?.base_amount_paise || 100000;
-            if (codeUpper === 'TIJUMWELCOME') {
-                const disc = Math.min(50000, subtotalPaise);
-                setAppliedCoupon({
-                    code: 'TIJUMWELCOME',
-                    discount_amount_paise: disc,
-                    offer_type: 'fixed_amount',
-                    title: 'Welcome Discount (₹500 OFF)',
-                });
-                Alert.alert('Coupon Applied!', 'Saved ₹500 with TIJUMWELCOME');
-            } else if (codeUpper === 'COLIVING15') {
-                const disc = Math.min(100000, Math.round(subtotalPaise * 0.15));
-                setAppliedCoupon({
-                    code: 'COLIVING15',
-                    discount_amount_paise: disc,
-                    offer_type: 'percentage',
-                    title: '15% Off Co-Living',
-                });
-                Alert.alert(
-                    'Coupon Applied!',
-                    `Saved ₹${Math.round(disc / 100)} with COLIVING15`,
-                );
-            } else {
-                setCouponError('Invalid or expired promo code.');
-            }
+        } catch (err: any) {
+            const serverMessage =
+                err?.response?.data?.message ||
+                err?.message ||
+                'Unable to validate coupon. Please try again.';
+            setCouponError(serverMessage);
         } finally {
             setCouponLoading(false);
         }

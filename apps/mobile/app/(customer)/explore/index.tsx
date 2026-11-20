@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
+    Modal,
     RefreshControl,
     ScrollView,
     StyleSheet,
+    Switch,
     Text,
     TextInput,
     TouchableOpacity,
@@ -23,6 +25,10 @@ import {
     Users,
     Sparkles,
     User,
+    SlidersHorizontal,
+    Utensils,
+    Calendar,
+    Check,
 } from 'lucide-react-native';
 import { PublicApi } from '../../../src/api/public';
 import { CustomerApi } from '../../../src/api/customer';
@@ -34,6 +40,9 @@ import {
     normalizeCategorySlug,
 } from '../../../src/constants/categories';
 import { PropertyCard } from '../../../src/components/PropertyCard';
+import { Input } from '../../../src/components/Input';
+import { Button } from '../../../src/components/Button';
+import { Badge } from '../../../src/components/Badge';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
@@ -95,6 +104,15 @@ export default function ExploreScreen() {
     >('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [filterAc, setFilterAc] = useState(false);
+    const [filterBreakfast, setFilterBreakfast] = useState(false);
+    const [filterLunch, setFilterLunch] = useState(false);
+    const [filterDinner, setFilterDinner] = useState(false);
+    const [selectedSharing, setSelectedSharing] = useState<number | null>(null);
+    const [minPrice, setMinPrice] = useState('');
+    const [maxPrice, setMaxPrice] = useState('');
+    const [checkInDate, setCheckInDate] = useState('');
+    const [checkOutDate, setCheckOutDate] = useState('');
+    const [advancedModalVisible, setAdvancedModalVisible] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [wishlistedIds, setWishlistedIds] = useState<Set<number>>(new Set());
 
@@ -123,6 +141,27 @@ export default function ExploreScreen() {
         });
     };
 
+    const activeFiltersCount =
+        (filterAc ? 1 : 0) +
+        (selectedGender !== 'all' ? 1 : 0) +
+        (filterBreakfast ? 1 : 0) +
+        (filterLunch ? 1 : 0) +
+        (filterDinner ? 1 : 0) +
+        (selectedSharing ? 1 : 0) +
+        (minPrice || maxPrice ? 1 : 0) +
+        (checkInDate ? 1 : 0);
+
+    const resetAdvancedFilters = () => {
+        setFilterBreakfast(false);
+        setFilterLunch(false);
+        setFilterDinner(false);
+        setSelectedSharing(null);
+        setMinPrice('');
+        setMaxPrice('');
+        setCheckInDate('');
+        setCheckOutDate('');
+    };
+
     const loadProperties = async (isRefresh = false) => {
         if (isRefresh) {
             setRefreshing(true);
@@ -149,6 +188,30 @@ export default function ExploreScreen() {
                 filters.gender = selectedGender;
                 filters.gender_preference = selectedGender;
             }
+            if (filterBreakfast) {
+                filters.breakfast = true;
+            }
+            if (filterLunch) {
+                filters.lunch = true;
+            }
+            if (filterDinner) {
+                filters.dinner = true;
+            }
+            if (selectedSharing) {
+                filters.sharing_capacity = selectedSharing;
+            }
+            if (minPrice && !isNaN(Number(minPrice))) {
+                filters.min_price = Number(minPrice) * 100;
+            }
+            if (maxPrice && !isNaN(Number(maxPrice))) {
+                filters.max_price = Number(maxPrice) * 100;
+            }
+            if (checkInDate.trim()) {
+                filters.check_in_date = checkInDate.trim();
+            }
+            if (checkOutDate.trim()) {
+                filters.check_out_date = checkOutDate.trim();
+            }
 
             const res = await PublicApi.getProperties(filters);
             let list = res.data || [];
@@ -173,7 +236,16 @@ export default function ExploreScreen() {
 
     useEffect(() => {
         loadProperties();
-    }, [selectedCity, selectedCategory, filterAc, selectedGender]);
+    }, [
+        selectedCity,
+        selectedCategory,
+        filterAc,
+        selectedGender,
+        filterBreakfast,
+        filterLunch,
+        filterDinner,
+        selectedSharing,
+    ]);
 
     const handleSearchSubmit = () => {
         loadProperties();
@@ -286,12 +358,40 @@ export default function ExploreScreen() {
                     })}
                 </ScrollView>
 
-                {/* Secondary Filters: Cities & AC */}
+                {/* Secondary Filters: Advanced Filters, Cities & AC */}
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.cityPillContainer}
                 >
+                    <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => setAdvancedModalVisible(true)}
+                        style={[
+                            styles.cityPill,
+                            activeFiltersCount > 0 && styles.filterPillActive,
+                        ]}
+                    >
+                        <SlidersHorizontal
+                            size={12}
+                            color={activeFiltersCount > 0 ? Colors.white : Colors.deepPlum}
+                            style={{ marginRight: 4 }}
+                        />
+                        <Text
+                            style={[
+                                styles.cityPillText,
+                                activeFiltersCount > 0 && styles.cityPillTextActive,
+                                { fontWeight: '700' },
+                            ]}
+                        >
+                            {activeFiltersCount > 0
+                                ? `Filters (${activeFiltersCount})`
+                                : 'Filters'}
+                        </Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.pillDivider} />
+
                     {CITIES.map((city) => {
                         const isSelected = selectedCity === city;
                         return (
@@ -480,6 +580,214 @@ export default function ExploreScreen() {
                     )}
                 />
             )}
+
+            {/* Advanced Filters Modal */}
+            <Modal
+                visible={advancedModalVisible}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setAdvancedModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={styles.modalHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <SlidersHorizontal size={18} color={Colors.deepPlum} />
+                                <Text style={styles.modalTitle}>Stay Filters</Text>
+                            </View>
+                            <TouchableOpacity
+                                onPress={() => setAdvancedModalVisible(false)}
+                                style={{ padding: 4 }}
+                            >
+                                <X size={20} color={Colors.deepPlum} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView
+                            contentContainerStyle={styles.modalScroll}
+                            showsVerticalScrollIndicator={false}
+                        >
+                            {/* Dates */}
+                            <Text style={styles.filterGroupTitle}>Stay Dates</Text>
+                            <View style={styles.dateInputsRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Input
+                                        label="Check-in Date"
+                                        placeholder="YYYY-MM-DD"
+                                        value={checkInDate}
+                                        onChangeText={setCheckInDate}
+                                    />
+                                </View>
+                                <View style={{ width: Spacing.sm }} />
+                                <View style={{ flex: 1 }}>
+                                    <Input
+                                        label="Check-out Date"
+                                        placeholder="YYYY-MM-DD"
+                                        value={checkOutDate}
+                                        onChangeText={setCheckOutDate}
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Meal Inclusions */}
+                            <Text style={styles.filterGroupTitle}>Meal Inclusions</Text>
+                            <Text style={styles.filterGroupSub}>
+                                Filter properties offering verified meal services.
+                            </Text>
+                            <View style={styles.chipsWrap}>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.filterChip,
+                                        filterBreakfast && styles.filterChipActive,
+                                    ]}
+                                    onPress={() => setFilterBreakfast(!filterBreakfast)}
+                                >
+                                    <Utensils
+                                        size={14}
+                                        color={filterBreakfast ? Colors.white : Colors.gray700}
+                                        style={{ marginRight: 6 }}
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.filterChipText,
+                                            filterBreakfast && styles.filterChipTextActive,
+                                        ]}
+                                    >
+                                        Breakfast
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[
+                                        styles.filterChip,
+                                        filterLunch && styles.filterChipActive,
+                                    ]}
+                                    onPress={() => setFilterLunch(!filterLunch)}
+                                >
+                                    <Utensils
+                                        size={14}
+                                        color={filterLunch ? Colors.white : Colors.gray700}
+                                        style={{ marginRight: 6 }}
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.filterChipText,
+                                            filterLunch && styles.filterChipTextActive,
+                                        ]}
+                                    >
+                                        Lunch
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[
+                                        styles.filterChip,
+                                        filterDinner && styles.filterChipActive,
+                                    ]}
+                                    onPress={() => setFilterDinner(!filterDinner)}
+                                >
+                                    <Utensils
+                                        size={14}
+                                        color={filterDinner ? Colors.white : Colors.gray700}
+                                        style={{ marginRight: 6 }}
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.filterChipText,
+                                            filterDinner && styles.filterChipTextActive,
+                                        ]}
+                                    >
+                                        Dinner
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Sharing Capacity */}
+                            <Text style={styles.filterGroupTitle}>Room Sharing Capacity</Text>
+                            <View style={styles.chipsWrap}>
+                                {[
+                                    { capacity: 1, label: 'Single / 1-Share' },
+                                    { capacity: 2, label: '2-Share' },
+                                    { capacity: 3, label: '3-Share' },
+                                    { capacity: 4, label: '4+ Share' },
+                                ].map((item) => {
+                                    const isSelected = selectedSharing === item.capacity;
+                                    return (
+                                        <TouchableOpacity
+                                            key={item.capacity}
+                                            style={[
+                                                styles.filterChip,
+                                                isSelected && styles.filterChipActive,
+                                            ]}
+                                            onPress={() =>
+                                                setSelectedSharing(
+                                                    isSelected ? null : item.capacity,
+                                                )
+                                            }
+                                        >
+                                            <Users
+                                                size={14}
+                                                color={isSelected ? Colors.white : Colors.gray700}
+                                                style={{ marginRight: 6 }}
+                                            />
+                                            <Text
+                                                style={[
+                                                    styles.filterChipText,
+                                                    isSelected && styles.filterChipTextActive,
+                                                ]}
+                                            >
+                                                {item.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+
+                            {/* Monthly Price Range */}
+                            <Text style={styles.filterGroupTitle}>Monthly Budget Range</Text>
+                            <View style={styles.dateInputsRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Input
+                                        label="Min Monthly (₹)"
+                                        placeholder="e.g. 5000"
+                                        keyboardType="numeric"
+                                        value={minPrice}
+                                        onChangeText={setMinPrice}
+                                    />
+                                </View>
+                                <View style={{ width: Spacing.sm }} />
+                                <View style={{ flex: 1 }}>
+                                    <Input
+                                        label="Max Monthly (₹)"
+                                        placeholder="e.g. 25000"
+                                        keyboardType="numeric"
+                                        value={maxPrice}
+                                        onChangeText={setMaxPrice}
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Modal Action Buttons */}
+                            <View style={styles.modalButtonsRow}>
+                                <Button
+                                    title="Reset All"
+                                    variant="outline"
+                                    onPress={resetAdvancedFilters}
+                                    style={{ flex: 1 }}
+                                />
+                                <Button
+                                    title="Apply Filters"
+                                    onPress={() => {
+                                        setAdvancedModalVisible(false);
+                                        loadProperties();
+                                    }}
+                                    style={{ flex: 1 }}
+                                />
+                            </View>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -557,6 +865,10 @@ const styles = StyleSheet.create({
     cityPillActive: {
         backgroundColor: Colors.deepPlum,
         borderColor: Colors.deepPlum,
+    },
+    filterPillActive: {
+        backgroundColor: Colors.coral,
+        borderColor: Colors.coral,
     },
     cityPillText: {
         fontSize: Typography.fontSize.xs,
@@ -653,5 +965,83 @@ const styles = StyleSheet.create({
         color: Colors.gray500,
         textAlign: 'center',
         maxWidth: 280,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalCard: {
+        backgroundColor: Colors.white,
+        borderTopLeftRadius: BorderRadius.xl,
+        borderTopRightRadius: BorderRadius.xl,
+        padding: Spacing.lg,
+        maxHeight: '85%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: Spacing.md,
+    },
+    modalTitle: {
+        ...Typography.titleMedium,
+        color: Colors.deepPlum,
+        fontWeight: '700',
+    },
+    modalScroll: {
+        paddingBottom: Spacing.xl,
+    },
+    filterGroupTitle: {
+        ...Typography.labelMedium,
+        color: Colors.deepPlum,
+        fontWeight: '700',
+        marginTop: Spacing.md,
+        marginBottom: 4,
+    },
+    filterGroupSub: {
+        ...Typography.bodySmall,
+        color: Colors.gray500,
+        marginBottom: Spacing.xs,
+        fontSize: 11,
+    },
+    chipsWrap: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: Spacing.xs,
+        marginTop: 4,
+    },
+    filterChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.gray100,
+        paddingHorizontal: Spacing.md,
+        paddingVertical: 7,
+        borderRadius: BorderRadius.full,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+    },
+    filterChipActive: {
+        backgroundColor: Colors.deepPlum,
+        borderColor: Colors.deepPlum,
+    },
+    filterChipText: {
+        ...Typography.bodySmall,
+        color: Colors.gray700,
+        fontWeight: '600',
+    },
+    filterChipTextActive: {
+        color: Colors.white,
+        fontWeight: '700',
+    },
+    dateInputsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    modalButtonsRow: {
+        flexDirection: 'row',
+        gap: Spacing.md,
+        marginTop: Spacing.xl,
     },
 });

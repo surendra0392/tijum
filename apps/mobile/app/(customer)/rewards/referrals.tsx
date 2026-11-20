@@ -49,45 +49,7 @@ export default function ReferralsScreen() {
                 setReferrals(res.data.referrals || []);
             }
         } catch {
-            setProfile({
-                referral_code: 'TIJUM-VIP88',
-                referral_link: 'https://tijum.com/r/TIJUM-VIP88',
-                referrer_reward_points: 500,
-                referee_reward_points: 250,
-                total_referrals_count: 3,
-                completed_referrals_count: 2,
-                pending_referrals_count: 1,
-                total_points_earned: 1000,
-                pending_points_expected: 500,
-            });
-            setReferrals([
-                {
-                    id: 1,
-                    referred_customer_name: 'Rahul Sharma',
-                    status: 'stay_completed',
-                    status_label: 'Stay Completed (Rewarded)',
-                    points_reward: 500,
-                    created_at: '2026-10-20',
-                    completed_at: '2026-11-05',
-                },
-                {
-                    id: 2,
-                    referred_customer_name: 'Sneha Patel',
-                    status: 'stay_completed',
-                    status_label: 'Stay Completed (Rewarded)',
-                    points_reward: 500,
-                    created_at: '2026-10-25',
-                    completed_at: '2026-11-08',
-                },
-                {
-                    id: 3,
-                    referred_customer_name: 'Vikram Reddy',
-                    status: 'booking_created',
-                    status_label: 'Active Booking (Pending Checkout)',
-                    points_reward: 500,
-                    created_at: '2026-11-09',
-                },
-            ]);
+            // Handled without fabricated data
         } finally {
             setLoading(false);
             setRefreshing(false);
