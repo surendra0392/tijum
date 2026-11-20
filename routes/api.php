@@ -14,15 +14,20 @@ use App\Http\Controllers\Api\V1\Customer\CustomerReservationController;
 use App\Http\Controllers\Api\V1\Customer\CustomerReviewController;
 use App\Http\Controllers\Api\V1\Customer\CustomerRewardsController;
 use App\Http\Controllers\Api\V1\Customer\CustomerWishlistController;
+use App\Http\Controllers\Api\V1\Owner\OwnerAmenityController;
+use App\Http\Controllers\Api\V1\Owner\OwnerAvailabilityBlockController;
 use App\Http\Controllers\Api\V1\Owner\OwnerDashboardController;
 use App\Http\Controllers\Api\V1\Owner\OwnerDeviceController;
 use App\Http\Controllers\Api\V1\Owner\OwnerFinancialController;
+use App\Http\Controllers\Api\V1\Owner\OwnerMediaController;
 use App\Http\Controllers\Api\V1\Owner\OwnerNotificationController;
+use App\Http\Controllers\Api\V1\Owner\OwnerPricingController;
 use App\Http\Controllers\Api\V1\Owner\OwnerProfileController;
 use App\Http\Controllers\Api\V1\Owner\OwnerPropertyController;
 use App\Http\Controllers\Api\V1\Owner\OwnerReservationController;
 use App\Http\Controllers\Api\V1\Owner\OwnerReviewController;
 use App\Http\Controllers\Api\V1\Owner\OwnerRoomController;
+use App\Http\Controllers\Api\V1\Owner\OwnerRoomTypeController;
 use App\Http\Controllers\Api\V1\Public\PublicCategoryController;
 use App\Http\Controllers\Api\V1\Public\PublicCityController;
 use App\Http\Controllers\Api\V1\Public\PublicConfigController;
@@ -160,8 +165,42 @@ Route::prefix('v1')->group(function (): void {
 
         // Properties
         Route::get('properties', [OwnerPropertyController::class, 'index'])->name('api.v1.owner.properties.index');
+        Route::post('properties', [OwnerPropertyController::class, 'store'])->name('api.v1.owner.properties.store');
+        Route::get('reference-data', [OwnerPropertyController::class, 'referenceData'])->name('api.v1.owner.reference-data');
         Route::get('properties/{id}', [OwnerPropertyController::class, 'show'])->name('api.v1.owner.properties.show');
+        Route::put('properties/{id}', [OwnerPropertyController::class, 'update'])->name('api.v1.owner.properties.update');
+        Route::post('properties/{id}/submit-verification', [OwnerPropertyController::class, 'submitVerification'])->name('api.v1.owner.properties.submit-verification');
+        Route::get('properties/{id}/verification-status', [OwnerPropertyController::class, 'verificationStatus'])->name('api.v1.owner.properties.verification-status');
+
+        // Property Room Types
+        Route::get('properties/{id}/room-types', [OwnerRoomTypeController::class, 'index'])->name('api.v1.owner.properties.room-types.index');
+        Route::post('properties/{id}/room-types', [OwnerRoomTypeController::class, 'store'])->name('api.v1.owner.properties.room-types.store');
+        Route::put('properties/{id}/room-types/{roomTypeId}', [OwnerRoomTypeController::class, 'update'])->name('api.v1.owner.properties.room-types.update');
+        Route::delete('properties/{id}/room-types/{roomTypeId}', [OwnerRoomTypeController::class, 'destroy'])->name('api.v1.owner.properties.room-types.destroy');
+
+        // Physical Rooms
         Route::get('properties/{id}/rooms', [OwnerRoomController::class, 'rooms'])->name('api.v1.owner.properties.rooms');
+        Route::post('properties/{id}/rooms', [OwnerRoomController::class, 'store'])->name('api.v1.owner.properties.rooms.store');
+        Route::put('properties/{id}/rooms/{roomId}', [OwnerRoomController::class, 'update'])->name('api.v1.owner.properties.rooms.update');
+        Route::patch('properties/{id}/rooms/{roomId}/status', [OwnerRoomController::class, 'updateStatus'])->name('api.v1.owner.properties.rooms.status');
+
+        // Pricing, Rate Plans & Food Inclusions
+        Route::get('properties/{id}/pricing', [OwnerPricingController::class, 'show'])->name('api.v1.owner.properties.pricing.show');
+        Route::put('properties/{id}/pricing', [OwnerPricingController::class, 'update'])->name('api.v1.owner.properties.pricing.update');
+
+        // Availability Blocks
+        Route::get('properties/{id}/availability-blocks', [OwnerAvailabilityBlockController::class, 'index'])->name('api.v1.owner.properties.availability-blocks.index');
+        Route::post('properties/{id}/availability-blocks', [OwnerAvailabilityBlockController::class, 'store'])->name('api.v1.owner.properties.availability-blocks.store');
+        Route::delete('properties/{id}/availability-blocks/{blockId}', [OwnerAvailabilityBlockController::class, 'destroy'])->name('api.v1.owner.properties.availability-blocks.destroy');
+
+        // Photographs & Media
+        Route::get('properties/{id}/media', [OwnerMediaController::class, 'index'])->name('api.v1.owner.properties.media.index');
+        Route::post('properties/{id}/media', [OwnerMediaController::class, 'store'])->name('api.v1.owner.properties.media.store');
+        Route::delete('properties/{id}/media/{mediaId}', [OwnerMediaController::class, 'destroy'])->name('api.v1.owner.properties.media.destroy');
+
+        // Amenities
+        Route::get('properties/{id}/amenities', [OwnerAmenityController::class, 'index'])->name('api.v1.owner.properties.amenities.index');
+        Route::post('properties/{id}/amenities', [OwnerAmenityController::class, 'store'])->name('api.v1.owner.properties.amenities.store');
 
         // Reservations
         Route::get('reservations', [OwnerReservationController::class, 'index'])->name('api.v1.owner.reservations.index');

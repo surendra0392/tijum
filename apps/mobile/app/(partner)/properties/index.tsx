@@ -12,6 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { OwnerApi } from '../../../src/api/owner';
 import { PhysicalRoom, PropertyDetail } from '../../../src/api/types';
 import { Badge } from '../../../src/components/Badge';
@@ -27,16 +28,22 @@ import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 import { StayTimingBadge } from '../../../src/components/StayTimingBadge';
 import {
+    BedDouble,
     Building2,
+    Calendar,
     DoorClosed,
+    Edit2,
     Home,
+    IndianRupee,
     MapPin,
+    Plus,
     Sparkles,
     Users,
     X,
 } from 'lucide-react-native';
 
 export default function PartnerPropertiesScreen() {
+    const router = useRouter();
     const [properties, setProperties] = useState<PropertyDetail[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -262,12 +269,100 @@ export default function PartnerPropertiesScreen() {
                         Inspect Physical Rooms
                     </Text>
                 </TouchableOpacity>
+
+                {/* Partner Management Actions Bar */}
+                <View style={styles.cardActionsGrid}>
+                    <TouchableOpacity
+                        style={styles.actionChip}
+                        onPress={() =>
+                            router.push(
+                                `/(partner)/properties/${item.id}/edit` as any,
+                            )
+                        }
+                        activeOpacity={0.8}
+                    >
+                        <Edit2 size={13} color={Colors.deepPlum} />
+                        <Text style={styles.actionChipText}>Edit</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.actionChip}
+                        onPress={() =>
+                            router.push(
+                                `/(partner)/properties/${item.id}/room-types` as any,
+                            )
+                        }
+                        activeOpacity={0.8}
+                    >
+                        <BedDouble size={13} color={Colors.deepPlum} />
+                        <Text style={styles.actionChipText}>Categories</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.actionChip}
+                        onPress={() =>
+                            router.push(
+                                `/(partner)/properties/${item.id}/rooms` as any,
+                            )
+                        }
+                        activeOpacity={0.8}
+                    >
+                        <DoorClosed size={13} color={Colors.deepPlum} />
+                        <Text style={styles.actionChipText}>Rooms</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.actionChip}
+                        onPress={() =>
+                            router.push(
+                                `/(partner)/properties/${item.id}/pricing` as any,
+                            )
+                        }
+                        activeOpacity={0.8}
+                    >
+                        <IndianRupee size={13} color={Colors.deepPlum} />
+                        <Text style={styles.actionChipText}>Rates</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.actionChip}
+                        onPress={() =>
+                            router.push(
+                                `/(partner)/properties/${item.id}/availability` as any,
+                            )
+                        }
+                        activeOpacity={0.8}
+                    >
+                        <Calendar size={13} color={Colors.deepPlum} />
+                        <Text style={styles.actionChipText}>Blocks</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         </View>
     );
 
     return (
         <SafeAreaView style={styles.container}>
+            {/* Top Bar with Add Property */}
+            <View style={styles.topBar}>
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.topBarTitle}>
+                        Manage Accommodations
+                    </Text>
+                    <Text style={styles.topBarSubtitle}>
+                        {properties.length} Registered Properties
+                    </Text>
+                </View>
+                <TouchableOpacity
+                    style={styles.addPropertyBtn}
+                    onPress={() => router.push('/(partner)/properties/create')}
+                    activeOpacity={0.8}
+                >
+                    <Plus size={16} color={Colors.white} />
+                    <Text style={styles.addPropertyBtnText}>Add Stay</Text>
+                </TouchableOpacity>
+            </View>
+
             {/* Category Filter Tabs */}
             <View style={styles.filterSection}>
                 <ScrollView
@@ -565,6 +660,64 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: Colors.warmOffWhite,
+    },
+    topBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: Spacing.base,
+        paddingTop: Spacing.sm,
+        paddingBottom: Spacing.xs,
+        backgroundColor: Colors.white,
+    },
+    topBarTitle: {
+        fontSize: Typography.fontSize.base,
+        fontWeight: '700',
+        color: Colors.deepPlum,
+    },
+    topBarSubtitle: {
+        fontSize: Typography.fontSize.xs,
+        color: Colors.gray500,
+        marginTop: 1,
+    },
+    addPropertyBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.deepPlum,
+        paddingHorizontal: Spacing.md,
+        paddingVertical: 6,
+        borderRadius: BorderRadius.full,
+    },
+    addPropertyBtnText: {
+        fontSize: Typography.fontSize.xs,
+        fontWeight: '700',
+        color: Colors.white,
+        marginLeft: 4,
+    },
+    cardActionsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: Spacing.xs,
+        marginTop: Spacing.md,
+        paddingTop: Spacing.sm,
+        borderTopWidth: 1,
+        borderTopColor: Colors.gray100,
+    },
+    actionChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: Spacing.sm,
+        paddingVertical: 5,
+        borderRadius: BorderRadius.sm,
+        borderWidth: 1,
+        borderColor: Colors.deepPlum,
+        backgroundColor: Colors.white,
+    },
+    actionChipText: {
+        fontSize: Typography.fontSize.xs,
+        fontWeight: '600',
+        color: Colors.deepPlum,
+        marginLeft: 4,
     },
     filterSection: {
         backgroundColor: Colors.white,

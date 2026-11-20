@@ -1,11 +1,11 @@
 # TIJUM Mobile Security Implementation Specification
 
 **Document Reference:** `docs/mobile/TIJUM_MOBILE_SECURITY_IMPLEMENTATION.md`  
-**Application Scope:** `apps/mobile/src/auth/` and `apps/mobile/src/api/`  
+**Application Scope:** `apps/mobile/src/auth/`, `apps/mobile/src/api/`, and Backend Owner Security Guard  
 **Framework Target:** React Native 0.83.10 / Expo SDK 55  
-**Security Standards:** OWASP Mobile Top 10 (2024/2025), Hardware Keystore Storage  
-**Date:** November 20, 2026 (Phase M9 Reconciled)  
-**Status:** **ACTIVE, RECONCILED & CERTIFIED**
+**Security Standards:** OWASP Mobile Top 10 (2024/2025), Hardware Keystore Storage, Strict Multitenant Isolation  
+**Date:** November 20, 2026 (Phase M10A Complete)  
+**Status:** **ACTIVE, COMPLETE & VERIFIED**
 
 ---
 
@@ -17,6 +17,7 @@ The TIJUM Native Mobile application processes financial booking holds, customer 
 3. **Session Leakage & Domain Confusion:** Mitigated via a **Single Active Session** architecture with explicit role tracking (`customer` vs `owner`).
 4. **Offline Token Revocation Failure:** Mitigated via a persistent, self-healing FIFO offline revocation queue.
 5. **Brute Force & Enumeration Attacks:** Mitigated via backend rate-limiting middleware (`throttle:api-auth`).
+6. **Multi-Tenant Cross-Property Hijacking:** Mitigated via strict `auth.owner` middleware and tenant-boundary scoped database queries.
 
 ---
 
@@ -37,7 +38,43 @@ Only **one** authenticated principal is permitted in the mobile client at any ti
 
 ---
 
-## 3. Resilient Offline Token Revocation & Self-Healing
+## 3. Partner Multi-Tenant Authorization & Integrity (Phase M10A)
+
+### 3.1 Strict Route Guarding (`auth.owner`)
+All partner API routes under `/api/v1/owner/*` enforce dual middleware:
+- `auth:sanctum`: Ensures the bearer token is valid, non-expired, and cryptographically verified.
+- `auth.owner`: Guarantees the authenticated principal is an instance of `App\Models\Owner`. Any customer token attempting to access `/api/v1/owner/*` is rejected with `403 Forbidden`.
+
+### 3.2 Property Ownership Enforcement
+Every property-scoped controller action rigorously scopes queries by the authenticated owner ID:
+```php
+$property = Property::query()
+    ->where('owner_id', $owner->id)
+    ->where(function ($query) use ($id): void {
+        if (is_numeric($id)) {
+            $query->where('id', (int) $id);
+        } else {
+            $query->where('slug', (string) $id);
+        }
+    })
+    ->first();
+
+if ($property === null) {
+    return $this->error("Property '{$id}' not found or unauthorized.", 'NOT_FOUND', 404);
+}
+```
+Any attempt to inspect, edit, or manipulate rooms, rates, blocks, or media of another partner's property returns an ambiguous 404, preventing enumeration of foreign resources.
+
+### 3.3 Concurrency & Pessimistic Row Locking
+To prevent double-booking, conflicting room allocations, or overlapping blackout blocks:
+- Transactional operations acquire row locks using `lockForUpdate()`.
+- Hierarchical lock acquisition sequence:
+  `Property -> PropertyRoomType -> Reservation -> PropertyRoom (sorted by ID ASC)`.
+- Race conditions during simultaneous check-in or room allocation are trapped and rolled back safely.
+
+---
+
+## 4. Resilient Offline Token Revocation & Self-Healing
 
 When an authenticated user logs out while offline (or in poor connectivity):
 1. **Local Eviction:** Session state is immediately cleared from the React tree, preventing unauthorized local device access.
@@ -50,7 +87,7 @@ When an authenticated user logs out while offline (or in poor connectivity):
 
 ---
 
-## 4. API Attack Surface Protection & Rate Limiting
+## 5. API Attack Surface Protection & Rate Limiting
 
 1. **Authentication Rate Limiting:**
    - Public and authentication endpoints (`/api/v1/auth/customer/forgot-password`, `/api/v1/auth/owner/forgot-password`, login) are governed by `throttle:api-auth` preventing brute-force dictionary attacks.

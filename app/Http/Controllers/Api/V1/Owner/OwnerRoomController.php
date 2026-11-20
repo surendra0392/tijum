@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Owner;
 
+use App\Actions\Owner\Properties\SavePropertyRoom;
+use App\Actions\Owner\Properties\UpdatePropertyRoomOperationalStatus;
 use App\Actions\Reservations\SaveReservationAllocations;
 use App\Enums\PropertyRoomStatus;
 use App\Enums\ReservationStatus;
@@ -66,6 +68,199 @@ class OwnerRoomController extends ApiController
         ])->values()->all();
 
         return $this->success($data, 'Property rooms retrieved successfully.');
+    }
+
+    /**
+     * Create a new physical room for the property.
+     */
+    public function store(Request $request, int|string $id, SavePropertyRoom $saveRoom): JsonResponse
+    {
+        /** @var Owner $owner */
+        $owner = $request->user();
+
+        $property = Property::query()
+            ->where('owner_id', $owner->id)
+            ->where(function ($query) use ($id): void {
+                if (is_numeric($id)) {
+                    $query->where('id', (int) $id);
+                } else {
+                    $query->where('slug', (string) $id);
+                }
+            })
+            ->first();
+
+        if ($property === null) {
+            return $this->error("Property '{$id}' not found or unauthorized.", 'NOT_FOUND', 404);
+        }
+
+        $validated = $request->validate([
+            'room_number' => ['required', 'string', 'max:50'],
+            'property_room_type_id' => ['required', 'integer'],
+            'operational_status' => ['nullable', 'string'],
+            'floor_number' => ['nullable', 'string', 'max:50'],
+            'wing_name' => ['nullable', 'string', 'max:50'],
+            'building_name' => ['nullable', 'string', 'max:50'],
+            'description' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        try {
+            $room = $saveRoom->execute($owner, $property, $validated);
+        } catch (ValidationException $e) {
+            return $this->error($e->getMessage(), 'VALIDATION_ERROR', 422, $e->errors());
+        }
+
+        $room->load('roomType');
+
+        return $this->success([
+            'id' => $room->id,
+            'property_id' => $room->property_id,
+            'property_room_type_id' => $room->property_room_type_id,
+            'room_type_name' => $room->roomType?->name,
+            'room_number' => $room->room_number,
+            'floor_number' => $room->floor_number,
+            'wing_name' => $room->wing_name,
+            'building_name' => $room->building_name,
+            'operational_status' => $room->operational_status->value,
+            'operational_status_label' => $room->operational_status->label(),
+            'is_active' => $room->operational_status === PropertyRoomStatus::Active,
+            'configured_capacity' => $room->configuredCapacity(),
+        ], "Physical room {$room->room_number} created successfully.", 201);
+    }
+
+    /**
+     * Update an existing physical room.
+     */
+    public function update(
+        Request $request,
+        int|string $id,
+        int $roomId,
+        SavePropertyRoom $saveRoom
+    ): JsonResponse {
+        /** @var Owner $owner */
+        $owner = $request->user();
+
+        $property = Property::query()
+            ->where('owner_id', $owner->id)
+            ->where(function ($query) use ($id): void {
+                if (is_numeric($id)) {
+                    $query->where('id', (int) $id);
+                } else {
+                    $query->where('slug', (string) $id);
+                }
+            })
+            ->first();
+
+        if ($property === null) {
+            return $this->error("Property '{$id}' not found or unauthorized.", 'NOT_FOUND', 404);
+        }
+
+        $existingRoom = PropertyRoom::query()
+            ->where('id', $roomId)
+            ->where('property_id', $property->id)
+            ->first();
+
+        if ($existingRoom === null) {
+            return $this->error("Room '{$roomId}' not found in property.", 'NOT_FOUND', 404);
+        }
+
+        $validated = $request->validate([
+            'room_number' => ['required', 'string', 'max:50'],
+            'property_room_type_id' => ['required', 'integer'],
+            'operational_status' => ['nullable', 'string'],
+            'floor_number' => ['nullable', 'string', 'max:50'],
+            'wing_name' => ['nullable', 'string', 'max:50'],
+            'building_name' => ['nullable', 'string', 'max:50'],
+            'description' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        try {
+            $room = $saveRoom->execute($owner, $property, $validated, $existingRoom);
+        } catch (ValidationException $e) {
+            return $this->error($e->getMessage(), 'VALIDATION_ERROR', 422, $e->errors());
+        }
+
+        $room->load('roomType');
+
+        return $this->success([
+            'id' => $room->id,
+            'property_id' => $room->property_id,
+            'property_room_type_id' => $room->property_room_type_id,
+            'room_type_name' => $room->roomType?->name,
+            'room_number' => $room->room_number,
+            'floor_number' => $room->floor_number,
+            'wing_name' => $room->wing_name,
+            'building_name' => $room->building_name,
+            'operational_status' => $room->operational_status->value,
+            'operational_status_label' => $room->operational_status->label(),
+            'is_active' => $room->operational_status === PropertyRoomStatus::Active,
+            'configured_capacity' => $room->configuredCapacity(),
+        ], "Physical room {$room->room_number} updated successfully.");
+    }
+
+    /**
+     * Update room operational status (e.g. Active, Maintenance, Blocked, Inactive).
+     */
+    public function updateStatus(
+        Request $request,
+        int|string $id,
+        int $roomId,
+        UpdatePropertyRoomOperationalStatus $updateStatus
+    ): JsonResponse {
+        /** @var Owner $owner */
+        $owner = $request->user();
+
+        $property = Property::query()
+            ->where('owner_id', $owner->id)
+            ->where(function ($query) use ($id): void {
+                if (is_numeric($id)) {
+                    $query->where('id', (int) $id);
+                } else {
+                    $query->where('slug', (string) $id);
+                }
+            })
+            ->first();
+
+        if ($property === null) {
+            return $this->error("Property '{$id}' not found or unauthorized.", 'NOT_FOUND', 404);
+        }
+
+        $room = PropertyRoom::query()
+            ->where('id', $roomId)
+            ->where('property_id', $property->id)
+            ->first();
+
+        if ($room === null) {
+            return $this->error("Room '{$roomId}' not found in property.", 'NOT_FOUND', 404);
+        }
+
+        $validated = $request->validate([
+            'operational_status' => ['required', 'string'],
+            'internal_description' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $targetStatus = PropertyRoomStatus::tryFrom($validated['operational_status']);
+        if ($targetStatus === null) {
+            return $this->error('Invalid operational status.', 'VALIDATION_ERROR', 422);
+        }
+
+        try {
+            $updatedRoom = $updateStatus->execute(
+                $owner,
+                $property,
+                $room,
+                $targetStatus,
+                $validated['internal_description'] ?? null
+            );
+        } catch (ValidationException $e) {
+            return $this->error($e->getMessage(), 'VALIDATION_ERROR', 422, $e->errors());
+        }
+
+        return $this->success([
+            'id' => $updatedRoom->id,
+            'operational_status' => $updatedRoom->operational_status->value,
+            'operational_status_label' => $updatedRoom->operational_status->label(),
+            'is_active' => $updatedRoom->operational_status === PropertyRoomStatus::Active,
+        ], "Room {$room->room_number} status updated to {$targetStatus->label()}.");
     }
 
     /**

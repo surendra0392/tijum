@@ -141,7 +141,30 @@ export class ApiClient {
         });
     }
 
-    static async delete<T>(endpoint: string): Promise<T> {
-        return this.request<T>(endpoint, { method: 'DELETE' });
+    static async patch<T>(endpoint: string, body?: any): Promise<T> {
+        return this.request<T>(endpoint, {
+            method: 'PATCH',
+            body: body ? JSON.stringify(body) : undefined,
+        });
+    }
+
+    static async delete<T>(
+        endpoint: string,
+        queryParams?: Record<string, any>,
+    ): Promise<T> {
+        let url = endpoint;
+        if (queryParams) {
+            const filtered: Record<string, string> = {};
+            Object.entries(queryParams).forEach(([k, v]) => {
+                if (v !== undefined && v !== null && v !== '') {
+                    filtered[k] = String(v);
+                }
+            });
+            const query = new URLSearchParams(filtered).toString();
+            if (query) {
+                url += (endpoint.includes('?') ? '&' : '?') + query;
+            }
+        }
+        return this.request<T>(url, { method: 'DELETE' });
     }
 }

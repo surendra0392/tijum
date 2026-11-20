@@ -100,6 +100,8 @@ export interface RoomType {
     sharing_capacity: number;
     capacity_per_room?: number;
     is_air_conditioned: boolean;
+    is_active?: boolean;
+    is_operational?: boolean;
     price_daily_paise: number;
     price_weekly_paise: number;
     price_monthly_paise: number;
@@ -617,4 +619,132 @@ export interface PromotionQuoteResult {
     points_discount_paise: number;
     final_payable_paise: number;
     points_to_earn_on_completion: number;
+}
+
+
+// ==========================================
+// Phase M10A: Owner Property Operations Types
+// ==========================================
+
+export interface OwnerReferenceData {
+    cities: City[];
+    categories: Array<{
+        id: number;
+        name: string;
+        slug: string;
+        code?: string;
+        description?: string;
+    }>;
+    canonical_categories: Array<{
+        slug: CanonicalCategorySlug;
+        name: string;
+    }>;
+    room_type_modes: Array<{ value: string; label: string }>;
+    gender_policies: Array<{ value: string; label: string }>;
+    guest_compositions: Array<{ value: string; label: string }>;
+    room_operational_statuses: Array<{ value: string; label: string }>;
+    block_scopes: Array<{ value: string; label: string }>;
+    block_types: Array<{ value: string; label: string }>;
+    amenities: Array<{
+        id: number;
+        name: string;
+        code: string;
+        category?: string;
+        icon_key?: string;
+    }>;
+}
+
+export interface PropertyPricingData {
+    property_id: number;
+    property_name: string;
+    food: {
+        provided: boolean;
+        breakfast: boolean;
+        lunch: boolean;
+        dinner: boolean;
+    };
+    room_types: Array<{
+        id: number;
+        name: string;
+        accommodation_mode: 'shared' | 'private';
+        accommodation_mode_label?: string;
+        pricing_basis: 'per_guest' | 'per_room';
+        max_guests_per_room: number;
+        sharing_capacity: number;
+        is_air_conditioned: boolean;
+        is_active: boolean;
+        daily_rate_minor?: number | null;
+        weekly_rate_minor?: number | null;
+        monthly_rate_minor?: number | null;
+    }>;
+    evaluation: {
+        active_room_types_count: number;
+        configured_room_types_count: number;
+        missing_pricing_count: number;
+        has_food_configuration: boolean;
+    };
+    currency_code: string;
+}
+
+export interface PropertyAvailabilityBlock {
+    id: number;
+    property_id: number;
+    scope: 'property' | 'room_type' | 'physical_room';
+    scope_label: string;
+    block_type: string;
+    block_type_label: string;
+    status: 'active' | 'cancelled' | 'expired';
+    status_label?: string;
+    is_active: boolean;
+    start_date: string;
+    end_date: string;
+    property_room_type_id?: number | null;
+    room_type_name?: string | null;
+    property_room_id?: number | null;
+    room_number?: string | null;
+    reason: string;
+    is_admin_restriction: boolean;
+    created_at?: string;
+}
+
+export interface PropertyVerificationEvaluation {
+    property_id: number;
+    property_reference: string;
+    status: string;
+    is_verified: boolean;
+    booking_eligible: boolean;
+    application?: {
+        id: number;
+        status: string;
+        status_label: string;
+        is_editable: boolean;
+        revision_number: number;
+        submitted_at?: string | null;
+        rejection_reasons?: string[] | null;
+    } | null;
+    evaluation: {
+        is_ready_for_review: boolean;
+        owner_active: boolean;
+        identity_complete: boolean;
+        has_active_room_types: boolean;
+        has_active_rooms: boolean;
+        has_min_photos: boolean;
+        has_cover_photo: boolean;
+        blocking_reasons?: string[];
+    };
+}
+
+export interface PropertyMediaItem {
+    id: number;
+    url: string;
+    alt_text: string;
+    category: string;
+    category_label?: string;
+    is_cover: boolean;
+    moderation_status?: string;
+    publication_status?: string;
+    property_room_type_id?: number | null;
+    room_type_name?: string | null;
+    property_room_id?: number | null;
+    room_number?: string | null;
 }

@@ -95,11 +95,34 @@ class PropertyDetailResource extends JsonResource
         $lat = $this->latitude !== null ? (float) $this->latitude : null;
         $lng = $this->longitude !== null ? (float) $this->longitude : null;
 
+        $operationalStatus = $this->status->value;
+        $operationalStatusLabel = $this->status->label();
+
+        $activeApp = $this->relationLoaded('activeVerificationApplication')
+            ? $this->activeVerificationApplication
+            : null;
+        $verificationStatus = $activeApp !== null
+            ? $activeApp->status->value
+            : ($this->is_verified ? 'approved' : 'draft');
+        $verificationStatusLabel = $activeApp !== null
+            ? $activeApp->status->label()
+            : ($this->is_verified ? 'Verified' : 'Draft');
+
         return [
             'id' => $this->id,
+            'property_reference' => $this->property_reference,
             'name' => $this->name,
             'slug' => $this->slug,
             'description' => $this->description,
+            'status' => $operationalStatus,
+            'status_label' => $operationalStatusLabel,
+            'verification_status' => $verificationStatus,
+            'verification_status_label' => $verificationStatusLabel,
+            'contact_person_name' => $this->contact_person_name,
+            'contact_phone' => $this->contact_phone,
+            'contact_email' => $this->contact_email,
+            'address_line_1' => $this->address_line_1,
+            'address_line_2' => $this->address_line_2,
             'category' => $this->category ? [
                 'id' => $this->category->id,
                 'name' => $this->category->name,

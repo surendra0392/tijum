@@ -1,10 +1,10 @@
 # TIJUM Mobile Design System & UI Specification
 
 **Document Reference:** `docs/mobile/TIJUM_MOBILE_DESIGN_SYSTEM.md`  
-**Application Scope:** `apps/mobile/src/theme/` and `apps/mobile/src/components/`  
+**Application Scope:** `apps/mobile/src/theme/`, `apps/mobile/src/components/`, and `apps/mobile/app/`  
 **Brand Identity:** "Stay easy. Eat well. Spend less."  
 **Platform Target:** React Native (iOS & Android)  
-**Date:** November 20, 2026  
+**Date:** November 20, 2026 (Phase M10A Complete)  
 **Status:** **ACTIVE & CERTIFIED**
 
 ---
@@ -92,3 +92,33 @@ export const BorderRadius = {
 
 5. **MealBadge (`src/components/MealBadge.tsx`):**
    - Displays breakfast, lunch, and dinner inclusion with operational timeframes.
+
+---
+
+## 5. Partner Operational UI Patterns (Phase M10A)
+
+1. **Multi-Step Form Wizard (`(partner)/properties/create.tsx`):**
+   - Progress bar indicator showing current step (1 to 5) and title.
+   - Prev / Next sticky footer navigation with disabled state validation.
+   - Step state retention enabling frictionless back/forward navigation.
+
+2. **Quick-Action Chips Row (`(partner)/properties/index.tsx`):**
+   - Horizontal touchable action chips on property cards:
+     * `Edit Stay` (navigate to details & verification checklist).
+     * `Categories` (navigate to room types management).
+     * `Rooms` (navigate to physical room inventory).
+     * `Rates` (navigate to pricing plans & meal toggles).
+     * `Blocks` (navigate to blackout dates & availability).
+
+3. **Status Filter Tabs (`(partner)/properties/[id]/rooms.tsx`, `(partner)/reservations/index.tsx`):**
+   - Horizontal pill tab bar with count indicators.
+   - Active state styling in Deep Plum with white text.
+
+4. **Pricing Readiness Banner (`(partner)/properties/[id]/pricing.tsx`):**
+   - Dynamic banner indicating whether property rates are complete and eligible for customer booking.
+   - Distinct visual states: Complete (Emerald), Incomplete (Amber), Missing Rates (Rose).
+
+5. **Operational Bottom-Sheets & Modals:**
+   - Standardized semi-transparent backdrop (`rgba(0,0,0,0.5)`).
+   - Rounded top border radii (`BorderRadius.xl = 16px`).
+   - Sticky footer with Cancel and Primary Save buttons.
