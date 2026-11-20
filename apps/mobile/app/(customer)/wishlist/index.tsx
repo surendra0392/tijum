@@ -16,17 +16,28 @@ import { PropertyCard as PropertyCardType } from '../../../src/api/types';
 import { PropertyCard } from '../../../src/components/PropertyCard';
 import { Button } from '../../../src/components/Button';
 import { AppHeader } from '../../../src/components/AppHeader';
+import { ExceptionalState } from '../../../src/components/ExceptionalState';
+import { useAuth } from '../../../src/auth/AuthContext';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 
 export default function WishlistScreen() {
     const router = useRouter();
+    const { token, authState, isLoading: authLoading } = useAuth();
     const [properties, setProperties] = useState<PropertyCardType[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [isUnauthenticated, setIsUnauthenticated] = useState(false);
 
     const loadWishlist = async (isRefresh = false) => {
+        if (!token || authState === 'guest' || authState === 'session_expired') {
+            setIsUnauthenticated(true);
+            setLoading(false);
+            setRefreshing(false);
+            return;
+        }
+
         if (isRefresh) {
             setRefreshing(true);
         } else {
@@ -34,12 +45,17 @@ export default function WishlistScreen() {
         }
 
         try {
+            setIsUnauthenticated(false);
             const res = await CustomerApi.getWishlist();
             if (res.data) {
                 setProperties(res.data);
             }
-        } catch (e) {
-            console.error('Failed to load wishlist', e);
+        } catch (e: any) {
+            if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
+                setIsUnauthenticated(true);
+            } else {
+                console.error('Failed to load wishlist', e);
+            }
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -47,20 +63,57 @@ export default function WishlistScreen() {
     };
 
     useEffect(() => {
+        if (authLoading) return;
+        if (!token || authState === 'guest' || authState === 'session_expired') {
+            setIsUnauthenticated(true);
+            setLoading(false);
+            return;
+        }
+        setIsUnauthenticated(false);
         loadWishlist();
-    }, []);
+    }, [token, authState, authLoading]);
 
     const handleToggleWishlist = async (propertyId: number) => {
+        if (!token || authState === 'guest' || authState === 'session_expired') {
+            setIsUnauthenticated(true);
+            return;
+        }
         // Optimistic removal from wishlist view
         setProperties((prev) => prev.filter((p) => p.id !== propertyId));
         try {
             await CustomerApi.toggleWishlist(propertyId, true);
-        } catch (e) {
-            console.error('Failed to update wishlist', e);
+        } catch (e: any) {
+            if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
+                setIsUnauthenticated(true);
+            } else {
+                console.error('Failed to update wishlist', e);
+            }
             // Re-fetch on failure to restore state
             loadWishlist();
         }
     };
+
+    if (!authLoading && (isUnauthenticated || !token || authState === 'guest' || authState === 'session_expired')) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <AppHeader
+                    title="Saved Stays"
+                    subtitle="Your favorited verified accommodations"
+                    variant="plum"
+                    showBack={true}
+                />
+                <ExceptionalState
+                    type="session-expired"
+                    title="Sign In to View Saved Stays"
+                    description="Please sign in to your customer account to save and view your favorite verified accommodations."
+                    primaryActionLabel="Sign In as Customer"
+                    onPrimaryAction={() => router.push('/(auth)/customer-login')}
+                    secondaryActionLabel="Explore Stays"
+                    onSecondaryAction={() => router.push('/(customer)/explore/index')}
+                />
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>

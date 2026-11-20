@@ -20,6 +20,7 @@ import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 import { Input } from '../../../src/components/Input';
 import { Button } from '../../../src/components/Button';
+import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import {
     ChevronDown,
     ChevronRight,
@@ -33,11 +34,12 @@ import {
 
 export default function CustomerProfileScreen() {
     const router = useRouter();
-    const { user, logout } = useAuth();
+    const { user, token, authState, isLoading: authLoading, logout } = useAuth();
 
     const [profile, setProfile] = useState<CustomerProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [isUnauthenticated, setIsUnauthenticated] = useState(false);
 
     // Form
     const [name, setName] = useState('');
@@ -52,12 +54,25 @@ export default function CustomerProfileScreen() {
     const [passwordSaving, setPasswordSaving] = useState(false);
 
     useEffect(() => {
+        if (authLoading) return;
+        if (!token || authState === 'guest' || authState === 'session_expired') {
+            setIsUnauthenticated(true);
+            setLoading(false);
+            return;
+        }
+        setIsUnauthenticated(false);
         loadProfile();
-    }, []);
+    }, [token, authState, authLoading]);
 
     const loadProfile = async () => {
+        if (!token || authState === 'guest' || authState === 'session_expired') {
+            setIsUnauthenticated(true);
+            setLoading(false);
+            return;
+        }
         try {
             setLoading(true);
+            setIsUnauthenticated(false);
             const res = await CustomerApi.getProfile();
             if (res.data) {
                 setProfile(res.data);
@@ -66,7 +81,11 @@ export default function CustomerProfileScreen() {
                 setMarketingConsent(res.data.marketing_consent);
             }
         } catch (e: any) {
-            console.error('Failed to load profile', e);
+            if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
+                setIsUnauthenticated(true);
+            } else {
+                console.error('Failed to load profile', e);
+            }
         } finally {
             setLoading(false);
         }
@@ -135,6 +154,22 @@ export default function CustomerProfileScreen() {
             },
         ]);
     };
+
+    if (!authLoading && (isUnauthenticated || !token || authState === 'guest' || authState === 'session_expired')) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <ExceptionalState
+                    type="session-expired"
+                    title="Sign In to Your Account"
+                    description="Please sign in to manage your bookings, reward points, saved stays, and account settings."
+                    primaryActionLabel="Sign In as Customer"
+                    onPrimaryAction={() => router.push('/(auth)/customer-login')}
+                    secondaryActionLabel="Explore Stays"
+                    onSecondaryAction={() => router.push('/(customer)/explore/index')}
+                />
+            </SafeAreaView>
+        );
+    }
 
     if (loading) {
         return (

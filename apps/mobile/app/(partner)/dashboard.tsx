@@ -19,6 +19,9 @@ import { Typography } from '../../src/theme/typography';
 import { Badge } from '../../src/components/Badge';
 import { Button } from '../../src/components/Button';
 import { ReservationStatusBadge } from '../../src/components/ReservationStatusBadge';
+import { ExceptionalState } from '../../src/components/ExceptionalState';
+import { AppHeader } from '../../src/components/AppHeader';
+import { useAuth } from '../../src/auth/AuthContext';
 import {
     Bell,
     Building2,
@@ -33,33 +36,77 @@ import {
 
 export default function PartnerDashboardScreen() {
     const router = useRouter();
+    const { token, authState, isLoading: authLoading } = useAuth();
     const [data, setData] = useState<PartnerDashboardData | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [isUnauthenticated, setIsUnauthenticated] = useState(false);
 
     useEffect(() => {
+        if (authLoading) return;
+        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+            setIsUnauthenticated(true);
+            setLoading(false);
+            return;
+        }
+        setIsUnauthenticated(false);
         loadDashboard();
-    }, []);
+    }, [token, authState, authLoading]);
 
     const loadDashboard = async () => {
+        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+            setIsUnauthenticated(true);
+            setLoading(false);
+            return;
+        }
         try {
             setLoading(true);
+            setIsUnauthenticated(false);
             const res = await OwnerApi.getDashboard();
             if (res.data) {
                 setData(res.data);
             }
-        } catch (e) {
-            console.error('Failed to load partner dashboard', e);
+        } catch (e: any) {
+            if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
+                setIsUnauthenticated(true);
+            } else {
+                console.error('Failed to load partner dashboard', e);
+            }
         } finally {
             setLoading(false);
         }
     };
 
     const onRefresh = async () => {
+        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+            setIsUnauthenticated(true);
+            return;
+        }
         setRefreshing(true);
         await loadDashboard();
         setRefreshing(false);
     };
+
+    if (!authLoading && (isUnauthenticated || !token || authState !== 'owner_authenticated')) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <AppHeader
+                    title="Host Command Center"
+                    subtitle="Manage your properties and reservations"
+                    variant="plum"
+                />
+                <ExceptionalState
+                    type="session-expired"
+                    title="Sign In as Partner"
+                    description="Please sign in to your verified TIJUM partner account to access your properties, bookings, and payout records."
+                    primaryActionLabel="Sign In as Partner"
+                    onPrimaryAction={() => router.push('/(auth)/owner-login')}
+                    secondaryActionLabel="Explore Stays"
+                    onSecondaryAction={() => router.push('/(customer)/explore/index')}
+                />
+            </SafeAreaView>
+        );
+    }
 
     if (loading && !refreshing) {
         return (

@@ -16,6 +16,8 @@ import { Reservation } from '../../../src/api/types';
 import { ReservationStatusBadge } from '../../../src/components/ReservationStatusBadge';
 import { Button } from '../../../src/components/Button';
 import { AppHeader } from '../../../src/components/AppHeader';
+import { ExceptionalState } from '../../../src/components/ExceptionalState';
+import { useAuth } from '../../../src/auth/AuthContext';
 import { Colors } from '../../../src/theme/colors';
 import { Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
@@ -29,32 +31,55 @@ const FILTER_TABS = [
 
 export default function CustomerBookingsScreen() {
     const router = useRouter();
+    const { token, authState, isLoading: authLoading } = useAuth();
     const [reservations, setReservations] = useState<Reservation[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [activeFilter, setActiveFilter] = useState<string | undefined>(
         undefined,
     );
+    const [isUnauthenticated, setIsUnauthenticated] = useState(false);
 
     useEffect(() => {
+        if (authLoading) return;
+        if (!token || authState === 'guest' || authState === 'session_expired') {
+            setIsUnauthenticated(true);
+            setLoading(false);
+            return;
+        }
+        setIsUnauthenticated(false);
         loadReservations();
-    }, [activeFilter]);
+    }, [activeFilter, token, authState, authLoading]);
 
     const loadReservations = async () => {
+        if (!token || authState === 'guest' || authState === 'session_expired') {
+            setIsUnauthenticated(true);
+            setLoading(false);
+            return;
+        }
         try {
             setLoading(true);
+            setIsUnauthenticated(false);
             const res = await CustomerApi.getReservations(activeFilter);
             if (res.data) {
                 setReservations(res.data);
             }
-        } catch (e) {
-            console.error('Failed to load reservations', e);
+        } catch (e: any) {
+            if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
+                setIsUnauthenticated(true);
+            } else {
+                console.error('Failed to load reservations', e);
+            }
         } finally {
             setLoading(false);
         }
     };
 
     const onRefresh = async () => {
+        if (!token || authState === 'guest' || authState === 'session_expired') {
+            setIsUnauthenticated(true);
+            return;
+        }
         setRefreshing(true);
         await loadReservations();
         setRefreshing(false);
@@ -181,6 +206,27 @@ export default function CustomerBookingsScreen() {
             </TouchableOpacity>
         );
     };
+
+    if (!authLoading && (isUnauthenticated || !token || authState === 'guest' || authState === 'session_expired')) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <AppHeader
+                    title="My Reservations"
+                    subtitle="Track your verified food-inclusive stays"
+                    variant="plum"
+                />
+                <ExceptionalState
+                    type="session-expired"
+                    title="Sign In to View Stays"
+                    description="Please sign in to your customer account to access your active reservations, check-in codes, and payment receipts."
+                    primaryActionLabel="Sign In as Customer"
+                    onPrimaryAction={() => router.push('/(auth)/customer-login')}
+                    secondaryActionLabel="Explore Stays"
+                    onSecondaryAction={() => router.push('/(customer)/explore/index')}
+                />
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>

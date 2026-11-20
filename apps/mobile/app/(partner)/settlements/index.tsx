@@ -13,6 +13,8 @@ import { useRouter } from 'expo-router';
 import { OwnerApi } from '../../../src/api/owner';
 import { Badge } from '../../../src/components/Badge';
 import { AppHeader } from '../../../src/components/AppHeader';
+import { ExceptionalState } from '../../../src/components/ExceptionalState';
+import { useAuth } from '../../../src/auth/AuthContext';
 import { Colors } from '../../../src/theme/colors';
 import { Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
@@ -20,21 +22,46 @@ import { Wallet } from 'lucide-react-native';
 
 export default function PartnerSettlementsScreen() {
     const router = useRouter();
+    const { token, authState, isLoading: authLoading } = useAuth();
     const [summary, setSummary] = useState<any>(null);
     const [settlements, setSettlements] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [isUnauthenticated, setIsUnauthenticated] = useState(false);
 
     useEffect(() => {
+        if (authLoading) return;
+        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+            setIsUnauthenticated(true);
+            setLoading(false);
+            return;
+        }
+        setIsUnauthenticated(false);
         loadFinances();
-    }, []);
+    }, [token, authState, authLoading]);
 
     const loadFinances = async () => {
+        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+            setIsUnauthenticated(true);
+            setLoading(false);
+            return;
+        }
         try {
             setLoading(true);
+            setIsUnauthenticated(false);
             const [sumRes, setRes] = await Promise.all([
-                OwnerApi.getFinancialSummary().catch(() => ({ data: null })),
-                OwnerApi.getSettlements().catch(() => ({ data: [] })),
+                OwnerApi.getFinancialSummary().catch((e) => {
+                    if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
+                        setIsUnauthenticated(true);
+                    }
+                    return { data: null };
+                }),
+                OwnerApi.getSettlements().catch((e) => {
+                    if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
+                        setIsUnauthenticated(true);
+                    }
+                    return { data: [] };
+                }),
             ]);
 
             if (sumRes.data) {
@@ -43,14 +70,22 @@ export default function PartnerSettlementsScreen() {
             if (setRes.data) {
                 setSettlements(setRes.data);
             }
-        } catch (e) {
-            console.error('Failed to load finances', e);
+        } catch (e: any) {
+            if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
+                setIsUnauthenticated(true);
+            } else {
+                console.error('Failed to load finances', e);
+            }
         } finally {
             setLoading(false);
         }
     };
 
     const onRefresh = async () => {
+        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+            setIsUnauthenticated(true);
+            return;
+        }
         setRefreshing(true);
         await loadFinances();
         setRefreshing(false);
@@ -122,6 +157,27 @@ export default function PartnerSettlementsScreen() {
             </TouchableOpacity>
         );
     };
+
+    if (!authLoading && (isUnauthenticated || !token || authState !== 'owner_authenticated')) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <AppHeader
+                    title="Payouts & Settlements"
+                    subtitle="Razorpay Route weekly automated payouts"
+                    variant="plum"
+                />
+                <ExceptionalState
+                    type="session-expired"
+                    title="Sign In as Partner"
+                    description="Please sign in to your verified TIJUM partner account to view your payout and settlement records."
+                    primaryActionLabel="Sign In as Partner"
+                    onPrimaryAction={() => router.push('/(auth)/owner-login')}
+                    secondaryActionLabel="Explore Stays"
+                    onSecondaryAction={() => router.push('/(customer)/explore/index')}
+                />
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>

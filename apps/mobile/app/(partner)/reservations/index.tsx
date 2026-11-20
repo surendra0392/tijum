@@ -16,6 +16,8 @@ import { Reservation } from '../../../src/api/types';
 import { ReservationStatusBadge } from '../../../src/components/ReservationStatusBadge';
 import { Button } from '../../../src/components/Button';
 import { AppHeader } from '../../../src/components/AppHeader';
+import { ExceptionalState } from '../../../src/components/ExceptionalState';
+import { useAuth } from '../../../src/auth/AuthContext';
 import { Colors } from '../../../src/theme/colors';
 import { Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
@@ -31,6 +33,7 @@ const FILTER_TABS = [
 
 export default function PartnerReservationsScreen() {
     const router = useRouter();
+    const { token, authState, isLoading: authLoading } = useAuth();
     const [reservations, setReservations] = useState<Reservation[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -38,26 +41,48 @@ export default function PartnerReservationsScreen() {
         undefined,
     );
     const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [isUnauthenticated, setIsUnauthenticated] = useState(false);
 
     useEffect(() => {
+        if (authLoading) return;
+        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+            setIsUnauthenticated(true);
+            setLoading(false);
+            return;
+        }
+        setIsUnauthenticated(false);
         loadReservations();
-    }, [activeFilter]);
+    }, [activeFilter, token, authState, authLoading]);
 
     const loadReservations = async () => {
+        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+            setIsUnauthenticated(true);
+            setLoading(false);
+            return;
+        }
         try {
             setLoading(true);
+            setIsUnauthenticated(false);
             const res = await OwnerApi.getReservations(activeFilter);
             if (res.data) {
                 setReservations(res.data);
             }
-        } catch (e) {
-            console.error('Failed to load partner reservations', e);
+        } catch (e: any) {
+            if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
+                setIsUnauthenticated(true);
+            } else {
+                console.error('Failed to load partner reservations', e);
+            }
         } finally {
             setLoading(false);
         }
     };
 
     const onRefresh = async () => {
+        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+            setIsUnauthenticated(true);
+            return;
+        }
         setRefreshing(true);
         await loadReservations();
         setRefreshing(false);
@@ -148,6 +173,27 @@ export default function PartnerReservationsScreen() {
             </TouchableOpacity>
         );
     };
+
+    if (!authLoading && (isUnauthenticated || !token || authState !== 'owner_authenticated')) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <AppHeader
+                    title="Guest Bookings"
+                    subtitle="Manage arrivals, allocations & turnovers"
+                    variant="plum"
+                />
+                <ExceptionalState
+                    type="session-expired"
+                    title="Sign In as Partner"
+                    description="Please sign in to your verified TIJUM partner account to access and manage your guest bookings."
+                    primaryActionLabel="Sign In as Partner"
+                    onPrimaryAction={() => router.push('/(auth)/owner-login')}
+                    secondaryActionLabel="Explore Stays"
+                    onSecondaryAction={() => router.push('/(customer)/explore/index')}
+                />
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>

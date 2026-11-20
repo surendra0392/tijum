@@ -22,14 +22,18 @@ import { Typography } from '../../../src/theme/typography';
 import { Button } from '../../../src/components/Button';
 import { Badge } from '../../../src/components/Badge';
 import { AppHeader } from '../../../src/components/AppHeader';
+import { ExceptionalState } from '../../../src/components/ExceptionalState';
+import { useAuth } from '../../../src/auth/AuthContext';
 import { Bell, SlidersHorizontal, X, Check, Info } from 'lucide-react-native';
 
 export default function CustomerNotificationsScreen() {
     const router = useRouter();
+    const { token, authState, isLoading: authLoading } = useAuth();
 
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [isUnauthenticated, setIsUnauthenticated] = useState(false);
 
     // Preferences modal state
     const [prefModalVisible, setPrefModalVisible] = useState(false);
@@ -55,24 +59,45 @@ export default function CustomerNotificationsScreen() {
     });
 
     useEffect(() => {
+        if (authLoading) return;
+        if (!token || authState === 'guest' || authState === 'session_expired') {
+            setIsUnauthenticated(true);
+            setLoading(false);
+            return;
+        }
+        setIsUnauthenticated(false);
         loadNotifications();
-    }, []);
+    }, [token, authState, authLoading]);
 
     const loadNotifications = async () => {
+        if (!token || authState === 'guest' || authState === 'session_expired') {
+            setIsUnauthenticated(true);
+            setLoading(false);
+            return;
+        }
         try {
             setLoading(true);
+            setIsUnauthenticated(false);
             const res = await CustomerApi.getNotifications();
             if (res.data) {
                 setNotifications(res.data);
             }
-        } catch (e) {
-            console.error('Failed to load notifications', e);
+        } catch (e: any) {
+            if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
+                setIsUnauthenticated(true);
+            } else {
+                console.error('Failed to load notifications', e);
+            }
         } finally {
             setLoading(false);
         }
     };
 
     const onRefresh = async () => {
+        if (!token || authState === 'guest' || authState === 'session_expired') {
+            setIsUnauthenticated(true);
+            return;
+        }
         setRefreshing(true);
         await loadNotifications();
         setRefreshing(false);
@@ -233,6 +258,27 @@ export default function CustomerNotificationsScreen() {
             </Text>
         </TouchableOpacity>
     );
+
+    if (!authLoading && (isUnauthenticated || !token || authState === 'guest' || authState === 'session_expired')) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <AppHeader
+                    title="Activity & Alerts"
+                    subtitle="Stay updates & system notifications"
+                    variant="plum"
+                />
+                <ExceptionalState
+                    type="session-expired"
+                    title="Sign In for Alerts"
+                    description="Please sign in to your customer account to view your booking updates, check-in details, and support messages."
+                    primaryActionLabel="Sign In as Customer"
+                    onPrimaryAction={() => router.push('/(auth)/customer-login')}
+                    secondaryActionLabel="Explore Stays"
+                    onSecondaryAction={() => router.push('/(customer)/explore/index')}
+                />
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>

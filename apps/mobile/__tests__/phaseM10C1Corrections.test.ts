@@ -1,5 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 describe('Phase M10C.1 Production Acceptance Corrections Specification', () => {
     describe('1. Customer Protection SLA Targets & Statutory Deadlines', () => {
@@ -234,6 +240,113 @@ describe('Phase M10C.1 Production Acceptance Corrections Specification', () => {
             assert.equal(netPayableMinor, 4405000); // INR 44,050
             // Verify commission GST is deducted exactly once
             assert.equal(grossRentMinor - netPayableMinor, 595000);
+        });
+    });
+
+    describe('4. Unauthenticated Guest State & Session Expiration Guards', () => {
+        it('verifies customer bookings index guards guest state and renders ExceptionalState', () => {
+            const bookingsPath = path.resolve(__dirname, '../app/(customer)/bookings/index.tsx');
+            const content = fs.readFileSync(bookingsPath, 'utf8');
+
+            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(content.includes('useAuth'), 'Must import useAuth');
+            assert.ok(content.includes("authState === 'guest'"), 'Must guard against guest authState');
+            assert.ok(content.includes("authState === 'session_expired'"), 'Must guard against session_expired');
+            assert.ok(content.includes('Sign In as Customer'), 'Must provide Customer Sign In CTA');
+            assert.ok(content.includes('Explore Stays'), 'Must provide Explore Stays secondary CTA');
+            assert.ok(content.includes('isUnauthenticated'), 'Must track unauthenticated state');
+        });
+
+        it('verifies customer notifications index guards guest state and renders ExceptionalState', () => {
+            const notifPath = path.resolve(__dirname, '../app/(customer)/notifications/index.tsx');
+            const content = fs.readFileSync(notifPath, 'utf8');
+
+            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(content.includes('useAuth'), 'Must import useAuth');
+            assert.ok(content.includes("authState === 'guest'"), 'Must guard against guest authState');
+            assert.ok(content.includes('Sign In for Alerts'), 'Must display Sign In for Alerts state');
+            assert.ok(content.includes('Sign In as Customer'), 'Must provide Customer Sign In CTA');
+        });
+
+        it('verifies customer wishlist index guards guest state and renders ExceptionalState', () => {
+            const wishlistPath = path.resolve(__dirname, '../app/(customer)/wishlist/index.tsx');
+            const content = fs.readFileSync(wishlistPath, 'utf8');
+
+            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(content.includes('useAuth'), 'Must import useAuth');
+            assert.ok(content.includes("authState === 'guest'"), 'Must guard against guest authState');
+            assert.ok(content.includes('Sign In to View Saved Stays'), 'Must display Sign In to View Saved Stays');
+            assert.ok(content.includes('Sign In as Customer'), 'Must provide Customer Sign In CTA');
+        });
+
+        it('verifies customer profile index guards guest state and renders ExceptionalState', () => {
+            const profilePath = path.resolve(__dirname, '../app/(customer)/profile/index.tsx');
+            const content = fs.readFileSync(profilePath, 'utf8');
+
+            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(content.includes("authState === 'guest'"), 'Must guard against guest authState');
+            assert.ok(content.includes('Sign In to Your Account'), 'Must display Sign In to Your Account');
+            assert.ok(content.includes('Sign In as Customer'), 'Must provide Customer Sign In CTA');
+        });
+
+        it('verifies partner dashboard guards guest/customer state and renders ExceptionalState', () => {
+            const dashboardPath = path.resolve(__dirname, '../app/(partner)/dashboard.tsx');
+            const content = fs.readFileSync(dashboardPath, 'utf8');
+
+            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(content.includes('useAuth'), 'Must import useAuth');
+            assert.ok(content.includes("authState !== 'owner_authenticated'"), 'Must require owner_authenticated state');
+            assert.ok(content.includes('Sign In as Partner'), 'Must provide Partner Sign In CTA');
+            assert.ok(content.includes('/(auth)/owner-login'), 'Must route to owner login');
+        });
+
+        it('verifies partner reservations index guards guest state and renders ExceptionalState', () => {
+            const reservationsPath = path.resolve(__dirname, '../app/(partner)/reservations/index.tsx');
+            const content = fs.readFileSync(reservationsPath, 'utf8');
+
+            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(content.includes('useAuth'), 'Must import useAuth');
+            assert.ok(content.includes("authState !== 'owner_authenticated'"), 'Must require owner_authenticated state');
+            assert.ok(content.includes('Sign In as Partner'), 'Must provide Partner Sign In CTA');
+        });
+
+        it('verifies partner properties index guards guest state and renders ExceptionalState', () => {
+            const propertiesPath = path.resolve(__dirname, '../app/(partner)/properties/index.tsx');
+            const content = fs.readFileSync(propertiesPath, 'utf8');
+
+            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(content.includes('useAuth'), 'Must import useAuth');
+            assert.ok(content.includes("authState !== 'owner_authenticated'"), 'Must require owner_authenticated state');
+            assert.ok(content.includes('Sign In as Partner'), 'Must provide Partner Sign In CTA');
+        });
+
+        it('verifies partner settlements index guards guest state and renders ExceptionalState', () => {
+            const settlementsPath = path.resolve(__dirname, '../app/(partner)/settlements/index.tsx');
+            const content = fs.readFileSync(settlementsPath, 'utf8');
+
+            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(content.includes('useAuth'), 'Must import useAuth');
+            assert.ok(content.includes("authState !== 'owner_authenticated'"), 'Must require owner_authenticated state');
+            assert.ok(content.includes('Sign In as Partner'), 'Must provide Partner Sign In CTA');
+        });
+
+        it('verifies partner notifications index guards guest state and renders ExceptionalState', () => {
+            const notifPath = path.resolve(__dirname, '../app/(partner)/notifications/index.tsx');
+            const content = fs.readFileSync(notifPath, 'utf8');
+
+            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(content.includes('useAuth'), 'Must import useAuth');
+            assert.ok(content.includes("authState !== 'owner_authenticated'"), 'Must require owner_authenticated state');
+            assert.ok(content.includes('Sign In as Partner'), 'Must provide Partner Sign In CTA');
+        });
+
+        it('verifies partner account guards guest state and renders ExceptionalState', () => {
+            const accountPath = path.resolve(__dirname, '../app/(partner)/account.tsx');
+            const content = fs.readFileSync(accountPath, 'utf8');
+
+            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(content.includes("authState !== 'owner_authenticated'"), 'Must require owner_authenticated state');
+            assert.ok(content.includes('Sign In as Partner'), 'Must provide Partner Sign In CTA');
         });
     });
 });

@@ -28,6 +28,8 @@ import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 import { StayTimingBadge } from '../../../src/components/StayTimingBadge';
 import { AppHeader } from '../../../src/components/AppHeader';
+import { ExceptionalState } from '../../../src/components/ExceptionalState';
+import { useAuth } from '../../../src/auth/AuthContext';
 import {
     BedDouble,
     Building2,
@@ -46,12 +48,14 @@ import {
 
 export default function PartnerPropertiesScreen() {
     const router = useRouter();
+    const { token, authState, isLoading: authLoading } = useAuth();
     const [properties, setProperties] = useState<PropertyDetail[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [activeCategoryFilter, setActiveCategoryFilter] = useState<
         'all' | CanonicalCategorySlug
     >('all');
+    const [isUnauthenticated, setIsUnauthenticated] = useState(false);
 
     // Physical Rooms Modal State
     const [selectedPropertyForRooms, setSelectedPropertyForRooms] =
@@ -83,24 +87,45 @@ export default function PartnerPropertiesScreen() {
     };
 
     useEffect(() => {
+        if (authLoading) return;
+        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+            setIsUnauthenticated(true);
+            setLoading(false);
+            return;
+        }
+        setIsUnauthenticated(false);
         loadProperties();
-    }, []);
+    }, [token, authState, authLoading]);
 
     const loadProperties = async () => {
+        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+            setIsUnauthenticated(true);
+            setLoading(false);
+            return;
+        }
         try {
             setLoading(true);
+            setIsUnauthenticated(false);
             const res = await OwnerApi.getProperties();
             if (res.data) {
                 setProperties(res.data);
             }
-        } catch (e) {
-            console.error('Failed to load partner properties', e);
+        } catch (e: any) {
+            if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
+                setIsUnauthenticated(true);
+            } else {
+                console.error('Failed to load partner properties', e);
+            }
         } finally {
             setLoading(false);
         }
     };
 
     const onRefresh = async () => {
+        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+            setIsUnauthenticated(true);
+            return;
+        }
         setRefreshing(true);
         await loadProperties();
         setRefreshing(false);
@@ -368,6 +393,27 @@ export default function PartnerPropertiesScreen() {
             </View>
         </View>
     );
+
+    if (!authLoading && (isUnauthenticated || !token || authState !== 'owner_authenticated')) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <AppHeader
+                    title="Manage Stays"
+                    subtitle="Track and manage your accommodations"
+                    variant="plum"
+                />
+                <ExceptionalState
+                    type="session-expired"
+                    title="Sign In as Partner"
+                    description="Please sign in to your verified TIJUM partner account to register and manage your properties."
+                    primaryActionLabel="Sign In as Partner"
+                    onPrimaryAction={() => router.push('/(auth)/owner-login')}
+                    secondaryActionLabel="Explore Stays"
+                    onSecondaryAction={() => router.push('/(customer)/explore/index')}
+                />
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>

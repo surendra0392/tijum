@@ -19,11 +19,13 @@ import { Typography } from '../../src/theme/typography';
 import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
 import { Badge } from '../../src/components/Badge';
+import { AppHeader } from '../../src/components/AppHeader';
+import { ExceptionalState } from '../../src/components/ExceptionalState';
 import { Building2, User, Lock, ShieldCheck, Landmark, HelpCircle, ChevronRight } from 'lucide-react-native';
 
 export default function PartnerAccountScreen() {
     const router = useRouter();
-    const { owner, logout, refreshProfile } = useAuth();
+    const { owner, token, authState, isLoading: authLoading, logout, refreshProfile } = useAuth();
 
     // Contact Profile State
     const [name, setName] = useState(owner?.name || '');
@@ -135,6 +137,27 @@ export default function PartnerAccountScreen() {
             ],
         );
     };
+
+    if (!authLoading && (!token || authState !== 'owner_authenticated')) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <AppHeader
+                    title="Host Account"
+                    subtitle="Manage host credentials and profile settings"
+                    variant="plum"
+                />
+                <ExceptionalState
+                    type="session-expired"
+                    title="Sign In as Partner"
+                    description="Please sign in to your verified TIJUM partner account to manage your profile and security credentials."
+                    primaryActionLabel="Sign In as Partner"
+                    onPrimaryAction={() => router.push('/(auth)/owner-login')}
+                    secondaryActionLabel="Explore Stays"
+                    onSecondaryAction={() => router.push('/(customer)/explore/index')}
+                />
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>
