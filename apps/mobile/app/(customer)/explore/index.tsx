@@ -3,7 +3,9 @@ import {
     ActivityIndicator,
     FlatList,
     Modal,
+    Platform,
     RefreshControl,
+    SafeAreaView,
     ScrollView,
     StyleSheet,
     Switch,
@@ -29,6 +31,8 @@ import {
     Utensils,
     Calendar,
     Check,
+    Bell,
+    ChevronDown,
 } from 'lucide-react-native';
 import { PublicApi } from '../../../src/api/public';
 import { CustomerApi } from '../../../src/api/customer';
@@ -285,35 +289,74 @@ export default function ExploreScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Search Bar & Filters */}
-            <View style={styles.searchSection}>
-                <View style={styles.searchBar}>
-                    <Search
-                        size={18}
-                        color={Colors.gray400}
-                        style={styles.searchIcon}
-                    />
-                    <TextInput
-                        placeholder="Search locality, area, or stay name..."
-                        placeholderTextColor={Colors.gray400}
-                        style={styles.searchInput}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        onSubmitEditing={handleSearchSubmit}
-                        returnKeyType="search"
-                    />
-                    {searchQuery ? (
+            {/* Top Curved Plum Header */}
+            <View style={styles.plumHeader}>
+                <SafeAreaView>
+                    <View style={styles.plumHeaderTopRow}>
                         <TouchableOpacity
+                            style={styles.locationSelector}
                             onPress={() => {
-                                setSearchQuery('');
-                                loadProperties();
+                                const currentIndex = CITIES.indexOf(selectedCity);
+                                const nextIndex = (currentIndex + 1) % CITIES.length;
+                                setSelectedCity(CITIES[nextIndex]);
                             }}
+                            activeOpacity={0.8}
                         >
-                            <X size={16} color={Colors.gray400} />
+                            <MapPin size={15} color={Colors.coral} style={{ marginRight: 4 }} />
+                            <Text style={styles.locationText}>
+                                {selectedCity === 'All' ? 'Hyderabad, Telangana' : selectedCity}
+                            </Text>
+                            <ChevronDown size={14} color={Colors.white} style={{ marginLeft: 4 }} />
                         </TouchableOpacity>
-                    ) : null}
-                </View>
 
+                        <TouchableOpacity
+                            style={styles.notificationBell}
+                            onPress={() => router.push('/(customer)/notifications')}
+                            activeOpacity={0.8}
+                        >
+                            <Bell size={18} color={Colors.white} />
+                            <View style={styles.notificationBadgeDot} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.heroTextSection}>
+                        <Text style={styles.heroTitle}>Find Your Perfect Stay & Meal</Text>
+                        <Text style={styles.heroSubtitle}>
+                            Food-inclusive hostels, homestays & co-living with transparent disclosures
+                        </Text>
+                    </View>
+
+                    <View style={styles.searchBar}>
+                        <Search
+                            size={18}
+                            color={Colors.gray400}
+                            style={styles.searchIcon}
+                        />
+                        <TextInput
+                            placeholder="Search locality, area, or stay name..."
+                            placeholderTextColor={Colors.gray400}
+                            style={styles.searchInput}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            onSubmitEditing={handleSearchSubmit}
+                            returnKeyType="search"
+                        />
+                        {searchQuery ? (
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setSearchQuery('');
+                                    loadProperties();
+                                }}
+                            >
+                                <X size={16} color={Colors.gray400} />
+                            </TouchableOpacity>
+                        ) : null}
+                    </View>
+                </SafeAreaView>
+            </View>
+
+            {/* Filter Section */}
+            <View style={styles.searchSection}>
                 {/* Canonical Category Selector Bar */}
                 <ScrollView
                     horizontal
@@ -796,9 +839,70 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: Colors.canvas,
     },
+    plumHeader: {
+        backgroundColor: Colors.deepPlum,
+        paddingHorizontal: Spacing.base,
+        paddingTop: Platform.OS === 'android' ? 36 : 10,
+        paddingBottom: Spacing.base,
+        borderBottomLeftRadius: BorderRadius.xl,
+        borderBottomRightRadius: BorderRadius.xl,
+        ...Shadows.subtle,
+    },
+    plumHeaderTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: Spacing.sm,
+    },
+    locationSelector: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        paddingHorizontal: Spacing.md,
+        paddingVertical: 6,
+        borderRadius: BorderRadius.pill,
+    },
+    locationText: {
+        fontSize: Typography.fontSize.xs,
+        fontWeight: '700',
+        color: Colors.white,
+    },
+    notificationBell: {
+        width: 36,
+        height: 36,
+        borderRadius: BorderRadius.pill,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+    },
+    notificationBadgeDot: {
+        position: 'absolute',
+        top: 7,
+        right: 8,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: Colors.coral,
+        borderWidth: 1.5,
+        borderColor: Colors.deepPlum,
+    },
+    heroTextSection: {
+        marginBottom: Spacing.md,
+    },
+    heroTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: Colors.white,
+    },
+    heroSubtitle: {
+        fontSize: 12,
+        color: 'rgba(255, 255, 255, 0.8)',
+        marginTop: 2,
+    },
     searchSection: {
         backgroundColor: Colors.white,
-        paddingTop: Spacing.sm,
+        paddingTop: Spacing.xs,
         paddingBottom: Spacing.sm,
         borderBottomWidth: 1,
         borderBottomColor: Colors.borderSubtle,
@@ -807,13 +911,11 @@ const styles = StyleSheet.create({
     searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: Colors.surfaceSubtle,
-        marginHorizontal: Spacing.base,
+        backgroundColor: Colors.white,
         paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.sm,
+        paddingVertical: Platform.OS === 'ios' ? 10 : 8,
         borderRadius: BorderRadius.pill,
-        borderWidth: 1,
-        borderColor: Colors.borderSubtle,
+        ...Shadows.subtle,
     },
     searchIcon: {
         marginRight: Spacing.sm,

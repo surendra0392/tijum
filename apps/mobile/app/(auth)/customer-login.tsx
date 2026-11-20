@@ -10,7 +10,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { AlertCircle, X, Mail } from 'lucide-react-native';
+import { AlertCircle, X, Mail, Check } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthContext';
 import { PublicApi } from '../../src/api/public';
@@ -27,6 +27,7 @@ export default function CustomerLoginScreen() {
 
     const [loginIdentifier, setLoginIdentifier] = useState('');
     const [password, setPassword] = useState('');
+    const [rememberMe, setRememberMe] = useState(true);
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
@@ -135,6 +136,26 @@ export default function CustomerLoginScreen() {
 
                     <View style={styles.forgotPasswordRow}>
                         <TouchableOpacity
+                            style={styles.rememberMeRow}
+                            onPress={() => setRememberMe(!rememberMe)}
+                            activeOpacity={0.8}
+                        >
+                            <View
+                                style={[
+                                    styles.checkbox,
+                                    rememberMe && styles.checkboxActive,
+                                ]}
+                            >
+                                {rememberMe ? (
+                                    <Check size={12} color={Colors.white} />
+                                ) : null}
+                            </View>
+                            <Text style={styles.rememberMeText}>
+                                Remember me
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
                             onPress={() => setShowForgotModal(true)}
                             activeOpacity={0.7}
                         >
@@ -152,6 +173,39 @@ export default function CustomerLoginScreen() {
                         onPress={handleLogin}
                         style={styles.loginButton}
                     />
+
+                    <View style={styles.dividerRow}>
+                        <View style={styles.dividerLine} />
+                        <Text style={styles.dividerText}>or continue with</Text>
+                        <View style={styles.dividerLine} />
+                    </View>
+
+                    <View style={styles.socialButtonsRow}>
+                        <TouchableOpacity
+                            style={styles.socialBtn}
+                            activeOpacity={0.8}
+                            onPress={() =>
+                                Alert.alert(
+                                    'Social Sign-In',
+                                    'Google sign-in is available through web SSO.',
+                                )
+                            }
+                        >
+                            <Text style={styles.socialBtnText}>Google</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.socialBtn}
+                            activeOpacity={0.8}
+                            onPress={() =>
+                                Alert.alert(
+                                    'Social Sign-In',
+                                    'Apple sign-in is available through Apple ID.',
+                                )
+                            }
+                        >
+                            <Text style={styles.socialBtnText}>Apple</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 <View style={styles.footer}>
@@ -260,8 +314,34 @@ const styles = StyleSheet.create({
         gap: Spacing.xs,
     },
     forgotPasswordRow: {
-        alignItems: 'flex-end',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         marginVertical: Spacing.xs,
+    },
+    rememberMeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    checkbox: {
+        width: 18,
+        height: 18,
+        borderRadius: 4,
+        borderWidth: 1.5,
+        borderColor: Colors.borderStrong,
+        backgroundColor: Colors.white,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    checkboxActive: {
+        backgroundColor: Colors.coral,
+        borderColor: Colors.coral,
+    },
+    rememberMeText: {
+        fontSize: Typography.fontSize.xs,
+        color: Colors.gray700,
+        fontWeight: '500',
     },
     forgotPasswordText: {
         fontSize: 12,
@@ -270,6 +350,41 @@ const styles = StyleSheet.create({
     },
     loginButton: {
         marginTop: Spacing.xs,
+    },
+    dividerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: Spacing.md,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: Colors.borderSubtle,
+    },
+    dividerText: {
+        marginHorizontal: Spacing.sm,
+        fontSize: Typography.fontSize.xs,
+        color: Colors.gray400,
+        fontWeight: '600',
+    },
+    socialButtonsRow: {
+        flexDirection: 'row',
+        gap: Spacing.md,
+    },
+    socialBtn: {
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: BorderRadius.pill,
+        borderWidth: 1,
+        borderColor: Colors.borderSubtle,
+        backgroundColor: Colors.surfaceSubtle,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    socialBtnText: {
+        fontSize: Typography.fontSize.sm,
+        fontWeight: '700',
+        color: Colors.deepPlum,
     },
     footer: {
         flexDirection: 'row',

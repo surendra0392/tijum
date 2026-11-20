@@ -15,6 +15,7 @@ import { CustomerApi } from '../../../src/api/customer';
 import { PropertyCard as PropertyCardType } from '../../../src/api/types';
 import { PropertyCard } from '../../../src/components/PropertyCard';
 import { Button } from '../../../src/components/Button';
+import { AppHeader } from '../../../src/components/AppHeader';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
@@ -63,6 +64,12 @@ export default function WishlistScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
+            <AppHeader
+                title="Saved Stays"
+                subtitle="Your favorited verified accommodations"
+                showBack={true}
+                variant="plum"
+            />
             {loading ? (
                 <View style={styles.center}>
                     <ActivityIndicator size="large" color={Colors.coral} />

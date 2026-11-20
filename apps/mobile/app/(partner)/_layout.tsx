@@ -40,7 +40,7 @@ export default function PartnerTabsLayout() {
                 name="dashboard"
                 options={{
                     title: 'Dashboard',
-                    headerTitle: 'Host Command Center',
+                    headerShown: false,
                     tabBarIcon: ({ color }: { color: string }) => (
                         <LayoutDashboard size={20} color={color} />
                     ),

@@ -8,17 +8,19 @@ import {
     RefreshControl,
     TouchableOpacity,
     SafeAreaView,
+    Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { OwnerApi } from '../../src/api/owner';
 import { PartnerDashboardData } from '../../src/api/types';
 import { Colors } from '../../src/theme/colors';
-import { Spacing } from '../../src/theme/spacing';
+import { BorderRadius, Spacing } from '../../src/theme/spacing';
 import { Typography } from '../../src/theme/typography';
 import { Badge } from '../../src/components/Badge';
 import { Button } from '../../src/components/Button';
 import { ReservationStatusBadge } from '../../src/components/ReservationStatusBadge';
 import {
+    Bell,
     Building2,
     Calendar,
     ChevronRight,
@@ -87,16 +89,32 @@ export default function PartnerDashboardScreen() {
                     />
                 }
             >
-                <View style={styles.contentPadding}>
-                    {/* Welcome / Header */}
-                    <Text style={styles.welcomeText}>
-                        Welcome back, Partner
-                    </Text>
-                    <Text style={styles.subtitleText}>
-                        Manage your properties, confirmed bookings, and guest
-                        arrivals.
-                    </Text>
+                {/* Curved Plum Header */}
+                <View style={styles.plumHeader}>
+                    <SafeAreaView>
+                        <View style={styles.plumHeaderTopRow}>
+                            <View style={styles.partnerBadge}>
+                                <Zap size={14} color={Colors.coral} style={{ marginRight: 4 }} />
+                                <Text style={styles.partnerBadgeText}>Host Command Center</Text>
+                            </View>
+                            <TouchableOpacity
+                                style={styles.notificationBell}
+                                onPress={() => router.push('/(partner)/notifications')}
+                                activeOpacity={0.8}
+                            >
+                                <Bell size={18} color={Colors.white} />
+                                {pendingCount > 0 ? <View style={styles.notificationBadgeDot} /> : null}
+                            </TouchableOpacity>
+                        </View>
 
+                        <Text style={styles.heroGreeting}>Welcome back, Partner</Text>
+                        <Text style={styles.heroSub}>
+                            Manage your verified properties, room inventory, guest check-ins, and settlements.
+                        </Text>
+                    </SafeAreaView>
+                </View>
+
+                <View style={styles.contentPadding}>
                     {/* Metrics Grid */}
                     <View style={styles.metricsGrid}>
                         <View style={styles.metricCard}>
@@ -198,6 +216,47 @@ export default function PartnerDashboardScreen() {
                         <ChevronRight size={18} color={Colors.gray400} />
                     </TouchableOpacity>
 
+                    {/* 6-Month Booking & Revenue Velocity */}
+                    <View style={styles.trendCard}>
+                        <View style={styles.trendHeader}>
+                            <View>
+                                <Text style={styles.trendTitle}>Booking & Revenue Velocity</Text>
+                                <Text style={styles.trendSubtitle}>Past 6 months occupancy performance</Text>
+                            </View>
+                            <Badge label="Active Stays" variant="success" size="sm" />
+                        </View>
+                        <View style={styles.trendBarContainer}>
+                            {[
+                                { month: 'Jun', height: '45%' },
+                                { month: 'Jul', height: '60%' },
+                                { month: 'Aug', height: '75%' },
+                                { month: 'Sep', height: '70%' },
+                                { month: 'Oct', height: '85%' },
+                                { month: 'Nov', height: '95%', active: true },
+                            ].map((bar, idx) => (
+                                <View key={idx} style={styles.trendBarColumn}>
+                                    <View style={styles.trendBarTrack}>
+                                        <View
+                                            style={[
+                                                styles.trendBarFill,
+                                                { height: bar.height as any },
+                                                bar.active && styles.trendBarFillActive,
+                                            ]}
+                                        />
+                                    </View>
+                                    <Text
+                                        style={[
+                                            styles.trendMonthLabel,
+                                            bar.active && styles.trendMonthLabelActive,
+                                        ]}
+                                    >
+                                        {bar.month}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+
                     {/* Recent Reservations */}
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>
@@ -293,11 +352,132 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: Colors.warmOffWhite,
     },
+    plumHeader: {
+        backgroundColor: Colors.deepPlum,
+        paddingHorizontal: Spacing.base,
+        paddingTop: Platform.OS === 'android' ? 36 : 10,
+        paddingBottom: Spacing.lg,
+        borderBottomLeftRadius: BorderRadius.xl,
+        borderBottomRightRadius: BorderRadius.xl,
+    },
+    plumHeaderTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: Spacing.sm,
+    },
+    partnerBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        paddingHorizontal: Spacing.md,
+        paddingVertical: 5,
+        borderRadius: BorderRadius.pill,
+    },
+    partnerBadgeText: {
+        fontSize: Typography.fontSize.xs,
+        fontWeight: '700',
+        color: Colors.white,
+    },
+    notificationBell: {
+        width: 36,
+        height: 36,
+        borderRadius: BorderRadius.pill,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+    },
+    notificationBadgeDot: {
+        position: 'absolute',
+        top: 7,
+        right: 8,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: Colors.coral,
+        borderWidth: 1.5,
+        borderColor: Colors.deepPlum,
+    },
+    heroGreeting: {
+        fontSize: 22,
+        fontWeight: '800',
+        color: Colors.white,
+        marginTop: Spacing.xs,
+    },
+    heroSub: {
+        fontSize: Typography.fontSize.xs,
+        color: 'rgba(255, 255, 255, 0.85)',
+        marginTop: 4,
+        lineHeight: 18,
+    },
     scrollContent: {
         paddingBottom: Spacing.xxl,
     },
     contentPadding: {
         padding: Spacing.lg,
+    },
+    trendCard: {
+        backgroundColor: Colors.white,
+        borderRadius: 12,
+        padding: Spacing.md,
+        marginVertical: Spacing.sm,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+    },
+    trendHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: Spacing.md,
+    },
+    trendTitle: {
+        fontSize: Typography.fontSize.sm,
+        fontWeight: '700',
+        color: Colors.deepPlum,
+    },
+    trendSubtitle: {
+        fontSize: Typography.fontSize.xs,
+        color: Colors.gray500,
+        marginTop: 1,
+    },
+    trendBarContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
+        height: 100,
+        paddingTop: Spacing.xs,
+        paddingHorizontal: Spacing.xs,
+    },
+    trendBarColumn: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    trendBarTrack: {
+        width: 18,
+        height: 75,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 4,
+        justifyContent: 'flex-end',
+        overflow: 'hidden',
+    },
+    trendBarFill: {
+        width: '100%',
+        backgroundColor: '#CBD5E1',
+        borderRadius: 4,
+    },
+    trendBarFillActive: {
+        backgroundColor: Colors.coral,
+    },
+    trendMonthLabel: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: Colors.gray400,
+        marginTop: 6,
+    },
+    trendMonthLabelActive: {
+        color: Colors.coral,
+        fontWeight: '700',
     },
     welcomeText: {
         ...Typography.titleMedium,

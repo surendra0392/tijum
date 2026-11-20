@@ -33,7 +33,7 @@ export default function CustomerTabsLayout() {
                 name="explore/index"
                 options={{
                     title: 'Explore',
-                    headerTitle: 'TIJUM Stays',
+                    headerShown: false,
                     tabBarIcon: ({ color }: { color: string }) => (
                         <Search size={20} color={color} />
                     ),
@@ -136,7 +136,7 @@ export default function CustomerTabsLayout() {
                 name="wishlist/index"
                 options={{
                     href: null,
-                    headerTitle: 'Saved Stays',
+                    headerShown: false,
                 }}
             />
         </Tabs>
