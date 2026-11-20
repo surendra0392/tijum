@@ -18,17 +18,70 @@ export class StorageWriteError extends Error {
     }
 }
 
+const inMemoryStore: Record<string, string> = {};
+
+const webStorage: StorageEngine = {
+    getItemAsync: async (key: string) => {
+        try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+                return window.localStorage.getItem(key);
+            }
+        } catch {}
+        return inMemoryStore[key] ?? null;
+    },
+    setItemAsync: async (key: string, value: string) => {
+        try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+                window.localStorage.setItem(key, value);
+                return;
+            }
+        } catch {}
+        inMemoryStore[key] = value;
+    },
+    deleteItemAsync: async (key: string) => {
+        try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+                window.localStorage.removeItem(key);
+                return;
+            }
+        } catch {}
+        delete inMemoryStore[key];
+    },
+};
+
 let nativeSecureStore: StorageEngine;
 try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    nativeSecureStore = require('expo-secure-store');
+    if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+        nativeSecureStore = webStorage;
+    } else {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const secureStore = require('expo-secure-store');
+        nativeSecureStore = {
+            getItemAsync: async (key: string) => {
+                try {
+                    return await secureStore.getItemAsync(key);
+                } catch {
+                    return webStorage.getItemAsync(key);
+                }
+            },
+            setItemAsync: async (key: string, value: string) => {
+                try {
+                    await secureStore.setItemAsync(key, value);
+                } catch {
+                    await webStorage.setItemAsync(key, value);
+                }
+            },
+            deleteItemAsync: async (key: string) => {
+                try {
+                    await secureStore.deleteItemAsync(key);
+                } catch {
+                    await webStorage.deleteItemAsync(key);
+                }
+            },
+        };
+    }
 } catch {
-    // Fallback for non-native test environments (e.g. Node test runner)
-    nativeSecureStore = {
-        getItemAsync: async () => null,
-        setItemAsync: async () => {},
-        deleteItemAsync: async () => {},
-    };
+    nativeSecureStore = webStorage;
 }
 
 let activeStorage: StorageEngine = nativeSecureStore;
@@ -146,13 +199,26 @@ export class SecureTokenStorage {
             ]);
         } catch (err) {
             console.warn(
-                '[SecureTokenStorage] SecureStore write failure in setActiveSession:',
+                '[SecureTokenStorage] SecureStore write failure in setActiveSession, saving to fallback:',
                 err,
             );
-            throw new StorageWriteError(
-                'Failed to persist active session token to SecureStore',
-                err,
-            );
+            try {
+                await Promise.all([
+                    webStorage.setItemAsync(ACTIVE_SESSION_TOKEN_KEY, token),
+                    webStorage.setItemAsync(
+                        ACTIVE_PRINCIPAL_TYPE_KEY,
+                        principalType,
+                    ),
+                    webStorage.setItemAsync(
+                        ACTIVE_DEVICE_SESSION_ID_KEY,
+                        deviceSessionId,
+                    ),
+                ]);
+            } catch {
+                inMemoryStore[ACTIVE_SESSION_TOKEN_KEY] = token;
+                inMemoryStore[ACTIVE_PRINCIPAL_TYPE_KEY] = principalType;
+                inMemoryStore[ACTIVE_DEVICE_SESSION_ID_KEY] = deviceSessionId;
+            }
         }
     }
 

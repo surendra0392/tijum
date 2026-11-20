@@ -70,11 +70,7 @@ export default function CustomerBookingsScreen() {
                 setReservations(SHOWCASE_BOOKINGS);
             }
         } catch (e: any) {
-            if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
-                setIsUnauthenticated(true);
-            } else {
-                setReservations(SHOWCASE_BOOKINGS);
-            }
+            setReservations(SHOWCASE_BOOKINGS);
         } finally {
             setLoading(false);
         }
@@ -208,7 +204,7 @@ export default function CustomerBookingsScreen() {
                     </Text>
                 </View>
                 <ExceptionalState
-                    type="session-expired"
+                    type="auth-required"
                     title="Sign In to View Stays"
                     description="Please sign in to your customer account to access your active reservations, check-in codes, and payment receipts."
                     actionLabel="Sign In as Customer"

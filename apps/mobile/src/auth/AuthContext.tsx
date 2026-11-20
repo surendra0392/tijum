@@ -104,26 +104,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setPrincipalType(session.principalType);
 
             if (session.principalType === 'customer') {
-                const res =
-                    await ApiClient.get<ApiResponse<CustomerProfile>>(
-                        'customer/profile',
-                    );
-                if (res.data) {
-                    setCustomerUser(res.data);
+                if (session.token.startsWith('demo_')) {
+                    setCustomerUser(SHOWCASE_CUSTOMER);
                     setPartnerUser(null);
                     setAuthState('customer_authenticated');
                 } else {
-                    throw new Error('Invalid customer session');
+                    const res =
+                        await ApiClient.get<ApiResponse<CustomerProfile>>(
+                            'customer/profile',
+                        );
+                    if (res.data) {
+                        setCustomerUser(res.data);
+                        setPartnerUser(null);
+                        setAuthState('customer_authenticated');
+                    } else {
+                        throw new Error('Invalid customer session');
+                    }
                 }
             } else if (session.principalType === 'owner') {
-                const res =
-                    await ApiClient.get<ApiResponse<any>>('owner/dashboard');
-                if (res.data && res.data.partner_profile) {
-                    setPartnerUser(res.data.partner_profile as OwnerProfile);
+                if (session.token.startsWith('demo_')) {
+                    setPartnerUser(SHOWCASE_PARTNER as any);
                     setCustomerUser(null);
                     setAuthState('owner_authenticated');
                 } else {
-                    throw new Error('Invalid partner session');
+                    const res =
+                        await ApiClient.get<ApiResponse<any>>('owner/dashboard');
+                    if (res.data && res.data.partner_profile) {
+                        setPartnerUser(res.data.partner_profile as OwnerProfile);
+                        setCustomerUser(null);
+                        setAuthState('owner_authenticated');
+                    } else {
+                        throw new Error('Invalid partner session');
+                    }
                 }
             }
         } catch {

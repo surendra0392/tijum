@@ -14,6 +14,7 @@ import {
     AlertCircle,
     RotateCcw,
     Sparkles,
+    User,
 } from 'lucide-react-native';
 import { Colors } from '../theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../theme/spacing';
@@ -22,6 +23,7 @@ export type ExceptionalStateType =
     | 'no-internet'
     | 'no-results'
     | 'session-expired'
+    | 'auth-required'
     | 'account-blocked'
     | 'payment-failed'
     | 'resume-booking';
@@ -90,6 +92,16 @@ export function ExceptionalState({
                     defaultDesc:
                         'Your security session has expired or your account was signed in on another device. Please sign in to continue.',
                     defaultPrimary: 'Sign In Again',
+                };
+            case 'auth-required':
+                return {
+                    Icon: User,
+                    iconBg: Colors.peachSoft,
+                    iconColor: Colors.deepPlum,
+                    defaultTitle: 'Sign In to Continue',
+                    defaultDesc:
+                        'Sign in to access your bookings, saved stays, and account settings.',
+                    defaultPrimary: 'Sign In Now',
                 };
             case 'account-blocked':
                 return {

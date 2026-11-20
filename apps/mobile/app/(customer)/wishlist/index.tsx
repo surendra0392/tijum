@@ -134,7 +134,7 @@ export default function WishlistScreen() {
                     </View>
                 </View>
                 <ExceptionalState
-                    type="session-expired"
+                    type="auth-required"
                     title="Sign In to View Saved Stays"
                     description="Save and compare your favorite verified hostels, homestays, and co-living spaces."
                     actionLabel="Sign In as Customer"

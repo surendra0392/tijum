@@ -106,23 +106,38 @@ export default function WelcomeScreen() {
         }
     };
 
-    const handlePermissionContinue = async () => {
+    const requestAllPermissions = async () => {
         try {
             await PushNotificationService.requestInitialPermissionsOnInstall();
-            if (
-                Platform.OS === 'web' &&
-                typeof window !== 'undefined' &&
-                'Notification' in window
-            ) {
-                await (window as any).Notification.requestPermission();
-            }
-        } catch {
-            // Proceed gracefully even if user dismisses native dialog
+        } catch {}
+
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            try {
+                if ('Notification' in window && (window as any).Notification.permission === 'default') {
+                    await (window as any).Notification.requestPermission();
+                }
+            } catch {}
+            try {
+                if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+                    await new Promise<void>((resolve) => {
+                        navigator.geolocation.getCurrentPosition(
+                            () => resolve(),
+                            () => resolve(),
+                            { timeout: 3000, enableHighAccuracy: false }
+                        );
+                    });
+                }
+            } catch {}
         }
+    };
+
+    const handlePermissionContinue = async () => {
+        await requestAllPermissions();
         router.replace('/(customer)/explore');
     };
 
-    const handleSkip = () => {
+    const handleSkip = async () => {
+        await requestAllPermissions();
         router.replace('/(customer)/explore');
     };
 
@@ -242,8 +257,6 @@ export default function WelcomeScreen() {
                         <Text style={styles.primaryButtonText}>
                             {isPermissionSlide
                                 ? 'Allow Permissions & Get Started'
-                                : activeSlide === ONBOARDING_SLIDES.length - 2
-                                ? 'Get Started →'
                                 : 'Next →'}
                         </Text>
                     </TouchableOpacity>

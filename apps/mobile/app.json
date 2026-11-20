@@ -28,7 +28,9 @@
       "package": "com.tijum.app",
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
       ],
       "intentFilters": [
         {

@@ -128,7 +128,7 @@ export default function PartnerNotificationsScreen() {
                     variant="plum"
                 />
                 <ExceptionalState
-                    type="session-expired"
+                    type="auth-required"
                     title="Sign In as Partner"
                     description="Please sign in to your verified TIJUM partner account to access and review your notifications and alerts."
                     primaryActionLabel="Sign In as Partner"

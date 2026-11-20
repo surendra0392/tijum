@@ -164,7 +164,7 @@ export default function CustomerNotificationsScreen() {
                     </View>
                 </View>
                 <ExceptionalState
-                    type="session-expired"
+                    type="auth-required"
                     title="Sign In for Alerts"
                     description="Sign in to receive real-time notifications about your bookings, payment receipts, and offers."
                     actionLabel="Sign In as Customer"

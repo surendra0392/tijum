@@ -51,7 +51,8 @@ export class ApiClient {
             ...(options.headers as Record<string, string>),
         };
 
-        if (!isFormData && !headers['Content-Type']) {
+        const method = (options.method || 'GET').toUpperCase();
+        if (!isFormData && !headers['Content-Type'] && (options.body || ['POST', 'PUT', 'PATCH'].includes(method))) {
             headers['Content-Type'] = 'application/json';
         }
 
@@ -81,8 +82,10 @@ export class ApiClient {
 
             if (!response.ok) {
                 if (response.status === 401) {
-                    // Token expired or invalid
-                    await SecureTokenStorage.clearAll();
+                    // Token expired or invalid (preserve local demo sessions)
+                    if (token && !token.startsWith('demo_')) {
+                        await SecureTokenStorage.clearAll();
+                    }
                 }
 
                 const fallbackMessage =

@@ -175,7 +175,7 @@ export default function PartnerReservationsScreen() {
                     </Text>
                 </View>
                 <ExceptionalState
-                    type="session-expired"
+                    type="auth-required"
                     title="Partner Access Required"
                     description="Please sign in to your partner account to view and manage guest bookings."
                     actionLabel="Sign In as Partner"

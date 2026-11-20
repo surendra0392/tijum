@@ -84,7 +84,7 @@ export default function CustomerProfileScreen() {
                     <Text style={styles.headerTitle}>Profile</Text>
                 </View>
                 <ExceptionalState
-                    type="session-expired"
+                    type="auth-required"
                     title="Sign In to Your Account"
                     description="Please sign in to manage your bookings, reward points, saved stays, and account settings."
                     actionLabel="Sign In as Customer"

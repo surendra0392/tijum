@@ -108,7 +108,7 @@ export default function PartnerSettlementsScreen() {
                     </View>
                 </View>
                 <ExceptionalState
-                    type="session-expired"
+                    type="auth-required"
                     title="Partner Access Required"
                     description="Please sign in to your partner account to view earnings, financial breakdowns, and withdrawal history."
                     actionLabel="Sign In as Partner"

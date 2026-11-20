@@ -11,7 +11,7 @@ import {
     View,
     Image,
 } from 'react-native';
-import { AlertCircle, X, Mail, Lock, Eye, EyeOff, Check, Sparkles } from 'lucide-react-native';
+import { AlertCircle, X, Mail, Lock, Eye, EyeOff, Check } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthContext';
 import { PublicApi } from '../../src/api/public';
@@ -265,33 +265,6 @@ export default function CustomerLoginScreen() {
                             style={styles.loginButton}
                         />
 
-                        {/* 1-Tap Quick Demo Access */}
-                        <TouchableOpacity
-                            style={styles.demoButton}
-                            activeOpacity={0.88}
-                            onPress={async () => {
-                                setLoading(true);
-                                try {
-                                    if (activeTab === 'customer') {
-                                        await loginDemoCustomer();
-                                        router.replace('/(customer)/explore');
-                                    } else {
-                                        await loginDemoPartner();
-                                        router.replace('/(partner)/dashboard');
-                                    }
-                                } finally {
-                                    setLoading(false);
-                                }
-                            }}
-                        >
-                            <Sparkles size={16} color={Colors.white} style={{ marginRight: 8 }} />
-                            <Text style={styles.demoButtonText}>
-                                {activeTab === 'customer'
-                                    ? '1-Tap Demo Customer: Rahul Sharma'
-                                    : '1-Tap Demo Host: Priya Sharma'}
-                            </Text>
-                        </TouchableOpacity>
-
                         {/* Divider */}
                         <View style={styles.dividerRow}>
                             <View style={styles.dividerLine} />
@@ -536,26 +509,6 @@ const styles = StyleSheet.create({
         marginTop: Spacing.sm,
         backgroundColor: Colors.deepPlum,
         borderRadius: 12,
-    },
-    demoButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: Colors.coral,
-        paddingVertical: 13,
-        paddingHorizontal: Spacing.md,
-        borderRadius: BorderRadius.pill,
-        marginTop: Spacing.sm,
-        shadowColor: '#E05A47',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.25,
-        shadowRadius: 5,
-        elevation: 3,
-    },
-    demoButtonText: {
-        color: Colors.white,
-        fontWeight: '700',
-        fontSize: 13,
     },
     errorBox: {
         flexDirection: 'row',

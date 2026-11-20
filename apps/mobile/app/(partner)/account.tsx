@@ -80,7 +80,7 @@ export default function PartnerAccountScreen() {
                     <Text style={styles.headerTitle}>Partner Account</Text>
                 </View>
                 <ExceptionalState
-                    type="session-expired"
+                    type="auth-required"
                     title="Partner Access Required"
                     description="Please sign in to your verified partner portal to manage business settings, bank details, and active sessions."
                     actionLabel="Sign In as Partner"

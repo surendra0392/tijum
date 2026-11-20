@@ -87,7 +87,7 @@ export default function PartnerDashboardScreen() {
                     <Text style={styles.greetingText}>Partner Portal</Text>
                 </View>
                 <ExceptionalState
-                    type="session-expired"
+                    type="auth-required"
                     title="Partner Access Required"
                     description="Please sign in to your verified partner portal to manage properties, view occupancy, and track earnings."
                     actionLabel="Sign In as Partner"

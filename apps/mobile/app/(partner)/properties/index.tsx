@@ -404,7 +404,7 @@ export default function PartnerPropertiesScreen() {
                     variant="plum"
                 />
                 <ExceptionalState
-                    type="session-expired"
+                    type="auth-required"
                     title="Partner Access Required"
                     description="Please sign in to your partner account to view, edit, and configure your property listings."
                     actionLabel="Sign In as Partner"
