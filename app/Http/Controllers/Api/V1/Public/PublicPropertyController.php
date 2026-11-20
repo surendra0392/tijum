@@ -6,6 +6,8 @@ namespace App\Http\Controllers\Api\V1\Public;
 
 use App\Enums\AccommodationCategory;
 use App\Enums\AmenityVerificationStatus;
+use App\Enums\PropertyAvailabilityBlockScope;
+use App\Enums\PropertyAvailabilityBlockStatus;
 use App\Enums\PropertyGenderPolicy;
 use App\Enums\PropertyOperationalStatus;
 use App\Enums\PropertyRoomStatus;
@@ -18,6 +20,7 @@ use App\Models\Property;
 use App\Models\PropertyReview;
 use App\Models\PropertyRoomType;
 use App\Services\PropertySearchService;
+use App\Services\ReservationAvailabilityService;
 use App\Services\ReservationQuoteService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -26,8 +29,11 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 class PublicPropertyController extends ApiController
 {
-    public function index(Request $request, PropertySearchService $searchService): JsonResponse
-    {
+    public function index(
+        Request $request,
+        PropertySearchService $searchService,
+        ReservationAvailabilityService $availabilityService,
+    ): JsonResponse {
         $query = Property::query()
             ->where('status', PropertyOperationalStatus::Active)
             ->where('is_verified', true)
@@ -100,49 +106,96 @@ class PublicPropertyController extends ApiController
             });
         }
 
-        if ($request->filled('check_in_date') || $request->filled('check_in')) {
-            $checkInStr = (string) ($request->query('check_in_date') ?? $request->query('check_in'));
-            $checkOutStr = (string) ($request->query('check_out_date') ?? $request->query('check_out'));
+        $hasCheckInParam = $request->has('check_in_date') || $request->has('check_in');
+        $hasCheckOutParam = $request->has('check_out_date') || $request->has('check_out');
+
+        $checkInVal = $request->query('check_in_date') ?? $request->query('check_in');
+        $checkOutVal = $request->query('check_out_date') ?? $request->query('check_out');
+
+        $isCheckInProvided = $hasCheckInParam && $checkInVal !== null && trim((string) $checkInVal) !== '';
+        $isCheckOutProvided = $hasCheckOutParam && $checkOutVal !== null && trim((string) $checkOutVal) !== '';
+
+        $stayFilterCheckIn = null;
+        $stayFilterCheckOut = null;
+        $requestedQuantity = max(1, (int) ($request->query('quantity') ?? $request->query('guests') ?? $request->query('guest_count') ?? 1));
+
+        if ($hasCheckInParam || $hasCheckOutParam || $isCheckInProvided || $isCheckOutProvided) {
+            if (! $isCheckInProvided || ! $isCheckOutProvided) {
+                return $this->error(
+                    'Both check-in date and check-out date must be provided together.',
+                    'VALIDATION_ERROR',
+                    422,
+                    [
+                        'check_in_date' => ! $isCheckInProvided ? ['Check-in date is required when searching by stay dates.'] : [],
+                        'check_out_date' => ! $isCheckOutProvided ? ['Check-out date is required when searching by stay dates.'] : [],
+                    ]
+                );
+            }
 
             try {
-                $checkIn = CarbonImmutable::parse($checkInStr)->startOfDay();
-                $checkOut = $checkOutStr !== '' ? CarbonImmutable::parse($checkOutStr)->startOfDay() : $checkIn->addDay();
+                $checkIn = CarbonImmutable::parse((string) $checkInVal)->startOfDay();
+                $checkOut = CarbonImmutable::parse((string) $checkOutVal)->startOfDay();
+            } catch (\Throwable) {
+                return $this->error(
+                    'Invalid date format provided for check-in or check-out.',
+                    'VALIDATION_ERROR',
+                    422,
+                    ['dates' => ['Check-in and check-out must be valid date strings (YYYY-MM-DD).']]
+                );
+            }
 
-                if ($checkOut->greaterThan($checkIn)) {
-                    $start = $checkIn->toDateString();
-                    $endInclusive = $checkOut->subDay()->toDateString();
+            $today = CarbonImmutable::now()->startOfDay();
+            if ($checkIn->lessThan($today)) {
+                return $this->error(
+                    'Check-in date cannot be in the past.',
+                    'VALIDATION_ERROR',
+                    422,
+                    ['check_in_date' => ['The check-in date cannot be earlier than today.']]
+                );
+            }
 
-                    $query->whereDoesntHave('availabilityBlocks', function ($q) use ($start, $endInclusive): void {
-                        $q->where('scope', 'property')
-                            ->where('status', 'active')
+            if ($checkOut->lessThanOrEqualTo($checkIn)) {
+                return $this->error(
+                    'Check-out date must be strictly after check-in date.',
+                    'VALIDATION_ERROR',
+                    422,
+                    ['check_out_date' => ['The check-out date must be at least one day after the check-in date.']]
+                );
+            }
+
+            $stayFilterCheckIn = $checkIn;
+            $stayFilterCheckOut = $checkOut;
+
+            $start = $checkIn->toDateString();
+            $endInclusive = $checkOut->subDay()->toDateString();
+
+            $query->whereDoesntHave('availabilityBlocks', function ($q) use ($start, $endInclusive): void {
+                $q->where('scope', PropertyAvailabilityBlockScope::Property->value)
+                    ->where('status', PropertyAvailabilityBlockStatus::Active->value)
+                    ->whereDate('start_date', '<=', $endInclusive)
+                    ->whereDate('end_date', '>=', $start);
+            });
+
+            $query->whereHas('roomTypes', function ($rt) use ($start, $endInclusive): void {
+                $rt->where('is_active', true)
+                    ->whereDoesntHave('property.availabilityBlocks', function ($q) use ($start, $endInclusive): void {
+                        $q->where('scope', PropertyAvailabilityBlockScope::RoomType->value)
+                            ->where('status', PropertyAvailabilityBlockStatus::Active->value)
+                            ->whereColumn('property_availability_blocks.property_room_type_id', 'property_room_types.id')
                             ->whereDate('start_date', '<=', $endInclusive)
                             ->whereDate('end_date', '>=', $start);
-                    });
-
-                    $query->whereHas('roomTypes', function ($rt) use ($start, $endInclusive): void {
-                        $rt->where('is_active', true)
+                    })
+                    ->whereHas('rooms', function ($room) use ($start, $endInclusive): void {
+                        $room->where('operational_status', PropertyRoomStatus::Active->value)
                             ->whereDoesntHave('property.availabilityBlocks', function ($q) use ($start, $endInclusive): void {
-                                $q->where('scope', 'room_type')
-                                    ->where('status', 'active')
-                                    ->whereColumn('property_availability_blocks.property_room_type_id', 'property_room_types.id')
+                                $q->where('scope', PropertyAvailabilityBlockScope::Room->value)
+                                    ->where('status', PropertyAvailabilityBlockStatus::Active->value)
+                                    ->whereColumn('property_availability_blocks.property_room_id', 'property_rooms.id')
                                     ->whereDate('start_date', '<=', $endInclusive)
                                     ->whereDate('end_date', '>=', $start);
-                            })
-                            ->whereHas('rooms', function ($room) use ($start, $endInclusive): void {
-                                $room->where('operational_status', PropertyRoomStatus::Active->value)
-                                    ->whereDoesntHave('property.availabilityBlocks', function ($q) use ($start, $endInclusive): void {
-                                        $q->where('scope', 'room')
-                                            ->where('status', 'active')
-                                            ->whereColumn('property_availability_blocks.property_room_id', 'property_rooms.id')
-                                            ->whereDate('start_date', '<=', $endInclusive)
-                                            ->whereDate('end_date', '>=', $start);
-                                    });
                             });
                     });
-                }
-            } catch (\Throwable) {
-                // Ignore unparseable date strings gracefully
-            }
+            });
         }
 
         $foodMeals = $this->parseCsvOrArray($request->query('food_meals'));
@@ -224,6 +277,29 @@ class PublicPropertyController extends ApiController
         $sort = (string) ($request->query('sort', ($searchedLocality !== null || $refCoords !== null) ? 'relevant' : 'recent'));
 
         $properties = $query->latest('id')->get();
+
+        if ($stayFilterCheckIn !== null) {
+            $properties = $properties->filter(function (Property $property) use ($stayFilterCheckIn, $stayFilterCheckOut, $requestedQuantity, $availabilityService): bool {
+                foreach ($property->roomTypes as $roomType) {
+                    if (! $roomType->is_active) {
+                        continue;
+                    }
+
+                    $stay = $availabilityService->stayCapacity(
+                        $roomType,
+                        $stayFilterCheckIn->toDateString(),
+                        $stayFilterCheckOut->toDateString(),
+                        $requestedQuantity,
+                    );
+
+                    if ($stay['available']) {
+                        return true;
+                    }
+                }
+
+                return false;
+            })->values();
+        }
 
         // Annotate each property with distance & locality match
         $properties->each(function (Property $property) use ($refCoords, $searchedLocality, $searchService): void {

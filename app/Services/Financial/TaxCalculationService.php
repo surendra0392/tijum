@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Financial;
 
+use App\Enums\RefundStatus;
 use App\Enums\ReservationStatus;
 use App\Models\Owner;
 use App\Models\OwnerFinancialProfile;
 use App\Models\Reservation;
+use App\Models\ReservationRefund;
 use App\Models\TaxConfiguration;
 use Carbon\CarbonImmutable;
 
@@ -53,32 +55,39 @@ class TaxCalculationService
         $tdsRateBps = 0;
         $tdsAmountMinor = 0;
 
-        $isExemptFromConfig = $tdsConfig instanceof TaxConfiguration && $tdsConfig->is_exempt;
+        $hasVerifiedPan = $profile?->pan_verified_at !== null && ! blank($profile?->pan_number);
 
-        if (! $isExemptFromConfig) {
-            $isIndividualOrHuf = in_array(
-                $profile?->business_constitution,
-                ['individual', 'proprietorship'],
-                true,
-            );
-            $threshold = (int) config('tijum.settlements.tds_individual_huf_threshold_minor', 50000000); // INR 5,00,000 threshold
+        $constitution = strtolower(trim((string) $profile?->business_constitution));
+        $isIndividualOrHuf = in_array(
+            $constitution,
+            ['individual', 'proprietorship', 'sole proprietorship', 'huf'],
+            true,
+        );
 
-            $hasVerifiedPan = $profile?->pan_verified_at !== null && ! blank($profile?->pan_number);
+        // Order-level exemption requires explicit CA approval reference, approved order, and verified PAN.
+        // Blanket bypass without PAN verification or for non-individual entities is strictly disallowed.
+        $isOrderExempt = $tdsConfig instanceof TaxConfiguration
+            && $tdsConfig->is_exempt
+            && $tdsConfig->is_approved
+            && ! blank($tdsConfig->ca_approval_reference)
+            && $hasVerifiedPan;
 
-            $cumulativeFySales = $this->getCumulativeFinancialYearSales($owner, $date);
-            $projectedFySales = $cumulativeFySales + $grossAmountMinor;
+        $threshold = (int) config('tijum.settlements.tds_individual_huf_threshold_minor', 50000000); // INR 5,00,000 threshold
+        $cumulativeFySales = $this->getCumulativeFinancialYearSales($owner, $date);
+        $projectedFySales = $cumulativeFySales + $grossAmountMinor;
 
-            // Individual/HUF exemption applies only if PAN is verified and cumulative FY turnover <= threshold
-            $exempt = $isIndividualOrHuf
-                && $hasVerifiedPan
-                && $projectedFySales <= $threshold;
+        // Individual/HUF statutory exemption applies only if PAN is verified and cumulative FY turnover <= threshold
+        $isStatutoryExempt = $isIndividualOrHuf
+            && $hasVerifiedPan
+            && $projectedFySales <= $threshold;
 
-            if (! $exempt) {
-                $tdsRateBps = $tdsConfig instanceof TaxConfiguration
-                    ? $tdsConfig->rate_bps
-                    : (int) config('tijum.settlements.default_tds_rate_bps', 10); // 10 bps = 0.10%
-                $tdsAmountMinor = (int) round(($grossAmountMinor * $tdsRateBps) / 10000);
-            }
+        $exempt = $isOrderExempt || $isStatutoryExempt;
+
+        if (! $exempt) {
+            $tdsRateBps = $tdsConfig instanceof TaxConfiguration
+                ? $tdsConfig->rate_bps
+                : (int) config('tijum.settlements.default_tds_rate_bps', 10); // 10 bps = 0.10%
+            $tdsAmountMinor = (int) round(($grossAmountMinor * $tdsRateBps) / 10000);
         }
 
         // 2. Section 9(5) CGST Act classification
@@ -159,10 +168,31 @@ class TaxCalculationService
             return 0;
         }
 
-        return (int) Reservation::query()
+        // Section 393(1) withholding applies at time of credit or payment.
+        // For reservations, payment is captured/credited at confirmed_at (with created_at fallback for legacy records).
+        // Cancelled bookings are excluded, and processed refunds are subtracted to prevent turnover inflation.
+        $reservationQuery = Reservation::query()
             ->whereIn('property_id', $propertyIds)
             ->where('status', ReservationStatus::Confirmed)
-            ->whereBetween('check_in_date', [$fyStart->toDateString(), $fyEnd->toDateString()])
-            ->sum('total_amount_minor');
+            ->where(function ($query) use ($fyStart, $fyEnd): void {
+                $query->whereBetween('confirmed_at', [$fyStart->toDateTimeString(), $fyEnd->toDateTimeString()])
+                    ->orWhere(function ($q) use ($fyStart, $fyEnd): void {
+                        $q->whereNull('confirmed_at')
+                            ->whereBetween('created_at', [$fyStart->toDateTimeString(), $fyEnd->toDateTimeString()]);
+                    });
+            });
+
+        $grossSales = (int) $reservationQuery->sum('total_amount_minor');
+
+        $reservationIds = (clone $reservationQuery)->pluck('id');
+        $processedRefunds = 0;
+        if ($reservationIds->isNotEmpty()) {
+            $processedRefunds = (int) ReservationRefund::query()
+                ->whereIn('reservation_id', $reservationIds)
+                ->where('status', RefundStatus::Processed)
+                ->sum('amount_minor');
+        }
+
+        return max(0, $grossSales - $processedRefunds);
     }
 }

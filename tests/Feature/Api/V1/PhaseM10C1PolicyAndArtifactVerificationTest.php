@@ -61,7 +61,9 @@ class PhaseM10C1PolicyAndArtifactVerificationTest extends TestCase
             'unit_rate_minor' => $amountMinor,
             'rate_unit' => ReservationRateUnit::PerGuest->value,
             'total_amount_minor' => $amountMinor,
-            'submitted_at' => now(),
+            'submitted_at' => CarbonImmutable::parse($checkIn),
+            'confirmed_at' => CarbonImmutable::parse($checkIn),
+            'created_at' => CarbonImmutable::parse($checkIn),
         ]);
         $res->save();
 

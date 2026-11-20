@@ -171,14 +171,18 @@ class CustomerProtectionCase extends Model
 
     public function getResolutionDueAtAttribute(): CarbonImmutable
     {
-        if ($this->sla_due_at !== null) {
-            return CarbonImmutable::parse($this->sla_due_at);
-        }
-
         $created = CarbonImmutable::parse($this->created_at);
         $days = (int) config('tijum.customer_protection.sla.resolution_days', 30);
+        $statutoryDeadline = $created->addDays($days);
 
-        return $created->addDays($days);
+        // Legacy sla_due_at field must never truncate or override the statutory 30-day resolution deadline
+        if ($this->sla_due_at !== null) {
+            $parsedSla = CarbonImmutable::parse($this->sla_due_at);
+
+            return $parsedSla->greaterThan($statutoryDeadline) ? $parsedSla : $statutoryDeadline;
+        }
+
+        return $statutoryDeadline;
     }
 
     public function getFirstActionTargetHoursAttribute(): int
