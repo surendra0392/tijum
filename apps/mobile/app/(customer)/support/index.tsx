@@ -471,7 +471,7 @@ export default function CustomerSupportScreen() {
                                             </View>
                                         </View>
                                         <Text style={styles.caseCategory}>
-                                            Category: {c.category}
+                                            Category: {c.category} • Priority: {(c.priority || 'standard').toUpperCase()}
                                         </Text>
                                         <Text style={styles.caseDesc} numberOfLines={2}>
                                             {c.description}

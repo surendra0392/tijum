@@ -19,6 +19,7 @@ use App\Models\PropertyReview;
 use App\Models\PropertyRoomType;
 use App\Services\PropertySearchService;
 use App\Services\ReservationQuoteService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -97,6 +98,51 @@ class PublicPropertyController extends ApiController
                 $q->where('locality', 'like', "%{$searchedLocality}%")
                     ->orWhere('name', 'like', "%{$searchedLocality}%");
             });
+        }
+
+        if ($request->filled('check_in_date') || $request->filled('check_in')) {
+            $checkInStr = (string) ($request->query('check_in_date') ?? $request->query('check_in'));
+            $checkOutStr = (string) ($request->query('check_out_date') ?? $request->query('check_out'));
+
+            try {
+                $checkIn = CarbonImmutable::parse($checkInStr)->startOfDay();
+                $checkOut = $checkOutStr !== '' ? CarbonImmutable::parse($checkOutStr)->startOfDay() : $checkIn->addDay();
+
+                if ($checkOut->greaterThan($checkIn)) {
+                    $start = $checkIn->toDateString();
+                    $endInclusive = $checkOut->subDay()->toDateString();
+
+                    $query->whereDoesntHave('availabilityBlocks', function ($q) use ($start, $endInclusive): void {
+                        $q->where('scope', 'property')
+                            ->where('status', 'active')
+                            ->whereDate('start_date', '<=', $endInclusive)
+                            ->whereDate('end_date', '>=', $start);
+                    });
+
+                    $query->whereHas('roomTypes', function ($rt) use ($start, $endInclusive): void {
+                        $rt->where('is_active', true)
+                            ->whereDoesntHave('property.availabilityBlocks', function ($q) use ($start, $endInclusive): void {
+                                $q->where('scope', 'room_type')
+                                    ->where('status', 'active')
+                                    ->whereColumn('property_availability_blocks.property_room_type_id', 'property_room_types.id')
+                                    ->whereDate('start_date', '<=', $endInclusive)
+                                    ->whereDate('end_date', '>=', $start);
+                            })
+                            ->whereHas('rooms', function ($room) use ($start, $endInclusive): void {
+                                $room->where('operational_status', PropertyRoomStatus::Active->value)
+                                    ->whereDoesntHave('property.availabilityBlocks', function ($q) use ($start, $endInclusive): void {
+                                        $q->where('scope', 'room')
+                                            ->where('status', 'active')
+                                            ->whereColumn('property_availability_blocks.property_room_id', 'property_rooms.id')
+                                            ->whereDate('start_date', '<=', $endInclusive)
+                                            ->whereDate('end_date', '>=', $start);
+                                    });
+                            });
+                    });
+                }
+            } catch (\Throwable) {
+                // Ignore unparseable date strings gracefully
+            }
         }
 
         $foodMeals = $this->parseCsvOrArray($request->query('food_meals'));

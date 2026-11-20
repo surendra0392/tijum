@@ -857,5 +857,11 @@ export interface OwnerCase {
     created_at: string;
     updated_at: string;
     resolution?: string | null;
+    sla_due_at?: string | null;
+    first_action_due_at?: string | null;
+    first_action_target_hours?: number | null;
+    acknowledgement_due_at?: string | null;
+    resolution_due_at?: string | null;
+    is_sla_breached?: boolean;
     messages?: CaseMessage[];
 }

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Financial;
 
+use App\Enums\ReservationStatus;
 use App\Models\Owner;
 use App\Models\OwnerFinancialProfile;
+use App\Models\Reservation;
 use App\Models\TaxConfiguration;
 use Carbon\CarbonImmutable;
 
@@ -37,7 +39,7 @@ class TaxCalculationService
 
         $dateStr = $date->toDateString();
 
-        // 1. Check approved Income-tax Act, 2025 Section 393(1) withholding rule
+        // 1. Check approved Income-tax Act, 2025 Section 393(1) withholding rule (0.10% / 10 bps default)
         $tdsConfig = TaxConfiguration::query()
             ->where('code', 'ITA_2025_SEC_393')
             ->where('is_approved', true)
@@ -51,21 +53,30 @@ class TaxCalculationService
         $tdsRateBps = 0;
         $tdsAmountMinor = 0;
 
-        if ($tdsConfig instanceof TaxConfiguration && ! $tdsConfig->is_exempt) {
+        $isExemptFromConfig = $tdsConfig instanceof TaxConfiguration && $tdsConfig->is_exempt;
+
+        if (! $isExemptFromConfig) {
             $isIndividualOrHuf = in_array(
                 $profile?->business_constitution,
                 ['individual', 'proprietorship'],
                 true,
             );
-            $threshold = (int) config('tijum.settlements.tds_individual_huf_threshold_minor', 50000000);
+            $threshold = (int) config('tijum.settlements.tds_individual_huf_threshold_minor', 50000000); // INR 5,00,000 threshold
 
-            // Individual/HUF exemption applies only if PAN is verified and turnover < threshold
+            $hasVerifiedPan = $profile?->pan_verified_at !== null && ! blank($profile?->pan_number);
+
+            $cumulativeFySales = $this->getCumulativeFinancialYearSales($owner, $date);
+            $projectedFySales = $cumulativeFySales + $grossAmountMinor;
+
+            // Individual/HUF exemption applies only if PAN is verified and cumulative FY turnover <= threshold
             $exempt = $isIndividualOrHuf
-                && $profile?->pan_verified_at !== null
-                && $grossAmountMinor < $threshold;
+                && $hasVerifiedPan
+                && $projectedFySales <= $threshold;
 
             if (! $exempt) {
-                $tdsRateBps = $tdsConfig->rate_bps;
+                $tdsRateBps = $tdsConfig instanceof TaxConfiguration
+                    ? $tdsConfig->rate_bps
+                    : (int) config('tijum.settlements.default_tds_rate_bps', 10); // 10 bps = 0.10%
                 $tdsAmountMinor = (int) round(($grossAmountMinor * $tdsRateBps) / 10000);
             }
         }
@@ -120,5 +131,38 @@ class TaxCalculationService
         }
 
         return false;
+    }
+
+    /**
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    public function getFinancialYearBounds(CarbonImmutable $date): array
+    {
+        $year = $date->year;
+        if ($date->month < 4) {
+            $fyStart = CarbonImmutable::create($year - 1, 4, 1, 0, 0, 0, $date->getTimezone());
+            $fyEnd = CarbonImmutable::create($year, 3, 31, 23, 59, 59, $date->getTimezone());
+        } else {
+            $fyStart = CarbonImmutable::create($year, 4, 1, 0, 0, 0, $date->getTimezone());
+            $fyEnd = CarbonImmutable::create($year + 1, 3, 31, 23, 59, 59, $date->getTimezone());
+        }
+
+        return [$fyStart, $fyEnd];
+    }
+
+    public function getCumulativeFinancialYearSales(Owner $owner, CarbonImmutable $date): int
+    {
+        [$fyStart, $fyEnd] = $this->getFinancialYearBounds($date);
+
+        $propertyIds = $owner->properties()->pluck('id');
+        if ($propertyIds->isEmpty()) {
+            return 0;
+        }
+
+        return (int) Reservation::query()
+            ->whereIn('property_id', $propertyIds)
+            ->where('status', ReservationStatus::Confirmed)
+            ->whereBetween('check_in_date', [$fyStart->toDateString(), $fyEnd->toDateString()])
+            ->sum('total_amount_minor');
     }
 }

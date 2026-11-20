@@ -227,18 +227,23 @@ export default function CaseDetailScreen() {
                             <View style={styles.slaHeaderRow}>
                                 <Clock size={16} color={sla.color} />
                                 <Text style={[styles.slaTitle, { color: sla.color }]}>
-                                    First Action Target: {sla.target}
+                                    First Action Target: {caseDetail.first_action_target_hours ? `${caseDetail.first_action_target_hours} Hours` : sla.target}
                                 </Text>
                                 <Badge variant={caseDetail.priority === 'urgent' || caseDetail.priority === 'high' ? 'error' : caseDetail.priority === 'medium' ? 'warning' : 'neutral'} size="sm">
                                     {(caseDetail.priority || 'standard').toUpperCase()}
                                 </Badge>
                             </View>
                             <Text style={styles.slaDesc}>{sla.desc}</Text>
+                            {caseDetail.first_action_due_at ? (
+                                <Text style={[styles.slaStatutoryText, { color: sla.color, marginTop: 4, fontWeight: '600' }]}>
+                                    First action due by: {new Date(caseDetail.first_action_due_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, {new Date(caseDetail.first_action_due_at).toLocaleDateString()}
+                                </Text>
+                            ) : null}
                             <View style={styles.slaDivider} />
                             <View style={styles.slaStatutoryRow}>
                                 <Shield size={14} color={Colors.textTertiary} />
                                 <Text style={styles.slaStatutoryText}>
-                                    Statutory formal acknowledgement within 48h • Resolution tracking up to 30 days
+                                    Statutory formal acknowledgement within 48h ({caseDetail.acknowledgement_due_at ? new Date(caseDetail.acknowledgement_due_at).toLocaleDateString() : 'within 48h'}) • Statutory resolution deadline: {caseDetail.resolution_due_at || caseDetail.sla_due_at ? new Date(caseDetail.resolution_due_at || caseDetail.sla_due_at).toLocaleDateString() : '30 days from filing'}
                                 </Text>
                             </View>
                         </View>

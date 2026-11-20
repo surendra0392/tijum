@@ -67,6 +67,10 @@ class CustomerProtectionController extends ApiController
             'booking_reference' => $case->reservation->booking_reference,
             'description' => $case->description,
             'resolution_summary' => $case->resolution_summary,
+            'first_action_due_at' => $case->first_action_due_at->toIso8601String(),
+            'first_action_target_hours' => $case->first_action_target_hours,
+            'acknowledgement_due_at' => $case->acknowledgement_due_at->toIso8601String(),
+            'resolution_due_at' => $case->resolution_due_at->toIso8601String(),
             'sla_due_at' => $case->sla_due_at?->toIso8601String(),
             'created_at' => $case->created_at->toIso8601String(),
             'messages' => $case->messages->map(fn ($m) => [

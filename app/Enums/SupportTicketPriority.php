@@ -24,8 +24,8 @@ enum SupportTicketPriority: string
     public function defaultSlaHours(): int
     {
         return match ($this) {
-            self::Urgent => 4,
-            self::High => 12,
+            self::Urgent => 2,
+            self::High => 4,
             self::Standard => 24,
             self::Low => 48,
         };

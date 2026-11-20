@@ -47,6 +47,16 @@ class CustomerProtectionCase extends Model
     protected $guarded = [];
 
     /**
+     * @var list<string>
+     */
+    protected $appends = [
+        'first_action_due_at',
+        'acknowledgement_due_at',
+        'resolution_due_at',
+        'first_action_target_hours',
+    ];
+
+    /**
      * @return array{
      *     category: 'App\\Enums\\CaseCategory',
      *     status: 'App\\Enums\\CaseStatus',
@@ -141,5 +151,38 @@ class CustomerProtectionCase extends Model
         }
 
         return $this->sla_due_at !== null && $this->sla_due_at->isPast();
+    }
+
+    public function getFirstActionDueAtAttribute(): CarbonImmutable
+    {
+        $created = CarbonImmutable::parse($this->created_at);
+        $hours = $this->priority->firstActionSlaHours();
+
+        return $created->addHours($hours);
+    }
+
+    public function getAcknowledgementDueAtAttribute(): CarbonImmutable
+    {
+        $created = CarbonImmutable::parse($this->created_at);
+        $hours = (int) config('tijum.customer_protection.sla.acknowledgement_hours', 48);
+
+        return $created->addHours($hours);
+    }
+
+    public function getResolutionDueAtAttribute(): CarbonImmutable
+    {
+        if ($this->sla_due_at !== null) {
+            return CarbonImmutable::parse($this->sla_due_at);
+        }
+
+        $created = CarbonImmutable::parse($this->created_at);
+        $days = (int) config('tijum.customer_protection.sla.resolution_days', 30);
+
+        return $created->addDays($days);
+    }
+
+    public function getFirstActionTargetHoursAttribute(): int
+    {
+        return $this->priority->firstActionSlaHours();
     }
 }

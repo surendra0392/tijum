@@ -38,7 +38,7 @@
 ### 1.4 Post-Booking, Front-Desk & Dispute Lifecycle
 - **Self-Service Cancellation:** Transparent breakdown of cancellation fee vs refund estimate in accordance with property policy.
 - **Review Submission:** 4 canonical subcategory ratings (`cleanliness`, `food_quality`, `staff_hospitality`, `amenities`) with 1–5 star boundaries and 10-character minimum content validation.
-- **Customer Protection SLAs:** Priority-driven resolution targets (High: 4 hours, Medium: 12 hours, Low: 24 hours) displayed on dispute case cards and message threads.
+- **Customer Protection SLAs:** Priority-driven internal first-action response targets (Urgent: 2 hours, High: 4 hours, Medium: 24 hours, Low: 48 hours) paired with statutory timelines (formal acknowledgement within 48 hours, resolution within 30 days per Consumer Protection E-Commerce Rules) displayed with server-authoritative timestamps on dispute case cards and message threads.
 
 ---
 
@@ -71,7 +71,7 @@
   - Electronically presents agreement terms and commission rate tier.
   - Captures authenticated Partner ID, SHA-256 hash of agreement terms, timestamp, server IP, and User-Agent.
 - **Settlement Statements:**
-  - Line-item transparency: Gross rental receipts, platform commission deduction, GST on commission (18%), TDS withholding (Section 194-O, 1%), and net payable amount.
+  - Line-item transparency: Gross rental receipts, platform commission deduction, GST on commission (18%), TDS withholding (Income-tax Act, 2025 Section 393(1), 0.10% with ₹5,00,000 threshold exemption for verified Individual/HUF partners), and net payable amount.
   - Banking UTR and payout batch tracking.
 
 ### 2.5 Partner Reviews & Support Cases

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CustomerApi } from '../../../src/api/customer';
+import { PushNotificationService } from '../../../src/notifications/PushNotificationService';
 import { NotificationItem } from '../../../src/api/types';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
@@ -159,6 +160,28 @@ export default function CustomerNotificationsScreen() {
             Alert.alert('Notice', 'Using local channel settings.');
         } finally {
             setPrefLoading(false);
+        }
+    };
+
+    const handleTogglePush = async (val: boolean) => {
+        if (val) {
+            const result = await PushNotificationService.requestPushPermissionsContextually(
+                'settings_toggle',
+                'customer',
+                true,
+            );
+            if (result.granted) {
+                setPushActive(true);
+            } else {
+                setPushActive(false);
+                Alert.alert(
+                    'Push Permission Needed',
+                    'To receive instant push notifications for reservation updates, please enable notifications for TIJUM in your device settings.',
+                );
+            }
+        } else {
+            setPushActive(false);
+            await PushNotificationService.unregisterDevice('customer');
         }
     };
 
@@ -355,7 +378,7 @@ export default function CustomerNotificationsScreen() {
                                     </View>
                                     <Switch
                                         value={pushActive}
-                                        onValueChange={setPushActive}
+                                        onValueChange={handleTogglePush}
                                         disabled={!channelsAvailable.push}
                                         trackColor={{ false: Colors.gray200, true: Colors.coral }}
                                         thumbColor={Colors.white}

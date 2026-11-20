@@ -20,10 +20,14 @@
 | **SMS** | **INACTIVE** | Gateway credentials (e.g. Twilio/Msg91) pending production deployment | Clearly marked as "SMS delivery currently unavailable" in mobile preferences; not falsely simulated |
 | **WhatsApp** | **INACTIVE** | WhatsApp Business API gateway pending partner onboarding | Clearly marked as "WhatsApp notifications currently unavailable" in preferences; not falsely simulated |
 
-### 1.2 Device Push Token Lifecycle
-1. **Permission Request:** On first launch, app requests notification permissions via `expo-notifications`.
-2. **Registration:** Upon receiving native Expo Push Token (`ExponentPushToken[...]`), client registers it with authenticated backend session via `/api/v1/customer/devices/register` or `/api/v1/owner/devices/register`.
-3. **Session Revocation & Unregistration:** On user logout (`CustomerAuthController@logout` or `OwnerAuthController@logout`), device token is automatically unregistered from backend database to prevent cross-account notification leakage.
+### 1.2 Device Push Token Lifecycle & Permission Protocol
+1. **No Cold-Start Prompting:** The application strictly never prompts for OS push notification permissions on app cold-start, first launch, or login.
+2. **Contextual Permission Request:** When the user navigates to Notification Preferences and toggles push notifications ON, the application displays a contextual rationale explaining the operational benefit (booking updates, payment confirmations, support alerts).
+3. **Registration Upon Grant:** Only if the native OS permission is `GRANTED`, the native Expo Push Token (`ExponentPushToken[...]`) is acquired and registered with the authenticated backend session via `/api/v1/customer/devices/register` or `/api/v1/owner/devices/register`.
+4. **Token Revocation & Unregistration:**
+   - When the user toggles push notifications OFF, the device unregisters the token from the backend.
+   - On user logout (`CustomerAuthController@logout` or `OwnerAuthController@logout`), the device token is automatically unregistered to prevent cross-account notification leakage.
+   - On role switch, existing tokens are safely unlinked.
 
 ---
 

@@ -126,6 +126,11 @@ export class PushNotificationService {
         accountType: 'customer' | 'partner',
     ): Promise<string | null> {
         try {
+            const currentStatus = await this.checkPermissionStatus();
+            if (currentStatus !== Notifications.PermissionStatus.GRANTED) {
+                return null;
+            }
+
             const tokenData = await Notifications.getExpoPushTokenAsync().catch(
                 () => null,
             );
