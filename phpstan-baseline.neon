@@ -361,12 +361,6 @@ parameters:
 			path: app/Http/Controllers/Api/V1/Auth/OwnerAuthController.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\ReservationPayment\:\:\$amount_paise\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/V1/Customer/CustomerPaymentController.php
-
-		-
 			message: '#^Property App\\Services\\Reviews\\ReviewEligibilityResult\:\:\$reason \(string\) on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.property
 			count: 1

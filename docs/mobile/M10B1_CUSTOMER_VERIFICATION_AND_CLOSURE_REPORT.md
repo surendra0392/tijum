@@ -157,6 +157,19 @@ The complete 22-step booking lifecycle was traced across backend actions and mob
 2. **Status Idempotency:** If a reservation is already confirmed, re-submitting payment verification returns 200 without duplicate billing.
 3. **Inventory Isolation:** Unpaid holds expire after the 15-minute payment deadline, releasing room capacity.
 
+### End-to-End Payment Scenario Verification Matrix
+
+| Scenario | Tested Condition | Mechanism & Expected Result | Test Result |
+|---|---|---|---|
+| **1. Duplicate gateway callbacks** | Duplicate webhook callback with identical `event_id`, and duplicate client `verify` call. | `ProcessWebhookEvent` checks `payment_webhook_events` and returns `status: ignored`, `message: Event already processed.` Client `VerifyCheckoutPayment` safely returns HTTP 200 with confirmed reservation and exactly 1 payment record. | **PASSED** (`test_duplicate_gateway_callbacks_and_verifications_are_handled_idempotently`) |
+| **2. Invalid payment signatures** | Client submits forged or tampered `razorpay_signature`. | `VerifyCheckoutPayment` evaluates `verifyCheckoutSignature()`, rejects with HTTP 422 `PAYMENT_VERIFICATION_FAILED`. Reservation remains `awaiting_payment` with null `confirmed_at`. Confirms no booking confirms on mobile callback alone. | **PASSED** (`test_invalid_payment_signatures_are_strictly_rejected_and_reservation_never_confirmed`) |
+| **3. Payment success + network drop** | Payment succeeds on gateway, but mobile drops connection before calling `/payment/verify`. | Asynchronous Razorpay webhook `payment.captured` confirms reservation on backend. When client reconnects, `CustomerPaymentController@status` returns `is_confirmed: true`, `status: confirmed`. | **PASSED** (`test_payment_success_with_network_interruption_recovers_via_gateway_webhook_and_status_polling`) |
+| **4. App termination during payment** | OS terminates mobile application midway through checkout. | Reservation is safely parked under `awaiting_payment`. Upon app reopen, customer queries `/reservations?status=awaiting_payment` and `/payment/status`, discovers pending reservation, and can resume checkout. | **PASSED** (`test_application_termination_during_payment_allows_state_recovery_on_reopening`) |
+| **5. Payment retry** | First payment attempt fails (e.g., user cancels UPI or bank declines). | Reservation remains in `awaiting_payment`. Customer taps "Pay Now" within the 15-minute window; `InitiatePaymentOrder` generates fresh Razorpay order and returns 200 OK. | **PASSED** (`test_payment_retry_within_15_minute_hold_succeeds_with_fresh_order`) |
+| **6. Expired 15-minute hold** | Customer attempts to pay after 15-minute hold expires (`isPast() === true`). | `CustomerPaymentController@initiate` rejects with HTTP 422 `PAYMENT_WINDOW_EXPIRED`. Payment status endpoint returns `is_deadline_expired: true`. Mobile countdown timer auto-reloads. | **PASSED** (`test_expired_15_minute_inventory_hold_rejects_payment_initiation_and_marks_deadline_expired`) |
+| **7. Simultaneous booking attempts** | Two customers simultaneously attempt to book the last available room/bed. | InnoDB pessimistic row locks (`lockForUpdate()`) serialize execution in `CreateReservation`. Customer A secures the unit; Customer B receives HTTP 422 `RESERVATION_CREATION_FAILED` (insufficient capacity). Overbooking strictly prevented. | **PASSED** (`test_simultaneous_booking_attempts_for_same_inventory_prevents_overbooking`) |
+| **8. Booking recovery on relaunch** | Customer reopens app with in-flight booking. | Client queries `/customer/reservations/{reference}`, receives full snapshot (room type, meals, `payment_deadline_at`, payments relation), rendering countdown timer and "Pay Now" CTA. | **PASSED** (`test_booking_recovery_after_reopening_application_returns_accurate_reservation_and_payment_status`) |
+
 ---
 
 ## 6. PRICING & CANONICAL FOOD ARCHITECTURE AUDIT
@@ -211,11 +224,11 @@ Verified in `PropertyDetailResource.php` (lines 153–164) and `apps/mobile/app/
 ================================================================================
 1. Mobile Unit & Integration Tests (Node / Jest)
    - Executed: node --experimental-strip-types --test __tests__/*.test.ts
-   - Suites:   59
-   - Tests:    139
-   - Passed:   139
+   - Suites:   64
+   - Tests:    146
+   - Passed:   146
    - Failed:   0
-   - Result:   PASSED (1048ms)
+   - Result:   PASSED (897ms)
 
 2. Mobile TypeScript Compilation Check
    - Executed: npm run types:check (tsc --noEmit)
@@ -228,11 +241,11 @@ Verified in `PropertyDetailResource.php` (lines 153–164) and `apps/mobile/app/
 
 4. Backend API V1 Feature Tests (PHPUnit)
    - Executed: php artisan test --compact tests/Feature/Api/V1/
-   - Tests:    72
-   - Asserts:  454
-   - Passed:   72
+   - Tests:    80
+   - Asserts:  524
+   - Passed:   80
    - Failed:   0
-   - Result:   PASSED (14420ms)
+   - Result:   PASSED (15274ms)
 
 5. Backend Code Style (Laravel Pint)
    - Executed: vendor/bin/pint --dirty --format agent

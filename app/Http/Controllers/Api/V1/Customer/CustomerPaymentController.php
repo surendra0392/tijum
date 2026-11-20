@@ -118,7 +118,8 @@ class CustomerPaymentController extends ApiController
                 'id' => $latestPayment->id,
                 'gateway' => $latestPayment->gateway,
                 'status' => $latestPayment->status,
-                'amount_paise' => $latestPayment->amount_paise,
+                'amount_minor' => $latestPayment->amount_minor,
+                'amount_paise' => $latestPayment->amount_minor,
                 'captured_at' => $latestPayment->captured_at?->toIso8601String(),
             ] : null,
         ]);
