@@ -740,6 +740,7 @@ export interface PropertyMediaItem {
     alt_text: string;
     category: string;
     category_label?: string;
+    media_type?: string;
     is_cover: boolean;
     moderation_status?: string;
     publication_status?: string;
@@ -747,4 +748,111 @@ export interface PropertyMediaItem {
     room_type_name?: string | null;
     property_room_id?: number | null;
     room_number?: string | null;
+}
+
+export interface OwnerPropertyAmenity {
+    id: number;
+    amenity_id: number;
+    name: string;
+    code: string;
+    category: string;
+    icon_key?: string;
+    availability: string;
+    status: string;
+    is_current: boolean;
+    is_customer_visible: boolean;
+    details?: string | null;
+}
+
+export interface AmenityCatalogItem {
+    id: number;
+    name: string;
+    code: string;
+    icon_key?: string;
+}
+
+export interface AmenityCatalogCategory {
+    id: number;
+    name: string;
+    amenities: AmenityCatalogItem[];
+}
+
+export interface OwnerFinancialProfile {
+    legal_business_name: string | null;
+    business_constitution: string | null;
+    pan: string | null;
+    gstin: string | null;
+    bank_account_number?: string | null;
+    bank_account_masked: string | null;
+    bank_ifsc: string | null;
+    bank_name: string | null;
+    bank_account_holder_name: string | null;
+    verification_status: string;
+    settlement_eligible: boolean;
+    rejection_reasons?: string[] | null;
+}
+
+export interface OwnerCommissionAgreement {
+    id: number;
+    commission_rate_percentage: number;
+    base_type: string;
+    gst_treatment: string;
+    terms_version: string;
+    effective_from: string;
+    effective_to?: string | null;
+    status: string;
+    accepted_at?: string | null;
+}
+
+export interface SettlementLineItem {
+    id: number;
+    booking_reference: string;
+    guest_name: string;
+    check_in_date: string;
+    check_out_date: string;
+    gross_minor: number;
+    commission_minor: number;
+    net_minor: number;
+}
+
+export interface SettlementDetail {
+    id: number;
+    settlement_reference: string;
+    period_start: string;
+    period_end: string;
+    gross_amount_minor: number;
+    commission_amount_minor: number;
+    commission_tax_amount_minor: number;
+    tds_amount_minor: number;
+    deductions_amount_minor: number;
+    net_payable_minor: number;
+    status: string;
+    payment_reference?: string | null;
+    settled_at?: string | null;
+    line_items?: SettlementLineItem[];
+}
+
+export interface CaseMessage {
+    id: number;
+    sender_name: string;
+    sender_role: string;
+    message: string;
+    created_at: string;
+    is_owner: boolean;
+}
+
+export interface OwnerCase {
+    id: number;
+    case_reference: string;
+    title: string;
+    type: string;
+    status: string;
+    priority: string;
+    booking_reference?: string | null;
+    guest_name?: string | null;
+    property_name?: string | null;
+    created_at: string;
+    updated_at: string;
+    resolution?: string | null;
+    messages?: CaseMessage[];
 }

@@ -18,7 +18,7 @@ import { Typography } from '../../src/theme/typography';
 import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
 import { Badge } from '../../src/components/Badge';
-import { Building2, User, Lock, ShieldCheck } from 'lucide-react-native';
+import { Building2, User, Lock, ShieldCheck, Landmark, HelpCircle, ChevronRight } from 'lucide-react-native';
 
 export default function PartnerAccountScreen() {
     const router = useRouter();
@@ -289,31 +289,44 @@ export default function PartnerAccountScreen() {
                     {/* Settlement Account Status */}
                     <View style={styles.divider} />
                     <Text style={styles.sectionTitle}>
-                        Settlement & Route Status
+                        Settlement & Operations Management
                     </Text>
-                    <View style={styles.infoCard}>
-                        <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>
-                                Settlement Channel:
-                            </Text>
-                            <Text style={styles.infoValue}>
-                                Razorpay Route Linked Account
-                            </Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>
-                                Payout Schedule:
-                            </Text>
-                            <Text style={styles.infoValue}>
-                                T+3 Weekly Batch
-                            </Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>
-                                Payout Currency:
-                            </Text>
-                            <Text style={styles.infoValue}>INR (₹)</Text>
-                        </View>
+                    <View style={styles.actionNavCard}>
+                        <TouchableOpacity
+                            style={styles.actionNavItem}
+                            onPress={() => router.push('/(partner)/financial-profile')}
+                            accessibilityLabel="Financial Profile & Banking"
+                        >
+                            <View style={styles.actionNavLeft}>
+                                <Landmark size={20} color={Colors.primary} />
+                                <View style={{ marginLeft: Spacing.sm }}>
+                                    <Text style={styles.actionNavTitle}>Financial Profile & Tax KYC</Text>
+                                    <Text style={styles.actionNavSubtitle}>
+                                        Bank accounts, PAN, GSTIN & Agreements
+                                    </Text>
+                                </View>
+                            </View>
+                            <ChevronRight size={18} color={Colors.gray400} />
+                        </TouchableOpacity>
+
+                        <View style={styles.actionNavDivider} />
+
+                        <TouchableOpacity
+                            style={styles.actionNavItem}
+                            onPress={() => router.push('/(partner)/cases')}
+                            accessibilityLabel="Support & Customer Protection Cases"
+                        >
+                            <View style={styles.actionNavLeft}>
+                                <HelpCircle size={20} color={Colors.primary} />
+                                <View style={{ marginLeft: Spacing.sm }}>
+                                    <Text style={styles.actionNavTitle}>Support & Protection Cases</Text>
+                                    <Text style={styles.actionNavSubtitle}>
+                                        Guest grievances, inquiries & resolution desk
+                                    </Text>
+                                </View>
+                            </View>
+                            <ChevronRight size={18} color={Colors.gray400} />
+                        </TouchableOpacity>
                     </View>
 
                     {/* Switch to Customer Portal */}
@@ -438,6 +451,39 @@ const styles = StyleSheet.create({
         ...Typography.bodySmall,
         color: Colors.deepPlum,
         fontWeight: '600',
+    },
+    actionNavCard: {
+        backgroundColor: Colors.warmOffWhite,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+        overflow: 'hidden',
+    },
+    actionNavItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: Spacing.md,
+    },
+    actionNavLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    actionNavTitle: {
+        fontSize: Typography.fontSize.sm,
+        fontWeight: '700',
+        color: Colors.deepPlum,
+    },
+    actionNavSubtitle: {
+        fontSize: Typography.fontSize.xs,
+        color: Colors.gray500,
+        marginTop: 2,
+    },
+    actionNavDivider: {
+        height: 1,
+        backgroundColor: Colors.gray200,
+        marginHorizontal: Spacing.md,
     },
     divider: {
         height: 1,

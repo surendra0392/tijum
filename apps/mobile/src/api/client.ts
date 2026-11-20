@@ -38,13 +38,18 @@ export class ApiClient {
 
         const token = await SecureTokenStorage.getToken();
         const requestId = 'req_' + Math.random().toString(36).substring(2, 11);
+        const isFormData =
+            typeof FormData !== 'undefined' && options.body instanceof FormData;
 
         const headers: Record<string, string> = {
             Accept: 'application/json',
-            'Content-Type': 'application/json',
             'X-Request-ID': requestId,
             ...(options.headers as Record<string, string>),
         };
+
+        if (!isFormData && !headers['Content-Type']) {
+            headers['Content-Type'] = 'application/json';
+        }
 
         if (token) {
             headers.Authorization = `Bearer ${token}`;
@@ -128,9 +133,25 @@ export class ApiClient {
     }
 
     static async post<T>(endpoint: string, body?: any): Promise<T> {
+        const isFormData =
+            typeof FormData !== 'undefined' && body instanceof FormData;
         return this.request<T>(endpoint, {
             method: 'POST',
-            body: body ? JSON.stringify(body) : undefined,
+            body: isFormData
+                ? body
+                : body !== undefined
+                  ? JSON.stringify(body)
+                  : undefined,
+        });
+    }
+
+    static async postFormData<T>(
+        endpoint: string,
+        formData: FormData,
+    ): Promise<T> {
+        return this.request<T>(endpoint, {
+            method: 'POST',
+            body: formData,
         });
     }
 

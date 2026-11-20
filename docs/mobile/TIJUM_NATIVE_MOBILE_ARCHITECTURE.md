@@ -35,9 +35,14 @@ TIJUM Native Mobile is an enterprise-grade, multi-tenant accommodation marketpla
      | • wishlist/index.tsx         |                            | • properties/[id]/rooms.tsx  |
      | • support/ (Inquiry & Griev) |                            | • properties/[id]/pricing    |
      +------------------------------+                            | • properties/[id]/avail      |
+                    |                                            | • properties/[id]/media.tsx  |
+                    |                                            | • properties/[id]/amenities  |
                     |                                            | • reservations/ (Index & Ops)|
                     |                                            | • reservations/[reference]   |
                     |                                            | • settlements/ (Payouts)     |
+                    |                                            | • settlements/[reference]    |
+                    |                                            | • financial-profile/ (KYC)   |
+                    |                                            | • cases/ (Support & Cases)   |
                     |                                            | • reviews/ (Host Responses)  |
                     |                                            | • account.tsx (Profile & Pwd)|
                     |                                            +------------------------------+

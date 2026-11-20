@@ -7,7 +7,9 @@ import {
     ActivityIndicator,
     RefreshControl,
     SafeAreaView,
+    TouchableOpacity,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { OwnerApi } from '../../../src/api/owner';
 import { Badge } from '../../../src/components/Badge';
 import { Colors } from '../../../src/theme/colors';
@@ -16,6 +18,7 @@ import { Typography } from '../../../src/theme/typography';
 import { Wallet } from 'lucide-react-native';
 
 export default function PartnerSettlementsScreen() {
+    const router = useRouter();
     const [summary, setSummary] = useState<any>(null);
     const [settlements, setSettlements] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -52,60 +55,72 @@ export default function PartnerSettlementsScreen() {
         setRefreshing(false);
     };
 
-    const renderSettlementCard = ({ item }: { item: any }) => (
-        <View style={styles.card}>
-            <View style={styles.cardHeader}>
-                <View>
-                    <Text style={styles.refText}>
-                        {item.reference || `SET-${item.id}`}
-                    </Text>
-                    <Text style={styles.periodText}>
-                        {item.period_start_date} to {item.period_end_date}
-                    </Text>
+    const renderSettlementCard = ({ item }: { item: any }) => {
+        const ref = item.settlement_reference || item.reference || `SET-${item.id}`;
+        return (
+            <TouchableOpacity
+                style={styles.card}
+                onPress={() => router.push(`/(partner)/settlements/${ref}`)}
+                activeOpacity={0.8}
+            >
+                <View style={styles.cardHeader}>
+                    <View>
+                        <Text style={styles.refText}>
+                            {ref}
+                        </Text>
+                        <Text style={styles.periodText}>
+                            {item.period_start_date || item.period_start} to {item.period_end_date || item.period_end}
+                        </Text>
+                    </View>
+                    <Badge
+                        label={item.status || 'settled'}
+                        variant={item.status === 'settled' ? 'accent' : 'secondary'}
+                    />
                 </View>
-                <Badge
-                    label={item.status || 'settled'}
-                    variant={item.status === 'settled' ? 'accent' : 'secondary'}
-                />
-            </View>
 
-            <View style={styles.calcBox}>
-                <View style={styles.calcRow}>
-                    <Text style={styles.calcLabel}>Gross Booking Revenue:</Text>
-                    <Text style={styles.calcValue}>
-                        ₹
-                        {((item.gross_amount_paise || 0) / 100).toLocaleString(
-                            'en-IN',
-                        )}
-                    </Text>
+                <View style={styles.calcBox}>
+                    <View style={styles.calcRow}>
+                        <Text style={styles.calcLabel}>Gross Booking Revenue:</Text>
+                        <Text style={styles.calcValue}>
+                            ₹
+                            {((item.gross_amount_paise || item.gross_booking_value_minor || 0) / 100).toLocaleString(
+                                'en-IN',
+                            )}
+                        </Text>
+                    </View>
+                    <View style={styles.calcRow}>
+                        <Text style={styles.calcLabel}>TIJUM Platform Fee:</Text>
+                        <Text style={[styles.calcValue, { color: Colors.coral }]}>
+                            - ₹
+                            {(
+                                (item.commission_amount_paise || item.commission_amount_minor || 0) / 100
+                            ).toLocaleString('en-IN')}
+                        </Text>
+                    </View>
+                    <View style={[styles.calcRow, styles.netRow]}>
+                        <Text style={styles.netLabel}>Net Payout:</Text>
+                        <Text style={styles.netValue}>
+                            ₹
+                            {((item.net_amount_paise || item.net_settlement_amount_minor || 0) / 100).toLocaleString(
+                                'en-IN',
+                            )}
+                        </Text>
+                    </View>
                 </View>
-                <View style={styles.calcRow}>
-                    <Text style={styles.calcLabel}>TIJUM Platform Fee:</Text>
-                    <Text style={[styles.calcValue, { color: Colors.coral }]}>
-                        - ₹
-                        {(
-                            (item.commission_amount_paise || 0) / 100
-                        ).toLocaleString('en-IN')}
-                    </Text>
-                </View>
-                <View style={[styles.calcRow, styles.netRow]}>
-                    <Text style={styles.netLabel}>Net Payout:</Text>
-                    <Text style={styles.netValue}>
-                        ₹
-                        {((item.net_amount_paise || 0) / 100).toLocaleString(
-                            'en-IN',
-                        )}
-                    </Text>
-                </View>
-            </View>
 
-            {item.utr_number ? (
-                <Text style={styles.utrText}>
-                    UTR / Bank Ref: {item.utr_number}
-                </Text>
-            ) : null}
-        </View>
-    );
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                    {item.utr_number || item.provider_transfer_id ? (
+                        <Text style={styles.utrText}>
+                            UTR: {item.utr_number || item.provider_transfer_id}
+                        </Text>
+                    ) : (
+                        <Text style={styles.utrText}>Tap to view statement breakdown →</Text>
+                    )}
+                    <Text style={{ fontSize: 11, color: Colors.deepPlum, fontWeight: '700' }}>Details →</Text>
+                </View>
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <SafeAreaView style={styles.container}>

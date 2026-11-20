@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Owner;
 
 use App\Actions\Owner\Properties\DeletePropertyMedia;
+use App\Actions\Owner\Properties\UpdatePropertyMediaDetails;
 use App\Actions\Owner\Properties\UploadPropertyMedia;
 use App\Enums\PropertyMediaCategory;
 use App\Http\Controllers\Api\V1\ApiController;
@@ -129,6 +130,117 @@ class OwnerMediaController extends ApiController
             'media_type' => $media->media_type->value,
             'is_cover' => (bool) $media->is_cover,
         ], 'Photograph uploaded successfully.', 201);
+    }
+
+    /**
+     * Update media details (alt text, category, cover flag).
+     */
+    public function update(
+        Request $request,
+        int|string $id,
+        int $mediaId,
+        UpdatePropertyMediaDetails $updateAction,
+    ): JsonResponse {
+        /** @var Owner $owner */
+        $owner = $request->user();
+
+        $property = Property::query()
+            ->where('owner_id', $owner->id)
+            ->where(function ($query) use ($id): void {
+                if (is_numeric($id)) {
+                    $query->where('id', (int) $id);
+                } else {
+                    $query->where('slug', (string) $id);
+                }
+            })
+            ->first();
+
+        if ($property === null) {
+            return $this->error("Property '{$id}' not found or unauthorized.", 'NOT_FOUND', 404);
+        }
+
+        $media = PropertyMedia::query()
+            ->where('id', $mediaId)
+            ->where('property_id', $property->id)
+            ->first();
+
+        if ($media === null) {
+            return $this->error("Media item '{$mediaId}' not found in property.", 'NOT_FOUND', 404);
+        }
+
+        $validated = $request->validate([
+            'alt_text' => ['required', 'string', 'max:255'],
+            'category' => ['nullable', 'string', Rule::in(PropertyMediaCategory::values())],
+            'make_cover' => ['nullable', 'boolean'],
+        ]);
+
+        $category = ! empty($validated['category'])
+            ? PropertyMediaCategory::from($validated['category'])
+            : null;
+        $makeCover = (bool) ($validated['make_cover'] ?? false);
+
+        try {
+            $updated = $updateAction->updateMetadata(
+                $owner,
+                $property,
+                $media,
+                $validated['alt_text'],
+                $category,
+                $makeCover,
+            );
+        } catch (ValidationException $e) {
+            return $this->error($e->getMessage(), 'VALIDATION_ERROR', 422, $e->errors());
+        }
+
+        return $this->success([
+            'id' => $updated->id,
+            'url' => $updated->publicOptimizedUrl() ?? $updated->publicThumbnailUrl() ?? '',
+            'alt_text' => $updated->alt_text,
+            'media_type' => $updated->media_type->value,
+            'is_cover' => (bool) $updated->is_cover,
+        ], 'Photograph details updated successfully.');
+    }
+
+    /**
+     * Reorder property media.
+     */
+    public function reorder(
+        Request $request,
+        int|string $id,
+        UpdatePropertyMediaDetails $updateAction,
+    ): JsonResponse {
+        /** @var Owner $owner */
+        $owner = $request->user();
+
+        $property = Property::query()
+            ->where('owner_id', $owner->id)
+            ->where(function ($query) use ($id): void {
+                if (is_numeric($id)) {
+                    $query->where('id', (int) $id);
+                } else {
+                    $query->where('slug', (string) $id);
+                }
+            })
+            ->first();
+
+        if ($property === null) {
+            return $this->error("Property '{$id}' not found or unauthorized.", 'NOT_FOUND', 404);
+        }
+
+        $validated = $request->validate([
+            'ordered_ids' => ['required', 'array'],
+            'ordered_ids.*' => ['integer'],
+        ]);
+
+        try {
+            /** @var list<int> $orderedIds */
+            $orderedIds = $validated['ordered_ids'];
+            $updateAction->reorder($owner, $property, $orderedIds);
+        } catch (ValidationException $e) {
+            return $this->error($e->getMessage(), 'VALIDATION_ERROR', 422, $e->errors());
+        }
+
+        return $this->success(null, 'Gallery order updated successfully.');
     }
 
     /**

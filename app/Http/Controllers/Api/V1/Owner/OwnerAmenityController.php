@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1\Owner;
 
 use App\Actions\Owner\Amenities\SavePropertyAmenityAssignment;
 use App\Enums\AmenityAvailability;
+use App\Enums\AmenityVerificationStatus;
 use App\Http\Controllers\Api\V1\ApiController;
 use App\Models\Amenity;
 use App\Models\AmenityCategory;
@@ -130,5 +131,45 @@ class OwnerAmenityController extends ApiController
             'availability' => $assignment->availability->value,
             'status' => $assignment->status->value,
         ], 'Amenity assigned to property successfully.', 201);
+    }
+
+    /**
+     * Remove or deactivate an amenity assignment from the property.
+     */
+    public function destroy(Request $request, int|string $id, int $amenityAssignmentId): JsonResponse
+    {
+        /** @var Owner $owner */
+        $owner = $request->user();
+
+        $property = Property::query()
+            ->where('owner_id', $owner->id)
+            ->where(function ($query) use ($id): void {
+                if (is_numeric($id)) {
+                    $query->where('id', (int) $id);
+                } else {
+                    $query->where('slug', (string) $id);
+                }
+            })
+            ->first();
+
+        if ($property === null) {
+            return $this->error("Property '{$id}' not found or unauthorized.", 'NOT_FOUND', 404);
+        }
+
+        $assignment = PropertyAmenity::query()
+            ->where('property_id', $property->id)
+            ->where('id', $amenityAssignmentId)
+            ->first();
+
+        if ($assignment === null) {
+            return $this->error('Amenity assignment not found.', 'NOT_FOUND', 404);
+        }
+
+        $assignment->forceFill([
+            'is_current' => false,
+            'status' => AmenityVerificationStatus::Inactive,
+        ])->save();
+
+        return $this->success(null, 'Amenity assignment removed successfully.');
     }
 }

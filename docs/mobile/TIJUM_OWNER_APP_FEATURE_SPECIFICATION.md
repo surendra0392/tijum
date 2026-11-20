@@ -81,12 +81,13 @@ The Partner Mobile Application empowers accommodation hosts across Andhra Prades
   - **Quick Operational Status Change Modal:**
     * Instantly mark rooms as Active, Maintenance, Blocked, or Inactive via `OwnerApi.updateRoomStatus()`.
 
-### 2.6 Pricing, Rate Plans & Meal Inclusions
-- **Rate Plans Screen (`(partner)/properties/[id]/pricing.tsx`):**
-  - Real-time pricing readiness indicator (Not Ready, Incomplete, Ready for Booking).
-  - Configures daily, weekly, and monthly rates per room type.
-  - Currency safety: Inputs handled in Rupees (₹) and transmitted as integer paise (`*_rate_minor`).
-  - Meal configuration switches: Food provided toggle, breakfast included, lunch included, dinner included.
+### 2.6 Direct Room-Type Pricing & Meal Settings
+- **Pricing & Meal Settings Screen (`(partner)/properties/[id]/pricing.tsx`):**
+  - Canonical Screen Title: **"Pricing & Meal Settings"**.
+  - Direct room-type pricing hierarchy: Direct integer paise values on `property_room_types` (`daily_rate_minor`, `weekly_rate_minor`, `monthly_rate_minor`).
+  - Anti-Pattern Ban: Zero references to retired Food Packages, Rate Plans, Seasonal Pricing, or Amenity Additional-Charge Pricing.
+  - Meal configuration flags: Independent boolean toggles directly on `properties` table (`food_provided`, `breakfast_included`, `lunch_included`, `dinner_included`).
+  - Pricing readiness evaluation: Dynamic validation that all active room types have positive rates.
   - Submits to `OwnerApi.updatePricing()` transactionally.
 
 ### 2.7 Availability Blocks & Blackout Dates
@@ -113,8 +114,12 @@ The Partner Mobile Application empowers accommodation hosts across Andhra Prades
 ### 2.9 Partner Settlements & Financials
 - **Settlements Hub (`(partner)/settlements/index.tsx`):**
   - Financial summary card: Total earnings, processed payouts, pending payouts in INR.
-  - Settlement payout batches list with status chips (Processing, Paid, Failed).
-  - Payout reference ID, bank account mask, processing dates, and net payout amounts.
+  - Settlement payout batches list with status chips (Processing, Settled, Failed).
+  - Tapping any settlement card navigates directly to the itemized statement breakdown.
+- **Settlement Statement Breakdown (`(partner)/settlements/[reference].tsx`):**
+  - Period dates, gross booking value, commission amount, GST on commission (18%), TDS deduction (1% 194-O), and net payout.
+  - Provider transfer ID / UTR tracking number.
+  - Itemized reservation line items with stay dates, guest names, gross values, commission deductions, and net payable.
 
 ### 2.10 Partner Review Management
 - **Reviews Hub (`(partner)/reviews/index.tsx`):**
@@ -126,4 +131,47 @@ The Partner Mobile Application empowers accommodation hosts across Andhra Prades
 - **Partner Account (`(partner)/account.tsx`):**
   - Update host full name and contact phone number.
   - Password change modal with validation (min 8 chars).
+  - Direct navigation entry points to Financial Profile & KYC, Commission Agreements, and Support & Grievances.
   - Secure sign-out clearing stored tokens.
+
+### 2.12 Property Media & Photograph Management
+- **Media Gallery & Upload Screen (`(partner)/properties/[id]/media.tsx`):**
+  - Full photo gallery with category filter chips (Exterior, Entrance, Reception, Common Area, Dining, Room Interior, Bathroom, Other).
+  - Native file upload supporting camera and gallery images via multipart `FormData`.
+  - Primary cover photo indicator and "Set as Cover" action.
+  - Edit photo category and accessibility alt text.
+  - Delete photograph with confirmation via `OwnerApi.deleteMedia()`.
+  - Drag-and-drop / ordered gallery sequence reordering via `OwnerApi.reorderMedia()`.
+
+### 2.13 Property Amenities Management
+- **Amenities Management Screen (`(partner)/properties/[id]/amenities.tsx`):**
+  - Total assigned amenities metric cards (Total, Approved, In Review).
+  - Assigned amenities list with verification status badges (`Approved`, `Draft`, `Under Review`, `Rejected`).
+  - Search and category filtering across catalogue sections (Safety, Facilities, Dining, Services).
+  - Inclusion badge: All listed amenities are included in direct room-type pricing with zero additional charge.
+  - Add Amenity Modal: Search approved catalogue, select amenity, add operational notes, and save via `OwnerApi.assignAmenity()`.
+  - Remove / deactivate amenity assignment via `OwnerApi.deleteAmenity()`.
+
+### 2.14 Financial Profile & Commission Agreements (Phase 15)
+- **Financial Profile & Tax KYC Screen (`(partner)/financial-profile/index.tsx`):**
+  - Legal business entity name and constitution selector (Individual, Partnership, LLP, Pvt Ltd, Public Ltd, Trust/Society).
+  - Income Tax PAN validation (`^[A-Z]{5}[0-9]{4}[A-Z]{1}$`) and GSTIN recording.
+  - Masked bank account display (`•••• •••• 1234`), bank name, and IFSC code.
+  - Verification status badges and rejection reasons display if KYC action is required.
+  - Settlement eligibility indicator (Active automatic weekly transfers vs Action required).
+  - Modal form for updating legal business and banking information via `OwnerApi.updateFinancialProfile()`.
+- **Commission Agreements Screen (`(partner)/financial-profile/agreements.tsx`):**
+  - Lists contractual agreements querying `OwnerApi.getCommissionAgreements()`.
+  - Displays commission percentage, base type (Gross Booking Value), GST treatment, terms version, and effective dates.
+  - Electronic agreement acceptance: One-tap electronic signature calling `OwnerApi.acceptCommissionAgreement()`.
+
+### 2.15 Customer Protection & Dispute Support Cases (Phase 14)
+- **Support & Grievances Hub (`(partner)/cases/index.tsx`):**
+  - Status tabs: *All Cases*, *Action Required*, *Under Review*, *Resolved*.
+  - Search by case reference, guest name, or booking reference.
+  - Action-required warning banner alerting hosts to 24-hour response SLA.
+  - Case cards with priority badges (`Urgent`, `High`, `Medium`, `Low`) and status chips.
+- **Case Detail & Timeline Screen (`(partner)/cases/[reference].tsx`):**
+  - Case header with associated reservation snapshot, stay dates, guest details, and property name.
+  - Chronological message timeline with distinct sender bubble styles (Host, Guest, TIJUM Support Desk).
+  - Host response input bar allowing host to submit explanations, evidence, or resolution notes via `OwnerApi.addCaseMessage()`.

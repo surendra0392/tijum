@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\Customer\CustomerRewardsController;
 use App\Http\Controllers\Api\V1\Customer\CustomerWishlistController;
 use App\Http\Controllers\Api\V1\Owner\OwnerAmenityController;
 use App\Http\Controllers\Api\V1\Owner\OwnerAvailabilityBlockController;
+use App\Http\Controllers\Api\V1\Owner\OwnerCaseController;
 use App\Http\Controllers\Api\V1\Owner\OwnerDashboardController;
 use App\Http\Controllers\Api\V1\Owner\OwnerDeviceController;
 use App\Http\Controllers\Api\V1\Owner\OwnerFinancialController;
@@ -196,11 +197,14 @@ Route::prefix('v1')->group(function (): void {
         // Photographs & Media
         Route::get('properties/{id}/media', [OwnerMediaController::class, 'index'])->name('api.v1.owner.properties.media.index');
         Route::post('properties/{id}/media', [OwnerMediaController::class, 'store'])->name('api.v1.owner.properties.media.store');
+        Route::put('properties/{id}/media/{mediaId}', [OwnerMediaController::class, 'update'])->name('api.v1.owner.properties.media.update');
+        Route::post('properties/{id}/media/reorder', [OwnerMediaController::class, 'reorder'])->name('api.v1.owner.properties.media.reorder');
         Route::delete('properties/{id}/media/{mediaId}', [OwnerMediaController::class, 'destroy'])->name('api.v1.owner.properties.media.destroy');
 
         // Amenities
         Route::get('properties/{id}/amenities', [OwnerAmenityController::class, 'index'])->name('api.v1.owner.properties.amenities.index');
         Route::post('properties/{id}/amenities', [OwnerAmenityController::class, 'store'])->name('api.v1.owner.properties.amenities.store');
+        Route::delete('properties/{id}/amenities/{amenityAssignmentId}', [OwnerAmenityController::class, 'destroy'])->name('api.v1.owner.properties.amenities.destroy');
 
         // Reservations
         Route::get('reservations', [OwnerReservationController::class, 'index'])->name('api.v1.owner.reservations.index');
@@ -213,9 +217,21 @@ Route::prefix('v1')->group(function (): void {
         Route::get('reviews', [OwnerReviewController::class, 'index'])->name('api.v1.owner.reviews.index');
         Route::post('reviews/{id}/response', [OwnerReviewController::class, 'respond'])->name('api.v1.owner.reviews.response');
 
-        // Financial & Settlement statements (read-only)
+        // Financial Profile, Settlements & Commission Agreements
         Route::get('financial/summary', [OwnerFinancialController::class, 'summary'])->name('api.v1.owner.financial.summary');
         Route::get('financial/settlements', [OwnerFinancialController::class, 'settlements'])->name('api.v1.owner.financial.settlements');
+        Route::get('settlements', [OwnerFinancialController::class, 'settlements'])->name('api.v1.owner.settlements.index');
+        Route::get('settlements/summary', [OwnerFinancialController::class, 'summary'])->name('api.v1.owner.settlements.summary');
+        Route::get('settlements/{reference}', [OwnerFinancialController::class, 'show'])->name('api.v1.owner.settlements.show');
+        Route::get('financial-profile', [OwnerFinancialController::class, 'profile'])->name('api.v1.owner.financial-profile.show');
+        Route::put('financial-profile', [OwnerFinancialController::class, 'updateProfile'])->name('api.v1.owner.financial-profile.update');
+        Route::get('commission-agreements', [OwnerFinancialController::class, 'agreements'])->name('api.v1.owner.commission-agreements.index');
+        Route::post('commission-agreements/{id}/accept', [OwnerFinancialController::class, 'acceptAgreement'])->name('api.v1.owner.commission-agreements.accept');
+
+        // Customer Protection & Support Cases
+        Route::get('cases', [OwnerCaseController::class, 'index'])->name('api.v1.owner.cases.index');
+        Route::get('cases/{reference}', [OwnerCaseController::class, 'show'])->name('api.v1.owner.cases.show');
+        Route::post('cases/{reference}/messages', [OwnerCaseController::class, 'addMessage'])->name('api.v1.owner.cases.messages.store');
 
         // In-App Notifications
         Route::get('notifications', [OwnerNotificationController::class, 'index'])->name('api.v1.owner.notifications.index');

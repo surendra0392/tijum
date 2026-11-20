@@ -1,8 +1,14 @@
 import { ApiClient } from './client';
 import {
+    AmenityCatalogCategory,
     ApiResponse,
+    CaseMessage,
     NotificationItem,
+    OwnerCase,
+    OwnerCommissionAgreement,
+    OwnerFinancialProfile,
     OwnerProfile,
+    OwnerPropertyAmenity,
     OwnerReferenceData,
     OwnerReview,
     PartnerDashboardData,
@@ -14,6 +20,7 @@ import {
     PropertyVerificationEvaluation,
     Reservation,
     RoomType,
+    SettlementDetail,
 } from './types';
 
 export const OwnerApi = {
@@ -251,6 +258,29 @@ export const OwnerApi = {
         ApiClient.get<ApiResponse<PropertyMediaItem[]>>(
             `owner/properties/${propertyId}/media`,
         ),
+    uploadMedia: (propertyId: number, formData: FormData) =>
+        ApiClient.post<ApiResponse<PropertyMediaItem>>(
+            `owner/properties/${propertyId}/media`,
+            formData,
+        ),
+    updateMedia: (
+        propertyId: number,
+        mediaId: number,
+        data: {
+            alt_text: string;
+            category?: string;
+            make_cover?: boolean;
+        },
+    ) =>
+        ApiClient.put<ApiResponse<PropertyMediaItem>>(
+            `owner/properties/${propertyId}/media/${mediaId}`,
+            data,
+        ),
+    reorderMedia: (propertyId: number, orderedIds: number[]) =>
+        ApiClient.post<ApiResponse<null>>(
+            `owner/properties/${propertyId}/media/reorder`,
+            { ordered_ids: orderedIds },
+        ),
     deleteMedia: (propertyId: number, mediaId: number) =>
         ApiClient.delete<ApiResponse<null>>(
             `owner/properties/${propertyId}/media/${mediaId}`,
@@ -258,19 +288,24 @@ export const OwnerApi = {
 
     // Amenities
     getAmenities: (propertyId: number) =>
-        ApiClient.get<ApiResponse<any>>(`owner/properties/${propertyId}/amenities`),
+        ApiClient.get<ApiResponse<{ assigned: OwnerPropertyAmenity[]; catalogue: AmenityCatalogCategory[] }>>(
+            `owner/properties/${propertyId}/amenities`,
+        ),
     assignAmenity: (
         propertyId: number,
         data: {
             amenity_id: number;
             availability?: string;
-            fee_amount_minor?: number;
-            description?: string;
+            details?: string;
         },
     ) =>
         ApiClient.post<ApiResponse<any>>(
             `owner/properties/${propertyId}/amenities`,
             data,
+        ),
+    deleteAmenity: (propertyId: number, amenityAssignmentId: number) =>
+        ApiClient.delete<ApiResponse<null>>(
+            `owner/properties/${propertyId}/amenities/${amenityAssignmentId}`,
         ),
 
     // Reservations
@@ -311,13 +346,54 @@ export const OwnerApi = {
             response: responseText,
         }),
 
-    // Financial & Settlements (read-only)
+    // Financial & Settlements
     getFinancialSummary: () =>
         ApiClient.get<ApiResponse<any>>('owner/financial/summary'),
     getSettlements: (page: number = 1) =>
         ApiClient.get<ApiResponse<any[]>>('owner/financial/settlements', {
             page,
         }),
+    getSettlement: (reference: string) =>
+        ApiClient.get<ApiResponse<SettlementDetail>>(
+            `owner/settlements/${reference}`,
+        ),
+    getFinancialProfile: () =>
+        ApiClient.get<ApiResponse<OwnerFinancialProfile>>(
+            'owner/financial-profile',
+        ),
+    updateFinancialProfile: (data: {
+        legal_business_name?: string;
+        business_constitution?: string;
+        pan?: string;
+        gstin?: string;
+        bank_account_number?: string;
+        bank_ifsc?: string;
+        bank_name?: string;
+        bank_account_holder_name?: string;
+    }) =>
+        ApiClient.put<ApiResponse<any>>(
+            'owner/financial-profile',
+            data,
+        ),
+    getCommissionAgreements: () =>
+        ApiClient.get<ApiResponse<OwnerCommissionAgreement[]>>(
+            'owner/commission-agreements',
+        ),
+    acceptCommissionAgreement: (id: number) =>
+        ApiClient.post<ApiResponse<any>>(
+            `owner/commission-agreements/${id}/accept`,
+        ),
+
+    // Support & Customer Protection Cases
+    getCases: (params?: { status?: string; search?: string; page?: number }) =>
+        ApiClient.get<ApiResponse<OwnerCase[]>>('owner/cases', params),
+    getCase: (reference: string) =>
+        ApiClient.get<ApiResponse<OwnerCase>>(`owner/cases/${reference}`),
+    addCaseMessage: (reference: string, message: string) =>
+        ApiClient.post<ApiResponse<CaseMessage>>(
+            `owner/cases/${reference}/messages`,
+            { message },
+        ),
 
     // Notifications
     getNotifications: (page: number = 1) =>

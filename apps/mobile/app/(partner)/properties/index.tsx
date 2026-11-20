@@ -31,6 +31,7 @@ import {
     BedDouble,
     Building2,
     Calendar,
+    Camera,
     DoorClosed,
     Edit2,
     Home,
@@ -321,7 +322,7 @@ export default function PartnerPropertiesScreen() {
                         activeOpacity={0.8}
                     >
                         <IndianRupee size={13} color={Colors.deepPlum} />
-                        <Text style={styles.actionChipText}>Rates</Text>
+                        <Text style={styles.actionChipText}>Pricing</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -335,6 +336,32 @@ export default function PartnerPropertiesScreen() {
                     >
                         <Calendar size={13} color={Colors.deepPlum} />
                         <Text style={styles.actionChipText}>Blocks</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.actionChip}
+                        onPress={() =>
+                            router.push(
+                                `/(partner)/properties/${item.id}/media` as any,
+                            )
+                        }
+                        activeOpacity={0.8}
+                    >
+                        <Camera size={13} color={Colors.deepPlum} />
+                        <Text style={styles.actionChipText}>Photos</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.actionChip}
+                        onPress={() =>
+                            router.push(
+                                `/(partner)/properties/${item.id}/amenities` as any,
+                            )
+                        }
+                        activeOpacity={0.8}
+                    >
+                        <Sparkles size={13} color={Colors.deepPlum} />
+                        <Text style={styles.actionChipText}>Amenities</Text>
                     </TouchableOpacity>
                 </View>
             </View>

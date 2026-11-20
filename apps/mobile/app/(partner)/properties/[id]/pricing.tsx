@@ -219,7 +219,7 @@ export default function PropertyPricingScreen() {
                         <ArrowLeft size={22} color={Colors.deepPlum} />
                     </TouchableOpacity>
                     <View style={styles.headerTitleBox}>
-                        <Text style={styles.headerTitle}>Pricing & Meal Plans</Text>
+                        <Text style={styles.headerTitle}>Pricing & Meal Settings</Text>
                         <Text style={styles.headerSubtitle} numberOfLines={1}>
                             {pricingData?.property_name || `Property #${propertyId}`}
                         </Text>

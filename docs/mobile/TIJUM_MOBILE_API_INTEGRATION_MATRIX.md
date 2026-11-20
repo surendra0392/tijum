@@ -4,8 +4,8 @@
 **API Specification:** REST API V1 (`routes/api.php`)  
 **Base URL:** `https://tijum.com/api/v1` (or local emulator host `http://10.0.2.2:8000/api/v1`)  
 **Authentication Scheme:** Bearer Token (Laravel Sanctum)  
-**Total Registered Routes:** **111 Authoritative Routes** (`php artisan route:list --path=api/v1`)  
-**Date:** November 20, 2026 (Phase M10A Reconciled & Certified)  
+**Total Registered Routes:** **124 Authoritative Routes** (`php artisan route:list --path=api/v1`)  
+**Date:** November 20, 2026 (Phase M10A.1 Reconciled & Certified)  
 **Status:** **ACTIVE, COMPLETE & VERIFIED**
 
 ---
@@ -107,10 +107,13 @@
 | **POST** | `/api/v1/owner/properties/{id}/availability-blocks` | `OwnerAvailabilityBlockController@store` | `OwnerApi.createAvailabilityBlock` | `auth:sanctum,auth.owner` | Create blackout availability block |
 | **DELETE** | `/api/v1/owner/properties/{id}/availability-blocks/{bId}` | `OwnerAvailabilityBlockController@destroy` | `OwnerApi.cancelAvailabilityBlock` | `auth:sanctum,auth.owner` | Cancel blackout availability block |
 | **GET** | `/api/v1/owner/properties/{id}/media` | `OwnerMediaController@index` | `OwnerApi.getMedia` | `auth:sanctum,auth.owner` | List property media & covers |
-| **POST** | `/api/v1/owner/properties/{id}/media` | `OwnerMediaController@store` | `ApiClient.post` | `auth:sanctum,auth.owner` | Upload property photograph |
+| **POST** | `/api/v1/owner/properties/{id}/media` | `OwnerMediaController@store` | `OwnerApi.uploadMedia` | `auth:sanctum,auth.owner` | Upload property photograph (multipart) |
+| **PUT** | `/api/v1/owner/properties/{id}/media/{mId}` | `OwnerMediaController@update` | `OwnerApi.updateMedia` | `auth:sanctum,auth.owner` | Update photo category, alt text & cover |
+| **POST** | `/api/v1/owner/properties/{id}/media/reorder` | `OwnerMediaController@reorder` | `OwnerApi.reorderMedia` | `auth:sanctum,auth.owner` | Reorder gallery display sequence |
 | **DELETE** | `/api/v1/owner/properties/{id}/media/{mId}` | `OwnerMediaController@destroy` | `OwnerApi.deleteMedia` | `auth:sanctum,auth.owner` | Remove property photograph |
 | **GET** | `/api/v1/owner/properties/{id}/amenities` | `OwnerAmenityController@index` | `OwnerApi.getAmenities` | `auth:sanctum,auth.owner` | List amenities & catalog |
 | **POST** | `/api/v1/owner/properties/{id}/amenities` | `OwnerAmenityController@store` | `OwnerApi.assignAmenity` | `auth:sanctum,auth.owner` | Assign amenity to property |
+| **DELETE** | `/api/v1/owner/properties/{id}/amenities/{aId}` | `OwnerAmenityController@destroy` | `OwnerApi.deleteAmenity` | `auth:sanctum,auth.owner` | Remove/deactivate amenity assignment |
 | **GET** | `/api/v1/owner/reservations` | `OwnerReservationController@index` | `OwnerApi.getReservations` | `auth:sanctum,auth.owner` | Host bookings list |
 | **GET** | `/api/v1/owner/reservations/{ref}` | `OwnerReservationController@show` | `OwnerApi.getReservation` | `auth:sanctum,auth.owner` | Host reservation details |
 | **POST** | `/api/v1/owner/reservations/{ref}/allocate` | `OwnerRoomController@allocate` | `OwnerApi.allocateRoom` | `auth:sanctum,auth.owner` | Physical room assignment |
@@ -118,16 +121,25 @@
 | **POST** | `/api/v1/owner/reservations/{ref}/check-out`| `OwnerReservationController@checkOut`| `OwnerApi.checkOutReservation`| `auth:sanctum,auth.owner` | Guest check-out & turnover |
 | **GET** | `/api/v1/owner/reviews` | `OwnerReviewController@index` | `OwnerApi.getReviews` | `auth:sanctum,auth.owner` | Property guest reviews list |
 | **POST** | `/api/v1/owner/reviews/{id}/response`| `OwnerReviewController@respond` | `OwnerApi.replyToReview` | `auth:sanctum,auth.owner` | Host reply to guest review (2,500 chars) |
-| **GET** | `/api/v1/owner/settlements` | `OwnerSettlementController@index` | `OwnerApi.getSettlements` | `auth:sanctum,auth.owner` | Financial settlement payouts |
-| **GET** | `/api/v1/owner/settlements/summary` | `OwnerSettlementController@summary` | `OwnerApi.getFinancialSummary` | `auth:sanctum,auth.owner` | Earnings & payout totals |
+| **GET** | `/api/v1/owner/settlements` | `OwnerFinancialController@settlements` | `OwnerApi.getSettlements` | `auth:sanctum,auth.owner` | Financial settlement payouts |
+| **GET** | `/api/v1/owner/settlements/summary` | `OwnerFinancialController@summary` | `OwnerApi.getFinancialSummary` | `auth:sanctum,auth.owner` | Earnings & payout totals |
+| **GET** | `/api/v1/owner/settlements/{ref}` | `OwnerFinancialController@show` | `OwnerApi.getSettlement` | `auth:sanctum,auth.owner` | Detailed settlement statement & line items |
+| **GET** | `/api/v1/owner/financial-profile` | `OwnerFinancialController@profile` | `OwnerApi.getFinancialProfile` | `auth:sanctum,auth.owner` | Banking, PAN, GSTIN & KYC status |
+| **PUT** | `/api/v1/owner/financial-profile` | `OwnerFinancialController@updateProfile` | `OwnerApi.updateFinancialProfile` | `auth:sanctum,auth.owner` | Update financial & banking KYC details |
+| **GET** | `/api/v1/owner/commission-agreements` | `OwnerFinancialController@agreements` | `OwnerApi.getCommissionAgreements` | `auth:sanctum,auth.owner` | Contractual commission agreements |
+| **POST** | `/api/v1/owner/commission-agreements/{id}/accept` | `OwnerFinancialController@acceptAgreement` | `OwnerApi.acceptCommissionAgreement` | `auth:sanctum,auth.owner` | Electronically accept commission agreement |
+| **GET** | `/api/v1/owner/cases` | `OwnerCaseController@index` | `OwnerApi.getCases` | `auth:sanctum,auth.owner` | Support & customer protection cases list |
+| **GET** | `/api/v1/owner/cases/{ref}` | `OwnerCaseController@show` | `OwnerApi.getCase` | `auth:sanctum,auth.owner` | Support case details & message timeline |
+| **POST** | `/api/v1/owner/cases/{ref}/messages` | `OwnerCaseController@addMessage` | `OwnerApi.addCaseMessage` | `auth:sanctum,auth.owner` | Post host response or dispute clarification |
 | **GET** | `/api/v1/owner/profile` | `OwnerProfileController@show` | `OwnerApi.getProfile` | `auth:sanctum,auth.owner` | Host profile data |
 | **PUT** | `/api/v1/owner/profile` | `OwnerProfileController@update` | `OwnerApi.updateProfile` | `auth:sanctum,auth.owner` | Host contact information update |
-| **PUT** | `/api/v1/owner/password` | `OwnerProfileController@changePassword`| `OwnerApi.changePassword` | `auth:sanctum,auth.owner` | Host credentials update |
-| **POST** | `/api/v1/owner/devices/register` | `OwnerDeviceController@register` | `Notifications.registerDevice`| `auth:sanctum,auth.owner` | Push notification token register |
-| **DELETE** | `/api/v1/owner/devices/unregister` | `OwnerDeviceController@unregister` | `Notifications.unregisterDevice`| `auth:sanctum,auth.owner` | Push notification token unregister |
-| **GET** | `/api/v1/owner/notifications` | `OwnerNotificationController@index` | `Notifications.getNotifications` | `auth:sanctum,auth.owner` | Notification inbox |
-| **POST** | `/api/v1/owner/notifications/{id}/read` | `OwnerNotificationController@read` | `Notifications.markRead` | `auth:sanctum,auth.owner` | Mark notification read |
-| **POST** | `/api/v1/owner/notifications/mark-all-read` | `OwnerNotificationController@markAllRead` | `Notifications.markAllRead` | `auth:sanctum,auth.owner` | Mark all notifications read |
+| **PUT** | `/api/v1/owner/password` | `OwnerProfileController@updatePassword`| `OwnerApi.changePassword` | `auth:sanctum,auth.owner` | Host credentials update |
+| **POST** | `/api/v1/owner/devices/register` | `OwnerDeviceController@register` | `OwnerApi.registerDevice`| `auth:sanctum,auth.owner` | Push notification token register |
+| **DELETE** | `/api/v1/owner/devices/unregister` | `OwnerDeviceController@unregister` | `OwnerApi.unregisterDevice`| `auth:sanctum,auth.owner` | Push notification token unregister |
+| **GET** | `/api/v1/owner/notifications` | `OwnerNotificationController@index` | `OwnerApi.getNotifications` | `auth:sanctum,auth.owner` | Notification inbox |
+| **GET** | `/api/v1/owner/notifications/unread-count` | `OwnerNotificationController@unreadCount` | `OwnerApi.getUnreadCount` | `auth:sanctum,auth.owner` | Unread notifications badge count |
+| **POST** | `/api/v1/owner/notifications/{id}/read` | `OwnerNotificationController@read` | `OwnerApi.markRead` | `auth:sanctum,auth.owner` | Mark notification read |
+| **POST** | `/api/v1/owner/notifications/mark-all-read` | `OwnerNotificationController@markAllRead` | `OwnerApi.markAllRead` | `auth:sanctum,auth.owner` | Mark all notifications read |
 
 ---
 

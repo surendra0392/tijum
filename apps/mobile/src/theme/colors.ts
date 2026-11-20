@@ -4,6 +4,7 @@ export const Colors = {
     coral: '#FF7A67',
     softPeach: '#FFB6A3',
     cream: '#FFF4EE',
+    warmCream: '#FFF4EE',
     mutedLavender: '#8B6B82',
     neutralSurface: '#E6E0DB',
 
@@ -42,4 +43,14 @@ export const Colors = {
     cardBorder: '#E5E7EB',
     text: '#111827',
     textMuted: '#6B7280',
+
+    // UI Aliases
+    surface: '#FFFFFF',
+    border: '#E5E7EB',
+    textPrimary: '#111827',
+    textSecondary: '#4B5563',
+    textTertiary: '#9CA3AF',
+    success: '#10B981',
+    warning: '#F59E0B',
+    error: '#E11D48',
 };
