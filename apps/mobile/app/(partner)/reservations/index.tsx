@@ -15,6 +15,7 @@ import { OwnerApi } from '../../../src/api/owner';
 import { Reservation } from '../../../src/api/types';
 import { ReservationStatusBadge } from '../../../src/components/ReservationStatusBadge';
 import { Button } from '../../../src/components/Button';
+import { AppHeader } from '../../../src/components/AppHeader';
 import { Colors } from '../../../src/theme/colors';
 import { Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
@@ -150,6 +151,11 @@ export default function PartnerReservationsScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
+            <AppHeader
+                title="Guest Bookings"
+                subtitle="Manage arrivals, allocations & turnovers"
+                variant="plum"
+            />
             {/* Filter Tabs */}
             <View style={styles.tabsContainer}>
                 {FILTER_TABS.map((tab) => (

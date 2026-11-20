@@ -21,6 +21,7 @@ import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 import { Button } from '../../../src/components/Button';
 import { Badge } from '../../../src/components/Badge';
+import { AppHeader } from '../../../src/components/AppHeader';
 import { Bell, SlidersHorizontal, X, Check, Info } from 'lucide-react-native';
 
 export default function CustomerNotificationsScreen() {
@@ -235,22 +236,26 @@ export default function CustomerNotificationsScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.topBar}>
-                <Text style={styles.topTitle}>Activity & Alerts</Text>
-                <View style={styles.topActionsRow}>
-                    <TouchableOpacity
-                        style={styles.prefButton}
-                        onPress={openPreferences}
-                        accessibilityLabel="Notification Preferences"
-                    >
-                        <SlidersHorizontal size={16} color={Colors.deepPlum} />
-                        <Text style={styles.prefButtonText}>Channels</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={handleMarkAllRead}>
-                        <Text style={styles.markAllText}>Mark all as read</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
+            <AppHeader
+                title="Activity & Alerts"
+                subtitle="Stay updates & system notifications"
+                variant="plum"
+                rightAction={
+                    <View style={styles.headerActionsRow}>
+                        <TouchableOpacity
+                            style={styles.headerPrefBtn}
+                            onPress={openPreferences}
+                            accessibilityLabel="Notification Preferences"
+                        >
+                            <SlidersHorizontal size={13} color={Colors.white} />
+                            <Text style={styles.headerPrefText}>Channels</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={handleMarkAllRead} style={styles.headerMarkReadBtn}>
+                            <Text style={styles.headerMarkReadText}>Mark Read</Text>
+                        </TouchableOpacity>
+                    </View>
+                }
+            />
 
             {loading && !refreshing ? (
                 <View style={styles.center}>
@@ -445,36 +450,35 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: Colors.warmOffWhite,
     },
-    topBar: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: Spacing.lg,
-        paddingVertical: Spacing.md,
-        backgroundColor: Colors.white,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.gray200,
-    },
-    topTitle: {
-        ...Typography.titleSmall,
-        color: Colors.deepPlum,
-        fontWeight: '700',
-    },
-    topActionsRow: {
+    headerActionsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: Spacing.md,
+        gap: 6,
     },
-    prefButton: {
+    headerPrefBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
         paddingHorizontal: 8,
-        paddingVertical: 4,
-        backgroundColor: Colors.warmOffWhite,
-        borderRadius: BorderRadius.sm,
-        borderWidth: 1,
-        borderColor: Colors.gray200,
+        paddingVertical: 5,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        borderRadius: BorderRadius.pill,
+    },
+    headerPrefText: {
+        fontSize: 11,
+        color: Colors.white,
+        fontWeight: '600',
+    },
+    headerMarkReadBtn: {
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        borderRadius: BorderRadius.pill,
+    },
+    headerMarkReadText: {
+        fontSize: 11,
+        color: Colors.coral,
+        fontWeight: '700',
     },
     prefButtonText: {
         ...Typography.labelSmall,

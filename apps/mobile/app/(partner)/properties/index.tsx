@@ -27,6 +27,7 @@ import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 import { StayTimingBadge } from '../../../src/components/StayTimingBadge';
+import { AppHeader } from '../../../src/components/AppHeader';
 import {
     BedDouble,
     Building2,
@@ -370,25 +371,22 @@ export default function PartnerPropertiesScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Top Bar with Add Property */}
-            <View style={styles.topBar}>
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.topBarTitle}>
-                        Manage Accommodations
-                    </Text>
-                    <Text style={styles.topBarSubtitle}>
-                        {properties.length} Registered Properties
-                    </Text>
-                </View>
-                <TouchableOpacity
-                    style={styles.addPropertyBtn}
-                    onPress={() => router.push('/(partner)/properties/create')}
-                    activeOpacity={0.8}
-                >
-                    <Plus size={16} color={Colors.white} />
-                    <Text style={styles.addPropertyBtnText}>Add Stay</Text>
-                </TouchableOpacity>
-            </View>
+            {/* Curved Plum Header with Add Stay action */}
+            <AppHeader
+                title="Manage Stays"
+                subtitle={`${properties.length} registered properties`}
+                variant="plum"
+                rightAction={
+                    <TouchableOpacity
+                        style={styles.addPropertyBtn}
+                        onPress={() => router.push('/(partner)/properties/create')}
+                        activeOpacity={0.8}
+                    >
+                        <Plus size={15} color={Colors.white} />
+                        <Text style={styles.addPropertyBtnText}>Add Stay</Text>
+                    </TouchableOpacity>
+                }
+            />
 
             {/* Category Filter Tabs */}
             <View style={styles.filterSection}>

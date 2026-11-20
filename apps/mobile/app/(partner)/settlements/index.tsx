@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { OwnerApi } from '../../../src/api/owner';
 import { Badge } from '../../../src/components/Badge';
+import { AppHeader } from '../../../src/components/AppHeader';
 import { Colors } from '../../../src/theme/colors';
 import { Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
@@ -124,6 +125,11 @@ export default function PartnerSettlementsScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
+            <AppHeader
+                title="Payouts & Settlements"
+                subtitle="Razorpay Route weekly automated payouts"
+                variant="plum"
+            />
             {/* Top Financial Summary Cards */}
             <View style={styles.summaryContainer}>
                 <View style={styles.summaryCard}>

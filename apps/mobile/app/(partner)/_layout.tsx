@@ -50,7 +50,7 @@ export default function PartnerTabsLayout() {
                 name="reservations/index"
                 options={{
                     title: 'Bookings',
-                    headerTitle: 'Guest Bookings',
+                    headerShown: false,
                     tabBarIcon: ({ color }: { color: string }) => (
                         <ClipboardList size={20} color={color} />
                     ),
@@ -60,7 +60,7 @@ export default function PartnerTabsLayout() {
                 name="properties/index"
                 options={{
                     title: 'Stays',
-                    headerTitle: 'My Properties',
+                    headerShown: false,
                     tabBarIcon: ({ color }: { color: string }) => (
                         <Building2 size={20} color={color} />
                     ),
@@ -70,7 +70,7 @@ export default function PartnerTabsLayout() {
                 name="settlements/index"
                 options={{
                     title: 'Finances',
-                    headerTitle: 'Payouts & Settlements',
+                    headerShown: false,
                     tabBarIcon: ({ color }: { color: string }) => (
                         <IndianRupee size={20} color={color} />
                     ),
@@ -80,7 +80,7 @@ export default function PartnerTabsLayout() {
                 name="notifications/index"
                 options={{
                     title: 'Alerts',
-                    headerTitle: 'Partner Alerts',
+                    headerShown: false,
                     tabBarIcon: ({ color }: { color: string }) => (
                         <Bell size={20} color={color} />
                     ),
@@ -90,7 +90,7 @@ export default function PartnerTabsLayout() {
                 name="account"
                 options={{
                     title: 'Account',
-                    headerTitle: 'Host Profile',
+                    headerShown: false,
                     tabBarIcon: ({ color }: { color: string }) => (
                         <UserCheck size={20} color={color} />
                     ),

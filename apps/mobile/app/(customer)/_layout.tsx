@@ -43,7 +43,7 @@ export default function CustomerTabsLayout() {
                 name="bookings/index"
                 options={{
                     title: 'My Stays',
-                    headerTitle: 'My Reservations',
+                    headerShown: false,
                     tabBarIcon: ({ color }: { color: string }) => (
                         <Luggage size={20} color={color} />
                     ),
@@ -53,7 +53,7 @@ export default function CustomerTabsLayout() {
                 name="notifications/index"
                 options={{
                     title: 'Alerts',
-                    headerTitle: 'Notifications',
+                    headerShown: false,
                     tabBarIcon: ({ color }: { color: string }) => (
                         <Bell size={20} color={color} />
                     ),
@@ -63,7 +63,7 @@ export default function CustomerTabsLayout() {
                 name="profile/index"
                 options={{
                     title: 'Account',
-                    headerTitle: 'My Account',
+                    headerShown: false,
                     tabBarIcon: ({ color }: { color: string }) => (
                         <User size={20} color={color} />
                     ),

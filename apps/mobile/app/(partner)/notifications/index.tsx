@@ -14,6 +14,7 @@ import { NotificationItem } from '../../../src/api/types';
 import { Colors } from '../../../src/theme/colors';
 import { Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
+import { AppHeader } from '../../../src/components/AppHeader';
 import { Bell } from 'lucide-react-native';
 
 export default function PartnerNotificationsScreen() {
@@ -93,12 +94,16 @@ export default function PartnerNotificationsScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.topBar}>
-                <Text style={styles.topTitle}>Host Operations & Alerts</Text>
-                <TouchableOpacity onPress={handleMarkAllRead}>
-                    <Text style={styles.markAllText}>Mark all as read</Text>
-                </TouchableOpacity>
-            </View>
+            <AppHeader
+                title="Partner Alerts"
+                subtitle="Operations, arrivals & settlement updates"
+                variant="plum"
+                rightAction={
+                    <TouchableOpacity onPress={handleMarkAllRead} style={styles.headerMarkReadBtn}>
+                        <Text style={styles.headerMarkReadText}>Mark Read</Text>
+                    </TouchableOpacity>
+                }
+            />
 
             {loading && !refreshing ? (
                 <View style={styles.center}>
@@ -147,24 +152,16 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: Colors.warmOffWhite,
     },
-    topBar: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: Spacing.lg,
-        paddingVertical: Spacing.md,
-        backgroundColor: Colors.white,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.gray200,
+    headerMarkReadBtn: {
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        borderRadius: 20,
     },
-    topTitle: {
-        ...Typography.titleSmall,
-        color: Colors.deepPlum,
-    },
-    markAllText: {
-        ...Typography.bodySmall,
+    headerMarkReadText: {
+        fontSize: 11,
         color: Colors.coral,
-        fontWeight: '600',
+        fontWeight: '700',
     },
     listContent: {
         padding: Spacing.md,

@@ -8,6 +8,7 @@ import {
     Alert,
     TouchableOpacity,
     SafeAreaView,
+    Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthContext';
@@ -138,24 +139,27 @@ export default function PartnerAccountScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
-                {/* Host Avatar / Profile Header */}
-                <View style={styles.header}>
-                    <View style={styles.avatarCircle}>
-                        {owner?.name ? (
-                            <Text style={styles.avatarText}>
-                                {owner.name.charAt(0).toUpperCase()}
-                            </Text>
-                        ) : (
-                            <Building2 size={32} color={Colors.white} />
-                        )}
-                    </View>
-                    <Text style={styles.userName}>
-                        {owner?.name || 'Accommodation Partner'}
-                    </Text>
-                    <Text style={styles.userEmail}>{owner?.email}</Text>
-                    <View style={{ marginTop: Spacing.xs }}>
-                        <Badge label="VERIFIED HOST" variant="accent" />
-                    </View>
+                {/* Curved Plum Header */}
+                <View style={styles.plumHeader}>
+                    <SafeAreaView>
+                        <View style={styles.avatarCircle}>
+                            {owner?.name ? (
+                                <Text style={styles.avatarText}>
+                                    {owner.name.charAt(0).toUpperCase()}
+                                </Text>
+                            ) : (
+                                <Building2 size={32} color={Colors.white} />
+                            )}
+                        </View>
+                        <Text style={styles.userName}>
+                            {owner?.name || 'Accommodation Partner'}
+                        </Text>
+                        <Text style={styles.userEmail}>{owner?.email}</Text>
+                        <View style={styles.verifiedBadgeRow}>
+                            <ShieldCheck size={13} color={Colors.coral} style={{ marginRight: 4 }} />
+                            <Text style={styles.verifiedBadgeText}>VERIFIED HOST</Text>
+                        </View>
+                    </SafeAreaView>
                 </View>
 
                 <View style={styles.contentPadding}>
@@ -361,35 +365,57 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingBottom: Spacing.xxl,
     },
-    header: {
+    plumHeader: {
         alignItems: 'center',
-        paddingVertical: Spacing.xl,
-        backgroundColor: Colors.warmOffWhite,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.gray200,
+        paddingTop: Platform.OS === 'android' ? 36 : 14,
+        paddingBottom: Spacing.xl,
+        backgroundColor: Colors.deepPlum,
+        borderBottomLeftRadius: BorderRadius.xl,
+        borderBottomRightRadius: BorderRadius.xl,
     },
     avatarCircle: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        backgroundColor: Colors.deepPlum,
+        width: 76,
+        height: 76,
+        borderRadius: 38,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        borderWidth: 2,
+        borderColor: Colors.white,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: Spacing.sm,
+        alignSelf: 'center',
     },
     avatarText: {
-        fontSize: 28,
+        fontSize: 30,
         color: Colors.white,
-        fontWeight: '700',
+        fontWeight: '800',
     },
     userName: {
-        ...Typography.titleMedium,
-        color: Colors.deepPlum,
+        fontSize: 20,
+        fontWeight: '800',
+        color: Colors.white,
+        textAlign: 'center',
     },
     userEmail: {
-        ...Typography.bodySmall,
-        color: Colors.gray500,
+        fontSize: 13,
+        color: 'rgba(255, 255, 255, 0.85)',
         marginTop: 2,
+        textAlign: 'center',
+    },
+    verifiedBadgeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        paddingHorizontal: Spacing.md,
+        paddingVertical: 4,
+        borderRadius: BorderRadius.pill,
+        marginTop: Spacing.sm,
+        alignSelf: 'center',
+    },
+    verifiedBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: Colors.white,
     },
     contentPadding: {
         padding: Spacing.lg,
