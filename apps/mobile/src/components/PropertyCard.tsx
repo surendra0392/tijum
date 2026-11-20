@@ -9,7 +9,7 @@ import {
 } from 'lucide-react-native';
 import { PropertyCard as PropertyCardType } from '../api/types';
 import { Colors } from '../theme/colors';
-import { BorderRadius, Spacing } from '../theme/spacing';
+import { BorderRadius, Shadows, Spacing } from '../theme/spacing';
 import { Typography } from '../theme/typography';
 import { MealBadge } from './MealBadge';
 import { CategoryBadge } from './CategoryBadge';
@@ -62,7 +62,7 @@ export function PropertyCard({
                 <View style={styles.verifiedBadge}>
                     <CheckCircle2
                         size={12}
-                        color="#065F46"
+                        color={Colors.successText}
                         style={styles.badgeIcon}
                     />
                     <Text style={styles.verifiedText}>Verified</Text>
@@ -106,8 +106,8 @@ export function PropertyCard({
                     <CategoryBadge category={property.category} size="sm" />
                     <View style={styles.localityRow}>
                         <MapPin
-                            size={11}
-                            color={Colors.gray500}
+                            size={12}
+                            color={Colors.coralPrimary}
                             style={{ marginRight: 3 }}
                         />
                         <Text style={styles.locality} numberOfLines={1}>
@@ -151,10 +151,10 @@ export function PropertyCard({
 
                 <View style={styles.footer}>
                     <View>
-                        <Text style={styles.priceLabel}>From</Text>
+                        <Text style={styles.priceLabel}>Starting from</Text>
                         <Text style={styles.price}>
                             {formatPrice(property.starting_price_monthly_paise)}
-                            <Text style={styles.priceUnit}> / month</Text>
+                            <Text style={styles.priceUnit}> / mo</Text>
                         </Text>
                     </View>
 
@@ -178,17 +178,13 @@ const styles = StyleSheet.create({
         borderRadius: BorderRadius.xl,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: Colors.gray200,
-        marginBottom: Spacing.lg,
-        elevation: 2,
-        shadowColor: Colors.black,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
+        borderColor: Colors.borderSubtle,
+        marginBottom: Spacing.base,
+        ...Shadows.card,
     },
     imageContainer: {
-        height: 180,
-        backgroundColor: Colors.gray100,
+        height: 190,
+        backgroundColor: Colors.surfaceSubtle,
         position: 'relative',
     },
     image: {
@@ -199,9 +195,9 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: Spacing.md,
         left: Spacing.md,
-        backgroundColor: Colors.emeraldLight,
+        backgroundColor: Colors.successLight,
         paddingHorizontal: Spacing.sm,
-        paddingVertical: 3,
+        paddingVertical: 4,
         borderRadius: BorderRadius.full,
         flexDirection: 'row',
         alignItems: 'center',
@@ -210,8 +206,8 @@ const styles = StyleSheet.create({
         marginRight: 4,
     },
     verifiedText: {
-        color: '#065F46',
-        fontSize: Typography.fontSize.xs,
+        color: Colors.successText,
+        fontSize: 11,
         fontWeight: '700',
     },
     ratingBadge: {
@@ -220,22 +216,24 @@ const styles = StyleSheet.create({
         right: Spacing.md,
         backgroundColor: Colors.white,
         paddingHorizontal: Spacing.sm,
-        paddingVertical: 3,
+        paddingVertical: 4,
         borderRadius: BorderRadius.full,
         flexDirection: 'row',
         alignItems: 'center',
+        ...Shadows.subtle,
     },
     ratingText: {
         color: Colors.gray800,
-        fontSize: Typography.fontSize.xs,
+        fontSize: 11,
         fontWeight: '700',
     },
     wishlistButton: {
         position: 'absolute',
         bottom: Spacing.sm,
         right: Spacing.sm,
-        backgroundColor: 'rgba(17, 24, 39, 0.5)',
-        padding: 6,
+        backgroundColor: 'rgba(17, 24, 39, 0.55)',
+        width: 32,
+        height: 32,
         borderRadius: BorderRadius.full,
         alignItems: 'center',
         justifyContent: 'center',
@@ -254,18 +252,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     locality: {
-        fontSize: Typography.fontSize.xs,
-        color: Colors.gray500,
+        fontSize: 12,
+        color: Colors.inkSecondary,
         fontWeight: '600',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
     },
     name: {
-        fontSize: Typography.fontSize.lg,
-        fontFamily: Typography.fontFamily.heading,
+        fontSize: 17,
         fontWeight: '700',
-        color: Colors.gray900,
-        marginBottom: Spacing.sm,
+        color: Colors.inkPrimary,
+        marginBottom: Spacing.xs,
     },
     mealRow: {
         marginBottom: Spacing.md,
@@ -275,34 +270,36 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         borderTopWidth: 1,
-        borderTopColor: Colors.gray100,
+        borderTopColor: Colors.borderSubtle,
         paddingTop: Spacing.md,
     },
     priceLabel: {
-        fontSize: Typography.fontSize.xs,
-        color: Colors.gray500,
+        fontSize: 11,
+        color: Colors.inkMuted,
+        marginBottom: 1,
     },
     price: {
-        fontSize: Typography.fontSize.lg,
+        fontSize: 17,
         fontWeight: '800',
-        color: Colors.deepPlum,
+        color: Colors.plumPrimary,
     },
     priceUnit: {
-        fontSize: Typography.fontSize.xs,
-        color: Colors.gray500,
+        fontSize: 12,
+        color: Colors.inkSecondary,
         fontWeight: 'normal',
     },
     viewButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: Colors.deepPlum,
+        backgroundColor: Colors.plumPrimary,
         paddingHorizontal: Spacing.base,
         paddingVertical: Spacing.sm,
-        borderRadius: BorderRadius.base,
+        borderRadius: BorderRadius.pill,
+        ...Shadows.subtle,
     },
     viewButtonText: {
         color: Colors.white,
-        fontSize: Typography.fontSize.sm,
+        fontSize: 13,
         fontWeight: '700',
     },
 });

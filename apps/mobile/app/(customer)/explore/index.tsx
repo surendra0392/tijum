@@ -39,12 +39,13 @@ import {
     getCategoryDisplayName,
     normalizeCategorySlug,
 } from '../../../src/constants/categories';
+import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import { PropertyCard } from '../../../src/components/PropertyCard';
 import { Input } from '../../../src/components/Input';
 import { Button } from '../../../src/components/Button';
 import { Badge } from '../../../src/components/Badge';
 import { Colors } from '../../../src/theme/colors';
-import { BorderRadius, Spacing } from '../../../src/theme/spacing';
+import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 
 const CITIES = ['All', 'Hyderabad', 'Guntur', 'Vijayawada', 'Visakhapatnam'];
@@ -500,25 +501,20 @@ export default function ExploreScreen() {
             {/* Main List */}
             {loading ? (
                 <View style={styles.centerContainer}>
-                    <ActivityIndicator size="large" color={Colors.deepPlum} />
+                    <ActivityIndicator size="large" color={Colors.plumPrimary} />
                     <Text style={styles.loadingText}>
                         Finding verified food-inclusive stays...
                     </Text>
                 </View>
             ) : errorMessage ? (
                 <View style={styles.centerContainer}>
-                    <AlertCircle
-                        size={28}
-                        color={Colors.rose}
-                        style={{ marginBottom: 8 }}
+                    <ExceptionalState
+                        type="no-internet"
+                        title="Unable to Load Stays"
+                        description={errorMessage}
+                        primaryActionLabel="Tap to Retry"
+                        onPrimaryAction={() => loadProperties()}
                     />
-                    <Text style={styles.errorText}>{errorMessage}</Text>
-                    <TouchableOpacity
-                        onPress={() => loadProperties()}
-                        style={styles.retryButton}
-                    >
-                        <Text style={styles.retryButtonText}>Tap to Retry</Text>
-                    </TouchableOpacity>
                 </View>
             ) : (
                 <FlatList
@@ -547,22 +543,25 @@ export default function ExploreScreen() {
                         </View>
                     }
                     ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <Building2
-                                size={48}
-                                color={Colors.gray300}
-                                style={{ marginBottom: 12 }}
-                            />
-                            <Text style={styles.emptyTitle}>
-                                {selectedCategory !== 'all'
-                                    ? `No ${getCategoryDisplayName(selectedCategory)} found`
-                                    : 'No accommodations found'}
-                            </Text>
-                            <Text style={styles.emptySubtitle}>
-                                Try selecting &ldquo;All Stays&rdquo; or
-                                adjusting your city filter or search keyword.
-                            </Text>
-                        </View>
+                        <ExceptionalState
+                            type="no-results"
+                            title={
+                                selectedCategory !== 'all'
+                                    ? `No ${getCategoryDisplayName(selectedCategory)} Found`
+                                    : 'No Stays Found'
+                            }
+                            description="Try adjusting your filters, selecting a different city, or clearing active search keywords."
+                            primaryActionLabel="Reset Filters"
+                            onPrimaryAction={() => {
+                                setSelectedCategory('all');
+                                setSelectedCity('All');
+                                setSearchQuery('');
+                                setFilterAc(false);
+                                setSelectedGender('all');
+                                resetAdvancedFilters();
+                                loadProperties();
+                            }}
+                        />
                     }
                     renderItem={({ item }) => (
                         <PropertyCard
@@ -795,25 +794,26 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F9FAFB',
+        backgroundColor: Colors.canvas,
     },
     searchSection: {
         backgroundColor: Colors.white,
         paddingTop: Spacing.sm,
         paddingBottom: Spacing.sm,
         borderBottomWidth: 1,
-        borderBottomColor: Colors.gray200,
+        borderBottomColor: Colors.borderSubtle,
+        ...Shadows.subtle,
     },
     searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: Colors.gray100,
+        backgroundColor: Colors.surfaceSubtle,
         marginHorizontal: Spacing.base,
         paddingHorizontal: Spacing.md,
         paddingVertical: Spacing.sm,
-        borderRadius: BorderRadius.base,
+        borderRadius: BorderRadius.pill,
         borderWidth: 1,
-        borderColor: Colors.gray200,
+        borderColor: Colors.borderSubtle,
     },
     searchIcon: {
         marginRight: Spacing.sm,
@@ -821,7 +821,7 @@ const styles = StyleSheet.create({
     searchInput: {
         flex: 1,
         fontSize: Typography.fontSize.sm,
-        color: Colors.gray900,
+        color: Colors.inkPrimary,
     },
     categoryPillContainer: {
         paddingHorizontal: Spacing.base,
@@ -832,17 +832,17 @@ const styles = StyleSheet.create({
     categoryPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: Colors.gray100,
+        backgroundColor: Colors.surfaceSubtle,
         paddingHorizontal: Spacing.base,
         paddingVertical: 8,
-        borderRadius: BorderRadius.full,
+        borderRadius: BorderRadius.pill,
         borderWidth: 1,
-        borderColor: Colors.gray200,
+        borderColor: Colors.borderSubtle,
     },
     categoryPillText: {
         fontSize: Typography.fontSize.sm,
         fontWeight: '700',
-        color: Colors.gray700,
+        color: Colors.inkSecondary,
     },
     categoryPillTextActive: {
         color: Colors.white,
@@ -855,25 +855,25 @@ const styles = StyleSheet.create({
     cityPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: Colors.gray50,
+        backgroundColor: Colors.white,
         paddingHorizontal: Spacing.md,
-        paddingVertical: 5,
-        borderRadius: BorderRadius.full,
+        paddingVertical: 6,
+        borderRadius: BorderRadius.pill,
         borderWidth: 1,
-        borderColor: Colors.gray200,
+        borderColor: Colors.borderSubtle,
     },
     cityPillActive: {
-        backgroundColor: Colors.deepPlum,
-        borderColor: Colors.deepPlum,
+        backgroundColor: Colors.plumPrimary,
+        borderColor: Colors.plumPrimary,
     },
     filterPillActive: {
-        backgroundColor: Colors.coral,
-        borderColor: Colors.coral,
+        backgroundColor: Colors.coralPrimary,
+        borderColor: Colors.coralPrimary,
     },
     cityPillText: {
         fontSize: Typography.fontSize.xs,
         fontWeight: '600',
-        color: Colors.gray700,
+        color: Colors.inkSecondary,
     },
     cityPillTextActive: {
         color: Colors.white,
@@ -881,7 +881,7 @@ const styles = StyleSheet.create({
     pillDivider: {
         width: 1,
         height: 18,
-        backgroundColor: Colors.gray300,
+        backgroundColor: Colors.borderStrong,
         marginHorizontal: 4,
         alignSelf: 'center',
     },
@@ -894,19 +894,19 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: Spacing.md,
         fontSize: Typography.fontSize.sm,
-        color: Colors.gray600,
+        color: Colors.inkSecondary,
     },
     errorText: {
         fontSize: Typography.fontSize.sm,
-        color: Colors.rose,
+        color: Colors.danger,
         textAlign: 'center',
         marginBottom: Spacing.md,
     },
     retryButton: {
-        backgroundColor: Colors.deepPlum,
+        backgroundColor: Colors.plumPrimary,
         paddingHorizontal: Spacing.lg,
         paddingVertical: Spacing.sm,
-        borderRadius: BorderRadius.base,
+        borderRadius: BorderRadius.pill,
     },
     retryButtonText: {
         color: Colors.white,
@@ -918,15 +918,16 @@ const styles = StyleSheet.create({
         paddingBottom: Spacing.xxl,
     },
     foodGuaranteeBanner: {
-        backgroundColor: Colors.cream,
-        borderColor: '#FED7AA',
+        backgroundColor: Colors.peachCream,
+        borderColor: Colors.peachSoft,
         borderWidth: 1,
         borderRadius: BorderRadius.xl,
         padding: Spacing.base,
-        marginBottom: Spacing.lg,
+        marginBottom: Spacing.base,
+        ...Shadows.subtle,
     },
     bannerBadge: {
-        backgroundColor: Colors.coral,
+        backgroundColor: Colors.coralPrimary,
         alignSelf: 'flex-start',
         paddingHorizontal: Spacing.sm,
         paddingVertical: 2,
@@ -942,12 +943,12 @@ const styles = StyleSheet.create({
     bannerTitle: {
         fontSize: Typography.fontSize.base,
         fontWeight: '800',
-        color: Colors.deepPlum,
+        color: Colors.plumDeep,
         marginBottom: 4,
     },
     bannerDesc: {
         fontSize: Typography.fontSize.xs,
-        color: Colors.gray700,
+        color: Colors.inkSecondary,
         lineHeight: 18,
     },
     emptyContainer: {
