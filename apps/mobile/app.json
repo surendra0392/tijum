@@ -26,6 +26,10 @@
         "backgroundColor": "#442F41"
       },
       "package": "com.tijum.app",
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "POST_NOTIFICATIONS"
+      ],
       "intentFilters": [
         {
           "action": "VIEW",

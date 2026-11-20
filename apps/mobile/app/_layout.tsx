@@ -4,11 +4,14 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../src/auth/AuthContext';
+import { PushNotificationService } from '../src/notifications/PushNotificationService';
 import { Colors } from '../src/theme/colors';
 import { sanitizeDeepLink } from '../src/utils/deepLinkSanitizer';
 
 export default function RootLayout() {
     useEffect(() => {
+        PushNotificationService.requestInitialPermissionsOnInstall().catch(() => {});
+
         Linking.getInitialURL().then((url) => {
             if (url) {
                 const sanitized = sanitizeDeepLink(url);

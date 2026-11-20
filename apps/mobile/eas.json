@@ -18,8 +18,8 @@
                 "buildType": "apk"
             },
             "env": {
-                "EXPO_PUBLIC_API_URL": "https://staging.tijum.com/api/v1",
-                "EXPO_PUBLIC_ENVIRONMENT": "preview"
+                "EXPO_PUBLIC_API_URL": "https://tijum.com/api/v1",
+                "EXPO_PUBLIC_ENVIRONMENT": "production"
             }
         },
         "production": {

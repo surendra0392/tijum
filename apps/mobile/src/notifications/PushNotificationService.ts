@@ -31,6 +31,31 @@ export type PushRequestContext =
 
 export class PushNotificationService {
     /**
+     * Request permissions on initial app install / first launch.
+     * Triggers native OS notification permission dialog on Android 13+ and iOS.
+     */
+    static async requestInitialPermissionsOnInstall(): Promise<boolean> {
+        try {
+            const currentStatus = await this.checkPermissionStatus();
+            if (currentStatus === Notifications.PermissionStatus.GRANTED) {
+                return true;
+            }
+
+            const { status } = await Notifications.requestPermissionsAsync({
+                ios: {
+                    allowAlert: true,
+                    allowBadge: true,
+                    allowSound: true,
+                },
+            });
+
+            return status === Notifications.PermissionStatus.GRANTED;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
      * Check OS permission status without triggering any user prompt.
      */
     static async checkPermissionStatus(): Promise<Notifications.PermissionStatus> {

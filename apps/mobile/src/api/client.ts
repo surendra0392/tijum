@@ -23,7 +23,11 @@ export class ApiError extends Error {
 
 export class ApiClient {
     private static getBaseUrl(): string {
-        return process.env.EXPO_PUBLIC_API_URL || DEFAULT_BASE_URL;
+        const envUrl = process.env.EXPO_PUBLIC_API_URL;
+        if (envUrl && !envUrl.includes('staging.tijum.com')) {
+            return envUrl;
+        }
+        return DEFAULT_BASE_URL;
     }
 
     static async request<T>(
