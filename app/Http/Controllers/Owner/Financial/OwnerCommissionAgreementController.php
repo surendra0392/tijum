@@ -62,7 +62,12 @@ class OwnerCommissionAgreementController extends Controller
         /** @var Owner $owner */
         $owner = $request->user('owner');
 
-        $action->execute($agreement, $owner);
+        $action->execute(
+            $agreement,
+            $owner,
+            $request->ip(),
+            $request->userAgent(),
+        );
 
         Inertia::flash('toast', [
             'type' => 'success',

@@ -114,9 +114,42 @@ export default function PartnerCasesScreen() {
         }
     };
 
-    const actionRequiredCount = cases.filter(
+    const getPrioritySlaTarget = (priority?: string) => {
+        switch (priority?.toLowerCase()) {
+            case 'urgent':
+                return { target: '2h', label: 'First Action Target: 2 Hours (Urgent)' };
+            case 'high':
+                return { target: '4h', label: 'First Action Target: 4 Hours (High Priority)' };
+            case 'medium':
+                return { target: '24h', label: 'First Action Target: 24 Hours' };
+            case 'low':
+            default:
+                return { target: '48h', label: 'First Action Target: 48 Hours' };
+        }
+    };
+
+    const actionRequiredCases = cases.filter(
         (c) => c.status?.toLowerCase() === 'action_required',
-    ).length;
+    );
+    const actionRequiredCount = actionRequiredCases.length;
+
+    const getActionRequiredSlaBannerText = (actionCases: OwnerCase[]) => {
+        const hasUrgent = actionCases.some((c) => c.priority?.toLowerCase() === 'urgent');
+        const hasHigh = actionCases.some((c) => c.priority?.toLowerCase() === 'high');
+        const hasMedium = actionCases.some((c) => c.priority?.toLowerCase() === 'medium');
+
+        if (hasUrgent) {
+            return `${actionCases.length} case${actionCases.length > 1 ? 's require' : ' requires'} urgent attention (Internal Target: 2 hours). Immediate response required.`;
+        }
+        if (hasHigh) {
+            return `${actionCases.length} high-priority case${actionCases.length > 1 ? 's require' : ' requires'} response within 4 hours.`;
+        }
+        if (hasMedium) {
+            return `${actionCases.length} case${actionCases.length > 1 ? 's require' : ' requires'} response within 24 hours.`;
+        }
+        return `${actionCases.length} case${actionCases.length > 1 ? 's require' : ' requires'} response within 48 hours.`;
+    };
+
     const underReviewCount = cases.filter(
         (c) => c.status?.toLowerCase() === 'under_review' || c.status?.toLowerCase() === 'open',
     ).length;
@@ -209,10 +242,15 @@ export default function PartnerCasesScreen() {
                     ListHeaderComponent={
                         actionRequiredCount > 0 ? (
                             <View style={styles.alertBanner}>
-                                <AlertTriangle size={18} color={Colors.warning} />
-                                <Text style={styles.alertBannerText}>
-                                    {actionRequiredCount} case{actionRequiredCount > 1 ? 's require' : ' requires'} your response within 24 hours to prevent automatic guest refund.
-                                </Text>
+                                <AlertTriangle size={20} color={Colors.warning} />
+                                <View style={styles.alertTextContainer}>
+                                    <Text style={styles.alertBannerText}>
+                                        {getActionRequiredSlaBannerText(actionRequiredCases)}
+                                    </Text>
+                                    <Text style={styles.alertBannerSubtext}>
+                                        Statutory formal acknowledgement within 48h; formal resolution tracking up to 30 days.
+                                    </Text>
+                                </View>
                             </View>
                         ) : null
                     }
@@ -280,6 +318,28 @@ export default function PartnerCasesScreen() {
                                     ) : null}
                                 </View>
                             )}
+
+                            <View style={styles.slaRow}>
+                                <Clock
+                                    size={12}
+                                    color={
+                                        item.priority?.toLowerCase() === 'urgent' ||
+                                        item.priority?.toLowerCase() === 'high'
+                                            ? Colors.error
+                                            : Colors.textSecondary
+                                    }
+                                />
+                                <Text
+                                    style={[
+                                        styles.slaText,
+                                        (item.priority?.toLowerCase() === 'urgent' ||
+                                            item.priority?.toLowerCase() === 'high') &&
+                                            styles.slaUrgentText,
+                                    ]}
+                                >
+                                    {getPrioritySlaTarget(item.priority).label}
+                                </Text>
+                            </View>
 
                             <View style={styles.cardFooter}>
                                 <View style={styles.footerLeft}>
@@ -401,7 +461,7 @@ const styles = StyleSheet.create({
     },
     alertBanner: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         backgroundColor: Colors.warning + '15',
         borderWidth: 1,
         borderColor: Colors.warning + '40',
@@ -410,11 +470,20 @@ const styles = StyleSheet.create({
         marginBottom: Spacing.md,
         gap: Spacing.xs,
     },
-    alertBannerText: {
+    alertTextContainer: {
         flex: 1,
+    },
+    alertBannerText: {
         fontSize: Typography.fontSize.xs,
+        fontWeight: '600',
         color: Colors.textPrimary,
-        lineHeight: 16,
+        lineHeight: 18,
+    },
+    alertBannerSubtext: {
+        fontSize: 11,
+        color: Colors.textSecondary,
+        marginTop: 2,
+        lineHeight: 15,
     },
     emptyContainer: {
         padding: Spacing.xl,
@@ -478,6 +547,26 @@ const styles = StyleSheet.create({
     metaText: {
         fontSize: Typography.fontSize.xs,
         color: Colors.textSecondary,
+    },
+    slaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: Colors.background,
+        paddingHorizontal: Spacing.xs + 2,
+        paddingVertical: 3,
+        borderRadius: BorderRadius.sm,
+        alignSelf: 'flex-start',
+        marginBottom: Spacing.xs,
+    },
+    slaText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: Colors.textSecondary,
+    },
+    slaUrgentText: {
+        color: Colors.error,
+        fontWeight: '700',
     },
     cardFooter: {
         flexDirection: 'row',

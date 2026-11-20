@@ -101,7 +101,42 @@ export default function CaseDetailScreen() {
         }
     };
 
+    const getPrioritySlaTarget = (priority?: string) => {
+        switch (priority?.toLowerCase()) {
+            case 'urgent':
+                return {
+                    target: '2 Hours',
+                    label: 'Urgent Dispute',
+                    color: Colors.error,
+                    desc: 'Critical guest disruption. First-action response target is within 2 hours.',
+                };
+            case 'high':
+                return {
+                    target: '4 Hours',
+                    label: 'High Priority',
+                    color: Colors.error,
+                    desc: 'High severity dispute. First-action response target is within 4 hours.',
+                };
+            case 'medium':
+                return {
+                    target: '24 Hours',
+                    label: 'Medium Priority',
+                    color: Colors.warning,
+                    desc: 'Standard grievance. First-action response target is within 24 hours.',
+                };
+            case 'low':
+            default:
+                return {
+                    target: '48 Hours',
+                    label: 'Standard Inquiry',
+                    color: Colors.textSecondary,
+                    desc: 'Standard question or dispute. First-action response target is within 48 hours.',
+                };
+        }
+    };
+
     const messages = caseDetail?.messages || [];
+    const sla = getPrioritySlaTarget(caseDetail?.priority);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -185,6 +220,27 @@ export default function CaseDetailScreen() {
                                     </View>
                                 </View>
                             ) : null}
+                        </View>
+
+                        {/* Customer Protection SLA Target Card */}
+                        <View style={styles.slaCard}>
+                            <View style={styles.slaHeaderRow}>
+                                <Clock size={16} color={sla.color} />
+                                <Text style={[styles.slaTitle, { color: sla.color }]}>
+                                    First Action Target: {sla.target}
+                                </Text>
+                                <Badge variant={caseDetail.priority === 'urgent' || caseDetail.priority === 'high' ? 'error' : caseDetail.priority === 'medium' ? 'warning' : 'neutral'} size="sm">
+                                    {(caseDetail.priority || 'standard').toUpperCase()}
+                                </Badge>
+                            </View>
+                            <Text style={styles.slaDesc}>{sla.desc}</Text>
+                            <View style={styles.slaDivider} />
+                            <View style={styles.slaStatutoryRow}>
+                                <Shield size={14} color={Colors.textTertiary} />
+                                <Text style={styles.slaStatutoryText}>
+                                    Statutory formal acknowledgement within 48h • Resolution tracking up to 30 days
+                                </Text>
+                            </View>
                         </View>
 
                         {/* Chronological Message Timeline */}
@@ -377,6 +433,45 @@ const styles = StyleSheet.create({
         color: Colors.textPrimary,
         marginTop: 2,
         lineHeight: 16,
+    },
+    slaCard: {
+        backgroundColor: Colors.surface,
+        borderRadius: BorderRadius.lg,
+        borderWidth: 1,
+        borderColor: Colors.border,
+        padding: Spacing.md,
+        marginBottom: Spacing.md,
+    },
+    slaHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.xs,
+        marginBottom: Spacing.xs,
+    },
+    slaTitle: {
+        fontSize: Typography.fontSize.sm,
+        fontWeight: '700',
+        flex: 1,
+    },
+    slaDesc: {
+        fontSize: Typography.fontSize.xs,
+        color: Colors.textSecondary,
+        lineHeight: 16,
+    },
+    slaDivider: {
+        height: 1,
+        backgroundColor: Colors.border + '50',
+        marginVertical: Spacing.xs + 2,
+    },
+    slaStatutoryRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    slaStatutoryText: {
+        fontSize: 11,
+        color: Colors.textTertiary,
+        flex: 1,
     },
     timelineHeader: {
         flexDirection: 'row',

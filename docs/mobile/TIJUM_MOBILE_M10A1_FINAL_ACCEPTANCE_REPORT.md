@@ -27,7 +27,7 @@ The application strictly complies with all approved business rules:
 1. **Authoritative Hierarchy:** `Property -> PropertyRoomType -> PropertyRoom`.
 2. **Elimination of Retired Models:** 0 references in runtime code to `FoodPackage`, `FoodPackagePricing`, `RatePlan`, `SeasonalPricing`, `RatePeriod`, or `supports_additional_charge`.
 3. **Direct Pricing:** Integer paise storage on `property_room_types` (`daily_rate_minor`, `weekly_rate_minor`, `monthly_rate_minor`).
-4. **Independent Meal Switches:** Independent boolean switches on `properties` (`food_provided`, `breakfast_included`, `lunch_included`, `dinner_included`, `pure_veg`) with zero additional guest surcharge.
+4. **Independent Meal Switches:** Four canonical boolean switches on `properties` (`food_provided`, `breakfast_included`, `lunch_included`, `dinner_included`) with zero additional guest surcharge.
 5. **Anti-Bed Architecture:** No bed models. Discrete physical rooms (`property_rooms`) are allocated to confirmed bookings.
 6. **Instant Booking Model:** Bookings are confirmed immediately upon Razorpay payment capture. No host Accept/Decline steps.
 7. **Central Timing Policy:** Standard 09:00 AM IST check-in and 08:00 AM IST check-out.

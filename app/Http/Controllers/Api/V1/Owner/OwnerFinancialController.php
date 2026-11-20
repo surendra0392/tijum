@@ -265,6 +265,8 @@ class OwnerFinancialController extends ApiController
                 'status_label' => $a->status->label(),
                 'effective_from' => $a->effective_from->toDateString(),
                 'effective_until' => $a->effective_until?->toDateString(),
+                'terms_hash' => $a->terms_hash,
+                'accepted_by_owner_id' => $a->accepted_by_owner_id,
                 'accepted_at' => $a->accepted_at?->toIso8601String(),
                 'is_pending_acceptance' => $a->status === CommissionAgreementStatus::PendingAcceptance,
                 'is_active' => $a->status === CommissionAgreementStatus::Active,
@@ -294,7 +296,12 @@ class OwnerFinancialController extends ApiController
         }
 
         try {
-            $accepted = $action->execute($agreement, $owner);
+            $accepted = $action->execute(
+                $agreement,
+                $owner,
+                $request->ip(),
+                $request->userAgent(),
+            );
         } catch (ValidationException $e) {
             return $this->error($e->getMessage(), 'VALIDATION_ERROR', 422, $e->errors());
         }
@@ -303,6 +310,8 @@ class OwnerFinancialController extends ApiController
             'id' => $accepted->id,
             'agreement_reference' => $accepted->agreement_reference,
             'status' => $accepted->status->value,
+            'terms_hash' => $accepted->terms_hash,
+            'accepted_by_owner_id' => $accepted->accepted_by_owner_id,
             'accepted_at' => $accepted->accepted_at?->toIso8601String(),
         ], 'Commercial agreement terms accepted successfully.');
     }

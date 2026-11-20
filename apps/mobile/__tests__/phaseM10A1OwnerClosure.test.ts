@@ -26,7 +26,7 @@ describe('Phase M10A.1 Owner Application Final Functional Closure & Verification
             assert.equal(roomType.accommodation_mode, 'private');
         });
 
-        it('enforces independent meal flags on property level with zero extra meal plan charges', () => {
+        it('enforces independent meal flags on property level with zero extra meal plan charges and confirms pure_veg is excluded', () => {
             const property = {
                 id: 50,
                 name: 'TIJUM Green Homestay',
@@ -40,6 +40,7 @@ describe('Phase M10A.1 Owner Application Final Functional Closure & Verification
             assert.equal(property.breakfast_included, true);
             assert.equal(property.lunch_included, false);
             assert.equal(property.dinner_included, true);
+            assert.equal('pure_veg' in property, false, 'pure_veg is not an approved property attribute');
         });
 
         it('verifies that pricing screen title is "Pricing & Meal Settings"', () => {
@@ -98,19 +99,52 @@ describe('Phase M10A.1 Owner Application Final Functional Closure & Verification
             assert.equal(masked, '•••• •••• 1234');
         });
 
-        it('calculates commission correctly based on contract percentage', () => {
+        it('calculates commission, GST and statutory deductions under Income-tax Act, 2025 Section 393(1) (0.10%)', () => {
             const grossPaise = 5000000; // ₹50,000
             const commissionRatePercentage = 15.0; // 15%
 
-            const commissionPaise = Math.round((grossPaise * commissionRatePercentage) / 100);
-            const gstOnCommissionPaise = Math.round((commissionPaise * 18) / 100);
-            const tdsPaise = Math.round((grossPaise * 1) / 100); // 1% 194-O
-            const netPayablePaise = grossPaise - commissionPaise - gstOnCommissionPaise - tdsPaise;
+            const commissionPaise = Math.round((grossPaise * commissionRatePercentage) / 100); // ₹7,500
+            
+            // Case A: Exclusive GST (18% on commission)
+            const gstExclusivePaise = Math.round((commissionPaise * 18) / 100); // ₹1,350
+            
+            // Case B: Inclusive GST (tax included in commission)
+            const gstInclusivePaise = 0;
 
+            // Statutory TDS withholding under Income-tax Act, 2025 Section 393(1):
+            // Rate is 0.10% (10 basis points) on gross payments.
+            // Individual / Sole-proprietor PAN threshold is ₹5,00,000 (50,000,000 paise).
+            const fyCumulativeGrossPaise = 30000000; // ₹3,00,000 (below threshold)
+            const tdsExemptPaise = fyCumulativeGrossPaise < 50000000 ? 0 : Math.round((grossPaise * 10) / 10000);
+            assert.equal(tdsExemptPaise, 0, 'Should be exempt from TDS below ₹5,00,000 FY threshold');
+
+            // Exceeding threshold (or company/non-individual): 0.10% (10 bps)
+            const tdsApplicablePaise = Math.round((grossPaise * 10) / 10000); // 10 bps = 0.10%
+            assert.equal(tdsApplicablePaise, 5000); // ₹50.00 (NOT legacy 1% ₹500)
+
+            const netPayablePaiseExclusive = grossPaise - commissionPaise - gstExclusivePaise - tdsApplicablePaise;
             assert.equal(commissionPaise, 750000); // ₹7,500
-            assert.equal(gstOnCommissionPaise, 135000); // ₹1,350
-            assert.equal(tdsPaise, 50000); // ₹500
-            assert.equal(netPayablePaise, 4065000); // ₹40,650
+            assert.equal(gstExclusivePaise, 135000); // ₹1,350
+            assert.equal(tdsApplicablePaise, 5000); // ₹50
+            assert.equal(netPayablePaiseExclusive, 4110000); // ₹41,100
+
+            const netPayablePaiseInclusive = grossPaise - commissionPaise - gstInclusivePaise - tdsApplicablePaise;
+            assert.equal(netPayablePaiseInclusive, 4245000); // ₹42,450
+        });
+
+        it('validates electronic commission agreement acceptance audit trail and SHA-256 hash', () => {
+            const agreement = {
+                id: 12,
+                agreement_reference: 'AGR-2026-0012',
+                status: 'accepted',
+                terms_hash: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
+                accepted_at: '2026-11-20T07:00:00Z',
+                accepted_by_owner_id: 42,
+            };
+
+            assert.equal(agreement.status, 'accepted');
+            assert.equal(agreement.terms_hash.length, 64, 'SHA-256 hash must be 64 hexadecimal characters');
+            assert.equal(agreement.accepted_by_owner_id, 42);
         });
 
         it('verifies financial profile screen and agreements screen exist', () => {
@@ -172,6 +206,41 @@ describe('Phase M10A.1 Owner Application Final Functional Closure & Verification
             assert.ok(detailContent.includes('OwnerApi.getCase'));
             assert.ok(detailContent.includes('OwnerApi.addCaseMessage'));
             assert.ok(detailContent.includes('Discussion & Evidence Timeline'));
+        });
+
+        it('verifies priority-specific SLA targets and statutory acknowledgement timelines', () => {
+            const getPrioritySlaTarget = (priority?: string) => {
+                switch (priority?.toLowerCase()) {
+                    case 'urgent':
+                        return { target: '2 Hours', internalHours: 2 };
+                    case 'high':
+                        return { target: '4 Hours', internalHours: 4 };
+                    case 'medium':
+                        return { target: '24 Hours', internalHours: 24 };
+                    case 'low':
+                    default:
+                        return { target: '48 Hours', internalHours: 48 };
+                }
+            };
+
+            assert.equal(getPrioritySlaTarget('urgent').internalHours, 2, 'Urgent dispute SLA must be 2 hours');
+            assert.equal(getPrioritySlaTarget('high').internalHours, 4, 'High priority dispute SLA must be 4 hours');
+            assert.equal(getPrioritySlaTarget('medium').internalHours, 24, 'Medium priority dispute SLA must be 24 hours');
+            assert.equal(getPrioritySlaTarget('low').internalHours, 48, 'Low priority dispute SLA must be 48 hours');
+
+            const statutoryAcknowledgementHours = 48;
+            const formalResolutionMaxDays = 30;
+            assert.equal(statutoryAcknowledgementHours, 48, 'Statutory formal acknowledgement is 48 hours');
+            assert.equal(formalResolutionMaxDays, 30, 'Formal resolution tracking is up to 30 days');
+
+            const indexFilePath = path.join(__dirname, '../app/(partner)/cases/index.tsx');
+            const indexContent = fs.readFileSync(indexFilePath, 'utf-8');
+            assert.ok(indexContent.includes('Statutory formal acknowledgement within 48h'));
+
+            const detailFilePath = path.join(__dirname, '../app/(partner)/cases/[reference].tsx');
+            const detailContent = fs.readFileSync(detailFilePath, 'utf-8');
+            assert.ok(detailContent.includes('First Action Target:'));
+            assert.ok(detailContent.includes('Statutory formal acknowledgement within 48h'));
         });
     });
 

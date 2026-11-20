@@ -13,8 +13,12 @@ use Illuminate\Validation\ValidationException;
 
 class AcceptCommissionAgreement
 {
-    public function execute(PartnerCommissionAgreement $agreement, Owner $owner): PartnerCommissionAgreement
-    {
+    public function execute(
+        PartnerCommissionAgreement $agreement,
+        Owner $owner,
+        ?string $ip = null,
+        ?string $userAgent = null,
+    ): PartnerCommissionAgreement {
         if ($agreement->owner_id !== $owner->id) {
             throw ValidationException::withMessages([
                 'agreement' => 'You are not authorised to accept this commission agreement.',
@@ -27,8 +31,9 @@ class AcceptCommissionAgreement
             ]);
         }
 
-        return DB::transaction(function () use ($agreement, $owner): PartnerCommissionAgreement {
+        return DB::transaction(function () use ($agreement, $owner, $ip, $userAgent): PartnerCommissionAgreement {
             $now = CarbonImmutable::now();
+            $termsHash = $agreement->generateTermsHash();
 
             // Supersede existing active agreements for same scope
             PartnerCommissionAgreement::query()
@@ -41,11 +46,23 @@ class AcceptCommissionAgreement
                     'effective_until' => $agreement->effective_from->subDay(),
                 ]);
 
+            $auditNote = sprintf(
+                'Electronically accepted by Owner #%d at %s [IP: %s, UA: %s, SHA256: %s]',
+                $owner->id,
+                $now->toIso8601String(),
+                $ip ?? 'N/A',
+                $userAgent ?? 'N/A',
+                $termsHash,
+            );
+
+            $existingNotes = $agreement->admin_notes ? $agreement->admin_notes."\n" : '';
+
             $agreement->forceFill([
                 'status' => CommissionAgreementStatus::Active,
                 'accepted_by_owner_id' => $owner->id,
                 'accepted_at' => $now,
-                'terms_hash' => $agreement->generateTermsHash(),
+                'terms_hash' => $termsHash,
+                'admin_notes' => $existingNotes.$auditNote,
             ])->save();
 
             return $agreement;

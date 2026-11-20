@@ -36,15 +36,13 @@ const payload = {
     breakfast_included: breakfastIncluded,
     lunch_included: lunchIncluded,
     dinner_included: dinnerIncluded,
-    pure_veg: isPureVeg,
 };
 ```
 
 ### 1.3 Independent Meal Configuration
-Meal flags are managed directly on the property level as independent booleans. They represent inclusions, not extra billable add-ons:
+Meal flags are managed directly on the property level as canonical independent booleans conforming to the database schema. They represent inclusions, not extra billable add-ons:
 - `food_provided`: Master switch for meal service.
 - `breakfast_included`, `lunch_included`, `dinner_included`: Specific meal inclusions.
-- `pure_veg`: Pure vegetarian kitchen certification.
 
 Zero surcharge is added to guest quotes for meals when flags are enabled.
 

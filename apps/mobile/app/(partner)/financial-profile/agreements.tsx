@@ -191,13 +191,24 @@ export default function CommissionAgreementsScreen() {
                                         </View>
 
                                         {agreement.accepted_at ? (
-                                            <View style={styles.detailRow}>
-                                                <CheckCircle2 size={14} color={Colors.success} />
-                                                <Text style={styles.detailLabel}>Accepted At:</Text>
-                                                <Text style={[styles.detailValue, { color: Colors.success, fontWeight: '700' }]}>
-                                                    {agreement.accepted_at}
-                                                </Text>
-                                            </View>
+                                            <>
+                                                <View style={styles.detailRow}>
+                                                    <CheckCircle2 size={14} color={Colors.success} />
+                                                    <Text style={styles.detailLabel}>Accepted At:</Text>
+                                                    <Text style={[styles.detailValue, { color: Colors.success, fontWeight: '700' }]}>
+                                                        {agreement.accepted_at}
+                                                    </Text>
+                                                </View>
+                                                {agreement.terms_hash ? (
+                                                    <View style={styles.detailRow}>
+                                                        <Shield size={14} color={Colors.primary} />
+                                                        <Text style={styles.detailLabel}>SHA-256 Hash:</Text>
+                                                        <Text style={[styles.detailValue, { fontSize: 11 }]} numberOfLines={1}>
+                                                            {agreement.terms_hash.slice(0, 16)}...
+                                                        </Text>
+                                                    </View>
+                                                ) : null}
+                                            </>
                                         ) : (
                                             <View style={styles.detailRow}>
                                                 <AlertCircle size={14} color={Colors.warning} />

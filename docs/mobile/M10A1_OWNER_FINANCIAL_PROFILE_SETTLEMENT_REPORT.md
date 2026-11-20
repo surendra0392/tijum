@@ -55,7 +55,13 @@ In compliance with Phase 15 contractual compliance standards:
   - GST treatment: Exclusive of GST (18% GST applies to platform fee).
   - Terms version (e.g., `TIJUM-HOST-AGR-V2`).
   - Effective dates and signature timestamps.
-- **Electronic Acceptance:** Unaccepted agreements display a prominent "Review & Sign Agreement" CTA. Tapping opens a confirmation dialog stating legal terms; confirming calls `POST /api/v1/owner/commission-agreements/{id}/accept`, which records the host ID, IP address, and timestamp, instantly transitioning the agreement to `ACTIVE`.
+- **Electronic Acceptance:** Unaccepted agreements display a prominent "Review & Sign Agreement" CTA. Tapping opens a confirmation dialog stating legal terms; confirming calls `POST /api/v1/owner/commission-agreements/{id}/accept`, which records:
+  - Agreement ID
+  - SHA-256 terms hash (`terms_hash`)
+  - Authenticated Owner ID (`accepted_by_owner_id`)
+  - Acceptance timestamp (`accepted_at`)
+  - Server-recorded IP address and User Agent
+  - Cryptographic audit trail logging in `admin_notes`
 
 ---
 
@@ -67,10 +73,15 @@ Previous releases only showed total payout numbers. Phase M10A.1 delivers an ite
 For every settlement period (weekly batch):
 $$\text{Gross Booking Value}$$
 $$- \quad \text{TIJUM Platform Commission (e.g. 15\%)}$$
-$$- \quad \text{GST on Commission (18\% on Commission)}$$
-$$- \quad \text{TDS / Statutory Deduction (Section 194-O, 1\% on Gross)}$$
+$$- \quad \text{GST on Commission (Exclusive: 18\% / Inclusive: ₹0.00 Included in Fee)}$$
+$$- \quad \text{TDS / Statutory Deduction (Income-tax Act, 2025 Section 393(1), 0.10\% / Exempt if < ₹5L)}$$
 $$- \quad \text{Refund / Relocation Adjustments (if any)}$$
 $$= \quad \mathbf{\text{Net Settlement Payout}}$$
+
+- **Dynamic Tax Rendering:** Mobile UI renders backend-calculated line items directly without client-side hardcoding of 18% GST or legacy 194-O rates:
+  - When `commission_tax_amount_minor === 0`, displays `GST on Commission (Inclusive)`.
+  - When `statutory_deductions_minor === 0`, displays `TDS Withholding (Sec 393) - ₹0.00 (Exempt)`.
+  - When statutory deductions apply, displays dynamic `TDS Withholding (Sec 393)` at 0.10% (10 bps).
 
 ### 4.2 Banking Transfer & UTR Tracking
 - Displays Provider Transfer ID / Bank UTR number (e.g., `UTR202611200049281`).

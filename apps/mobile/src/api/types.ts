@@ -794,6 +794,7 @@ export interface OwnerFinancialProfile {
 
 export interface OwnerCommissionAgreement {
     id: number;
+    agreement_reference?: string;
     commission_rate_percentage: number;
     base_type: string;
     gst_treatment: string;
@@ -801,6 +802,8 @@ export interface OwnerCommissionAgreement {
     effective_from: string;
     effective_to?: string | null;
     status: string;
+    terms_hash?: string | null;
+    accepted_by_owner_id?: number | null;
     accepted_at?: string | null;
 }
 

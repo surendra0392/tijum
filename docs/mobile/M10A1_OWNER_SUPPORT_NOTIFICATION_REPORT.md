@@ -18,14 +18,19 @@ To comply with the Consumer Protection (E-Commerce) Rules and Phase 14 platform 
   - `Under Review`: Cases currently evaluated by the TIJUM Customer Protection team.
   - `Resolved`: Cases successfully resolved with guest agreement or mediated settlement.
   - `All Cases`: Complete grievance history.
-- **24-Hour SLA Warning Banner:** When cases in `action_required` exist, an alert banner highlights:
-  > "Case requires your response within 24 hours to prevent automatic guest refund."
-- **Priority Badging:** Cases carry priority tags: `URGENT` (Red), `HIGH` (Red), `MEDIUM` (Amber), `LOW` (Neutral).
+- **Priority-Specific SLA Dynamic Alert Banner:** When cases in `action_required` exist, the alert banner dynamically reflects the highest urgency level:
+  - **Urgent Cases:** First-action response target within **2 hours** (immediate host action required).
+  - **High Priority Cases:** First-action response target within **4 hours**.
+  - **Medium Priority Cases:** First-action response target within **24 hours**.
+  - **Low / Standard Inquiries:** First-action response target within **48 hours**.
+  - **Statutory Timelines:** Displays statutory formal acknowledgement commitment within 48 hours and formal resolution tracking up to 30 days pursuant to the Consumer Protection (E-Commerce) Rules.
+- **Priority Badging & SLA Tag:** Every case card in the list displays priority badges (`URGENT`, `HIGH`, `MEDIUM`, `LOW`) accompanied by the specific first-action SLA target.
 - **Search:** Search across case references (e.g. `CASE-2026-0812`), booking references, or guest names.
 
 ### 1.2 Case Timeline & Message Thread (`(partner)/cases/[reference].tsx`)
 The case detail screen displays complete context:
 - **Case Summary:** Issue title, category (Cleanliness, Amenities Mismatch, Check-in Refusal, Safety Issue), property name, booking reference, and stay dates.
+- **SLA & Statutory Commitment Card:** Highlights the case's priority-specific first action target (Urgent: 2h, High: 4h, Medium: 24h, Low: 48h) and formal statutory milestones (48h acknowledgement, 30 days resolution tracking).
 - **Chronological Discussion Thread:** Messages displayed sequentially with distinct visual styling:
   - **Host Messages (You):** Deep plum tinted bubbles aligned right, tagged with `HOST`.
   - **Guest Messages:** Neutral card bubbles aligned left, tagged with `GUEST`.

@@ -166,16 +166,22 @@ export default function SettlementDetailScreen() {
                         </View>
 
                         <View style={styles.calcRow}>
-                            <Text style={styles.calcLabel}>GST on Commission (18%)</Text>
-                            <Text style={[styles.calcValue, { color: Colors.error }]}>
-                                - ₹{((statement.commission_tax_amount_minor || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            <Text style={styles.calcLabel}>
+                                GST on Commission{statement.commission_tax_amount_minor === 0 ? ' (Inclusive)' : ''}
+                            </Text>
+                            <Text style={[styles.calcValue, (statement.commission_tax_amount_minor || 0) > 0 && { color: Colors.error }]}>
+                                {(statement.commission_tax_amount_minor || 0) > 0
+                                    ? `- ₹${((statement.commission_tax_amount_minor || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                                    : '₹0.00 (Included)'}
                             </Text>
                         </View>
 
                         <View style={styles.calcRow}>
-                            <Text style={styles.calcLabel}>TDS / Statutory Deduction (194-O)</Text>
-                            <Text style={[styles.calcValue, { color: Colors.error }]}>
-                                - ₹{((statement.statutory_deductions_minor || statement.tds_amount_minor || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            <Text style={styles.calcLabel}>TDS Withholding (Sec 393)</Text>
+                            <Text style={[styles.calcValue, (statement.statutory_deductions_minor || statement.tds_amount_minor || 0) > 0 && { color: Colors.error }]}>
+                                {(statement.statutory_deductions_minor || statement.tds_amount_minor || 0) > 0
+                                    ? `- ₹${(((statement.statutory_deductions_minor || statement.tds_amount_minor || 0)) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                                    : '₹0.00 (Exempt)'}
                             </Text>
                         </View>
 

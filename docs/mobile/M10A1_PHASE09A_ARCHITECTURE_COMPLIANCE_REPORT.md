@@ -49,12 +49,11 @@ In accordance with Phase 09A, room rates exist as first-class attributes directl
 
 ## 4. Independent Property Meal Configuration
 
-Meal provisions are decoupled from pricing and reside directly on the `properties` table as independent operational flags:
+Meal provisions are decoupled from pricing and reside directly on the `properties` table as four canonical independent operational flags:
 - `food_provided` (Boolean): Indicates whether the accommodation provides meals.
 - `breakfast_included` (Boolean): Breakfast service included in stay rent.
 - `lunch_included` (Boolean): Lunch service included in stay rent.
 - `dinner_included` (Boolean): Dinner service included in stay rent.
-- `pure_veg` (Boolean): Entire facility operates as pure vegetarian.
 
 These switches represent inclusions, not billable add-ons. Guests are never charged separate meal fees during booking checkout.
 

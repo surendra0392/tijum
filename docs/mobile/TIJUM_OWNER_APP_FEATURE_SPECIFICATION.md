@@ -117,7 +117,7 @@ The Partner Mobile Application empowers accommodation hosts across Andhra Prades
   - Settlement payout batches list with status chips (Processing, Settled, Failed).
   - Tapping any settlement card navigates directly to the itemized statement breakdown.
 - **Settlement Statement Breakdown (`(partner)/settlements/[reference].tsx`):**
-  - Period dates, gross booking value, commission amount, GST on commission (18%), TDS deduction (1% 194-O), and net payout.
+  - Period dates, gross booking value, commission amount, GST on commission (inclusive/exclusive), statutory TDS withholding (Income-tax Act, 2025 Section 393(1) at 0.10% / ₹5L FY threshold exemption), and net payout.
   - Provider transfer ID / UTR tracking number.
   - Itemized reservation line items with stay dates, guest names, gross values, commission deductions, and net payable.
 
