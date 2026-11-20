@@ -263,7 +263,7 @@ export default function CustomerCaseDetailScreen() {
                             <View style={styles.slaStatutoryRow}>
                                 <Shield size={14} color={Colors.gray500} />
                                 <Text style={styles.slaStatutoryText}>
-                                    Statutory formal acknowledgement within 48h • Resolution tracking up to 30 days
+                                    Statutory formal acknowledgement within 48h • Formal resolution deadline: {caseData.sla_due_at ? new Date(caseData.sla_due_at).toLocaleDateString() : '30 days from filing'}
                                 </Text>
                             </View>
                         </View>

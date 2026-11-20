@@ -186,6 +186,7 @@ export const CustomerApi = {
     updateNotificationPreferences: (data: {
         in_app_operational?: boolean;
         email_operational?: boolean;
+        push_operational?: boolean;
         sms_operational?: boolean;
         whatsapp_opted_in?: boolean;
     }) =>

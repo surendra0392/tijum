@@ -134,6 +134,7 @@ class CustomerNotificationController extends ApiController
         $validated = $request->validate([
             'in_app_operational' => ['nullable', 'boolean'],
             'email_operational' => ['nullable', 'boolean'],
+            'push_operational' => ['nullable', 'boolean'],
             'sms_operational' => ['nullable', 'boolean'],
             'whatsapp_opted_in' => ['nullable', 'boolean'],
         ]);

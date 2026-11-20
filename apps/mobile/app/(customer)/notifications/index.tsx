@@ -34,9 +34,23 @@ export default function CustomerNotificationsScreen() {
     const [prefLoading, setPrefLoading] = useState(false);
     const [prefSaving, setPrefSaving] = useState(false);
     const [inAppActive, setInAppActive] = useState(true);
-    const [emailActive, setEmailActive] = useState(false);
+    const [emailActive, setEmailActive] = useState(true);
+    const [pushActive, setPushActive] = useState(true);
     const [smsActive, setSmsActive] = useState(false);
     const [whatsappActive, setWhatsappActive] = useState(false);
+    const [channelsAvailable, setChannelsAvailable] = useState<{
+        in_app: boolean;
+        email: boolean;
+        push: boolean;
+        sms: boolean;
+        whatsapp: boolean;
+    }>({
+        in_app: true,
+        email: true,
+        push: true,
+        sms: false,
+        whatsapp: false,
+    });
 
     useEffect(() => {
         loadNotifications();
@@ -130,12 +144,16 @@ export default function CustomerNotificationsScreen() {
         setPrefLoading(true);
         try {
             const res = await CustomerApi.getNotificationPreferences();
-            if (res.data?.preferences) {
-                const prefs = res.data.preferences;
-                setInAppActive(Boolean(prefs.in_app_operational));
-                setEmailActive(Boolean(prefs.email_operational));
-                setSmsActive(Boolean(prefs.sms_operational));
-                setWhatsappActive(Boolean(prefs.whatsapp_opted_in));
+            const prefs = res.data?.preferences || res.data;
+            if (prefs) {
+                setInAppActive(Boolean(prefs.in_app_operational ?? true));
+                setEmailActive(Boolean(prefs.email_operational ?? true));
+                setPushActive(Boolean(prefs.push_operational ?? true));
+                setSmsActive(Boolean(prefs.sms_operational ?? false));
+                setWhatsappActive(Boolean(prefs.whatsapp_opted_in ?? false));
+                if (prefs.channels_available) {
+                    setChannelsAvailable(prefs.channels_available);
+                }
             }
         } catch (e: any) {
             Alert.alert('Notice', 'Using local channel settings.');
@@ -150,6 +168,7 @@ export default function CustomerNotificationsScreen() {
             await CustomerApi.updateNotificationPreferences({
                 in_app_operational: inAppActive,
                 email_operational: emailActive,
+                push_operational: pushActive,
                 sms_operational: smsActive,
                 whatsapp_opted_in: whatsappActive,
             });
@@ -302,18 +321,44 @@ export default function CustomerNotificationsScreen() {
                                     <View style={{ flex: 1 }}>
                                         <View style={styles.channelTitleRow}>
                                             <Text style={styles.channelName}>Email Delivery</Text>
-                                            <Badge label="INACTIVE" variant="neutral" />
+                                            <Badge
+                                                label={channelsAvailable.email ? 'ACTIVE' : 'INACTIVE'}
+                                                variant={channelsAvailable.email ? 'accent' : 'neutral'}
+                                            />
                                         </View>
                                         <Text style={styles.channelDesc}>
-                                            Platform transactional email is currently inactive per system configuration.
+                                            Transactional booking confirmations, invoices, and grievance updates sent to your registered email.
                                         </Text>
                                     </View>
                                     <Switch
                                         value={emailActive}
                                         onValueChange={setEmailActive}
-                                        disabled={true}
+                                        disabled={!channelsAvailable.email}
                                         trackColor={{ false: Colors.gray200, true: Colors.coral }}
-                                        thumbColor={Colors.gray400}
+                                        thumbColor={Colors.white}
+                                    />
+                                </View>
+
+                                {/* Mobile Push Channel */}
+                                <View style={styles.channelRow}>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={styles.channelTitleRow}>
+                                            <Text style={styles.channelName}>Mobile Push</Text>
+                                            <Badge
+                                                label={channelsAvailable.push ? 'ACTIVE' : 'INACTIVE'}
+                                                variant={channelsAvailable.push ? 'accent' : 'neutral'}
+                                            />
+                                        </View>
+                                        <Text style={styles.channelDesc}>
+                                            Instant push notifications for check-in reminders, status alerts, and important updates via Expo Push.
+                                        </Text>
+                                    </View>
+                                    <Switch
+                                        value={pushActive}
+                                        onValueChange={setPushActive}
+                                        disabled={!channelsAvailable.push}
+                                        trackColor={{ false: Colors.gray200, true: Colors.coral }}
+                                        thumbColor={Colors.white}
                                     />
                                 </View>
 

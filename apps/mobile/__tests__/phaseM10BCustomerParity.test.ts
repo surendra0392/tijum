@@ -149,8 +149,12 @@ describe('Phase M10B Customer Mobile Application & API Parity Specification', ()
                 'Must persist updated channel preferences',
             );
             assert.ok(
-                source.includes('Platform transactional email is currently inactive'),
-                'Must truthfully disclose inactive email channel status',
+                source.includes('Transactional booking confirmations, invoices, and grievance updates sent to your registered email'),
+                'Must truthfully disclose active email channel status',
+            );
+            assert.ok(
+                source.includes('Instant push notifications for check-in reminders, status alerts, and important updates via Expo Push'),
+                'Must truthfully disclose active push channel status',
             );
             assert.ok(
                 source.includes('SMS gateway is currently disabled'),
@@ -159,6 +163,27 @@ describe('Phase M10B Customer Mobile Application & API Parity Specification', ()
             assert.ok(
                 source.includes('WhatsApp channel is currently disabled'),
                 'Must truthfully disclose disabled WhatsApp channel',
+            );
+        });
+
+        it('verifies customer protection screen displays authoritative statutory SLA resolution deadline', () => {
+            const supportPath = path.resolve(
+                __dirname,
+                '../app/(customer)/support/[reference].tsx',
+            );
+            const source = fs.readFileSync(supportPath, 'utf8');
+
+            assert.ok(
+                source.includes('First Action Target:'),
+                'Must display internal priority first-action target',
+            );
+            assert.ok(
+                source.includes('Statutory formal acknowledgement within 48h'),
+                'Must disclose 48h statutory acknowledgement standard',
+            );
+            assert.ok(
+                source.includes('caseData.sla_due_at'),
+                'Must reference backend-authoritative sla_due_at for formal resolution deadline',
             );
         });
 

@@ -148,11 +148,13 @@ class NotificationPreferenceService
         return [
             'in_app_operational' => $prefs->get('in_app_operational_update')?->enabled ?? true,
             'email_operational' => $prefs->get('email_operational_update')?->enabled ?? true,
+            'push_operational' => $prefs->get('push_operational_update')?->enabled ?? true,
             'sms_operational' => $prefs->get('sms_operational_update')?->enabled ?? true,
             'whatsapp_opted_in' => $whatsappOptedIn,
             'channels_available' => [
                 'in_app' => (bool) config('tijum.notifications.channels.in_app.enabled', true),
-                'email' => (bool) config('tijum.notifications.channels.email.enabled', false),
+                'email' => (bool) config('tijum.notifications.channels.email.enabled', true),
+                'push' => (bool) config('tijum.notifications.channels.push.enabled', true),
                 'sms' => (bool) config('tijum.notifications.channels.sms.enabled', false),
                 'whatsapp' => (bool) config('tijum.notifications.channels.whatsapp.enabled', false),
             ],
@@ -174,6 +176,7 @@ class NotificationPreferenceService
         $channels = [
             'in_app' => NotificationChannel::InApp,
             'email' => NotificationChannel::Email,
+            'push' => NotificationChannel::Push,
             'sms' => NotificationChannel::Sms,
         ];
 
