@@ -329,6 +329,8 @@ class PhaseM10C1PolicyAndArtifactVerificationTest extends TestCase
      */
     public function test_property_search_filters_by_real_date_availability(): void
     {
+        $this->travelTo(CarbonImmutable::parse('2026-11-20 12:00:00', 'Asia/Kolkata'));
+
         $owner = $this->createActiveOwner(['email' => 'avail_owner@example.com']);
 
         // Property A: Fully available

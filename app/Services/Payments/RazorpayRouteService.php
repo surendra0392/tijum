@@ -19,11 +19,33 @@ class RazorpayRouteService
         private readonly string $keyId,
         private readonly string $keySecret,
         private readonly bool $routeEnabled,
+        private readonly bool $liveEnabled = false,
     ) {}
 
     public function isRouteEnabled(): bool
     {
         return $this->routeEnabled;
+    }
+
+    public function canTransfer(): bool
+    {
+        return $this->isRouteEnabled() && $this->credentialMode() !== null;
+    }
+
+    public function credentialMode(): ?string
+    {
+        $mode = $this->liveEnabled ? 'live' : 'test';
+
+        if (blank($this->keySecret)
+            || ! str_starts_with($this->keyId, "rzp_{$mode}_")
+            || strlen($this->keyId) <= strlen("rzp_{$mode}_")
+            || str_contains(strtolower($this->keyId), 'placeholder')
+            || str_contains(strtolower($this->keySecret), 'placeholder')
+            || (! $this->liveEnabled && app()->isProduction())) {
+            return null;
+        }
+
+        return $mode;
     }
 
     /**
@@ -106,22 +128,10 @@ class RazorpayRouteService
         string $paymentId,
         string $linkedAccountId,
         int $amountMinor,
-        string $idempotencyKey,
         array $notes = [],
     ): array {
-        if (! $this->routeEnabled || blank($this->keyId) || str_contains($this->keyId, 'placeholder')) {
-            $mockTransferId = 'trf_mock_'.strtolower(Str::random(14));
-
-            return [
-                'id' => $mockTransferId,
-                'entity' => 'transfer',
-                'status' => 'processed',
-                'amount' => $amountMinor,
-                'currency' => 'INR',
-                'recipient' => $linkedAccountId,
-                'payment_id' => $paymentId,
-                'settlement_status' => 'pending',
-            ];
+        if (! $this->canTransfer()) {
+            throw new RuntimeException('Razorpay Route is unavailable for transfers with the current configuration.');
         }
 
         $payload = [
@@ -135,27 +145,23 @@ class RazorpayRouteService
             ],
         ];
 
-        $response = $this->client()
-            ->withHeaders(['X-Razorpay-Idempotency-Key' => $idempotencyKey])
-            ->post(self::BASE_URL."/payments/{$paymentId}/transfers", $payload);
+        // Transfer creation from a payment has no documented idempotent replay.
+        $response = Http::withBasicAuth($this->keyId, $this->keySecret)
+            ->withoutRedirecting()
+            ->timeout(15)
+            ->post(self::BASE_URL.'/payments/'.rawurlencode($paymentId).'/transfers', $payload);
 
         if (! $response->successful()) {
-            $error = $response->json('error.description') ?? 'Failed to initiate Route transfer.';
-            throw new RuntimeException("Razorpay Route Transfer Error: {$error}");
+            throw new RuntimeException("Razorpay Route returned HTTP {$response->status()} for transfer creation.");
         }
 
-        /** @var array<string, mixed> $data */
-        $data = $response->json();
+        $items = $response->json('items');
 
-        // Response contains list of transfers; return the first transfer object
-        if (isset($data['items']) && is_array($data['items']) && count($data['items']) > 0) {
-            /** @var array<string, mixed> $first */
-            $first = $data['items'][0];
-
-            return $first;
+        if (! is_array($items) || count($items) !== 1 || ! is_array($items[0] ?? null)) {
+            throw new RuntimeException('Razorpay did not return exactly one transfer for the request.');
         }
 
-        return $data;
+        return $items[0];
     }
 
     /**
@@ -163,23 +169,37 @@ class RazorpayRouteService
      */
     public function fetchTransfer(string $transferId): array
     {
-        if (! $this->routeEnabled || blank($this->keyId) || str_contains($this->keyId, 'placeholder')) {
-            return [
-                'id' => $transferId,
-                'status' => 'processed',
-                'currency' => 'INR',
-            ];
+        return $this->fetchTransferData('/transfers/'.rawurlencode($transferId));
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function fetchPaymentTransfers(string $paymentId): array
+    {
+        $data = $this->fetchTransferData('/payments/'.rawurlencode($paymentId).'/transfers');
+        $items = $data['items'] ?? null;
+
+        if (! is_array($items) || ! array_is_list($items) || array_filter($items, 'is_array') !== $items) {
+            throw new RuntimeException('Razorpay did not return a transfer collection.');
         }
 
-        $response = $this->client()->get(self::BASE_URL."/transfers/{$transferId}");
+        return $items;
+    }
 
-        if (! $response->successful()) {
-            $error = $response->json('error.description') ?? 'Failed to fetch transfer details.';
-            throw new RuntimeException("Razorpay Route Transfer Fetch Error: {$error}");
+    /** @return array<string, mixed> */
+    private function fetchTransferData(string $path): array
+    {
+        if ($this->credentialMode() === null) {
+            throw new RuntimeException('Razorpay Route credentials are unavailable for reconciliation.');
         }
 
-        /** @var array<string, mixed> $data */
+        $response = $this->client()->withoutRedirecting()->get(self::BASE_URL.$path);
         $data = $response->json();
+
+        if (! $response->successful() || ! is_array($data)) {
+            throw new RuntimeException("Razorpay Route lookup failed with HTTP {$response->status()}.");
+        }
 
         return $data;
     }
@@ -224,8 +244,17 @@ class RazorpayRouteService
 
     private function client(): PendingRequest
     {
+        if (! $this->credentialsModeIsAllowed()) {
+            throw new RuntimeException('Live Razorpay credentials cannot be used while live payments are disabled.');
+        }
+
         return Http::withBasicAuth($this->keyId, $this->keySecret)
             ->timeout(15)
             ->retry(2, 200, throw: false);
+    }
+
+    private function credentialsModeIsAllowed(): bool
+    {
+        return $this->liveEnabled || ! str_starts_with($this->keyId, 'rzp_live_');
     }
 }

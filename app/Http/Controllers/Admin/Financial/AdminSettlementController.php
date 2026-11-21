@@ -221,7 +221,15 @@ class AdminSettlementController extends Controller
         /** @var Admin $admin */
         $admin = $request->user('admin');
 
-        $action->execute($settlement, $admin);
+        $result = $action->execute($settlement, $admin);
+
+        if ($result->status === SettlementStatus::Failed) {
+            return back()->withErrors(['settlement' => $result->failure_reason ?? 'Provider transfer failed.']);
+        }
+
+        if ($result->status === SettlementStatus::TransferPending) {
+            return back()->with('success', "Settlement {$settlement->settlement_reference} is awaiting provider confirmation.");
+        }
 
         return back()->with('success', "Settlement {$settlement->settlement_reference} provider transfer dispatched.");
     }

@@ -4,18 +4,17 @@ declare(strict_types=1);
 
 namespace App\Actions\Payments;
 
+use App\Actions\Financial\ReconcilePartnerTransfer;
 use App\Actions\Reservations\ReservationLifecycle;
 use App\Contracts\PaymentGateway;
 use App\Enums\PaymentStatus;
 use App\Enums\ProviderTransferStatus;
 use App\Enums\RefundStatus;
-use App\Enums\SettlementStatus;
 use App\Models\PaymentWebhookEvent;
 use App\Models\ProviderTransfer;
 use App\Models\ProviderTransferReversal;
 use App\Models\ReservationPayment;
 use App\Models\ReservationRefund;
-use App\Services\Financial\FinancialLedgerService;
 use App\Services\Notifications\NotificationDispatcher;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
@@ -26,6 +25,8 @@ use RuntimeException;
 
 class ProcessWebhookEvent
 {
+    public const ROUTE_TRANSFER_EVENTS = ['transfer.created', 'transfer.processed', 'transfer.failed'];
+
     public function __construct(
         private readonly PaymentGateway $gateway,
         private readonly ReservationLifecycle $lifecycle,
@@ -51,6 +52,19 @@ class ProcessWebhookEvent
 
         if ($eventId === '') {
             $eventId = 'evt_'.hash('sha256', $rawPayload);
+        }
+
+        if (in_array($eventType, self::ROUTE_TRANSFER_EVENTS, true)) {
+            $event = PaymentWebhookEvent::query()->firstOrCreate(
+                ['event_id' => $eventId],
+                ['gateway' => 'razorpay', 'event_type' => $eventType, 'payload' => $payload, 'status' => 'received'],
+            );
+
+            return [
+                'status' => $this->replayTransfer($event),
+                'event_id' => $eventId,
+                'event_type' => $eventType,
+            ];
         }
 
         // 2. Event deduplication
@@ -99,8 +113,6 @@ class ProcessWebhookEvent
                     'payment.failed' => $this->handlePaymentFailed($orderId, $paymentId, $payload),
                     'refund.processed' => $this->handleRefundProcessed($refundId, $payload),
                     'refund.failed' => $this->handleRefundFailed($refundId, $payload),
-                    'transfer.processed' => $this->handleTransferProcessed($payload),
-                    'transfer.failed' => $this->handleTransferFailed($payload),
                     'reversal.processed' => $this->handleReversalProcessed($payload),
                     default => null,
                 };
@@ -129,6 +141,35 @@ class ProcessWebhookEvent
             'event_id' => $eventId,
             'event_type' => $eventType,
         ];
+    }
+
+    public function replayTransfer(PaymentWebhookEvent $event): string
+    {
+        if ($event->gateway !== 'razorpay' || ! in_array($event->event_type, self::ROUTE_TRANSFER_EVENTS, true) || $event->status === 'processed') {
+            return 'ignored';
+        }
+
+        // Persist the signed event first. The provider read never holds a database lock.
+        $unprocessed = PaymentWebhookEvent::query()->whereKey($event->id)->where('status', '!=', 'processed');
+
+        try {
+            $transferId = data_get($event->payload, 'payload.transfer.entity.id');
+            $transfer = is_string($transferId) ? app(ReconcilePartnerTransfer::class)->byProviderId($transferId) : null;
+            $completed = $transfer !== null && ($event->event_type === 'transfer.created'
+                || in_array($transfer->status, [ProviderTransferStatus::Processed, ProviderTransferStatus::Failed, ProviderTransferStatus::Reversed], true));
+
+            $unprocessed->update([
+                'status' => $completed ? 'processed' : 'unresolved',
+                'processed_at' => $completed ? CarbonImmutable::now() : null,
+                'error_message' => $completed ? null : 'Waiting for a matching, authoritative Razorpay transfer state.',
+            ]);
+
+            return $completed ? 'success' : 'unresolved';
+        } catch (\Throwable $exception) {
+            $unprocessed->update(['status' => 'failed', 'processed_at' => null, 'error_message' => $exception->getMessage()]);
+
+            throw $exception;
+        }
     }
 
     /**
@@ -357,137 +398,6 @@ class ProcessWebhookEvent
             );
         } catch (\Throwable $e) {
             Log::warning('Failed to dispatch admin.refund_exception notification: '.$e->getMessage());
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function handleTransferProcessed(array $payload): void
-    {
-        $transferEntity = $payload['payload']['transfer']['entity'] ?? [];
-        $transferId = (string) ($transferEntity['id'] ?? '');
-        if ($transferId === '') {
-            return;
-        }
-
-        /** @var ProviderTransfer|null $transfer */
-        $transfer = ProviderTransfer::query()
-            ->where('gateway_transfer_id', $transferId)
-            ->lockForUpdate()
-            ->first();
-
-        if ($transfer === null) {
-            return;
-        }
-
-        $now = CarbonImmutable::now();
-        $transfer->forceFill([
-            'status' => ProviderTransferStatus::Processed->value,
-            'processed_at' => $now,
-            'raw_response' => array_merge((array) $transfer->raw_response, ['webhook' => $transferEntity]),
-        ])->save();
-
-        if ($transfer->settlement !== null) {
-            $transfer->settlement->forceFill([
-                'status' => SettlementStatus::Settled,
-                'settled_at' => $now,
-                'provider_status' => 'processed',
-            ])->save();
-        }
-
-        try {
-            app(FinancialLedgerService::class)->recordTransferCompleted($transfer);
-        } catch (\Throwable) {
-        }
-
-        $settlement = $transfer->settlement;
-        $owner = $settlement->owner;
-        if ($owner !== null) {
-            try {
-                $dispatcher = $this->notificationDispatcher ?? app(NotificationDispatcher::class);
-                $dispatcher->dispatch(
-                    eventType: 'partner.transfer_completed',
-                    recipients: $owner,
-                    variables: [
-                        'owner_name' => $owner->name,
-                        'amount' => '₹'.number_format($transfer->amount_minor / 100, 2),
-                        'settlement_reference' => $settlement->settlement_reference,
-                        'transfer_reference' => $transfer->gateway_transfer_id ?: ('TRF-'.$transfer->id),
-                        'completed_at' => ($transfer->processed_at ?? now())->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
-                        'action_url' => url("/owner/settlements/{$settlement->id}"),
-                    ],
-                    related: $settlement,
-                    relatedReference: $settlement->settlement_reference,
-                    idempotencySeed: 'transfer_processed_'.$transfer->id
-                );
-            } catch (\Throwable $e) {
-                Log::warning('Failed to dispatch partner.transfer_completed notification: '.$e->getMessage());
-            }
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function handleTransferFailed(array $payload): void
-    {
-        $transferEntity = $payload['payload']['transfer']['entity'] ?? [];
-        $transferId = (string) ($transferEntity['id'] ?? '');
-        if ($transferId === '') {
-            return;
-        }
-
-        /** @var ProviderTransfer|null $transfer */
-        $transfer = ProviderTransfer::query()
-            ->where('gateway_transfer_id', $transferId)
-            ->lockForUpdate()
-            ->first();
-
-        if ($transfer === null) {
-            return;
-        }
-
-        $errorCode = (string) ($transferEntity['error']['code'] ?? 'TRANSFER_FAILED');
-        $errorDescription = (string) ($transferEntity['error']['description'] ?? 'Provider transfer failed.');
-
-        $transfer->forceFill([
-            'status' => ProviderTransferStatus::Failed->value,
-            'error_code' => $errorCode,
-            'error_description' => $errorDescription,
-        ])->save();
-
-        if ($transfer->settlement !== null) {
-            $transfer->settlement->forceFill([
-                'status' => SettlementStatus::Failed,
-                'failure_reason' => $errorDescription,
-                'provider_status' => 'failed',
-            ])->save();
-        }
-
-        $transfer->loadMissing(['settlement.owner']);
-        $settlement = $transfer->settlement;
-        $owner = $settlement->owner;
-        if ($owner !== null) {
-            try {
-                $dispatcher = $this->notificationDispatcher ?? app(NotificationDispatcher::class);
-                $dispatcher->dispatch(
-                    eventType: 'partner.transfer_failed',
-                    recipients: $owner,
-                    variables: [
-                        'owner_name' => $owner->name,
-                        'amount' => '₹'.number_format($transfer->amount_minor / 100, 2),
-                        'settlement_reference' => $settlement->settlement_reference,
-                        'failure_reason' => Str::limit($errorDescription, 180),
-                        'action_url' => url("/owner/settlements/{$settlement->id}"),
-                    ],
-                    related: $settlement,
-                    relatedReference: $settlement->settlement_reference,
-                    idempotencySeed: 'transfer_failed_'.$transfer->id
-                );
-            } catch (\Throwable $e) {
-                Log::warning('Failed to dispatch partner.transfer_failed notification: '.$e->getMessage());
-            }
         }
     }
 

@@ -19,6 +19,8 @@ class ProviderTransfer extends Model
         'partner_settlement_id',
         'reservation_payment_id',
         'gateway',
+        'gateway_mode',
+        'gateway_payment_id',
         'gateway_transfer_id',
         'destination_account_id',
         'amount_minor',
@@ -47,6 +49,22 @@ class ProviderTransfer extends Model
             'processed_at' => 'datetime',
             'raw_response' => 'array',
         ];
+    }
+
+    public static function isRazorpayTransferId(mixed $transferId): bool
+    {
+        return is_string($transferId)
+            && preg_match('/^trf_[a-zA-Z0-9_]{1,60}$/D', $transferId) === 1
+            && ! str_starts_with($transferId, 'trf_mock_');
+    }
+
+    public function hasRouteProvenance(?string $mode): bool
+    {
+        return $mode !== null
+            && $this->gateway === 'razorpay'
+            && $this->gateway_mode === $mode
+            && filled($this->gateway_payment_id)
+            && ! str_starts_with($this->destination_account_id, 'acc_mock_');
     }
 
     /**
