@@ -17,6 +17,8 @@ use App\Models\PartnerSettlementItem;
 use App\Services\Financial\SettlementCalculationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -238,14 +240,32 @@ class AdminSettlementController extends Controller
         PartnerSettlement $settlement,
         Request $request,
     ): RedirectResponse {
+        /** @var Admin $admin */
+        $admin = $request->user('admin');
+        abort_unless($admin->hasPermission('settlements.manage'), 403);
+
         $validated = $request->validate([
             'reason' => ['required', 'string', 'max:500'],
         ]);
 
-        $settlement->forceFill([
-            'status' => SettlementStatus::OnHold,
-            'admin_notes' => trim(($settlement->admin_notes ?? '')."\nPlaced on hold: ".$validated['reason']),
-        ])->save();
+        DB::transaction(function () use ($settlement, $validated): void {
+            $lockedSettlement = PartnerSettlement::query()->lockForUpdate()->findOrFail($settlement->id);
+
+            if (! in_array($lockedSettlement->status, [SettlementStatus::Draft, SettlementStatus::PendingApproval, SettlementStatus::Approved], true)
+                || $lockedSettlement->transfer_initiated_at !== null
+                || $lockedSettlement->settled_at !== null
+                || filled($lockedSettlement->provider_transfer_id)
+                || $lockedSettlement->providerTransfers()->lockForUpdate()->first(['id']) !== null) {
+                throw ValidationException::withMessages([
+                    'settlement' => 'Only draft, awaiting approval, or approved settlements with no payout activity can be placed on hold.',
+                ]);
+            }
+
+            $lockedSettlement->forceFill([
+                'status' => SettlementStatus::OnHold,
+                'admin_notes' => trim(($lockedSettlement->admin_notes ?? '')."\nPlaced on hold: ".$validated['reason']),
+            ])->save();
+        }, 3);
 
         return back()->with('success', "Settlement {$settlement->settlement_reference} placed on hold.");
     }

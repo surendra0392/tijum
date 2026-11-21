@@ -14,6 +14,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\ReservationStatus;
 use App\Enums\SettlementItemType;
 use App\Enums\SettlementStatus;
+use App\Http\Controllers\Admin\Financial\AdminSettlementController;
 use App\Models\Admin;
 use App\Models\Owner;
 use App\Models\OwnerFinancialProfile;
@@ -25,6 +26,7 @@ use App\Models\ReservationPayment;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\Request;
+use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -258,13 +260,23 @@ class MySqlSettlementConcurrencyTest extends TestCase
         // Set short lock wait timeout on default connection
         DB::statement('SET SESSION innodb_lock_wait_timeout = 1');
 
-        $timedOut = false;
+        $releaseTimedOut = false;
+        $holdTimedOut = false;
+        $holdRequest = HttpRequest::create('/', 'POST', ['reason' => 'Finance review']);
+        $holdRequest->setUserResolver(fn (): Admin => $admin);
+
         try {
-            app(ReleasePartnerSettlement::class)->execute($settlement, $admin);
-        } catch (QueryException $e) {
-            if (str_contains($e->getMessage(), '1205')
-                || str_contains(strtolower($e->getMessage()), 'lock wait timeout')) {
-                $timedOut = true;
+            try {
+                app(ReleasePartnerSettlement::class)->execute($settlement, $admin);
+            } catch (QueryException $e) {
+                $releaseTimedOut = (int) ($e->errorInfo[1] ?? 0) === 1205;
+            }
+
+            try {
+                app(AdminSettlementController::class)->hold($settlement, $holdRequest);
+            } catch (QueryException $e) {
+                $holdTimedOut = (int) ($e->errorInfo[1] ?? 0) === 1205
+                    && str_contains(strtolower($e->getSql()), 'for update');
             }
         } finally {
             $lockConnection->rollBack();
@@ -272,7 +284,9 @@ class MySqlSettlementConcurrencyTest extends TestCase
             DB::statement('SET SESSION innodb_lock_wait_timeout = 50');
         }
 
-        $this->assertTrue($timedOut, 'Expected ReleasePartnerSettlement to wait and time out on InnoDB row lock.');
+        $this->assertTrue($releaseTimedOut, 'Expected release to wait on the InnoDB settlement row lock.');
+        $this->assertTrue($holdTimedOut, 'Expected hold to acquire the same InnoDB settlement row lock before validation.');
+        $this->assertSame(SettlementStatus::Approved, $settlement->fresh()->status);
     }
 
     /**
@@ -330,6 +344,9 @@ class MySqlSettlementConcurrencyTest extends TestCase
             try {
                 $this->assertSame('uncertain', DB::table('provider_transfers')
                     ->where('partner_settlement_id', $settlement->id)->value('status'));
+                $this->actingAs($admin, 'admin')
+                    ->post(route('admin.settlements.hold', $settlement), ['reason' => 'Concurrent finance request'])
+                    ->assertSessionHasErrors('settlement');
                 try {
                     app(ReleasePartnerSettlement::class)->execute($settlement, $admin);
                     $this->fail('A second connection must not dispatch an in-flight attempt.');

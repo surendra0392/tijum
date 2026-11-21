@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Financial;
 
+use App\Actions\Financial\ApprovePartnerSettlement;
 use App\Actions\Financial\ReleasePartnerSettlement;
 use App\Actions\Payments\ProcessWebhookEvent;
 use App\Enums\AdminRole;
@@ -774,6 +775,197 @@ class RazorpayRouteTransferTest extends TestCase
         $this->assertDatabaseCount('financial_ledger_entries', 0);
         $this->assertDatabaseHas('payment_webhook_events', ['event_id' => 'evt_sandbox', 'status' => 'unresolved']);
         Http::assertSentCount(1);
+    }
+
+    #[DataProvider('eligibleSettlementHolds')]
+    public function test_financial_admin_can_hold_a_pre_dispatch_settlement(AdminRole $role, SettlementStatus $status): void
+    {
+        [$admin, $settlement] = $this->setupApprovedSettlement();
+        $admin->update(['role' => $role]);
+        $settlement->update(['status' => $status]);
+
+        $this->actingAs($admin, 'admin')
+            ->post(route('admin.settlements.hold', $settlement), ['reason' => 'Finance review'])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(SettlementStatus::OnHold, $settlement->fresh()->status);
+        $this->assertStringContainsString('Finance review', $settlement->fresh()->admin_notes);
+        $this->post(route('admin.settlements.release', $settlement))->assertSessionHasErrors('settlement');
+        Http::assertNothingSent();
+    }
+
+    /** @return array<string, array{AdminRole, SettlementStatus}> */
+    public static function eligibleSettlementHolds(): array
+    {
+        return [
+            'Finance draft' => [AdminRole::Finance, SettlementStatus::Draft],
+            'Finance pending approval' => [AdminRole::Finance, SettlementStatus::PendingApproval],
+            'Finance approved' => [AdminRole::Finance, SettlementStatus::Approved],
+            'Super Admin approved' => [AdminRole::SuperAdmin, SettlementStatus::Approved],
+        ];
+    }
+
+    public function test_operations_cannot_hold_a_settlement(): void
+    {
+        [$admin, $settlement] = $this->setupApprovedSettlement();
+        $admin->update(['role' => AdminRole::Operations]);
+
+        $this->actingAs($admin, 'admin')
+            ->post(route('admin.settlements.hold', $settlement), ['reason' => 'Operations request'])
+            ->assertForbidden();
+
+        $this->assertSame(SettlementStatus::Approved, $settlement->fresh()->status);
+        Http::assertNothingSent();
+    }
+
+    public function test_approval_cannot_overwrite_a_hold_using_stale_settlement_state(): void
+    {
+        [$admin, $settlement] = $this->setupApprovedSettlement();
+        $settlement->update(['status' => SettlementStatus::Draft]);
+        $staleDraft = $settlement->fresh();
+
+        $this->actingAs($admin, 'admin')
+            ->post(route('admin.settlements.hold', $settlement), ['reason' => 'Finance review'])
+            ->assertSessionHasNoErrors();
+
+        $this->expectException(ValidationException::class);
+
+        try {
+            app(ApprovePartnerSettlement::class)->execute($staleDraft, $admin);
+        } finally {
+            $this->assertSame(SettlementStatus::OnHold, $settlement->fresh()->status);
+            $this->assertDatabaseCount('financial_ledger_entries', 0);
+        }
+    }
+
+    #[DataProvider('invalidSettlementHolds')]
+    public function test_finance_cannot_hold_terminal_settlements(SettlementStatus $status): void
+    {
+        [$admin, $settlement] = $this->setupApprovedSettlement();
+        $settlement->update(['status' => $status]);
+
+        $this->actingAs($admin, 'admin')
+            ->post(route('admin.settlements.hold', $settlement), ['reason' => 'Finance review'])
+            ->assertSessionHasErrors('settlement');
+
+        $this->assertSame($status, $settlement->fresh()->status);
+        Http::assertNothingSent();
+    }
+
+    /** @return array<string, array{SettlementStatus}> */
+    public static function invalidSettlementHolds(): array
+    {
+        return [
+            'settled' => [SettlementStatus::Settled],
+            'cancelled' => [SettlementStatus::Cancelled],
+            'reversed' => [SettlementStatus::Reversed],
+            'failed' => [SettlementStatus::Failed],
+        ];
+    }
+
+    public function test_pending_transfer_and_its_attempt_cannot_be_put_on_hold(): void
+    {
+        [$admin, $settlement] = $this->setupApprovedSettlement();
+        $this->fakeTransfer('trf_vizag_hold', status: 'pending');
+        app(ReleasePartnerSettlement::class)->execute($settlement, $admin);
+
+        $this->actingAs($admin, 'admin')
+            ->post(route('admin.settlements.hold', $settlement), ['reason' => 'Finance review'])
+            ->assertSessionHasErrors('settlement');
+        $this->assertSame(SettlementStatus::TransferPending, $settlement->fresh()->status);
+
+        $settlement->update(['status' => SettlementStatus::Approved, 'transfer_initiated_at' => null]);
+        $this->post(route('admin.settlements.hold', $settlement), ['reason' => 'Finance review'])
+            ->assertSessionHasErrors('settlement');
+        $this->assertSame(SettlementStatus::Approved, $settlement->fresh()->status);
+        $this->assertDatabaseHas('provider_transfers', ['gateway_transfer_id' => 'trf_vizag_hold', 'status' => 'pending']);
+        Http::assertSentCount(1);
+    }
+
+    public function test_callback_can_complete_a_historically_held_batch_without_duplicate_journals(): void
+    {
+        [$admin, $settlement, $payment] = $this->setupApprovedSettlement();
+        $this->fakeTransfer('trf_vizag_held', status: 'pending');
+        app(ReleasePartnerSettlement::class)->execute($settlement, $admin);
+        $settlement->update(['status' => SettlementStatus::OnHold]);
+
+        $this->sendTransferWebhook('transfer.processed', 'trf_vizag_held', 'evt_held');
+        $this->sendTransferWebhook('transfer.processed', 'trf_vizag_held', 'evt_held_again');
+
+        $this->assertSame(SettlementStatus::Settled, $settlement->fresh()->status);
+        $this->assertNotNull($settlement->fresh()->settled_at);
+        $this->assertSame(CommissionSnapshotStatus::Settled, $payment->reservation->fresh()->commission_status);
+        $this->assertDatabaseCount('financial_ledger_entries', 2);
+    }
+
+    public function test_hold_requested_during_completion_callback_is_rejected(): void
+    {
+        [$admin, $settlement] = $this->setupApprovedSettlement();
+        $this->fakeTransfer('trf_completing', status: 'pending');
+        app(ReleasePartnerSettlement::class)->execute($settlement, $admin);
+        $providerTransfer = $this->providerTransfers['trf_completing'];
+        unset($this->providerTransfers['trf_completing']);
+
+        Http::fake([
+            'https://api.razorpay.com/v1/transfers/trf_completing' => function () use ($admin, $settlement, $providerTransfer): PromiseInterface {
+                $this->actingAs($admin, 'admin')
+                    ->post(route('admin.settlements.hold', $settlement), ['reason' => 'Concurrent finance request'])
+                    ->assertSessionHasErrors('settlement');
+
+                return Http::response(array_replace($providerTransfer, ['transfer_status' => 'processed']));
+            },
+        ]);
+
+        $this->sendTransferWebhook('transfer.processed', 'trf_completing', 'evt_concurrent_hold', updateProviderState: false);
+
+        $this->assertSame(SettlementStatus::Settled, $settlement->fresh()->status);
+        $this->assertDatabaseCount('financial_ledger_entries', 2);
+    }
+
+    public function test_partially_paid_historical_hold_keeps_the_remaining_batch_on_hold(): void
+    {
+        [$admin, $settlement, $payment, $item] = $this->setupApprovedSettlement();
+        $this->addSecondPayableItem($settlement, $payment, $item);
+        Http::fake([
+            'https://api.razorpay.com/v1/payments/pay_vizag_001/transfers' => fn (Request $request) => $this->routeResponse($request, 'trf_held_first', 'pending'),
+            'https://api.razorpay.com/v1/payments/pay_vizag_002/transfers' => fn (Request $request) => $this->routeResponse($request, 'trf_held_second', 'pending'),
+        ]);
+        app(ReleasePartnerSettlement::class)->execute($settlement, $admin);
+        $settlement->update(['status' => SettlementStatus::OnHold]);
+
+        $this->sendTransferWebhook('transfer.processed', 'trf_held_first', 'evt_held_partial');
+        $this->sendTransferWebhook('transfer.processed', 'trf_held_first', 'evt_held_partial_again');
+
+        $settlement->refresh();
+        $this->assertSame(SettlementStatus::OnHold, $settlement->status);
+        $this->assertSame('partially_processed', $settlement->provider_status);
+        $this->assertNull($settlement->settled_at);
+        $this->assertSame(CommissionSnapshotStatus::SettlementPending, $payment->reservation->fresh()->commission_status);
+        $this->assertDatabaseCount('financial_ledger_entries', 2);
+        $this->assertDatabaseHas('provider_transfers', ['gateway_transfer_id' => 'trf_held_second', 'status' => 'pending']);
+        Http::assertSentCount(4);
+    }
+
+    public function test_reconciliation_repairs_a_paid_historical_hold_without_redispatching_or_reposting(): void
+    {
+        [$admin, $settlement, $payment] = $this->setupApprovedSettlement();
+        $this->fakeTransfer('trf_already_paid', status: 'pending');
+        app(ReleasePartnerSettlement::class)->execute($settlement, $admin);
+        $this->sendTransferWebhook('transfer.processed', 'trf_already_paid', 'evt_already_paid');
+        $processedAt = $settlement->providerTransfers()->sole()->processed_at;
+        $settlement->update(['status' => SettlementStatus::OnHold, 'settled_at' => null]);
+        $payment->reservation->update(['commission_status' => CommissionSnapshotStatus::SettlementPending]);
+
+        $this->artisan('tijum:reconcile-route-transfers')->assertSuccessful();
+        $this->artisan('tijum:reconcile-route-transfers')->assertSuccessful();
+
+        $settlement->refresh();
+        $this->assertSame(SettlementStatus::Settled, $settlement->status);
+        $this->assertEquals($processedAt, $settlement->settled_at);
+        $this->assertSame(CommissionSnapshotStatus::Settled, $payment->reservation->fresh()->commission_status);
+        $this->assertDatabaseCount('financial_ledger_entries', 2);
+        Http::assertSentCount(3);
     }
 
     private function routeResponse(Request $request, ?string $transferId, string $status = 'processed'): PromiseInterface

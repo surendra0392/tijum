@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Financial;
 
 use App\Enums\ProviderTransferStatus;
+use App\Enums\SettlementStatus;
 use App\Models\PartnerSettlement;
 use App\Models\ProviderTransfer;
 use App\Services\Financial\FinancialLedgerService;
@@ -111,6 +112,14 @@ class ReconcilePartnerTransfer
             }
 
             if (! in_array($transfer->status, [ProviderTransferStatus::Uncertain, ProviderTransferStatus::Pending], true)) {
+                if ($transfer->status === ProviderTransferStatus::Processed && $settlement->status === SettlementStatus::OnHold) {
+                    if ($status !== ProviderTransferStatus::Processed) {
+                        throw new RuntimeException('Razorpay no longer reports this held transfer as processed. Finance review is required.');
+                    }
+
+                    $this->updateTransferStatus->execute($settlement, CarbonImmutable::now(), $mode);
+                }
+
                 return $transfer;
             }
 

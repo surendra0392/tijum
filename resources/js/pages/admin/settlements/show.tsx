@@ -181,6 +181,8 @@ export default function AdminSettlementShow({ settlement }: Props) {
                     setHoldDialogOpen(false);
                     setHoldReason('');
                 },
+                onError: (errors) =>
+                    setHoldError(errors.settlement ?? errors.reason ?? null),
                 onFinish: () => setActionLoading(null),
             },
         );
@@ -265,25 +267,26 @@ export default function AdminSettlementShow({ settlement }: Props) {
                             </Button>
                         )}
 
-                        {settlement.status !== 'settled' &&
-                            settlement.status !== 'cancelled' && (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    loading={actionLoading === 'hold'}
-                                    onClick={() => {
-                                        setHoldError(null);
-                                        setHoldDialogOpen(true);
-                                    }}
-                                    className="border-status-warning-border text-status-warning-fg hover:bg-status-warning-bg"
-                                >
-                                    <PauseCircle
-                                        className="size-4"
-                                        aria-hidden="true"
-                                    />
-                                    <span>Place on Hold</span>
-                                </Button>
-                            )}
+                        {['draft', 'pending_approval', 'approved'].includes(
+                            settlement.status,
+                        ) && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                loading={actionLoading === 'hold'}
+                                onClick={() => {
+                                    setHoldError(null);
+                                    setHoldDialogOpen(true);
+                                }}
+                                className="border-status-warning-border text-status-warning-fg hover:bg-status-warning-bg"
+                            >
+                                <PauseCircle
+                                    className="size-4"
+                                    aria-hidden="true"
+                                />
+                                <span>Place on Hold</span>
+                            </Button>
+                        )}
                     </>
                 }
             />

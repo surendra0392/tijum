@@ -7,17 +7,19 @@ namespace App\Console\Commands;
 use App\Actions\Financial\ReconcilePartnerTransfer;
 use App\Actions\Payments\ProcessWebhookEvent;
 use App\Enums\ProviderTransferStatus;
+use App\Enums\SettlementStatus;
 use App\Models\PaymentWebhookEvent;
 use App\Models\ProviderTransfer;
 use App\Services\Payments\RazorpayRouteService;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
 use Throwable;
 
 class ReconcileRouteTransfers extends Command
 {
     protected $signature = 'tijum:reconcile-route-transfers';
 
-    protected $description = 'Recover transfer webhooks and reconcile pending Razorpay Route attempts without creating transfers.';
+    protected $description = 'Recover transfer webhooks and reconcile pending or held Razorpay Route attempts without creating transfers.';
 
     public function handle(
         RazorpayRouteService $routeService,
@@ -33,7 +35,13 @@ class ReconcileRouteTransfers extends Command
 
         $attempts = ProviderTransfer::query()->where('gateway', 'razorpay')
             ->where('gateway_mode', $mode)
-            ->whereIn('status', [ProviderTransferStatus::Uncertain, ProviderTransferStatus::Pending]);
+            ->where(function (Builder $query): void {
+                $query->whereIn('status', [ProviderTransferStatus::Uncertain, ProviderTransferStatus::Pending])
+                    ->orWhere(function (Builder $query): void {
+                        $query->where('status', ProviderTransferStatus::Processed)
+                            ->whereHas('settlement', fn (Builder $settlements) => $settlements->where('status', SettlementStatus::OnHold));
+                    });
+            });
 
         $unresolved = 0;
         foreach ($attempts->lazyById() as $attempt) {

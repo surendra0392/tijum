@@ -22,15 +22,15 @@ class ApprovePartnerSettlement
 
     public function execute(PartnerSettlement $settlement, Admin $admin): PartnerSettlement
     {
-        if (! in_array($settlement->status, [SettlementStatus::Draft, SettlementStatus::PendingApproval], true)) {
-            throw ValidationException::withMessages([
-                'settlement' => 'Only draft or pending-approval settlements can be approved.',
-            ]);
-        }
-
         $approved = DB::transaction(function () use ($settlement, $admin): PartnerSettlement {
             /** @var PartnerSettlement $locked */
             $locked = PartnerSettlement::query()->whereKey($settlement->id)->lockForUpdate()->firstOrFail();
+
+            if (! in_array($locked->status, [SettlementStatus::Draft, SettlementStatus::PendingApproval], true)) {
+                throw ValidationException::withMessages([
+                    'settlement' => 'Only draft or pending-approval settlements can be approved.',
+                ]);
+            }
 
             $now = CarbonImmutable::now();
 
