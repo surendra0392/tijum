@@ -35,7 +35,6 @@ import { Badge } from '../../../src/components/Badge';
 import { Button } from '../../../src/components/Button';
 import { Input } from '../../../src/components/Input';
 import { RazorpayService } from '../../../src/payments/RazorpayService';
-import { SHOWCASE_BOOKINGS } from '../../../src/data/showcaseData';
 
 export default function ReservationDetailScreen() {
     const { reference } = useLocalSearchParams<{ reference: string }>();
@@ -61,7 +60,7 @@ export default function ReservationDetailScreen() {
 
     useEffect(() => {
         if (reference) {
-            loadReservation();
+            void loadReservation();
         }
     }, [reference]);
 
@@ -74,7 +73,7 @@ export default function ReservationDetailScreen() {
             reservation.status === 'payment_pending';
 
         const deadlineStr =
-            (reservation as any).payment_deadline_at ||
+            reservation.payment_deadline_at ||
             reservation.payment_window_expires_at;
 
         if (isPayable && deadlineStr) {
@@ -92,7 +91,7 @@ export default function ReservationDetailScreen() {
                 setTimeLeft(remaining);
                 if (remaining <= 0) {
                     clearInterval(interval);
-                    loadReservation(); // refresh status (will be expired)
+                    void loadReservation(); // refresh status (will be expired)
                 }
             }, 1000);
 
@@ -110,16 +109,8 @@ export default function ReservationDetailScreen() {
                 setReservation(res.data);
                 return;
             }
+            setReservation(null);
         } catch (e: any) {
-            const fallback = SHOWCASE_BOOKINGS.find(
-                (b) =>
-                    b.reference === reference ||
-                    b.booking_reference === reference,
-            );
-            if (fallback) {
-                setReservation(fallback);
-                return;
-            }
             Alert.alert(
                 'Error',
                 e.message || 'Failed to load reservation details.',
@@ -135,7 +126,7 @@ export default function ReservationDetailScreen() {
             setPaying(true);
             // Step 1: Initiate payment on backend to create authoritative Razorpay order
             const initRes = await CustomerApi.initiatePayment(
-                reservation.reference,
+                reservation.reference ?? reservation.booking_reference,
             );
             const payload = initRes.data;
 
@@ -143,15 +134,15 @@ export default function ReservationDetailScreen() {
             const checkoutResponse = await RazorpayService.openCheckout(
                 payload,
                 {
-                    name: (reservation as any).customer_name,
-                    email: (reservation as any).customer_email,
-                    phone: (reservation as any).customer_phone,
+                    name: reservation.contact_name,
+                    email: reservation.contact_email,
+                    phone: reservation.contact_phone,
                 },
             );
 
             // Step 3: Authoritatively verify signature on backend
             const verifyRes = await CustomerApi.verifyPayment(
-                reservation.reference,
+                reservation.reference ?? reservation.booking_reference,
                 {
                     razorpay_order_id: checkoutResponse.razorpay_order_id,
                     razorpay_payment_id: checkoutResponse.razorpay_payment_id,
@@ -199,7 +190,8 @@ export default function ReservationDetailScreen() {
                         try {
                             setCancelling(true);
                             const res = await CustomerApi.cancelReservation(
-                                reservation!.reference,
+                                reservation!.reference ??
+                                    reservation!.booking_reference,
                                 'Customer requested cancellation via mobile app',
                             );
                             if (res.data) {
@@ -297,12 +289,12 @@ export default function ReservationDetailScreen() {
                         <Star
                             size={size}
                             color={
-                                star <= currentValue ? '#F59E0B' : Colors.gray300
-                            }
-                            fill={
                                 star <= currentValue
                                     ? '#F59E0B'
-                                    : 'transparent'
+                                    : Colors.gray300
+                            }
+                            fill={
+                                star <= currentValue ? '#F59E0B' : 'transparent'
                             }
                         />
                     </TouchableOpacity>
@@ -338,8 +330,7 @@ export default function ReservationDetailScreen() {
         reservation.status === 'payment_pending';
     const isCompletedStay =
         reservation.status === 'completed' ||
-        reservation.status === 'checked_out' ||
-        Boolean((reservation as any).is_completed);
+        reservation.status === 'checked_out';
     const formatTimer = (secs: number) => {
         const mins = Math.floor(secs / 60);
         const remainder = secs % 60;
@@ -441,20 +432,37 @@ export default function ReservationDetailScreen() {
                             </View>
                             <View style={styles.infoRow}>
                                 <Text style={styles.infoLabel}>
-                                    Rooms Booked:
+                                    {reservation.quantity_basis ===
+                                    'guest_places'
+                                        ? 'Guest Places:'
+                                        : 'Rooms Booked:'}
                                 </Text>
                                 <Text style={styles.infoValue}>
-                                    {reservation.quantity} Room(s)
+                                    {reservation.quantity}{' '}
+                                    {reservation.quantity_basis ===
+                                    'guest_places'
+                                        ? 'Guest(s)'
+                                        : 'Room(s)'}
                                 </Text>
                             </View>
                             <View style={styles.infoRow}>
                                 <Text style={styles.infoLabel}>
-                                    Guest Category:
+                                    Guest Gender:
                                 </Text>
                                 <Text style={styles.infoValue}>
                                     {reservation.guest_gender}
                                 </Text>
                             </View>
+                            {reservation.guest_composition_label ? (
+                                <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>
+                                        Guest Composition:
+                                    </Text>
+                                    <Text style={styles.infoValue}>
+                                        {reservation.guest_composition_label}
+                                    </Text>
+                                </View>
+                            ) : null}
                         </View>
                     </View>
 
@@ -475,7 +483,7 @@ export default function ReservationDetailScreen() {
                                 meal="breakfast"
                                 included={
                                     reservation.food_inclusions?.breakfast ??
-                                    true
+                                    false
                                 }
                                 timing={
                                     reservation.food_inclusions
@@ -494,7 +502,7 @@ export default function ReservationDetailScreen() {
                             <MealBadge
                                 meal="dinner"
                                 included={
-                                    reservation.food_inclusions?.dinner ?? true
+                                    reservation.food_inclusions?.dinner ?? false
                                 }
                                 timing={
                                     reservation.food_inclusions?.dinner_timing
@@ -523,11 +531,13 @@ export default function ReservationDetailScreen() {
                                 <Text style={styles.infoValue}>
                                     ₹
                                     {(
-                                        reservation.base_amount_paise / 100
+                                        (reservation.original_amount_paise ??
+                                            reservation.total_amount_paise) /
+                                        100
                                     ).toLocaleString('en-IN')}
                                 </Text>
                             </View>
-                            {reservation.tax_amount_paise > 0 ? (
+                            {(reservation.tax_amount_paise ?? 0) > 0 ? (
                                 <View style={styles.infoRow}>
                                     <Text style={styles.infoLabel}>
                                         GST / Taxes:
@@ -535,12 +545,13 @@ export default function ReservationDetailScreen() {
                                     <Text style={styles.infoValue}>
                                         ₹
                                         {(
-                                            reservation.tax_amount_paise / 100
+                                            (reservation.tax_amount_paise ??
+                                                0) / 100
                                         ).toLocaleString('en-IN')}
                                     </Text>
                                 </View>
                             ) : null}
-                            {reservation.deposit_amount_paise > 0 ? (
+                            {(reservation.deposit_amount_paise ?? 0) > 0 ? (
                                 <View style={styles.infoRow}>
                                     <Text style={styles.infoLabel}>
                                         Refundable Security Deposit:
@@ -548,8 +559,8 @@ export default function ReservationDetailScreen() {
                                     <Text style={styles.infoValue}>
                                         ₹
                                         {(
-                                            reservation.deposit_amount_paise /
-                                            100
+                                            (reservation.deposit_amount_paise ??
+                                                0) / 100
                                         ).toLocaleString('en-IN')}
                                     </Text>
                                 </View>
@@ -570,8 +581,7 @@ export default function ReservationDetailScreen() {
 
                     {/* Cancellation & Refund Tracking */}
                     {reservation.status === 'cancelled' ||
-                    ((reservation as any).refunds &&
-                        (reservation as any).refunds.length > 0) ? (
+                    (reservation.refunds?.length ?? 0) > 0 ? (
                         <View style={styles.section}>
                             <View style={styles.sectionHeaderRow}>
                                 <RotateCcw
@@ -588,7 +598,10 @@ export default function ReservationDetailScreen() {
                                     <Text style={styles.infoLabel}>
                                         Booking Status:
                                     </Text>
-                                    <Badge label="CANCELLED" variant="secondary" />
+                                    <Badge
+                                        label="CANCELLED"
+                                        variant="secondary"
+                                    />
                                 </View>
                                 {reservation.cancelled_at ? (
                                     <View style={styles.infoRow}>
@@ -615,9 +628,8 @@ export default function ReservationDetailScreen() {
 
                                 <View style={styles.refundDivider} />
 
-                                {(reservation as any).refunds &&
-                                (reservation as any).refunds.length > 0 ? (
-                                    (reservation as any).refunds.map(
+                                {(reservation.refunds?.length ?? 0) > 0 ? (
+                                    reservation.refunds?.map(
                                         (refItem: any) => (
                                             <View
                                                 key={refItem.id}
@@ -625,13 +637,17 @@ export default function ReservationDetailScreen() {
                                             >
                                                 <View style={styles.rowBetween}>
                                                     <Text
-                                                        style={styles.refundAmountText}
+                                                        style={
+                                                            styles.refundAmountText
+                                                        }
                                                     >
                                                         ₹
                                                         {(
                                                             refItem.amount_minor /
                                                             100
-                                                        ).toLocaleString('en-IN')}
+                                                        ).toLocaleString(
+                                                            'en-IN',
+                                                        )}
                                                     </Text>
                                                     <Badge
                                                         label={(
@@ -648,13 +664,18 @@ export default function ReservationDetailScreen() {
                                                 </View>
                                                 {refItem.utr ? (
                                                     <Text
-                                                        style={styles.refundUtrText}
+                                                        style={
+                                                            styles.refundUtrText
+                                                        }
                                                     >
-                                                        Bank UTR / Ref: {refItem.utr}
+                                                        Bank UTR / Ref:{' '}
+                                                        {refItem.utr}
                                                     </Text>
                                                 ) : null}
                                                 <Text
-                                                    style={styles.refundDateText}
+                                                    style={
+                                                        styles.refundDateText
+                                                    }
                                                 >
                                                     Updated:{' '}
                                                     {refItem.gateway_processed_at
@@ -671,7 +692,9 @@ export default function ReservationDetailScreen() {
                                 ) : (
                                     <View style={styles.refundNoticeBox}>
                                         <Text style={styles.refundNoticeText}>
-                                            {(reservation as any).original_amount_paise > 0
+                                                {(reservation.original_amount_paise ??
+                                                    0) >
+                                                0
                                                 ? 'Refund review initiated. Eligible amounts are processed to your original payment method in 5–7 banking days pursuant to our Cancellation Policy.'
                                                 : 'Reservation was cancelled prior to payment completion. No charges deducted.'}
                                         </Text>
@@ -739,7 +762,9 @@ export default function ReservationDetailScreen() {
                                                 color="#059669"
                                                 style={{ marginRight: 4 }}
                                             />
-                                            <Text style={styles.verifiedBadgeText}>
+                                            <Text
+                                                style={styles.verifiedBadgeText}
+                                            >
                                                 Verified Review
                                             </Text>
                                         </View>
@@ -750,11 +775,14 @@ export default function ReservationDetailScreen() {
                                                 fill="#F59E0B"
                                                 style={{ marginRight: 3 }}
                                             />
-                                            <Text style={styles.ratingBadgeText}>
+                                            <Text
+                                                style={styles.ratingBadgeText}
+                                            >
                                                 {(
                                                     reservation.review
                                                         ?.overall_rating ||
-                                                    reservation.review?.rating ||
+                                                    reservation.review
+                                                        ?.rating ||
                                                     5
                                                 ).toFixed(1)}{' '}
                                                 / 5
@@ -783,9 +811,9 @@ export default function ReservationDetailScreen() {
                                         How was your stay?
                                     </Text>
                                     <Text style={styles.reviewPromptDesc}>
-                                        Rate room cleanliness, food quality, host
-                                        communication, and value for money to help the
-                                        community.
+                                        Rate room cleanliness, food quality,
+                                        host communication, and value for money
+                                        to help the community.
                                     </Text>
                                     <Button
                                         title="Rate & Review Your Stay"
@@ -853,14 +881,24 @@ export default function ReservationDetailScreen() {
                     <View style={styles.reviewModalContent}>
                         <View style={styles.modalHeader}>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.modalTitle}>Rate Your Stay</Text>
-                                <Text style={styles.modalSubtitle} numberOfLines={1}>
+                                <Text style={styles.modalTitle}>
+                                    Rate Your Stay
+                                </Text>
+                                <Text
+                                    style={styles.modalSubtitle}
+                                    numberOfLines={1}
+                                >
                                     {reservation.property_name}
                                 </Text>
                             </View>
                             <TouchableOpacity
                                 onPress={() => setShowReviewModal(false)}
-                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                hitSlop={{
+                                    top: 10,
+                                    bottom: 10,
+                                    left: 10,
+                                    right: 10,
+                                }}
                             >
                                 <X size={20} color={Colors.gray600} />
                             </TouchableOpacity>
@@ -868,7 +906,9 @@ export default function ReservationDetailScreen() {
 
                         <ScrollView
                             showsVerticalScrollIndicator={false}
-                            contentContainerStyle={{ paddingBottom: Spacing.md }}
+                            contentContainerStyle={{
+                                paddingBottom: Spacing.md,
+                            }}
                         >
                             {reviewError ? (
                                 <View style={styles.reviewErrorBox}>

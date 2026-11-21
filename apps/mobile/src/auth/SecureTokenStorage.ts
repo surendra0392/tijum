@@ -51,7 +51,10 @@ const webStorage: StorageEngine = {
 
 let nativeSecureStore: StorageEngine;
 try {
-    if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+    if (
+        typeof window !== 'undefined' &&
+        typeof window.localStorage !== 'undefined'
+    ) {
         nativeSecureStore = webStorage;
     } else {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -642,9 +645,8 @@ export async function reconcilePendingRevocationQueue(
                     : 'auth/owner/logout';
 
             try {
-                let responseData: any = null;
                 if (requester) {
-                    responseData = await requester(endpoint, {
+                    await requester(endpoint, {
                         method: 'POST',
                         headers: { Authorization: `Bearer ${item.token}` },
                     });

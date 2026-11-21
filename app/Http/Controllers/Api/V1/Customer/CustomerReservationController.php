@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1\Customer;
 
 use App\Actions\Reservations\CreateReservation;
 use App\Actions\Reservations\ReservationLifecycle;
+use App\Enums\ReservationStatus;
 use App\Http\Controllers\Api\V1\ApiController;
 use App\Http\Requests\Reservations\QuoteReservationRequest;
 use App\Http\Requests\Reservations\StoreReservationRequest;
@@ -17,6 +18,7 @@ use App\Models\User;
 use App\Services\ReservationQuoteService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Throwable;
 
 class CustomerReservationController extends ApiController
@@ -34,10 +36,26 @@ class CustomerReservationController extends ApiController
 
         $query = Reservation::query()
             ->where('user_id', $user->id)
-            ->with(['property.city', 'roomType'])
+            ->with(['property.city', 'property.media', 'roomType'])
             ->latest('created_at');
 
-        if ($request->filled('status')) {
+        $validated = $request->validate([
+            'stage' => ['nullable', Rule::in(['upcoming', 'awaiting_action', 'past', 'cancelled'])],
+        ]);
+
+        match ($validated['stage'] ?? null) {
+            'upcoming' => $query
+                ->where('status', ReservationStatus::Confirmed)
+                ->whereDate('checkout_date', '>=', now()->toDateString()),
+            'awaiting_action' => $query->where('status', ReservationStatus::AwaitingPayment),
+            'past' => $query
+                ->where('status', ReservationStatus::Confirmed)
+                ->whereDate('checkout_date', '<', now()->toDateString()),
+            'cancelled' => $query->where('status', ReservationStatus::Cancelled),
+            default => null,
+        };
+
+        if ($request->filled('status') && ! $request->filled('stage')) {
             $query->where('status', (string) $request->query('status'));
         }
 
@@ -104,7 +122,7 @@ class CustomerReservationController extends ApiController
                 $request->validated()
             );
 
-            $reservation->loadMissing(['property.city', 'roomType']);
+            $reservation->loadMissing(['property.city', 'property.media', 'roomType']);
 
             return $this->success(
                 new ReservationResource($reservation),
@@ -128,7 +146,7 @@ class CustomerReservationController extends ApiController
         $reservation = Reservation::query()
             ->where('booking_reference', $reference)
             ->where('user_id', $user->id)
-            ->with(['property.city', 'roomType', 'payments', 'refunds'])
+            ->with(['property.city', 'property.media', 'roomType', 'payments', 'refunds'])
             ->first();
 
         if ($reservation === null) {
@@ -160,7 +178,7 @@ class CustomerReservationController extends ApiController
         $this->lifecycle->cancel($user, $reservation, $reason);
 
         $reservation->refresh();
-        $reservation->loadMissing(['property.city', 'roomType', 'refunds']);
+        $reservation->loadMissing(['property.city', 'property.media', 'roomType', 'refunds']);
 
         return $this->success(new ReservationResource($reservation), 'Reservation cancelled successfully.');
     }

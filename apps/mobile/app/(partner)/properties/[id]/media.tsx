@@ -4,9 +4,7 @@ import {
     Alert,
     FlatList,
     Image,
-    KeyboardAvoidingView,
     Modal,
-    Platform,
     RefreshControl,
     SafeAreaView,
     ScrollView,
@@ -29,13 +27,10 @@ import {
     AlertCircle,
     ArrowLeft,
     Camera,
-    CheckCircle2,
     Image as ImageIcon,
-    MoreVertical,
     Plus,
     Star,
     Trash2,
-    UploadCloud,
     X,
 } from 'lucide-react-native';
 
@@ -71,7 +66,9 @@ export default function PropertyMediaScreen() {
     const [uploadError, setUploadError] = useState<string | null>(null);
 
     // Edit Modal State
-    const [editingMedia, setEditingMedia] = useState<PropertyMediaItem | null>(null);
+    const [editingMedia, setEditingMedia] = useState<PropertyMediaItem | null>(
+        null,
+    );
     const [editAltText, setEditAltText] = useState('');
     const [editMakeCover, setEditMakeCover] = useState(false);
     const [savingEdit, setSavingEdit] = useState(false);
@@ -103,13 +100,13 @@ export default function PropertyMediaScreen() {
 
     useEffect(() => {
         if (propertyId) {
-            fetchMedia();
+            void fetchMedia();
         }
     }, [propertyId]);
 
     const handleRefresh = () => {
         setRefreshing(true);
-        fetchMedia();
+        void fetchMedia();
     };
 
     const handleSetCover = async (media: PropertyMediaItem) => {
@@ -120,9 +117,12 @@ export default function PropertyMediaScreen() {
                 make_cover: true,
             });
             Alert.alert('Success', 'Cover image updated successfully.');
-            fetchMedia();
+            void fetchMedia();
         } catch (err: any) {
-            Alert.alert('Update Failed', err?.message || 'Could not update cover image.');
+            Alert.alert(
+                'Update Failed',
+                err?.message || 'Could not update cover image.',
+            );
         }
     };
 
@@ -138,10 +138,18 @@ export default function PropertyMediaScreen() {
                     onPress: async () => {
                         try {
                             await OwnerApi.deleteMedia(propertyId, media.id);
-                            setMediaList((prev) => prev.filter((m) => m.id !== media.id));
-                            Alert.alert('Deleted', 'Photograph removed successfully.');
+                            setMediaList((prev) =>
+                                prev.filter((m) => m.id !== media.id),
+                            );
+                            Alert.alert(
+                                'Deleted',
+                                'Photograph removed successfully.',
+                            );
                         } catch (err: any) {
-                            Alert.alert('Deletion Failed', err?.message || 'Could not delete photograph.');
+                            Alert.alert(
+                                'Deletion Failed',
+                                err?.message || 'Could not delete photograph.',
+                            );
                         }
                     },
                 },
@@ -170,10 +178,13 @@ export default function PropertyMediaScreen() {
                 make_cover: editMakeCover,
             });
             setEditingMedia(null);
-            fetchMedia();
+            void fetchMedia();
             Alert.alert('Updated', 'Photograph details saved successfully.');
         } catch (err: any) {
-            Alert.alert('Save Failed', err?.message || 'Could not update photograph details.');
+            Alert.alert(
+                'Save Failed',
+                err?.message || 'Could not update photograph details.',
+            );
         } finally {
             setSavingEdit(false);
         }
@@ -181,7 +192,9 @@ export default function PropertyMediaScreen() {
 
     const handleSimulatedUpload = async () => {
         if (!uploadAltText.trim()) {
-            setUploadError('Descriptive alt text is required for accessibility.');
+            setUploadError(
+                'Descriptive alt text is required for accessibility.',
+            );
             return;
         }
 
@@ -208,10 +221,16 @@ export default function PropertyMediaScreen() {
             setIsUploadModalOpen(false);
             setUploadAltText('');
             setUploadMakeCover(false);
-            fetchMedia();
-            Alert.alert('Uploaded', 'Photograph uploaded successfully for verification.');
+            void fetchMedia();
+            Alert.alert(
+                'Uploaded',
+                'Photograph uploaded successfully for verification.',
+            );
         } catch (err: any) {
-            setUploadError(err?.message || 'Failed to upload photograph. Ensure file is under 12MB.');
+            setUploadError(
+                err?.message ||
+                    'Failed to upload photograph. Ensure file is under 12MB.',
+            );
         } finally {
             setUploading(false);
         }
@@ -262,7 +281,11 @@ export default function PropertyMediaScreen() {
                     <Text
                         style={[
                             styles.metricValue,
-                            { color: coverPhoto ? Colors.emerald : Colors.rose },
+                            {
+                                color: coverPhoto
+                                    ? Colors.emerald
+                                    : Colors.rose,
+                            },
                         ]}
                     >
                         {coverPhoto ? 'Set' : 'Missing'}
@@ -272,7 +295,11 @@ export default function PropertyMediaScreen() {
                 <View style={styles.metricDivider} />
                 <View style={styles.metricItem}>
                     <Text style={styles.metricValue}>
-                        {mediaList.filter((m) => m.moderation_status === 'approved').length}
+                        {
+                            mediaList.filter(
+                                (m) => m.moderation_status === 'approved',
+                            ).length
+                        }
                     </Text>
                     <Text style={styles.metricLabel}>Verified</Text>
                 </View>
@@ -280,19 +307,35 @@ export default function PropertyMediaScreen() {
 
             {/* Category Filter Chips */}
             <View style={styles.filterBar}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: Spacing.base }}>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ paddingHorizontal: Spacing.base }}
+                >
                     {MEDIA_CATEGORIES.map((cat) => {
-                        const count = cat.value === 'all'
-                            ? mediaList.length
-                            : mediaList.filter((m) => m.media_type === cat.value).length;
+                        const count =
+                            cat.value === 'all'
+                                ? mediaList.length
+                                : mediaList.filter(
+                                      (m) => m.media_type === cat.value,
+                                  ).length;
                         const isSelected = selectedCategory === cat.value;
                         return (
                             <TouchableOpacity
                                 key={cat.value}
-                                style={[styles.filterChip, isSelected && styles.filterChipActive]}
+                                style={[
+                                    styles.filterChip,
+                                    isSelected && styles.filterChipActive,
+                                ]}
                                 onPress={() => setSelectedCategory(cat.value)}
                             >
-                                <Text style={[styles.filterChipText, isSelected && styles.filterChipTextActive]}>
+                                <Text
+                                    style={[
+                                        styles.filterChipText,
+                                        isSelected &&
+                                            styles.filterChipTextActive,
+                                    ]}
+                                >
                                     {cat.label} ({count})
                                 </Text>
                             </TouchableOpacity>
@@ -305,7 +348,9 @@ export default function PropertyMediaScreen() {
             {loading && !refreshing ? (
                 <View style={styles.centerContainer}>
                     <ActivityIndicator size="large" color={Colors.deepPlum} />
-                    <Text style={styles.loadingText}>Loading photographs...</Text>
+                    <Text style={styles.loadingText}>
+                        Loading photographs...
+                    </Text>
                 </View>
             ) : filteredMedia.length === 0 ? (
                 <View style={styles.emptyContainer}>
@@ -327,12 +372,15 @@ export default function PropertyMediaScreen() {
             ) : (
                 <FlatList
                     data={filteredMedia}
-                    keyExtractor={(item) => String(item.id)}
+                    keyExtractor={(item: any) => String(item.id)}
                     contentContainerStyle={styles.listContent}
                     refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={handleRefresh}
+                        />
                     }
-                    renderItem={({ item }) => (
+                    renderItem={({ item }: { item: any }) => (
                         <View style={styles.photoCard}>
                             <View style={styles.imageContainer}>
                                 {item.url ? (
@@ -342,16 +390,30 @@ export default function PropertyMediaScreen() {
                                         resizeMode="cover"
                                     />
                                 ) : (
-                                    <View style={[styles.image, styles.placeholderImage]}>
-                                        <ImageIcon size={32} color={Colors.textSecondary} />
+                                    <View
+                                        style={[
+                                            styles.image,
+                                            styles.placeholderImage,
+                                        ]}
+                                    >
+                                        <ImageIcon
+                                            size={32}
+                                            color={Colors.textSecondary}
+                                        />
                                     </View>
                                 )}
 
                                 {/* Cover Badge */}
                                 {item.is_cover && (
                                     <View style={styles.coverBadge}>
-                                        <Star size={12} color={Colors.white} fill={Colors.white} />
-                                        <Text style={styles.coverBadgeText}>PRIMARY COVER</Text>
+                                        <Star
+                                            size={12}
+                                            color={Colors.white}
+                                            fill={Colors.white}
+                                        />
+                                        <Text style={styles.coverBadgeText}>
+                                            PRIMARY COVER
+                                        </Text>
                                     </View>
                                 )}
 
@@ -360,9 +422,11 @@ export default function PropertyMediaScreen() {
                                     <Badge
                                         label={item.moderation_status.toUpperCase()}
                                         variant={
-                                            item.moderation_status === 'approved'
+                                            item.moderation_status ===
+                                            'approved'
                                                 ? 'success'
-                                                : item.moderation_status === 'rejected'
+                                                : item.moderation_status ===
+                                                    'rejected'
                                                   ? 'danger'
                                                   : 'warning'
                                         }
@@ -392,8 +456,15 @@ export default function PropertyMediaScreen() {
                                             style={styles.setCoverBtn}
                                             onPress={() => handleSetCover(item)}
                                         >
-                                            <Star size={13} color={Colors.deepPlum} />
-                                            <Text style={styles.setCoverBtnText}>Make Cover</Text>
+                                            <Star
+                                                size={13}
+                                                color={Colors.deepPlum}
+                                            />
+                                            <Text
+                                                style={styles.setCoverBtnText}
+                                            >
+                                                Make Cover
+                                            </Text>
                                         </TouchableOpacity>
                                     )}
 
@@ -401,7 +472,9 @@ export default function PropertyMediaScreen() {
                                         style={styles.editBtn}
                                         onPress={() => handleOpenEdit(item)}
                                     >
-                                        <Text style={styles.editBtnText}>Edit Alt</Text>
+                                        <Text style={styles.editBtnText}>
+                                            Edit Alt
+                                        </Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
@@ -428,39 +501,73 @@ export default function PropertyMediaScreen() {
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.modalTitle}>Upload Photograph</Text>
+                                <Text style={styles.modalTitle}>
+                                    Upload Photograph
+                                </Text>
                                 <Text style={styles.modalSubtitle}>
-                                    Add a high-clarity photo to your accommodation profile
+                                    Add a high-clarity photo to your
+                                    accommodation profile
                                 </Text>
                             </View>
                             <TouchableOpacity
                                 onPress={() => setIsUploadModalOpen(false)}
-                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                hitSlop={{
+                                    top: 10,
+                                    bottom: 10,
+                                    left: 10,
+                                    right: 10,
+                                }}
                             >
                                 <X size={20} color={Colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
 
-                        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: Spacing.lg }}>
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{
+                                paddingBottom: Spacing.lg,
+                            }}
+                        >
                             {uploadError && (
                                 <View style={styles.errorBanner}>
-                                    <AlertCircle size={16} color={Colors.rose} />
-                                    <Text style={styles.errorBannerText}>{uploadError}</Text>
+                                    <AlertCircle
+                                        size={16}
+                                        color={Colors.rose}
+                                    />
+                                    <Text style={styles.errorBannerText}>
+                                        {uploadError}
+                                    </Text>
                                 </View>
                             )}
 
                             {/* Category Selector */}
-                            <Text style={styles.inputLabel}>Visual Category *</Text>
+                            <Text style={styles.inputLabel}>
+                                Visual Category *
+                            </Text>
                             <View style={styles.categoryGrid}>
-                                {MEDIA_CATEGORIES.filter((c) => c.value !== 'all').map((c) => {
+                                {MEDIA_CATEGORIES.filter(
+                                    (c) => c.value !== 'all',
+                                ).map((c) => {
                                     const active = uploadCategory === c.value;
                                     return (
                                         <TouchableOpacity
                                             key={c.value}
-                                            style={[styles.categoryOption, active && styles.categoryOptionActive]}
-                                            onPress={() => setUploadCategory(c.value)}
+                                            style={[
+                                                styles.categoryOption,
+                                                active &&
+                                                    styles.categoryOptionActive,
+                                            ]}
+                                            onPress={() =>
+                                                setUploadCategory(c.value)
+                                            }
                                         >
-                                            <Text style={[styles.categoryOptionText, active && styles.categoryOptionTextActive]}>
+                                            <Text
+                                                style={[
+                                                    styles.categoryOptionText,
+                                                    active &&
+                                                        styles.categoryOptionTextActive,
+                                                ]}
+                                            >
                                                 {c.label}
                                             </Text>
                                         </TouchableOpacity>
@@ -483,21 +590,31 @@ export default function PropertyMediaScreen() {
                             {/* Cover Switch */}
                             <View style={styles.switchRow}>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.switchTitle}>Set as Primary Cover</Text>
+                                    <Text style={styles.switchTitle}>
+                                        Set as Primary Cover
+                                    </Text>
                                     <Text style={styles.switchSubtitle}>
-                                        Featured as main photo in search results and customer explore cards
+                                        Featured as main photo in search results
+                                        and customer explore cards
                                     </Text>
                                 </View>
                                 <Switch
                                     value={uploadMakeCover}
                                     onValueChange={setUploadMakeCover}
-                                    trackColor={{ false: Colors.border, true: Colors.deepPlum }}
+                                    trackColor={{
+                                        false: Colors.border,
+                                        true: Colors.deepPlum,
+                                    }}
                                 />
                             </View>
 
                             {/* Upload Action */}
                             <Button
-                                title={uploading ? 'Uploading Photo...' : 'Upload Photograph'}
+                                title={
+                                    uploading
+                                        ? 'Uploading Photo...'
+                                        : 'Upload Photograph'
+                                }
                                 onPress={handleSimulatedUpload}
                                 loading={uploading}
                                 style={{ marginTop: Spacing.lg }}
@@ -518,12 +635,17 @@ export default function PropertyMediaScreen() {
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.modalTitle}>Edit Photograph Details</Text>
+                                <Text style={styles.modalTitle}>
+                                    Edit Photograph Details
+                                </Text>
                                 <Text style={styles.modalSubtitle}>
-                                    Update accessibility caption and cover status
+                                    Update accessibility caption and cover
+                                    status
                                 </Text>
                             </View>
-                            <TouchableOpacity onPress={() => setEditingMedia(null)}>
+                            <TouchableOpacity
+                                onPress={() => setEditingMedia(null)}
+                            >
                                 <X size={20} color={Colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
@@ -541,7 +663,9 @@ export default function PropertyMediaScreen() {
 
                         <View style={styles.switchRow}>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.switchTitle}>Primary Cover Photo</Text>
+                                <Text style={styles.switchTitle}>
+                                    Primary Cover Photo
+                                </Text>
                                 <Text style={styles.switchSubtitle}>
                                     Set this image as property primary cover
                                 </Text>
@@ -549,7 +673,10 @@ export default function PropertyMediaScreen() {
                             <Switch
                                 value={editMakeCover}
                                 onValueChange={setEditMakeCover}
-                                trackColor={{ false: Colors.border, true: Colors.deepPlum }}
+                                trackColor={{
+                                    false: Colors.border,
+                                    true: Colors.deepPlum,
+                                }}
                             />
                         </View>
 

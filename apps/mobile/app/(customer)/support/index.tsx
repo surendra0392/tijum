@@ -15,61 +15,80 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
     ShieldCheck,
-    MessageSquare,
     Phone,
     Mail,
     Clock,
     ChevronRight,
     HelpCircle,
     X,
-    Send,
-    CheckCircle2,
-    AlertTriangle,
+    AlertCircle,
+    Ticket,
 } from 'lucide-react-native';
 import { CustomerApi } from '../../../src/api/customer';
-import { PublicApi } from '../../../src/api/public';
 import { useAuth } from '../../../src/auth/AuthContext';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
-import { SHOWCASE_CASES } from '../../../src/data/showcaseData.ts';
+import { CustomerCaseSummary } from '../../../src/api/types';
+
+const STATUTORY_SLA_COPY =
+    'We acknowledge your grievance within 48 hours and resolve it within 30 days in accordance with statutory consumer protection regulations.';
+
+const SUPPORT_CATEGORIES = [
+    { id: 'food_not_provided', label: 'Promised Meals Not Provided' },
+    { id: 'room_mismatch', label: 'Room Mismatch' },
+    { id: 'safety_concern', label: 'Safety Concern' },
+    { id: 'booking_problem', label: 'Booking Problem' },
+    { id: 'payment_problem', label: 'Payment Problem' },
+    { id: 'refund_request', label: 'Refund Request' },
+    { id: 'customer_other', label: 'Other Stay Issue' },
+] as const;
+
+type SupportCategory = (typeof SUPPORT_CATEGORIES)[number]['id'];
 
 export default function CustomerSupportScreen() {
     const router = useRouter();
     const { booking_reference } = useLocalSearchParams<{
         booking_reference?: string;
     }>();
-    const { user, token, authState } = useAuth();
+    const { token, authState } = useAuth();
 
-    const [cases, setCases] = useState<any[]>(SHOWCASE_CASES);
-    const [loading, setLoading] = useState(false);
+    const [cases, setCases] = useState<CustomerCaseSummary[]>([]);
+    const [, setLoading] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
     const [slaModalVisible, setSlaModalVisible] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     // New Request Form State
     const [bookingRef, setBookingRef] = useState(booking_reference || '');
-    const [category, setCategory] = useState('food_inclusions');
+    const [category, setCategory] =
+        useState<SupportCategory>('booking_problem');
     const [description, setDescription] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
-    const isGuest = !token || authState === 'guest' || authState === 'session_expired';
+    const isGuest =
+        !token || authState === 'guest' || authState === 'session_expired';
 
     useEffect(() => {
         if (!isGuest) {
-            loadCases();
+            void loadCases();
         }
     }, [isGuest]);
 
     const loadCases = async () => {
         try {
             setLoading(true);
+            setErrorMessage(null);
             const res = await CustomerApi.getCases();
             if (res.data && res.data.length > 0) {
                 setCases(res.data);
             } else {
-                setCases(SHOWCASE_CASES);
+                setCases([]);
             }
         } catch {
-            setCases(SHOWCASE_CASES);
+            setErrorMessage(
+                'Unable to load your support cases. Please try again.',
+            );
+            setCases([]);
         } finally {
             setLoading(false);
         }
@@ -80,8 +99,11 @@ export default function CustomerSupportScreen() {
             Alert.alert('Required', 'Please enter your booking reference.');
             return;
         }
-        if (!description.trim()) {
-            Alert.alert('Required', 'Please enter a description of the issue.');
+        if (description.trim().length < 20) {
+            Alert.alert(
+                'More Detail Required',
+                'Please enter at least 20 characters describing the issue.',
+            );
             return;
         }
 
@@ -99,7 +121,7 @@ export default function CustomerSupportScreen() {
             );
             setModalVisible(false);
             setDescription('');
-            loadCases();
+            void loadCases();
         } catch (e: any) {
             Alert.alert('Error', e.message || 'Failed to submit request.');
         } finally {
@@ -109,179 +131,243 @@ export default function CustomerSupportScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
-            >
-                {/* Curved Plum Header */}
-                <View style={styles.plumHeader}>
-                    <Text style={styles.headerTitle}>Support & Protection</Text>
-                    <Text style={styles.headerSubtitle}>
-                        Your safety, comfort, and satisfaction guaranteed
-                    </Text>
-                </View>
-
-                {/* Hero Illustration Card */}
-                <View style={styles.heroCard}>
-                    <View style={styles.shieldWrapper}>
-                        <View style={styles.shieldBackgroundCircle}>
-                            <ShieldCheck size={48} color={Colors.success} />
-                        </View>
-                    </View>
-
-                    <Text style={styles.heroTitle}>We're here to help!</Text>
-                    <Text style={styles.heroSubtitle}>
-                        Raise a support request or track your existing case.
-                    </Text>
-
-                    <View style={styles.heroActionButtons}>
-                        <TouchableOpacity
-                            style={styles.primaryPlumButton}
-                            onPress={() => setModalVisible(true)}
-                            activeOpacity={0.85}
-                        >
-                            <Text style={styles.primaryPlumButtonText}>
-                                Raise a Request
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.secondaryOutlineButton}
-                            onPress={() => {
-                                if (cases.length > 0) {
-                                    router.push(`/(customer)/support/${cases[0].reference}` as any);
-                                } else {
-                                    Alert.alert('No Cases', 'You do not have any open cases yet.');
-                                }
-                            }}
-                            activeOpacity={0.85}
-                        >
-                            <Text style={styles.secondaryOutlineButtonText}>
-                                My Cases
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                {/* Your Cases Section */}
-                <View style={styles.sectionHeaderRow}>
-                    <Text style={styles.sectionHeading}>Your Cases</Text>
+            {errorMessage ? (
+                <View style={styles.errorContainer}>
+                    <AlertCircle size={48} color={Colors.coral} />
+                    <Text style={styles.errorTitle}>Unable to Load Cases</Text>
+                    <Text style={styles.errorSubtitle}>{errorMessage}</Text>
                     <TouchableOpacity
-                        onPress={() => {
-                            if (cases.length > 0) {
-                                router.push(`/(customer)/support/${cases[0].reference}` as any);
-                            }
-                        }}
+                        style={styles.retryBtn}
+                        onPress={loadCases}
                     >
-                        <Text style={styles.seeAllText}>See All &gt;</Text>
+                        <Text style={styles.retryBtnText}>Try Again</Text>
                     </TouchableOpacity>
                 </View>
-
-                {cases.map((c) => (
-                    <TouchableOpacity
-                        key={c.id || c.reference}
-                        style={styles.caseCard}
-                        onPress={() =>
-                            router.push(
-                                `/(customer)/support/${c.reference || 'CP-20250428-001'}` as any,
-                            )
-                        }
-                        activeOpacity={0.88}
-                    >
-                        <View style={styles.caseCardHeader}>
-                            <Text style={styles.caseRefText}>
-                                {c.reference || '#CP-20250428-001'}
+            ) : (
+                <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.scrollContent}
+                >
+                    {/* Curved Plum Header */}
+                    <View style={styles.plumHeader}>
+                        <Text style={styles.headerTitle}>
+                            Support & Protection
+                        </Text>
+                        <Text style={styles.headerSubtitle}>
+                            Your safety, comfort, and satisfaction guaranteed
+                        </Text>
+                        <TouchableOpacity
+                            accessibilityLabel="Open general helpdesk tickets"
+                            accessibilityRole="button"
+                            onPress={() =>
+                                router.push('/(customer)/support/tickets')
+                            }
+                            style={styles.helpdeskButton}
+                        >
+                            <Ticket size={18} color={Colors.deepPlum} />
+                            <Text style={styles.helpdeskButtonText}>
+                                General Helpdesk Tickets
                             </Text>
-                            <View style={styles.inProgressBadge}>
-                                <Text style={styles.inProgressBadgeText}>
-                                    {c.status_label || 'In Progress'}
-                                </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Hero Illustration Card */}
+                    <View style={styles.heroCard}>
+                        <View style={styles.shieldWrapper}>
+                            <View style={styles.shieldBackgroundCircle}>
+                                <ShieldCheck size={48} color={Colors.success} />
                             </View>
                         </View>
 
-                        <Text style={styles.caseCategoryText}>
-                            {c.category === 'food_inclusions'
-                                ? 'Food Inclusions / Meal Quality'
-                                : c.category || 'Booking Issue'}
+                        <Text style={styles.heroTitle}>
+                            We're here to help!
                         </Text>
-                        <Text style={styles.caseDateText}>
-                            {c.created_at || '28 Apr 2025 • 2:30 PM'}
+                        <Text style={styles.heroSubtitle}>
+                            Raise a support request or track your existing case.
                         </Text>
 
-                        <View style={styles.caseDivider} />
+                        <View style={styles.heroActionButtons}>
+                            <TouchableOpacity
+                                style={styles.primaryPlumButton}
+                                onPress={() => setModalVisible(true)}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={styles.primaryPlumButtonText}>
+                                    Raise a Request
+                                </Text>
+                            </TouchableOpacity>
 
-                        <View style={styles.caseFooter}>
-                            <Text style={styles.viewDetailsText}>
-                                View Details &gt;
-                            </Text>
+                            <TouchableOpacity
+                                style={styles.secondaryOutlineButton}
+                                onPress={() => {
+                                    if (cases.length > 0) {
+                                        router.push(
+                                            `/(customer)/support/${cases[0].case_reference}`,
+                                        );
+                                    } else {
+                                        Alert.alert(
+                                            'No Cases',
+                                            'You do not have any open cases yet.',
+                                        );
+                                    }
+                                }}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={styles.secondaryOutlineButtonText}>
+                                    My Cases
+                                </Text>
+                            </TouchableOpacity>
                         </View>
-                    </TouchableOpacity>
-                ))}
+                    </View>
 
-                {/* Quick Navigation Links */}
-                <View style={styles.menuLinksCard}>
-                    <TouchableOpacity
-                        style={styles.menuLinkItem}
-                        onPress={() => setSlaModalVisible(true)}
-                        activeOpacity={0.7}
-                    >
-                        <View style={styles.menuLinkLeft}>
-                            <Clock size={18} color={Colors.coral} />
-                            <Text style={styles.menuLinkLabel}>
-                                Customer Protection SLAs
-                            </Text>
-                        </View>
-                        <ChevronRight size={16} color={Colors.gray400} />
-                    </TouchableOpacity>
-
-                    <View style={styles.menuLinkDivider} />
-
-                    <TouchableOpacity
-                        style={styles.menuLinkItem}
-                        onPress={() =>
-                            Alert.alert(
-                                'Help & FAQs',
-                                'Browse common questions and troubleshooting guides on tijum.com/faqs.',
-                            )
-                        }
-                        activeOpacity={0.7}
-                    >
-                        <View style={styles.menuLinkLeft}>
-                            <HelpCircle size={18} color={Colors.coral} />
-                            <Text style={styles.menuLinkLabel}>Help & FAQs</Text>
-                        </View>
-                        <ChevronRight size={16} color={Colors.gray400} />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Contact Helpline Touchpoints */}
-                <View style={styles.helplineCard}>
-                    <Text style={styles.helplineTitle}>Official Support Helpline</Text>
-                    <Text style={styles.helplineSubtitle}>
-                        Operational Hours: 9:00 AM – 9:00 PM IST (Mon–Sat)
-                    </Text>
-
-                    <View style={styles.helplineButtonsRow}>
+                    {/* Your Cases Section */}
+                    <View style={styles.sectionHeaderRow}>
+                        <Text style={styles.sectionHeading}>Your Cases</Text>
                         <TouchableOpacity
-                            style={[styles.helplineBtn, styles.callBtn]}
-                            onPress={() => Linking.openURL('tel:+918142334033')}
-                            activeOpacity={0.8}
+                            onPress={() => {
+                                if (cases.length > 0) {
+                                    router.push(
+                                        `/(customer)/support/${cases[0].case_reference}`,
+                                    );
+                                }
+                            }}
                         >
-                            <Phone size={15} color="#1E40AF" style={{ marginRight: 6 }} />
-                            <Text style={styles.callBtnText}>Call Helpline</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.helplineBtn, styles.emailBtn]}
-                            onPress={() => Linking.openURL('mailto:support@tijum.com')}
-                            activeOpacity={0.8}
-                        >
-                            <Mail size={15} color="#9A3412" style={{ marginRight: 6 }} />
-                            <Text style={styles.emailBtnText}>Email Desk</Text>
+                            <Text style={styles.seeAllText}>See All &gt;</Text>
                         </TouchableOpacity>
                     </View>
-                </View>
-            </ScrollView>
+
+                    {cases.map((c) => (
+                        <TouchableOpacity
+                            key={c.id}
+                            style={styles.caseCard}
+                            onPress={() =>
+                                router.push(
+                                    `/(customer)/support/${c.case_reference}`,
+                                )
+                            }
+                            activeOpacity={0.88}
+                        >
+                            <View style={styles.caseCardHeader}>
+                                <Text style={styles.caseRefText}>
+                                    {c.case_reference}
+                                </Text>
+                                <View style={styles.inProgressBadge}>
+                                    <Text style={styles.inProgressBadgeText}>
+                                        {c.status.replaceAll('_', ' ')}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <Text style={styles.caseCategoryText}>
+                                {SUPPORT_CATEGORIES.find(
+                                    (option) => option.id === c.category,
+                                )?.label ?? c.category.replaceAll('_', ' ')}
+                            </Text>
+                            <Text style={styles.caseDateText}>
+                                {new Date(c.created_at).toLocaleString(
+                                    'en-IN',
+                                    {
+                                        dateStyle: 'medium',
+                                        timeStyle: 'short',
+                                    },
+                                )}
+                            </Text>
+
+                            <View style={styles.caseDivider} />
+
+                            <View style={styles.caseFooter}>
+                                <Text style={styles.viewDetailsText}>
+                                    View Details &gt;
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    ))}
+
+                    {/* Quick Navigation Links */}
+                    <View style={styles.menuLinksCard}>
+                        <TouchableOpacity
+                            style={styles.menuLinkItem}
+                            onPress={() => setSlaModalVisible(true)}
+                            activeOpacity={0.7}
+                        >
+                            <View style={styles.menuLinkLeft}>
+                                <Clock size={18} color={Colors.coral} />
+                                <Text style={styles.menuLinkLabel}>
+                                    Customer Protection SLAs
+                                </Text>
+                            </View>
+                            <ChevronRight size={16} color={Colors.gray400} />
+                        </TouchableOpacity>
+
+                        <View style={styles.menuLinkDivider} />
+
+                        <TouchableOpacity
+                            style={styles.menuLinkItem}
+                            onPress={() =>
+                                Alert.alert(
+                                    'Help & FAQs',
+                                    'Browse common questions and troubleshooting guides on tijum.com/faqs.',
+                                )
+                            }
+                            activeOpacity={0.7}
+                        >
+                            <View style={styles.menuLinkLeft}>
+                                <HelpCircle size={18} color={Colors.coral} />
+                                <Text style={styles.menuLinkLabel}>
+                                    Help & FAQs
+                                </Text>
+                            </View>
+                            <ChevronRight size={16} color={Colors.gray400} />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Contact Helpline Touchpoints */}
+                    <View style={styles.helplineCard}>
+                        <Text style={styles.helplineTitle}>
+                            Official Support Helpline
+                        </Text>
+                        <Text style={styles.helplineSubtitle}>
+                            Operational Hours: 9:00 AM – 9:00 PM IST (Mon–Sat)
+                        </Text>
+
+                        <View style={styles.helplineButtonsRow}>
+                            <TouchableOpacity
+                                style={[styles.helplineBtn, styles.callBtn]}
+                                onPress={() =>
+                                    Linking.openURL('tel:+918142334033')
+                                }
+                                activeOpacity={0.8}
+                            >
+                                <Phone
+                                    size={15}
+                                    color="#1E40AF"
+                                    style={{ marginRight: 6 }}
+                                />
+                                <Text style={styles.callBtnText}>
+                                    Call Helpline
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.helplineBtn, styles.emailBtn]}
+                                onPress={() =>
+                                    Linking.openURL('mailto:support@tijum.com')
+                                }
+                                activeOpacity={0.8}
+                            >
+                                <Mail
+                                    size={15}
+                                    color="#9A3412"
+                                    style={{ marginRight: 6 }}
+                                />
+                                <Text style={styles.emailBtnText}>
+                                    Email Desk
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </ScrollView>
+            )}
 
             {/* Raise Request Modal */}
             <Modal
@@ -293,33 +379,36 @@ export default function CustomerSupportScreen() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContainer}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Raise a Support Request</Text>
-                            <TouchableOpacity onPress={() => setModalVisible(false)}>
+                            <Text style={styles.modalTitle}>
+                                Raise a Support Request
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => setModalVisible(false)}
+                            >
                                 <X size={20} color={Colors.gray600} />
                             </TouchableOpacity>
                         </View>
 
                         <ScrollView style={styles.modalBody}>
-                            <Text style={styles.inputLabel}>Booking Reference *</Text>
+                            <Text style={styles.inputLabel}>
+                                Booking Reference *
+                            </Text>
                             <TextInput
                                 style={styles.textInput}
-                                placeholder="e.g. TJM25042500123"
+                                placeholder="Enter booking reference"
                                 value={bookingRef}
                                 onChangeText={setBookingRef}
                             />
 
                             <Text style={styles.inputLabel}>Category *</Text>
                             <View style={styles.categoryRadioGroup}>
-                                {[
-                                    { id: 'food_inclusions', label: 'Food & Meals' },
-                                    { id: 'room_condition', label: 'Room Condition' },
-                                    { id: 'safety', label: 'Safety & Grievance' },
-                                ].map((cat) => (
+                                {SUPPORT_CATEGORIES.map((cat) => (
                                     <TouchableOpacity
                                         key={cat.id}
                                         style={[
                                             styles.categoryRadioBtn,
-                                            category === cat.id && styles.categoryRadioBtnActive,
+                                            category === cat.id &&
+                                                styles.categoryRadioBtnActive,
                                         ]}
                                         onPress={() => setCategory(cat.id)}
                                     >
@@ -352,7 +441,10 @@ export default function CustomerSupportScreen() {
                                 disabled={submitting}
                             >
                                 {submitting ? (
-                                    <ActivityIndicator size="small" color={Colors.white} />
+                                    <ActivityIndicator
+                                        size="small"
+                                        color={Colors.white}
+                                    />
                                 ) : (
                                     <Text style={styles.submitModalBtnText}>
                                         Submit Request
@@ -374,8 +466,12 @@ export default function CustomerSupportScreen() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContainer}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Customer Protection SLAs</Text>
-                            <TouchableOpacity onPress={() => setSlaModalVisible(false)}>
+                            <Text style={styles.modalTitle}>
+                                Customer Protection SLAs
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => setSlaModalVisible(false)}
+                            >
                                 <X size={20} color={Colors.gray600} />
                             </TouchableOpacity>
                         </View>
@@ -385,15 +481,21 @@ export default function CustomerSupportScreen() {
                                 Internal First-Action Targets:
                             </Text>
                             <View style={styles.slaRow}>
-                                <Text style={styles.slaPriorityUrgent}>Urgent:</Text>
+                                <Text style={styles.slaPriorityUrgent}>
+                                    Urgent:
+                                </Text>
                                 <Text style={styles.slaDuration}>2 Hours</Text>
                             </View>
                             <View style={styles.slaRow}>
-                                <Text style={styles.slaPriorityHigh}>High:</Text>
+                                <Text style={styles.slaPriorityHigh}>
+                                    High:
+                                </Text>
                                 <Text style={styles.slaDuration}>4 Hours</Text>
                             </View>
                             <View style={styles.slaRow}>
-                                <Text style={styles.slaPriorityMedium}>Medium:</Text>
+                                <Text style={styles.slaPriorityMedium}>
+                                    Medium:
+                                </Text>
                                 <Text style={styles.slaDuration}>24 Hours</Text>
                             </View>
                             <View style={styles.slaRow}>
@@ -407,7 +509,7 @@ export default function CustomerSupportScreen() {
                                 Statutory Redressal Timelines:
                             </Text>
                             <Text style={styles.slaStatutoryText}>
-                                We acknowledge your grievance within 48 hours and resolve it within 30 days in accordance with statutory consumer protection regulations.
+                                {STATUTORY_SLA_COPY}
                             </Text>
                             <Text style={styles.slaStatutoryText}>
                                 • Acknowledgement within 48 hours
@@ -417,10 +519,15 @@ export default function CustomerSupportScreen() {
                             </Text>
 
                             <TouchableOpacity
-                                style={[styles.submitModalBtn, { marginTop: Spacing.lg }]}
+                                style={[
+                                    styles.submitModalBtn,
+                                    { marginTop: Spacing.lg },
+                                ]}
                                 onPress={() => setSlaModalVisible(false)}
                             >
-                                <Text style={styles.submitModalBtnText}>Got it</Text>
+                                <Text style={styles.submitModalBtnText}>
+                                    Got it
+                                </Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -458,6 +565,22 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: 4,
         opacity: 0.9,
+    },
+    helpdeskButton: {
+        minHeight: 48,
+        alignSelf: 'center',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+        backgroundColor: Colors.warmCream,
+        borderRadius: BorderRadius.pill,
+        marginTop: Spacing.md,
+        paddingHorizontal: Spacing.lg,
+    },
+    helpdeskButtonText: {
+        color: Colors.deepPlum,
+        fontSize: 13,
+        fontWeight: '800',
     },
     heroCard: {
         backgroundColor: Colors.white,
@@ -806,5 +929,38 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: Colors.inkSecondary,
         marginVertical: 2,
+    },
+    errorContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: Spacing.xl,
+        backgroundColor: Colors.canvas,
+    },
+    errorTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: Colors.deepPlum,
+        marginTop: Spacing.md,
+        textAlign: 'center',
+    },
+    errorSubtitle: {
+        fontSize: 13,
+        color: Colors.inkSecondary,
+        marginTop: 4,
+        textAlign: 'center',
+        maxWidth: 280,
+    },
+    retryBtn: {
+        backgroundColor: Colors.deepPlum,
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.xs + 2,
+        borderRadius: BorderRadius.md,
+        marginTop: Spacing.md,
+    },
+    retryBtnText: {
+        color: Colors.white,
+        fontSize: 12,
+        fontWeight: '700',
     },
 });

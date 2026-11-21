@@ -1,6 +1,7 @@
 export const Typography = {
     fontFamily: {
         heading: 'Montserrat-Bold',
+        headingExtraBold: 'Montserrat-ExtraBold',
         subheading: 'Montserrat-SemiBold',
         body: 'Nunito-Regular',
         bodyBold: 'Nunito-Bold',

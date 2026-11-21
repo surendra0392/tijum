@@ -1,11 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { Building2, Home, Users, Sparkles } from 'lucide-react-native';
-import {
-    CanonicalCategorySlug,
-    getCanonicalCategory,
-    normalizeCategorySlug,
-} from '../constants/categories';
+import { getCanonicalCategory } from '../constants/categories';
 import { Colors } from '../theme/colors';
 import { BorderRadius, Spacing } from '../theme/spacing';
 import { Typography } from '../theme/typography';
@@ -15,7 +11,7 @@ interface CategoryBadgeProps {
         | {
               id?: number;
               name?: string;
-              slug?: string | CanonicalCategorySlug;
+              slug?: string;
               code?: string;
           }
         | string

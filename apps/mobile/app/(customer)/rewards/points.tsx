@@ -15,7 +15,6 @@ import {
     ArrowUpRight,
     Clock,
     Lock,
-    Filter,
     Info,
     Calendar,
 } from 'lucide-react-native';
@@ -24,6 +23,7 @@ import { PointsLedgerItem, PointsWallet } from '../../../src/api/types';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
+import { ExceptionalState } from '../../../src/components/ExceptionalState';
 
 const FILTER_TABS = [
     { key: 'all', label: 'All Activity' },
@@ -65,10 +65,10 @@ export default function PointsWalletScreen() {
     };
 
     useEffect(() => {
-        loadData();
+        void loadData();
     }, []);
 
-    const filteredLedger = ledger.filter((item) => {
+    const filteredLedger = ledger.filter((item: any) => {
         if (selectedTab === 'earned')
             return item.direction === 'credit' && item.status === 'completed';
         if (selectedTab === 'redeemed') return item.direction === 'debit';
@@ -164,7 +164,15 @@ export default function PointsWalletScreen() {
 
     return (
         <SafeAreaView style={styles.safeArea}>
-            {loading ? (
+            {errorMessage && !wallet ? (
+                <ExceptionalState
+                    type="no-internet"
+                    title="Points Unavailable"
+                    description={errorMessage}
+                    actionLabel="Try Again"
+                    onAction={() => loadData()}
+                />
+            ) : loading ? (
                 <View style={styles.center}>
                     <ActivityIndicator size="large" color={Colors.coral} />
                     <Text style={styles.loadingText}>
@@ -174,7 +182,7 @@ export default function PointsWalletScreen() {
             ) : (
                 <FlatList
                     data={filteredLedger}
-                    keyExtractor={(item) => String(item.id)}
+                    keyExtractor={(item: any) => String(item.id)}
                     contentContainerStyle={styles.listContent}
                     ListHeaderComponent={renderHeader}
                     refreshControl={
@@ -199,7 +207,7 @@ export default function PointsWalletScreen() {
                             </Text>
                         </View>
                     }
-                    renderItem={({ item }) => {
+                    renderItem={({ item }: { item: any }) => {
                         const isCredit = item.direction === 'credit';
                         const isPending = item.status === 'pending';
                         return (

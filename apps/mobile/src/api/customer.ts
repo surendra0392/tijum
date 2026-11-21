@@ -3,26 +3,17 @@ import {
     ApiResponse,
     CustomerProfile,
     NotificationItem,
+    NotificationPreferences,
+    CustomerCaseSummary,
+    SupportTicketDetail,
+    SupportTicketIndexData,
+    SupportTicketMessage,
+    SupportTicketSummary,
     PaymentOrderPayload,
     PropertyCard,
     Reservation,
     StayQuoteResponse,
 } from './types';
-
-function createSubmissionUuid(): string {
-    if (
-        typeof globalThis.crypto !== 'undefined' &&
-        typeof globalThis.crypto.randomUUID === 'function'
-    ) {
-        return globalThis.crypto.randomUUID();
-    }
-
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = Math.floor(Math.random() * 16);
-        const v = c === 'x' ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-    });
-}
 
 export const CustomerApi = {
     // Profile
@@ -40,9 +31,12 @@ export const CustomerApi = {
     }) => ApiClient.put<ApiResponse<null>>('customer/password', data),
 
     // Reservations
-    getReservations: (status?: string, page: number = 1) =>
+    getReservations: (
+        stage?: 'upcoming' | 'awaiting_action' | 'past' | 'cancelled',
+        page: number = 1,
+    ) =>
         ApiClient.get<ApiResponse<Reservation[]>>('customer/reservations', {
-            status,
+            stage,
             page,
         }),
 
@@ -51,7 +45,7 @@ export const CustomerApi = {
         data: {
             property_room_type_id: number;
             check_in_date: string;
-            duration_type: 'daily' | 'weekly' | 'monthly' | string;
+            duration_type: 'daily' | 'weekly' | 'monthly';
             duration_quantity: number;
             quantity: number;
             guest_count?: number;
@@ -65,16 +59,16 @@ export const CustomerApi = {
         ),
 
     createReservation: (data: {
-        submission_token?: string;
+        submission_token: string;
         property_id: number;
         property_room_type_id: number;
         check_in_date: string;
-        duration_type: 'daily' | 'weekly' | 'monthly' | string;
+        duration_type: 'daily' | 'weekly' | 'monthly';
         duration_quantity: number;
         quantity: number;
         guest_count?: number;
-        guest_gender: 'male' | 'female' | 'mixed' | string;
-        guest_composition?: string;
+        guest_gender: 'male' | 'female' | 'mixed';
+        guest_composition?: 'individuals';
         booking_for?: 'self' | 'other';
         contact_name?: string;
         contact_email?: string;
@@ -87,7 +81,7 @@ export const CustomerApi = {
     }) =>
         ApiClient.post<ApiResponse<Reservation>>('customer/reservations', {
             ...data,
-            submission_token: data.submission_token ?? createSubmissionUuid(),
+            submission_token: data.submission_token,
             guest_count: data.guest_count ?? data.quantity,
             guest_composition: data.guest_composition ?? 'individuals',
         }),
@@ -151,7 +145,9 @@ export const CustomerApi = {
 
     // Support / Grievance Cases
     getCases: (page: number = 1) =>
-        ApiClient.get<ApiResponse<any[]>>('customer/cases', { page }),
+        ApiClient.get<ApiResponse<CustomerCaseSummary[]>>('customer/cases', {
+            page,
+        }),
     getCase: (reference: string) =>
         ApiClient.get<ApiResponse<any>>(`customer/cases/${reference}`),
     createCase: (data: {
@@ -163,6 +159,39 @@ export const CustomerApi = {
         ApiClient.post<ApiResponse<any>>(
             `customer/cases/${reference}/messages`,
             { message },
+        ),
+
+    getSupportTickets: (status?: string) =>
+        ApiClient.get<ApiResponse<SupportTicketIndexData>>(
+            'customer/support-tickets',
+            { status },
+        ),
+    createSupportTicket: (data: {
+        subject: string;
+        category: string;
+        priority: 'low' | 'standard' | 'high' | 'urgent';
+        message: string;
+        booking_reference?: string;
+    }) =>
+        ApiClient.post<ApiResponse<SupportTicketSummary>>(
+            'customer/support-tickets',
+            data,
+        ),
+    getSupportTicket: (reference: string) =>
+        ApiClient.get<
+            ApiResponse<{
+                ticket: SupportTicketDetail;
+                messages: SupportTicketMessage[];
+            }>
+        >(`customer/support-tickets/${reference}`),
+    addSupportTicketMessage: (reference: string, message: string) =>
+        ApiClient.post<ApiResponse<SupportTicketMessage>>(
+            `customer/support-tickets/${reference}/messages`,
+            { message },
+        ),
+    closeSupportTicket: (reference: string) =>
+        ApiClient.post<ApiResponse<SupportTicketSummary>>(
+            `customer/support-tickets/${reference}/close`,
         ),
 
     // Notifications & Preferences
@@ -182,7 +211,9 @@ export const CustomerApi = {
             'customer/notifications/mark-all-read',
         ),
     getNotificationPreferences: () =>
-        ApiClient.get<ApiResponse<any>>('customer/notifications/preferences'),
+        ApiClient.get<ApiResponse<NotificationPreferences>>(
+            'customer/notifications/preferences',
+        ),
     updateNotificationPreferences: (data: {
         in_app_operational?: boolean;
         email_operational?: boolean;
@@ -202,16 +233,10 @@ export const CustomerApi = {
         ApiClient.post<ApiResponse<any>>(`customer/wishlist/${propertyId}`),
     removeFromWishlist: (propertyId: number) =>
         ApiClient.delete<ApiResponse<any>>(`customer/wishlist/${propertyId}`),
-    toggleWishlist: (propertyId: number, currentlySaved?: boolean) => {
-        if (currentlySaved) {
-            return ApiClient.delete<ApiResponse<any>>(
-                `customer/wishlist/${propertyId}`,
-            );
-        }
-        return ApiClient.post<ApiResponse<any>>(
-            `customer/wishlist/${propertyId}`,
-        );
-    },
+    toggleWishlist: (propertyId: number) =>
+        ApiClient.post<ApiResponse<any>>(
+            `customer/wishlist/${propertyId}/toggle`,
+        ),
 
     // Push Device Registration
     registerDevice: (data: {
@@ -223,5 +248,7 @@ export const CustomerApi = {
     }) => ApiClient.post<ApiResponse<any>>('customer/devices/register', data),
 
     unregisterDevice: (deviceInstallationId: string) =>
-        ApiClient.delete<ApiResponse<null>>('customer/devices/unregister'),
+        ApiClient.delete<ApiResponse<null>>('customer/devices/unregister', {
+            device_installation_id: deviceInstallationId,
+        }),
 };

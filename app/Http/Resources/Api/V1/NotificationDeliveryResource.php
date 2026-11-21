@@ -32,6 +32,7 @@ class NotificationDeliveryResource extends JsonResource
             'category' => $this->category->value,
             'channel' => $this->channel->value,
             'template_code' => $this->template_code,
+            'related_reference' => $this->related_reference,
             'title' => $rendered['title'],
             'body' => $rendered['body'],
             'action_url' => $this->payload['action_url'] ?? null,

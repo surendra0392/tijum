@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    FlatList,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -28,17 +27,13 @@ import { Colors } from '../../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../../src/theme/spacing';
 import { Typography } from '../../../../src/theme/typography';
 import {
-    AlertCircle,
     ArrowLeft,
     Check,
-    CheckCircle2,
-    Clock,
     Plus,
     Search,
     Shield,
     Trash2,
     X,
-    XCircle,
 } from 'lucide-react-native';
 
 export default function PropertyAmenitiesScreen() {
@@ -50,13 +45,15 @@ export default function PropertyAmenitiesScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [assigned, setAssigned] = useState<OwnerPropertyAmenity[]>([]);
     const [catalogue, setCatalogue] = useState<AmenityCatalogCategory[]>([]);
-    const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
+    const [selectedCategoryFilter, setSelectedCategoryFilter] =
+        useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
 
     // Add Modal State
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [modalSearchQuery, setModalSearchQuery] = useState('');
-    const [selectedCatalogAmenity, setSelectedCatalogAmenity] = useState<AmenityCatalogItem | null>(null);
+    const [selectedCatalogAmenity, setSelectedCatalogAmenity] =
+        useState<AmenityCatalogItem | null>(null);
     const [amenityDetails, setAmenityDetails] = useState('');
     const [saving, setSaving] = useState(false);
 
@@ -77,18 +74,21 @@ export default function PropertyAmenitiesScreen() {
 
     useEffect(() => {
         if (propertyId) {
-            fetchData();
+            void fetchData();
         }
     }, [propertyId]);
 
     const onRefresh = () => {
         setRefreshing(true);
-        fetchData();
+        void fetchData();
     };
 
     const handleAssign = async () => {
         if (!selectedCatalogAmenity) {
-            Alert.alert('Required', 'Please select an amenity from the catalogue.');
+            Alert.alert(
+                'Required',
+                'Please select an amenity from the catalogue.',
+            );
             return;
         }
 
@@ -104,10 +104,16 @@ export default function PropertyAmenitiesScreen() {
             setSelectedCatalogAmenity(null);
             setAmenityDetails('');
             setModalSearchQuery('');
-            Alert.alert('Success', 'Amenity assigned to property successfully.');
-            fetchData();
+            Alert.alert(
+                'Success',
+                'Amenity assigned to property successfully.',
+            );
+            void fetchData();
         } catch (error: any) {
-            Alert.alert('Assignment Failed', error.message || 'Could not assign amenity.');
+            Alert.alert(
+                'Assignment Failed',
+                error.message || 'Could not assign amenity.',
+            );
         } finally {
             setSaving(false);
         }
@@ -125,10 +131,16 @@ export default function PropertyAmenitiesScreen() {
                     onPress: async () => {
                         try {
                             await OwnerApi.deleteAmenity(propertyId, item.id);
-                            Alert.alert('Removed', 'Amenity removed from property.');
-                            fetchData();
+                            Alert.alert(
+                                'Removed',
+                                'Amenity removed from property.',
+                            );
+                            void fetchData();
                         } catch (error: any) {
-                            Alert.alert('Error', error.message || 'Could not remove amenity.');
+                            Alert.alert(
+                                'Error',
+                                error.message || 'Could not remove amenity.',
+                            );
                         }
                     },
                 },
@@ -136,7 +148,9 @@ export default function PropertyAmenitiesScreen() {
         );
     };
 
-    const getStatusVariant = (status: string): 'success' | 'warning' | 'info' | 'error' | 'neutral' => {
+    const getStatusVariant = (
+        status: string,
+    ): 'success' | 'warning' | 'info' | 'error' | 'neutral' => {
         switch (status?.toLowerCase()) {
             case 'approved':
             case 'verified':
@@ -162,11 +176,13 @@ export default function PropertyAmenitiesScreen() {
     // Filtered assigned items
     const filteredAssigned = assigned.filter((item) => {
         const matchesCategory =
-            selectedCategoryFilter === 'all' || item.category === selectedCategoryFilter;
+            selectedCategoryFilter === 'all' ||
+            item.category === selectedCategoryFilter;
         const matchesSearch =
             !searchQuery ||
             item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (item.details && item.details.toLowerCase().includes(searchQuery.toLowerCase()));
+            (item.details &&
+                item.details.toLowerCase().includes(searchQuery.toLowerCase()));
         return matchesCategory && matchesSearch;
     });
 
@@ -175,7 +191,9 @@ export default function PropertyAmenitiesScreen() {
     const unassignedCatalogue = catalogue
         .map((cat) => ({
             ...cat,
-            amenities: cat.amenities.filter((a) => !assignedAmenityIds.has(a.id)),
+            amenities: cat.amenities.filter(
+                (a) => !assignedAmenityIds.has(a.id),
+            ),
         }))
         .filter((cat) => cat.amenities.length > 0);
 
@@ -185,16 +203,22 @@ export default function PropertyAmenitiesScreen() {
             amenities: cat.amenities.filter(
                 (a) =>
                     !modalSearchQuery ||
-                    a.name.toLowerCase().includes(modalSearchQuery.toLowerCase()),
+                    a.name
+                        .toLowerCase()
+                        .includes(modalSearchQuery.toLowerCase()),
             ),
         }))
         .filter((cat) => cat.amenities.length > 0);
 
     const approvedCount = assigned.filter(
-        (a) => a.status?.toLowerCase() === 'approved' || a.status?.toLowerCase() === 'verified',
+        (a) =>
+            a.status?.toLowerCase() === 'approved' ||
+            a.status?.toLowerCase() === 'verified',
     ).length;
     const pendingCount = assigned.filter(
-        (a) => a.status?.toLowerCase() === 'draft' || a.status?.toLowerCase() === 'under_review',
+        (a) =>
+            a.status?.toLowerCase() === 'draft' ||
+            a.status?.toLowerCase() === 'under_review',
     ).length;
 
     return (
@@ -210,7 +234,9 @@ export default function PropertyAmenitiesScreen() {
                 </TouchableOpacity>
                 <View style={styles.headerTitleContainer}>
                     <Text style={styles.headerTitle}>Amenities Management</Text>
-                    <Text style={styles.headerSubtitle}>Verified Facilities & Inclusions</Text>
+                    <Text style={styles.headerSubtitle}>
+                        Verified Facilities & Inclusions
+                    </Text>
                 </View>
                 <TouchableOpacity
                     style={styles.addButton}
@@ -230,28 +256,55 @@ export default function PropertyAmenitiesScreen() {
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                        />
                     }
                 >
                     {/* KPI Metrics */}
                     <View style={styles.metricsRow}>
                         <View style={styles.metricCard}>
-                            <Text style={styles.metricLabel}>Total Assigned</Text>
-                            <Text style={styles.metricValue}>{assigned.length}</Text>
+                            <Text style={styles.metricLabel}>
+                                Total Assigned
+                            </Text>
+                            <Text style={styles.metricValue}>
+                                {assigned.length}
+                            </Text>
                         </View>
                         <View style={styles.metricCard}>
-                            <Text style={[styles.metricLabel, { color: Colors.success }]}>
+                            <Text
+                                style={[
+                                    styles.metricLabel,
+                                    { color: Colors.success },
+                                ]}
+                            >
                                 Approved
                             </Text>
-                            <Text style={[styles.metricValue, { color: Colors.success }]}>
+                            <Text
+                                style={[
+                                    styles.metricValue,
+                                    { color: Colors.success },
+                                ]}
+                            >
                                 {approvedCount}
                             </Text>
                         </View>
                         <View style={styles.metricCard}>
-                            <Text style={[styles.metricLabel, { color: Colors.warning }]}>
+                            <Text
+                                style={[
+                                    styles.metricLabel,
+                                    { color: Colors.warning },
+                                ]}
+                            >
                                 In Review
                             </Text>
-                            <Text style={[styles.metricValue, { color: Colors.warning }]}>
+                            <Text
+                                style={[
+                                    styles.metricValue,
+                                    { color: Colors.warning },
+                                ]}
+                            >
                                 {pendingCount}
                             </Text>
                         </View>
@@ -261,13 +314,18 @@ export default function PropertyAmenitiesScreen() {
                     <View style={styles.noticeBanner}>
                         <Shield size={18} color={Colors.primary} />
                         <Text style={styles.noticeText}>
-                            All listed amenities are included in direct room-type pricing without extra charges to guests.
+                            All listed amenities are included in direct
+                            room-type pricing without extra charges to guests.
                         </Text>
                     </View>
 
                     {/* Search & Filter */}
                     <View style={styles.searchContainer}>
-                        <Search size={18} color={Colors.textTertiary} style={styles.searchIcon} />
+                        <Search
+                            size={18}
+                            color={Colors.textTertiary}
+                            style={styles.searchIcon}
+                        />
                         <TextInput
                             style={styles.searchInput}
                             placeholder="Search assigned amenities..."
@@ -276,7 +334,9 @@ export default function PropertyAmenitiesScreen() {
                             onChangeText={setSearchQuery}
                         />
                         {searchQuery.length > 0 && (
-                            <TouchableOpacity onPress={() => setSearchQuery('')}>
+                            <TouchableOpacity
+                                onPress={() => setSearchQuery('')}
+                            >
                                 <X size={18} color={Colors.textTertiary} />
                             </TouchableOpacity>
                         )}
@@ -294,16 +354,24 @@ export default function PropertyAmenitiesScreen() {
                                 return (
                                     <TouchableOpacity
                                         key={cat}
-                                        style={[styles.filterChip, active && styles.filterChipActive]}
-                                        onPress={() => setSelectedCategoryFilter(cat)}
+                                        style={[
+                                            styles.filterChip,
+                                            active && styles.filterChipActive,
+                                        ]}
+                                        onPress={() =>
+                                            setSelectedCategoryFilter(cat)
+                                        }
                                     >
                                         <Text
                                             style={[
                                                 styles.filterChipText,
-                                                active && styles.filterChipTextActive,
+                                                active &&
+                                                    styles.filterChipTextActive,
                                             ]}
                                         >
-                                            {cat === 'all' ? 'All Categories' : cat}
+                                            {cat === 'all'
+                                                ? 'All Categories'
+                                                : cat}
                                         </Text>
                                     </TouchableOpacity>
                                 );
@@ -315,7 +383,9 @@ export default function PropertyAmenitiesScreen() {
                     {filteredAssigned.length === 0 ? (
                         <View style={styles.emptyContainer}>
                             <Shield size={48} color={Colors.textTertiary} />
-                            <Text style={styles.emptyTitle}>No Amenities Found</Text>
+                            <Text style={styles.emptyTitle}>
+                                No Amenities Found
+                            </Text>
                             <Text style={styles.emptySubtitle}>
                                 {searchQuery || selectedCategoryFilter !== 'all'
                                     ? 'No amenities match your current filters.'
@@ -332,12 +402,18 @@ export default function PropertyAmenitiesScreen() {
                             <View key={item.id} style={styles.amenityCard}>
                                 <View style={styles.cardHeader}>
                                     <View style={styles.titleArea}>
-                                        <Text style={styles.amenityName}>{item.name}</Text>
-                                        <Text style={styles.amenityCategory}>{item.category || 'General'}</Text>
+                                        <Text style={styles.amenityName}>
+                                            {item.name}
+                                        </Text>
+                                        <Text style={styles.amenityCategory}>
+                                            {item.category || 'General'}
+                                        </Text>
                                     </View>
                                     <View style={styles.badgesArea}>
                                         <Badge
-                                            variant={getStatusVariant(item.status)}
+                                            variant={getStatusVariant(
+                                                item.status,
+                                            )}
                                             size="sm"
                                         >
                                             {item.status.toUpperCase()}
@@ -346,21 +422,33 @@ export default function PropertyAmenitiesScreen() {
                                 </View>
 
                                 {item.details ? (
-                                    <Text style={styles.amenityDetails}>{item.details}</Text>
+                                    <Text style={styles.amenityDetails}>
+                                        {item.details}
+                                    </Text>
                                 ) : null}
 
                                 <View style={styles.cardFooter}>
                                     <View style={styles.inclusionBadge}>
-                                        <Check size={14} color={Colors.success} />
-                                        <Text style={styles.inclusionText}>Included in Rent</Text>
+                                        <Check
+                                            size={14}
+                                            color={Colors.success}
+                                        />
+                                        <Text style={styles.inclusionText}>
+                                            Included in Rent
+                                        </Text>
                                     </View>
                                     <TouchableOpacity
                                         style={styles.deleteButton}
                                         onPress={() => handleDelete(item)}
                                         accessibilityLabel={`Remove ${item.name}`}
                                     >
-                                        <Trash2 size={16} color={Colors.error} />
-                                        <Text style={styles.deleteText}>Remove</Text>
+                                        <Trash2
+                                            size={16}
+                                            color={Colors.error}
+                                        />
+                                        <Text style={styles.deleteText}>
+                                            Remove
+                                        </Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -382,7 +470,9 @@ export default function PropertyAmenitiesScreen() {
                 >
                     <View style={styles.modalContainer}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Add Property Amenity</Text>
+                            <Text style={styles.modalTitle}>
+                                Add Property Amenity
+                            </Text>
                             <TouchableOpacity
                                 onPress={() => {
                                     setIsAddModalOpen(false);
@@ -394,7 +484,11 @@ export default function PropertyAmenitiesScreen() {
                         </View>
 
                         <View style={styles.modalSearchContainer}>
-                            <Search size={16} color={Colors.textTertiary} style={styles.searchIcon} />
+                            <Search
+                                size={16}
+                                color={Colors.textTertiary}
+                                style={styles.searchIcon}
+                            />
                             <TextInput
                                 style={styles.modalSearchInput}
                                 placeholder="Search catalog amenities..."
@@ -407,18 +501,25 @@ export default function PropertyAmenitiesScreen() {
                         <ScrollView style={styles.modalCatalogueList}>
                             {filteredModalCatalogue.length === 0 ? (
                                 <Text style={styles.emptyCatalogText}>
-                                    No available catalog amenities match your search.
+                                    No available catalog amenities match your
+                                    search.
                                 </Text>
                             ) : (
                                 filteredModalCatalogue.map((category) => (
-                                    <View key={category.id} style={styles.catalogCategoryGroup}>
-                                        <Text style={styles.catalogCategoryTitle}>
+                                    <View
+                                        key={category.id}
+                                        style={styles.catalogCategoryGroup}
+                                    >
+                                        <Text
+                                            style={styles.catalogCategoryTitle}
+                                        >
                                             {category.name}
                                         </Text>
                                         <View style={styles.catalogItemsGrid}>
                                             {category.amenities.map((item) => {
                                                 const isSelected =
-                                                    selectedCatalogAmenity?.id === item.id;
+                                                    selectedCatalogAmenity?.id ===
+                                                    item.id;
                                                 return (
                                                     <TouchableOpacity
                                                         key={item.id}
@@ -429,15 +530,21 @@ export default function PropertyAmenitiesScreen() {
                                                         ]}
                                                         onPress={() =>
                                                             setSelectedCatalogAmenity(
-                                                                isSelected ? null : item,
+                                                                isSelected
+                                                                    ? null
+                                                                    : item,
                                                             )
                                                         }
                                                     >
                                                         {isSelected && (
                                                             <Check
                                                                 size={14}
-                                                                color={Colors.primary}
-                                                                style={{ marginRight: 4 }}
+                                                                color={
+                                                                    Colors.primary
+                                                                }
+                                                                style={{
+                                                                    marginRight: 4,
+                                                                }}
                                                             />
                                                         )}
                                                         <Text
@@ -461,7 +568,10 @@ export default function PropertyAmenitiesScreen() {
                         {selectedCatalogAmenity && (
                             <View style={styles.selectedDetailArea}>
                                 <Text style={styles.selectedAmenityLabel}>
-                                    Selected: <Text style={{ fontWeight: '700' }}>{selectedCatalogAmenity.name}</Text>
+                                    Selected:{' '}
+                                    <Text style={{ fontWeight: '700' }}>
+                                        {selectedCatalogAmenity.name}
+                                    </Text>
                                 </Text>
                                 <TextInput
                                     style={styles.detailsInput}
@@ -486,7 +596,9 @@ export default function PropertyAmenitiesScreen() {
                                 style={{ flex: 1, marginRight: Spacing.sm }}
                             />
                             <Button
-                                title={saving ? 'Assigning...' : 'Assign Amenity'}
+                                title={
+                                    saving ? 'Assigning...' : 'Assign Amenity'
+                                }
                                 onPress={handleAssign}
                                 disabled={!selectedCatalogAmenity || saving}
                                 style={{ flex: 1 }}

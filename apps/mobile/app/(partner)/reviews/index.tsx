@@ -6,7 +6,6 @@ import {
     Modal,
     RefreshControl,
     SafeAreaView,
-    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -17,7 +16,6 @@ import {
     AlertCircle,
     Calendar,
     CheckCircle2,
-    Clock,
     CornerDownRight,
     MessageSquare,
     MessageSquarePlus,
@@ -27,6 +25,7 @@ import {
 import { OwnerApi } from '../../../src/api/owner';
 import { OwnerReview } from '../../../src/api/types';
 import { Button } from '../../../src/components/Button';
+import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
@@ -37,6 +36,7 @@ export default function PartnerReviewsScreen() {
     const [reviews, setReviews] = useState<OwnerReview[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     // Reply Modal State
     const [selectedReview, setSelectedReview] = useState<OwnerReview | null>(
@@ -54,12 +54,15 @@ export default function PartnerReviewsScreen() {
         }
 
         try {
+            setLoadError(null);
             const res = await OwnerApi.getReviews();
-            if (res.data) {
-                setReviews(res.data);
-            }
-        } catch (e: any) {
-            console.error('Failed to load partner reviews', e);
+            setReviews(res.data ?? []);
+        } catch (reviewLoadError: unknown) {
+            setLoadError(
+                reviewLoadError instanceof Error
+                    ? reviewLoadError.message
+                    : 'Unable to load partner reviews.',
+            );
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -67,7 +70,7 @@ export default function PartnerReviewsScreen() {
     };
 
     useEffect(() => {
-        loadReviews();
+        void loadReviews();
     }, []);
 
     const handleOpenReplyModal = (review: OwnerReview) => {
@@ -100,22 +103,7 @@ export default function PartnerReviewsScreen() {
             setReplying(true);
             setReplyError('');
             await OwnerApi.replyToReview(selectedReview.id, trimmed);
-
-            // Update in-place
-            setReviews((prev) =>
-                prev.map((r) =>
-                    r.id === selectedReview.id
-                        ? {
-                              ...r,
-                              response: {
-                                  response_text: trimmed,
-                                  status: 'pending_moderation',
-                                  submitted_at: 'Just now',
-                              },
-                          }
-                        : r,
-                ),
-            );
+            await loadReviews();
 
             handleCloseReplyModal();
             Alert.alert(
@@ -156,10 +144,18 @@ export default function PartnerReviewsScreen() {
                         Loading property reviews...
                     </Text>
                 </View>
+            ) : loadError && reviews.length === 0 ? (
+                <ExceptionalState
+                    type="no-internet"
+                    title="Reviews Unavailable"
+                    description={loadError}
+                    actionLabel="Try Again"
+                    onAction={() => loadReviews()}
+                />
             ) : (
                 <FlatList
                     data={reviews}
-                    keyExtractor={(item) => String(item.id)}
+                    keyExtractor={(item: OwnerReview) => String(item.id)}
                     contentContainerStyle={styles.listContent}
                     refreshControl={
                         <RefreshControl
@@ -196,7 +192,7 @@ export default function PartnerReviewsScreen() {
                             </Text>
                         </View>
                     }
-                    renderItem={({ item }) => (
+                    renderItem={({ item }: { item: any }) => (
                         <View style={styles.reviewCard}>
                             {/* Card Top: Property & Rating */}
                             <View style={styles.cardHeader}>

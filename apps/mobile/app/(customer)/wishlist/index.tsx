@@ -11,35 +11,37 @@ import {
     View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Heart, Star, LogIn, ChevronLeft } from 'lucide-react-native';
+import { Building2, Heart, Star, ChevronLeft } from 'lucide-react-native';
 import { CustomerApi } from '../../../src/api/customer';
 import { PropertyCard as PropertyCardType } from '../../../src/api/types';
 import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import { useAuth } from '../../../src/auth/AuthContext';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
-import { SHOWCASE_PROPERTIES } from '../../../src/data/showcaseData.ts';
 
 export default function WishlistScreen() {
     const router = useRouter();
     const { token, authState, isLoading: authLoading } = useAuth();
-    const [properties, setProperties] = useState<PropertyCardType[]>(SHOWCASE_PROPERTIES);
+    const [properties, setProperties] = useState<PropertyCardType[]>([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-    const isGuest = !token || authState === 'guest' || authState === 'session_expired';
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const isGuest =
+        !token || authState === 'guest' || authState === 'session_expired';
 
     const loadWishlist = async () => {
         if (isGuest) return;
         try {
             setLoading(true);
+            setErrorMessage(null);
             const res = await CustomerApi.getWishlist();
-            if (res.data && res.data.length > 0) {
-                setProperties(res.data);
-            } else {
-                setProperties(SHOWCASE_PROPERTIES);
-            }
-        } catch {
-            setProperties(SHOWCASE_PROPERTIES);
+            setProperties(res.data ?? []);
+        } catch (loadError: unknown) {
+            setErrorMessage(
+                loadError instanceof Error
+                    ? loadError.message
+                    : 'Unable to load your wishlist. Please try again.',
+            );
         } finally {
             setLoading(false);
         }
@@ -47,51 +49,61 @@ export default function WishlistScreen() {
 
     useEffect(() => {
         if (!isGuest) {
-            loadWishlist();
+            void loadWishlist();
         }
     }, [isGuest]);
 
     const handleRemove = (propertyId: number) => {
         setProperties((prev) => prev.filter((p) => p.id !== propertyId));
         if (!isGuest) {
-            CustomerApi.removeFromWishlist(propertyId).catch(() => {});
             CustomerApi.toggleWishlist(propertyId).catch(() => {});
         }
     };
 
     const renderGridItem = ({ item }: { item: PropertyCardType }) => {
-        const anyItem = item as any;
-        const rawPaise = item.starting_price_monthly_paise ?? (anyItem.starting_price ? anyItem.starting_price * 100 : 800000);
-        const rawPrice = rawPaise > 100000 ? Math.round(rawPaise / 100) : rawPaise;
-        const rating = item.rating_average || anyItem.rating || 4.7;
-        const reviews = item.reviews_count || 124;
-        const photo =
-            anyItem.primary_photo_url ||
-            item.cover_image_url ||
-            'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=600&q=80';
+        const rawPrice =
+            item.starting_price_monthly_paise !== null
+                ? item.starting_price_monthly_paise / 100
+                : null;
+        const hasReviews = item.rating_average > 0 && item.reviews_count > 0;
+        const photo = item.cover_image_url;
 
         return (
             <TouchableOpacity
+                accessibilityLabel={`Open ${item.name}`}
+                accessibilityRole="button"
                 style={styles.gridCard}
                 activeOpacity={0.88}
                 onPress={() =>
                     router.push(
-                        `/(customer)/explore/property/${item.slug || 'greenview-pg'}` as any,
+                        `/(customer)/explore/property/${item.slug}` as any,
                     )
                 }
             >
                 <View style={styles.imageWrapper}>
-                    <Image
-                        source={{ uri: photo }}
-                        style={styles.cardImage}
-                        resizeMode="cover"
-                    />
+                    {photo ? (
+                        <Image
+                            source={{ uri: photo }}
+                            style={styles.cardImage}
+                            resizeMode="cover"
+                        />
+                    ) : (
+                        <View style={styles.cardImagePlaceholder}>
+                            <Building2 size={36} color={Colors.gray400} />
+                        </View>
+                    )}
                     <TouchableOpacity
+                        accessibilityLabel={`Remove ${item.name} from wishlist`}
+                        accessibilityRole="button"
                         style={styles.heartBtn}
                         onPress={() => handleRemove(item.id)}
                         activeOpacity={0.8}
                     >
-                        <Heart size={15} color={Colors.white} fill={Colors.rose} />
+                        <Heart
+                            size={15}
+                            color={Colors.white}
+                            fill={Colors.rose}
+                        />
                     </TouchableOpacity>
                 </View>
 
@@ -100,25 +112,36 @@ export default function WishlistScreen() {
                         {item.name}
                     </Text>
 
-                    <View style={styles.ratingRow}>
-                        <Star size={11} color="#D97706" fill="#D97706" />
-                        <Text style={styles.ratingText}>
-                            {' '}
-                            {typeof rating === 'number' ? rating.toFixed(1) : rating} (
-                            {reviews})
-                        </Text>
-                    </View>
+                    {hasReviews ? (
+                        <View style={styles.ratingRow}>
+                            <Star size={11} color="#D97706" fill="#D97706" />
+                            <Text style={styles.ratingText}>
+                                {' '}
+                                {item.rating_average.toFixed(1)} (
+                                {item.reviews_count})
+                            </Text>
+                        </View>
+                    ) : null}
 
-                    <Text style={styles.cardPrice}>
-                        ₹{rawPrice.toLocaleString('en-IN')}{' '}
-                        <Text style={styles.perMonthText}>/ month</Text>
-                    </Text>
+                    {rawPrice !== null ? (
+                        <Text style={styles.cardPrice}>
+                            ₹{rawPrice.toLocaleString('en-IN')}{' '}
+                            <Text style={styles.perMonthText}>/ month</Text>
+                        </Text>
+                    ) : (
+                        <Text style={styles.priceUnavailable}>
+                            Price unavailable
+                        </Text>
+                    )}
                 </View>
             </TouchableOpacity>
         );
     };
 
-    if (!authLoading && (!token || authState === 'guest' || authState === 'session_expired')) {
+    if (
+        !authLoading &&
+        (!token || authState === 'guest' || authState === 'session_expired')
+    ) {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.plumHeader}>
@@ -130,7 +153,11 @@ export default function WishlistScreen() {
                             <ChevronLeft size={24} color={Colors.white} />
                         </TouchableOpacity>
                         <Text style={styles.headerTitle}>Saved Stays</Text>
-                        <Heart size={20} color={Colors.white} fill={Colors.white} />
+                        <Heart
+                            size={20}
+                            color={Colors.white}
+                            fill={Colors.white}
+                        />
                     </View>
                 </View>
                 <ExceptionalState
@@ -160,26 +187,15 @@ export default function WishlistScreen() {
                 </View>
             </View>
 
-            {/* Guest Banner */}
-            {isGuest && (
-                <View style={styles.guestBanner}>
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.guestBannerTitle}>Preview Mode</Text>
-                        <Text style={styles.guestBannerDesc}>
-                            Sign in to save and sync your favourite stays.
-                        </Text>
-                    </View>
-                    <TouchableOpacity
-                        style={styles.guestSignInBtn}
-                        onPress={() => router.push('/(auth)/customer-login')}
-                    >
-                        <LogIn size={13} color={Colors.white} style={{ marginRight: 4 }} />
-                        <Text style={styles.guestSignInBtnText}>Sign In</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
-
-            {loading ? (
+            {errorMessage && properties.length === 0 ? (
+                <ExceptionalState
+                    type="no-internet"
+                    title="Wishlist Unavailable"
+                    description={errorMessage}
+                    actionLabel="Try Again"
+                    onAction={loadWishlist}
+                />
+            ) : loading ? (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={Colors.deepPlum} />
                 </View>
@@ -187,7 +203,7 @@ export default function WishlistScreen() {
                 <FlatList
                     data={properties}
                     renderItem={renderGridItem}
-                    keyExtractor={(item) => String(item.id)}
+                    keyExtractor={(item: PropertyCardType) => String(item.id)}
                     numColumns={2}
                     contentContainerStyle={styles.listContainer}
                     columnWrapperStyle={styles.columnWrapper}
@@ -196,7 +212,9 @@ export default function WishlistScreen() {
                             refreshing={refreshing}
                             onRefresh={() => {
                                 setRefreshing(true);
-                                loadWishlist().then(() => setRefreshing(false));
+                                void loadWishlist().then(() =>
+                                    setRefreshing(false),
+                                );
                             }}
                         />
                     }
@@ -289,14 +307,20 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
     },
+    cardImagePlaceholder: {
+        width: '100%',
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     heartBtn: {
         position: 'absolute',
         top: 6,
         right: 6,
         backgroundColor: 'rgba(0,0,0,0.3)',
-        width: 26,
-        height: 26,
-        borderRadius: 13,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -328,6 +352,12 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: 'normal',
         color: Colors.inkMuted,
+    },
+    priceUnavailable: {
+        color: Colors.inkMuted,
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: 8,
     },
     loadingContainer: {
         flex: 1,

@@ -19,16 +19,16 @@ import { Badge } from '../../../src/components/Badge';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
+
+const STATUTORY_ACKNOWLEDGEMENT_COPY =
+    'Statutory formal acknowledgement within 48h; formal resolution tracking up to 30 days.';
 import {
-    AlertCircle,
     AlertTriangle,
     ArrowLeft,
-    CheckCircle2,
     Clock,
     HelpCircle,
     MessageSquare,
     Search,
-    ShieldAlert,
     X,
 } from 'lucide-react-native';
 
@@ -63,7 +63,10 @@ export default function PartnerCasesScreen() {
                 setCases(res.data);
             }
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to load support cases.');
+            Alert.alert(
+                'Error',
+                error.message || 'Failed to load support cases.',
+            );
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -72,20 +75,22 @@ export default function PartnerCasesScreen() {
 
     useEffect(() => {
         setLoading(true);
-        fetchCases();
+        void fetchCases();
     }, [selectedTab]);
 
     const onRefresh = () => {
         setRefreshing(true);
-        fetchCases();
+        void fetchCases();
     };
 
     const handleSearchSubmit = () => {
         setLoading(true);
-        fetchCases();
+        void fetchCases();
     };
 
-    const getStatusVariant = (status: string): 'success' | 'warning' | 'info' | 'error' | 'neutral' => {
+    const getStatusVariant = (
+        status: string,
+    ): 'success' | 'warning' | 'info' | 'error' | 'neutral' => {
         switch (status?.toLowerCase()) {
             case 'action_required':
             case 'urgent':
@@ -102,7 +107,9 @@ export default function PartnerCasesScreen() {
         }
     };
 
-    const getPriorityVariant = (priority: string): 'error' | 'warning' | 'neutral' => {
+    const getPriorityVariant = (
+        priority: string,
+    ): 'error' | 'warning' | 'neutral' => {
         switch (priority?.toLowerCase()) {
             case 'urgent':
             case 'high':
@@ -117,14 +124,26 @@ export default function PartnerCasesScreen() {
     const getPrioritySlaTarget = (priority?: string) => {
         switch (priority?.toLowerCase()) {
             case 'urgent':
-                return { target: '2h', label: 'First Action Target: 2 Hours (Urgent)' };
+                return {
+                    target: '2h',
+                    label: 'First Action Target: 2 Hours (Urgent)',
+                };
             case 'high':
-                return { target: '4h', label: 'First Action Target: 4 Hours (High Priority)' };
+                return {
+                    target: '4h',
+                    label: 'First Action Target: 4 Hours (High Priority)',
+                };
             case 'medium':
-                return { target: '24h', label: 'First Action Target: 24 Hours' };
+                return {
+                    target: '24h',
+                    label: 'First Action Target: 24 Hours',
+                };
             case 'low':
             default:
-                return { target: '48h', label: 'First Action Target: 48 Hours' };
+                return {
+                    target: '48h',
+                    label: 'First Action Target: 48 Hours',
+                };
         }
     };
 
@@ -134,9 +153,15 @@ export default function PartnerCasesScreen() {
     const actionRequiredCount = actionRequiredCases.length;
 
     const getActionRequiredSlaBannerText = (actionCases: OwnerCase[]) => {
-        const hasUrgent = actionCases.some((c) => c.priority?.toLowerCase() === 'urgent');
-        const hasHigh = actionCases.some((c) => c.priority?.toLowerCase() === 'high');
-        const hasMedium = actionCases.some((c) => c.priority?.toLowerCase() === 'medium');
+        const hasUrgent = actionCases.some(
+            (c) => c.priority?.toLowerCase() === 'urgent',
+        );
+        const hasHigh = actionCases.some(
+            (c) => c.priority?.toLowerCase() === 'high',
+        );
+        const hasMedium = actionCases.some(
+            (c) => c.priority?.toLowerCase() === 'medium',
+        );
 
         if (hasUrgent) {
             return `${actionCases.length} case${actionCases.length > 1 ? 's require' : ' requires'} urgent attention (Internal Target: 2 hours). Immediate response required.`;
@@ -149,10 +174,6 @@ export default function PartnerCasesScreen() {
         }
         return `${actionCases.length} case${actionCases.length > 1 ? 's require' : ' requires'} response within 48 hours.`;
     };
-
-    const underReviewCount = cases.filter(
-        (c) => c.status?.toLowerCase() === 'under_review' || c.status?.toLowerCase() === 'open',
-    ).length;
 
     return (
         <SafeAreaView style={styles.container}>
@@ -167,14 +188,20 @@ export default function PartnerCasesScreen() {
                 </TouchableOpacity>
                 <View style={styles.headerTitleContainer}>
                     <Text style={styles.headerTitle}>Support & Grievances</Text>
-                    <Text style={styles.headerSubtitle}>Customer Protection & Dispute Desk</Text>
+                    <Text style={styles.headerSubtitle}>
+                        Customer Protection & Dispute Desk
+                    </Text>
                 </View>
             </View>
 
             {/* Search Input */}
             <View style={styles.searchBarContainer}>
                 <View style={styles.searchBox}>
-                    <Search size={18} color={Colors.textTertiary} style={styles.searchIcon} />
+                    <Search
+                        size={18}
+                        color={Colors.textTertiary}
+                        style={styles.searchIcon}
+                    />
                     <TextInput
                         style={styles.searchInput}
                         placeholder="Search by case #, guest name, booking..."
@@ -188,7 +215,7 @@ export default function PartnerCasesScreen() {
                         <TouchableOpacity
                             onPress={() => {
                                 setSearchQuery('');
-                                fetchCases();
+                                void fetchCases();
                             }}
                         >
                             <X size={18} color={Colors.textTertiary} />
@@ -209,7 +236,10 @@ export default function PartnerCasesScreen() {
                         return (
                             <TouchableOpacity
                                 key={tab.key}
-                                style={[styles.tabChip, active && styles.tabChipActive]}
+                                style={[
+                                    styles.tabChip,
+                                    active && styles.tabChipActive,
+                                ]}
                                 onPress={() => setSelectedTab(tab.key)}
                             >
                                 <Text
@@ -229,26 +259,38 @@ export default function PartnerCasesScreen() {
             {loading ? (
                 <View style={styles.centered}>
                     <ActivityIndicator size="large" color={Colors.primary} />
-                    <Text style={styles.loadingText}>Loading support cases...</Text>
+                    <Text style={styles.loadingText}>
+                        Loading support cases...
+                    </Text>
                 </View>
             ) : (
                 <FlatList
                     data={cases}
-                    keyExtractor={(item) => String(item.id || item.case_reference)}
+                    keyExtractor={(item: any) =>
+                        String(item.id || item.case_reference)
+                    }
                     contentContainerStyle={styles.listContent}
                     refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                        />
                     }
                     ListHeaderComponent={
                         actionRequiredCount > 0 ? (
                             <View style={styles.alertBanner}>
-                                <AlertTriangle size={20} color={Colors.warning} />
+                                <AlertTriangle
+                                    size={20}
+                                    color={Colors.warning}
+                                />
                                 <View style={styles.alertTextContainer}>
                                     <Text style={styles.alertBannerText}>
-                                        {getActionRequiredSlaBannerText(actionRequiredCases)}
+                                        {getActionRequiredSlaBannerText(
+                                            actionRequiredCases,
+                                        )}
                                     </Text>
                                     <Text style={styles.alertBannerSubtext}>
-                                        Statutory formal acknowledgement within 48h; formal resolution tracking up to 30 days.
+                                        {STATUTORY_ACKNOWLEDGEMENT_COPY}
                                     </Text>
                                 </View>
                             </View>
@@ -257,7 +299,9 @@ export default function PartnerCasesScreen() {
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
                             <HelpCircle size={48} color={Colors.textTertiary} />
-                            <Text style={styles.emptyTitle}>No Cases Found</Text>
+                            <Text style={styles.emptyTitle}>
+                                No Cases Found
+                            </Text>
                             <Text style={styles.emptySubtitle}>
                                 {searchQuery || selectedTab !== 'all'
                                     ? 'No cases match your active filters.'
@@ -265,11 +309,13 @@ export default function PartnerCasesScreen() {
                             </Text>
                         </View>
                     }
-                    renderItem={({ item }) => (
+                    renderItem={({ item }: { item: any }) => (
                         <TouchableOpacity
                             style={styles.caseCard}
                             onPress={() =>
-                                router.push(`/(partner)/cases/${item.case_reference || item.id}`)
+                                router.push(
+                                    `/(partner)/cases/${item.case_reference || item.id}`,
+                                )
                             }
                             activeOpacity={0.8}
                         >
@@ -285,7 +331,9 @@ export default function PartnerCasesScreen() {
                                 <View style={styles.cardBadges}>
                                     {item.priority && (
                                         <Badge
-                                            variant={getPriorityVariant(item.priority)}
+                                            variant={getPriorityVariant(
+                                                item.priority,
+                                            )}
                                             size="sm"
                                         >
                                             {item.priority.toUpperCase()}
@@ -295,7 +343,9 @@ export default function PartnerCasesScreen() {
                                         variant={getStatusVariant(item.status)}
                                         size="sm"
                                     >
-                                        {(item.status || 'OPEN').replace('_', ' ').toUpperCase()}
+                                        {(item.status || 'OPEN')
+                                            .replace('_', ' ')
+                                            .toUpperCase()}
                                     </Badge>
                                 </View>
                             </View>
@@ -323,7 +373,8 @@ export default function PartnerCasesScreen() {
                                 <Clock
                                     size={12}
                                     color={
-                                        item.priority?.toLowerCase() === 'urgent' ||
+                                        item.priority?.toLowerCase() ===
+                                            'urgent' ||
                                         item.priority?.toLowerCase() === 'high'
                                             ? Colors.error
                                             : Colors.textSecondary
@@ -332,8 +383,10 @@ export default function PartnerCasesScreen() {
                                 <Text
                                     style={[
                                         styles.slaText,
-                                        (item.priority?.toLowerCase() === 'urgent' ||
-                                            item.priority?.toLowerCase() === 'high') &&
+                                        (item.priority?.toLowerCase() ===
+                                            'urgent' ||
+                                            item.priority?.toLowerCase() ===
+                                                'high') &&
                                             styles.slaUrgentText,
                                     ]}
                                 >
@@ -343,14 +396,23 @@ export default function PartnerCasesScreen() {
 
                             <View style={styles.cardFooter}>
                                 <View style={styles.footerLeft}>
-                                    <Clock size={12} color={Colors.textTertiary} />
+                                    <Clock
+                                        size={12}
+                                        color={Colors.textTertiary}
+                                    />
                                     <Text style={styles.footerDate}>
-                                        Updated: {item.updated_at || item.created_at}
+                                        Updated:{' '}
+                                        {item.updated_at || item.created_at}
                                     </Text>
                                 </View>
                                 <View style={styles.footerRight}>
-                                    <MessageSquare size={14} color={Colors.primary} />
-                                    <Text style={styles.footerLink}>View Timeline →</Text>
+                                    <MessageSquare
+                                        size={14}
+                                        color={Colors.primary}
+                                    />
+                                    <Text style={styles.footerLink}>
+                                        View Timeline →
+                                    </Text>
                                 </View>
                             </View>
                         </TouchableOpacity>

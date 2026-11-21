@@ -15,16 +15,35 @@ interface InputProps extends TextInputProps {
     error?: string;
 }
 
-export function Input({ label, error, style, ...props }: InputProps) {
+export function Input({
+    label,
+    error,
+    style,
+    accessibilityLabel,
+    accessibilityHint,
+    ...props
+}: InputProps) {
     return (
         <View style={styles.container}>
             {label ? <Text style={styles.label}>{label}</Text> : null}
             <TextInput
+                accessibilityLabel={
+                    accessibilityLabel ?? label ?? props.placeholder
+                }
+                accessibilityHint={accessibilityHint ?? error}
                 placeholderTextColor={Colors.gray400}
                 style={[styles.input, error ? styles.inputError : null, style]}
                 {...props}
             />
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            {error ? (
+                <Text
+                    accessibilityLiveRegion="polite"
+                    accessibilityRole="alert"
+                    style={styles.errorText}
+                >
+                    {error}
+                </Text>
+            ) : null}
         </View>
     );
 }
@@ -40,6 +59,7 @@ const styles = StyleSheet.create({
         marginBottom: Spacing.xs,
     },
     input: {
+        minHeight: 48,
         backgroundColor: Colors.white,
         borderColor: Colors.gray200,
         borderWidth: 1.5,

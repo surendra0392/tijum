@@ -13,10 +13,30 @@ export function StayTimingBadge({
     checkIn,
     checkOut,
 }: StayTimingBadgeProps = {}) {
+    const formatTime = (value?: string): string | null => {
+        if (!value) {
+            return null;
+        }
+
+        const match = value.match(/^(\d{1,2}):(\d{2})/);
+        if (!match) {
+            return value;
+        }
+
+        const hour = Number(match[1]);
+        const minutes = match[2];
+        const period = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour % 12 || 12;
+
+        return `${displayHour}:${minutes} ${period}`;
+    };
+
+    const formattedCheckIn = formatTime(checkIn);
+    const formattedCheckOut = formatTime(checkOut);
     const label =
-        checkIn && checkOut
-            ? `${checkIn} Check-In • ${checkOut} Checkout`
-            : '09:00 AM Check-In • 08:00 AM Checkout';
+        formattedCheckIn && formattedCheckOut
+            ? `${formattedCheckIn} Check-In • ${formattedCheckOut} Checkout`
+            : 'Stay timing not configured';
 
     return (
         <View style={styles.container}>

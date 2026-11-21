@@ -17,10 +17,10 @@ import { OwnerApi } from '../../../src/api/owner';
 import { City, OwnerReferenceData } from '../../../src/api/types';
 import { Button } from '../../../src/components/Button';
 import { Input } from '../../../src/components/Input';
+import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import {
     CANONICAL_CATEGORIES,
     CanonicalCategorySlug,
-    getCategoryDisplayName,
 } from '../../../src/constants/categories';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
@@ -30,28 +30,7 @@ import {
     Building2,
     CheckCircle2,
     MapPin,
-    Utensils,
 } from 'lucide-react-native';
-
-const FALLBACK_REF_DATA: OwnerReferenceData = {
-    categories: [
-        { id: 4, name: 'Hostels/PG', slug: 'hostels-pg', code: 'hostel_pg' } as any,
-        { id: 5, name: 'Homestays', slug: 'homestays', code: 'homestay' } as any,
-        { id: 6, name: 'Co-Living', slug: 'co-living', code: 'coliving' } as any,
-    ],
-    cities: [
-        { id: 1, name: 'Hyderabad', slug: 'hyderabad' } as any,
-        { id: 2, name: 'Guntur', slug: 'guntur' } as any,
-        { id: 3, name: 'Vijayawada', slug: 'vijayawada' } as any,
-        { id: 4, name: 'Visakhapatnam', slug: 'visakhapatnam' } as any,
-    ],
-    amenities: [
-        { id: 1, name: 'High-speed Wi-Fi', slug: 'wifi' } as any,
-        { id: 2, name: 'Air Conditioning', slug: 'ac' } as any,
-        { id: 3, name: 'Power Backup', slug: 'power-backup' } as any,
-        { id: 4, name: 'CCTV Security', slug: 'cctv' } as any,
-    ],
-} as unknown as OwnerReferenceData;
 
 export default function CreatePropertyScreen() {
     const router = useRouter();
@@ -59,6 +38,7 @@ export default function CreatePropertyScreen() {
     const [loadingRefData, setLoadingRefData] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [refData, setRefData] = useState<OwnerReferenceData | null>(null);
+    const [referenceError, setReferenceError] = useState<string | null>(null);
 
     // Form fields
     const [name, setName] = useState('');
@@ -86,12 +66,13 @@ export default function CreatePropertyScreen() {
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        loadReferenceData();
+        void loadReferenceData();
     }, []);
 
     const loadReferenceData = async () => {
         try {
             setLoadingRefData(true);
+            setReferenceError(null);
             const res = await OwnerApi.getReferenceData();
             if (res.data) {
                 setRefData(res.data);
@@ -99,9 +80,14 @@ export default function CreatePropertyScreen() {
                     setSelectedCityId(res.data.cities[0].id);
                 }
             }
-        } catch {
-            setRefData(FALLBACK_REF_DATA);
-            setSelectedCityId(FALLBACK_REF_DATA.cities[0].id);
+        } catch (loadError: unknown) {
+            setRefData(null);
+            setSelectedCityId(null);
+            setReferenceError(
+                loadError instanceof Error
+                    ? loadError.message
+                    : 'Unable to load the property catalogue.',
+            );
         } finally {
             setLoadingRefData(false);
         }
@@ -168,14 +154,20 @@ export default function CreatePropertyScreen() {
         const matchedCategory = refData?.categories.find(
             (c) => c.slug === selectedCategorySlug,
         );
-        const categoryId = matchedCategory?.id || 1;
+        if (!matchedCategory || !selectedCityId) {
+            Alert.alert(
+                'Catalogue Unavailable',
+                'Reload the property catalogue before submitting this property.',
+            );
+            return;
+        }
 
         setSubmitting(true);
         try {
             const payload = {
                 name: name.trim(),
-                category_id: categoryId,
-                city_id: selectedCityId!,
+                category_id: matchedCategory.id,
+                city_id: selectedCityId,
                 description: description.trim(),
                 contact_person_name: contactName.trim(),
                 contact_phone: contactPhone.trim(),
@@ -199,7 +191,7 @@ export default function CreatePropertyScreen() {
                             dinner_included: dinnerIncluded,
                             room_types: [],
                         });
-                    } catch (ignore) {
+                    } catch {
                         // Food config can also be edited later in Pricing tab
                     }
                 }
@@ -210,7 +202,8 @@ export default function CreatePropertyScreen() {
                     [
                         {
                             text: 'OK',
-                            onPress: () => router.replace('/(partner)/properties'),
+                            onPress: () =>
+                                router.replace('/(partner)/properties'),
                         },
                     ],
                 );
@@ -218,7 +211,8 @@ export default function CreatePropertyScreen() {
         } catch (e: any) {
             Alert.alert(
                 'Submission Error',
-                e.message || 'Failed to create property draft. Please check inputs.',
+                e.message ||
+                    'Failed to create property draft. Please check inputs.',
             );
         } finally {
             setSubmitting(false);
@@ -230,6 +224,23 @@ export default function CreatePropertyScreen() {
             <SafeAreaView style={styles.center}>
                 <ActivityIndicator size="large" color={Colors.deepPlum} />
                 <Text style={styles.loadingText}>Loading setup catalog...</Text>
+            </SafeAreaView>
+        );
+    }
+
+    if (referenceError || !refData) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <ExceptionalState
+                    type="no-internet"
+                    title="Property Catalogue Unavailable"
+                    description={
+                        referenceError ??
+                        'The property catalogue could not be loaded.'
+                    }
+                    actionLabel="Try Again"
+                    onAction={loadReferenceData}
+                />
             </SafeAreaView>
         );
     }
@@ -252,7 +263,12 @@ export default function CreatePropertyScreen() {
                     <View style={styles.headerTitleBox}>
                         <Text style={styles.headerTitle}>Add New Stay</Text>
                         <Text style={styles.headerSubtitle}>
-                            Step {step} of 3: {step === 1 ? 'Basic Information' : step === 2 ? 'Location & Address' : 'Meals & Finalize'}
+                            Step {step} of 3:{' '}
+                            {step === 1
+                                ? 'Basic Information'
+                                : step === 2
+                                  ? 'Location & Address'
+                                  : 'Meals & Finalize'}
                         </Text>
                     </View>
                 </View>
@@ -262,7 +278,14 @@ export default function CreatePropertyScreen() {
                     <View
                         style={[
                             styles.progressFill,
-                            { width: step === 1 ? '33%' : step === 2 ? '66%' : '100%' },
+                            {
+                                width:
+                                    step === 1
+                                        ? '33%'
+                                        : step === 2
+                                          ? '66%'
+                                          : '100%',
+                            },
                         ]}
                     />
                 </View>
@@ -278,7 +301,8 @@ export default function CreatePropertyScreen() {
                                 1. Canonical Category
                             </Text>
                             <Text style={styles.helperText}>
-                                Select one of TIJUM's three verified accommodation formats:
+                                Select one of TIJUM's three verified
+                                accommodation formats:
                             </Text>
                             <View style={styles.categoryPills}>
                                 {CANONICAL_CATEGORIES.map((cat) => {
@@ -289,7 +313,9 @@ export default function CreatePropertyScreen() {
                                             key={cat.slug}
                                             activeOpacity={0.8}
                                             onPress={() =>
-                                                setSelectedCategorySlug(cat.slug)
+                                                setSelectedCategorySlug(
+                                                    cat.slug,
+                                                )
                                             }
                                             style={[
                                                 styles.categoryPill,
@@ -320,7 +346,12 @@ export default function CreatePropertyScreen() {
                                 })}
                             </View>
 
-                            <Text style={[styles.sectionTitle, { marginTop: Spacing.lg }]}>
+                            <Text
+                                style={[
+                                    styles.sectionTitle,
+                                    { marginTop: Spacing.lg },
+                                ]}
+                            >
                                 2. Property Overview
                             </Text>
                             <Input
@@ -341,7 +372,12 @@ export default function CreatePropertyScreen() {
                                 error={errors.description}
                             />
 
-                            <Text style={[styles.sectionTitle, { marginTop: Spacing.md }]}>
+                            <Text
+                                style={[
+                                    styles.sectionTitle,
+                                    { marginTop: Spacing.md },
+                                ]}
+                            >
                                 3. Primary Contact
                             </Text>
                             <Input
@@ -383,26 +419,35 @@ export default function CreatePropertyScreen() {
                             </Text>
                             <View style={styles.cityPills}>
                                 {refData?.cities.map((city: City) => {
-                                    const isSelected = selectedCityId === city.id;
+                                    const isSelected =
+                                        selectedCityId === city.id;
                                     return (
                                         <TouchableOpacity
                                             key={city.id}
                                             activeOpacity={0.8}
-                                            onPress={() => setSelectedCityId(city.id)}
+                                            onPress={() =>
+                                                setSelectedCityId(city.id)
+                                            }
                                             style={[
                                                 styles.cityPill,
-                                                isSelected && styles.cityPillActive,
+                                                isSelected &&
+                                                    styles.cityPillActive,
                                             ]}
                                         >
                                             <MapPin
                                                 size={14}
-                                                color={isSelected ? Colors.white : Colors.gray700}
+                                                color={
+                                                    isSelected
+                                                        ? Colors.white
+                                                        : Colors.gray700
+                                                }
                                                 style={{ marginRight: 4 }}
                                             />
                                             <Text
                                                 style={[
                                                     styles.cityPillText,
-                                                    isSelected && styles.cityPillTextActive,
+                                                    isSelected &&
+                                                        styles.cityPillTextActive,
                                                 ]}
                                             >
                                                 {city.name}
@@ -412,7 +457,9 @@ export default function CreatePropertyScreen() {
                                 })}
                             </View>
                             {errors.city ? (
-                                <Text style={styles.errorInline}>{errors.city}</Text>
+                                <Text style={styles.errorInline}>
+                                    {errors.city}
+                                </Text>
                             ) : null}
 
                             <Input
@@ -460,7 +507,8 @@ export default function CreatePropertyScreen() {
                                 Meal & Food Inclusions
                             </Text>
                             <Text style={styles.helperText}>
-                                Customers see verified meal badges on listing cards. Configure your daily offerings:
+                                Customers see verified meal badges on listing
+                                cards. Configure your daily offerings:
                             </Text>
 
                             <View style={styles.switchCard}>
@@ -469,13 +517,16 @@ export default function CreatePropertyScreen() {
                                         Provide Food / Meals
                                     </Text>
                                     <Text style={styles.switchSubtitle}>
-                                        Are prepared meals included with stays?
+                                        Are meals available with stays?
                                     </Text>
                                 </View>
                                 <Switch
                                     value={foodProvided}
                                     onValueChange={setFoodProvided}
-                                    trackColor={{ false: Colors.gray300, true: Colors.coral }}
+                                    trackColor={{
+                                        false: Colors.gray300,
+                                        true: Colors.coral,
+                                    }}
                                     thumbColor={Colors.white}
                                 />
                             </View>
@@ -483,16 +534,22 @@ export default function CreatePropertyScreen() {
                             {foodProvided && (
                                 <View style={styles.mealOptionsBox}>
                                     <Text style={styles.mealsIncludedHeading}>
-                                        Included Daily Meals:
+                                        Select Included Meals:
                                     </Text>
                                     <TouchableOpacity
                                         style={styles.mealCheckRow}
-                                        onPress={() => setBreakfastIncluded((v) => !v)}
+                                        onPress={() =>
+                                            setBreakfastIncluded((v) => !v)
+                                        }
                                         activeOpacity={0.8}
                                     >
                                         <CheckCircle2
                                             size={20}
-                                            color={breakfastIncluded ? Colors.coral : Colors.gray300}
+                                            color={
+                                                breakfastIncluded
+                                                    ? Colors.coral
+                                                    : Colors.gray300
+                                            }
                                         />
                                         <Text style={styles.mealCheckLabel}>
                                             Breakfast Included
@@ -501,12 +558,18 @@ export default function CreatePropertyScreen() {
 
                                     <TouchableOpacity
                                         style={styles.mealCheckRow}
-                                        onPress={() => setLunchIncluded((v) => !v)}
+                                        onPress={() =>
+                                            setLunchIncluded((v) => !v)
+                                        }
                                         activeOpacity={0.8}
                                     >
                                         <CheckCircle2
                                             size={20}
-                                            color={lunchIncluded ? Colors.coral : Colors.gray300}
+                                            color={
+                                                lunchIncluded
+                                                    ? Colors.coral
+                                                    : Colors.gray300
+                                            }
                                         />
                                         <Text style={styles.mealCheckLabel}>
                                             Lunch Included
@@ -515,12 +578,18 @@ export default function CreatePropertyScreen() {
 
                                     <TouchableOpacity
                                         style={styles.mealCheckRow}
-                                        onPress={() => setDinnerIncluded((v) => !v)}
+                                        onPress={() =>
+                                            setDinnerIncluded((v) => !v)
+                                        }
                                         activeOpacity={0.8}
                                     >
                                         <CheckCircle2
                                             size={20}
-                                            color={dinnerIncluded ? Colors.coral : Colors.gray300}
+                                            color={
+                                                dinnerIncluded
+                                                    ? Colors.coral
+                                                    : Colors.gray300
+                                            }
                                         />
                                         <Text style={styles.mealCheckLabel}>
                                             Dinner Included
@@ -529,18 +598,32 @@ export default function CreatePropertyScreen() {
                                 </View>
                             )}
 
-                            <View style={[styles.declarationBox, { marginTop: Spacing.xl }]}>
+                            <View
+                                style={[
+                                    styles.declarationBox,
+                                    { marginTop: Spacing.xl },
+                                ]}
+                            >
                                 <TouchableOpacity
                                     style={styles.declarationRow}
-                                    onPress={() => setDeclarationAccepted((v) => !v)}
+                                    onPress={() =>
+                                        setDeclarationAccepted((v) => !v)
+                                    }
                                     activeOpacity={0.8}
                                 >
                                     <CheckCircle2
                                         size={22}
-                                        color={declarationAccepted ? Colors.deepPlum : Colors.gray300}
+                                        color={
+                                            declarationAccepted
+                                                ? Colors.deepPlum
+                                                : Colors.gray300
+                                        }
                                     />
                                     <Text style={styles.declarationText}>
-                                        I hereby declare that the property details, location, and operational terms provided are truthful and adhere to TIJUM partner guidelines.
+                                        I hereby declare that the property
+                                        details, location, and operational terms
+                                        provided are truthful and adhere to
+                                        TIJUM partner guidelines.
                                     </Text>
                                 </TouchableOpacity>
                             </View>

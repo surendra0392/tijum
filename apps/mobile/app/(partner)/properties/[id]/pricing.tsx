@@ -25,9 +25,7 @@ import {
     AlertCircle,
     ArrowLeft,
     CheckCircle2,
-    IndianRupee,
     Sparkles,
-    Utensils,
 } from 'lucide-react-native';
 
 export default function PropertyPricingScreen() {
@@ -61,7 +59,7 @@ export default function PropertyPricingScreen() {
 
     useEffect(() => {
         if (propertyId) {
-            loadPricing();
+            void loadPricing();
         }
     }, [propertyId]);
 
@@ -95,7 +93,9 @@ export default function PropertyPricingScreen() {
                         monthly:
                             rt.monthly_rate_minor !== null &&
                             rt.monthly_rate_minor !== undefined
-                                ? String(Math.floor(rt.monthly_rate_minor / 100))
+                                ? String(
+                                      Math.floor(rt.monthly_rate_minor / 100),
+                                  )
                                 : '',
                     };
                 });
@@ -104,7 +104,8 @@ export default function PropertyPricingScreen() {
         } catch (e: any) {
             Alert.alert(
                 'Failed to Load Pricing',
-                e.message || 'Unable to retrieve property rates and meal configuration.',
+                e.message ||
+                    'Unable to retrieve property rates and meal configuration.',
             );
         } finally {
             setLoading(false);
@@ -219,9 +220,12 @@ export default function PropertyPricingScreen() {
                         <ArrowLeft size={22} color={Colors.deepPlum} />
                     </TouchableOpacity>
                     <View style={styles.headerTitleBox}>
-                        <Text style={styles.headerTitle}>Pricing & Meal Settings</Text>
+                        <Text style={styles.headerTitle}>
+                            Pricing & Meal Settings
+                        </Text>
                         <Text style={styles.headerSubtitle} numberOfLines={1}>
-                            {pricingData?.property_name || `Property #${propertyId}`}
+                            {pricingData?.property_name ||
+                                `Property #${propertyId}`}
                         </Text>
                     </View>
                 </View>
@@ -239,11 +243,15 @@ export default function PropertyPricingScreen() {
                             </Text>
                         </View>
                         <Text style={styles.readinessDesc}>
-                            Rates are configured in Indian Rupees (₹) and stored as integer paise. Rates apply per guest for shared rooms, or per room for private configurations.
+                            Rates are configured in Indian Rupees (₹) and stored
+                            as integer paise. Rates apply per guest for shared
+                            rooms, or per room for private configurations.
                         </Text>
                         <View style={styles.readinessStats}>
                             <View style={styles.statPill}>
-                                <Text style={styles.statLabel}>Active Categories</Text>
+                                <Text style={styles.statLabel}>
+                                    Active Categories
+                                </Text>
                                 <Text style={styles.statValue}>
                                     {evaluation?.active_room_types_count ?? 0}
                                 </Text>
@@ -251,15 +259,19 @@ export default function PropertyPricingScreen() {
                             <View style={styles.statPill}>
                                 <Text style={styles.statLabel}>Configured</Text>
                                 <Text style={styles.statValue}>
-                                    {evaluation?.configured_room_types_count ?? 0}
+                                    {evaluation?.configured_room_types_count ??
+                                        0}
                                 </Text>
                             </View>
                             <View style={styles.statPill}>
-                                <Text style={styles.statLabel}>Missing Rates</Text>
+                                <Text style={styles.statLabel}>
+                                    Missing Rates
+                                </Text>
                                 <Text
                                     style={[
                                         styles.statValue,
-                                        evaluation && evaluation.missing_pricing_count > 0
+                                        evaluation &&
+                                        evaluation.missing_pricing_count > 0
                                             ? { color: Colors.rose }
                                             : { color: Colors.emerald },
                                     ]}
@@ -271,18 +283,25 @@ export default function PropertyPricingScreen() {
                     </View>
 
                     {/* Meal Configuration Section */}
-                    <Text style={styles.sectionTitle}>1. Daily Food & Meal Inclusions</Text>
+                    <Text style={styles.sectionTitle}>
+                        1. Daily Food & Meal Inclusions
+                    </Text>
                     <View style={styles.switchCard}>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.switchTitle}>Food Provided by Stay</Text>
+                            <Text style={styles.switchTitle}>
+                                Food Provided by Stay
+                            </Text>
                             <Text style={styles.switchSubtitle}>
-                                Daily home-cooked or catered meals included in rent
+                                Configure food availability and included meals
                             </Text>
                         </View>
                         <Switch
                             value={foodProvided}
                             onValueChange={setFoodProvided}
-                            trackColor={{ false: Colors.gray300, true: Colors.coral }}
+                            trackColor={{
+                                false: Colors.gray300,
+                                true: Colors.coral,
+                            }}
                             thumbColor={Colors.white}
                         />
                     </View>
@@ -290,7 +309,7 @@ export default function PropertyPricingScreen() {
                     {foodProvided && (
                         <View style={styles.mealOptionsBox}>
                             <Text style={styles.mealsIncludedHeading}>
-                                Included Daily Meals:
+                                Select Included Meals:
                             </Text>
                             <TouchableOpacity
                                 style={styles.mealCheckRow}
@@ -299,7 +318,11 @@ export default function PropertyPricingScreen() {
                             >
                                 <CheckCircle2
                                     size={20}
-                                    color={breakfastIncluded ? Colors.coral : Colors.gray300}
+                                    color={
+                                        breakfastIncluded
+                                            ? Colors.coral
+                                            : Colors.gray300
+                                    }
                                 />
                                 <Text style={styles.mealCheckLabel}>
                                     Breakfast Included
@@ -313,7 +336,11 @@ export default function PropertyPricingScreen() {
                             >
                                 <CheckCircle2
                                     size={20}
-                                    color={lunchIncluded ? Colors.coral : Colors.gray300}
+                                    color={
+                                        lunchIncluded
+                                            ? Colors.coral
+                                            : Colors.gray300
+                                    }
                                 />
                                 <Text style={styles.mealCheckLabel}>
                                     Lunch Included
@@ -327,7 +354,11 @@ export default function PropertyPricingScreen() {
                             >
                                 <CheckCircle2
                                     size={20}
-                                    color={dinnerIncluded ? Colors.coral : Colors.gray300}
+                                    color={
+                                        dinnerIncluded
+                                            ? Colors.coral
+                                            : Colors.gray300
+                                    }
                                 />
                                 <Text style={styles.mealCheckLabel}>
                                     Dinner Included
@@ -337,11 +368,14 @@ export default function PropertyPricingScreen() {
                     )}
 
                     {/* Standard Rates Section */}
-                    <Text style={[styles.sectionTitle, { marginTop: Spacing.xl }]}>
+                    <Text
+                        style={[styles.sectionTitle, { marginTop: Spacing.xl }]}
+                    >
                         2. Room Category Standard Rates
                     </Text>
 
-                    {pricingData?.room_types && pricingData.room_types.length > 0 ? (
+                    {pricingData?.room_types &&
+                    pricingData.room_types.length > 0 ? (
                         pricingData.room_types.map((rt) => {
                             const curRates = ratesMap[rt.id] || {
                                 daily: '',
@@ -349,18 +383,32 @@ export default function PropertyPricingScreen() {
                                 monthly: '',
                             };
                             return (
-                                <View key={rt.id} style={styles.roomTypePricingCard}>
+                                <View
+                                    key={rt.id}
+                                    style={styles.roomTypePricingCard}
+                                >
                                     <View style={styles.cardHeader}>
                                         <View style={{ flex: 1 }}>
                                             <Text style={styles.roomTypeName}>
                                                 {rt.name}
                                             </Text>
                                             <Text style={styles.pricingBasis}>
-                                                Basis: {rt.pricing_basis === 'per_guest' ? 'Per Guest' : 'Per Room'} • {rt.is_air_conditioned ? 'AC' : 'Non-AC'}
+                                                Basis:{' '}
+                                                {rt.pricing_basis ===
+                                                'per_guest'
+                                                    ? 'Per Guest'
+                                                    : 'Per Room'}{' '}
+                                                •{' '}
+                                                {rt.is_air_conditioned
+                                                    ? 'AC'
+                                                    : 'Non-AC'}
                                             </Text>
                                         </View>
                                         <Badge
-                                            label={rt.accommodation_mode_label || rt.accommodation_mode}
+                                            label={
+                                                rt.accommodation_mode_label ||
+                                                rt.accommodation_mode
+                                            }
                                             variant="secondary"
                                         />
                                     </View>
@@ -372,7 +420,11 @@ export default function PropertyPricingScreen() {
                                                 placeholder="e.g. 800"
                                                 value={curRates.daily}
                                                 onChangeText={(v) =>
-                                                    handleRateChange(rt.id, 'daily', v)
+                                                    handleRateChange(
+                                                        rt.id,
+                                                        'daily',
+                                                        v,
+                                                    )
                                                 }
                                                 keyboardType="numeric"
                                             />
@@ -383,7 +435,11 @@ export default function PropertyPricingScreen() {
                                                 placeholder="e.g. 5000"
                                                 value={curRates.weekly}
                                                 onChangeText={(v) =>
-                                                    handleRateChange(rt.id, 'weekly', v)
+                                                    handleRateChange(
+                                                        rt.id,
+                                                        'weekly',
+                                                        v,
+                                                    )
                                                 }
                                                 keyboardType="numeric"
                                             />
@@ -394,7 +450,11 @@ export default function PropertyPricingScreen() {
                                                 placeholder="e.g. 15000"
                                                 value={curRates.monthly}
                                                 onChangeText={(v) =>
-                                                    handleRateChange(rt.id, 'monthly', v)
+                                                    handleRateChange(
+                                                        rt.id,
+                                                        'monthly',
+                                                        v,
+                                                    )
                                                 }
                                                 keyboardType="numeric"
                                             />
@@ -410,13 +470,16 @@ export default function PropertyPricingScreen() {
                                 No Room Categories Configured
                             </Text>
                             <Text style={styles.emptyRoomsDesc}>
-                                Add at least one room category to configure pricing and make this property bookable.
+                                Add at least one room category to configure
+                                pricing and make this property bookable.
                             </Text>
                             <Button
                                 title="Manage Room Types"
                                 variant="outline"
                                 onPress={() =>
-                                    router.push(`/(partner)/properties/${propertyId}/room-types` as any)
+                                    router.push(
+                                        `/(partner)/properties/${propertyId}/room-types` as any,
+                                    )
                                 }
                                 style={{ marginTop: Spacing.md }}
                             />

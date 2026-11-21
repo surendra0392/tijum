@@ -9,24 +9,25 @@ import {
     Text,
     TouchableOpacity,
     View,
-    Image,
 } from 'react-native';
-import { AlertCircle, X, Mail, Lock, Eye, EyeOff, Check } from 'lucide-react-native';
+import { AlertCircle, X, Eye, EyeOff, Check } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthContext';
 import { PublicApi } from '../../src/api/public';
+import { BrandLogo } from '../../src/components/BrandLogo';
 import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
-import { PushNotificationService } from '../../src/notifications/PushNotificationService';
 import { Colors } from '../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../src/theme/spacing';
 import { Typography } from '../../src/theme/typography';
 
 export default function CustomerLoginScreen() {
     const router = useRouter();
-    const { loginCustomer, loginPartner, loginDemoCustomer, loginDemoPartner } = useAuth();
+    const { loginCustomer } = useAuth();
 
-    const [activeTab, setActiveTab] = useState<'customer' | 'owner'>('customer');
+    const [activeTab, setActiveTab] = useState<'customer' | 'owner'>(
+        'customer',
+    );
     const [loginIdentifier, setLoginIdentifier] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -54,12 +55,14 @@ export default function CustomerLoginScreen() {
         try {
             if (activeTab === 'customer') {
                 await loginCustomer(loginIdentifier.trim(), password);
-                PushNotificationService.registerForPushNotifications('customer').catch(() => {});
                 router.replace('/(customer)/explore');
             } else {
-                await loginPartner(loginIdentifier.trim(), password);
-                PushNotificationService.registerForPushNotifications('partner').catch(() => {});
-                router.replace('/(partner)/dashboard');
+                Alert.alert(
+                    'Partner Login',
+                    'Please use the Partner Portal sign-in page.',
+                    [{ text: 'OK' }],
+                );
+                router.replace('/(auth)/owner-login');
             }
         } catch (err: any) {
             setErrorMessage(
@@ -110,22 +113,23 @@ export default function CustomerLoginScreen() {
             >
                 {/* Curved Plum Hero Banner with TIJUM Logo */}
                 <View style={styles.plumHeroBanner}>
-                    <View style={styles.brandLogoRow}>
-                        <View style={styles.roofIcon} />
-                        <Text style={styles.brandTitle}>TIJUM</Text>
-                    </View>
-                    <Text style={styles.brandTagline}>Stay • Dine • Belong</Text>
-                    <Text style={styles.brandSubtag}>Your Stay. Our Priority.</Text>
+                    <BrandLogo size={158} tone="light" />
                 </View>
 
                 {/* Main Card */}
                 <View style={styles.cardContainer}>
+                    <Text style={styles.welcomeTitle}>Welcome Back!</Text>
+                    <Text style={styles.welcomeSubtitle}>
+                        Sign in to continue your journey
+                    </Text>
+
                     {/* Role Segmented Switch: Customer vs Owner */}
                     <View style={styles.segmentedContainer}>
                         <TouchableOpacity
                             style={[
                                 styles.segmentTab,
-                                activeTab === 'customer' && styles.segmentTabActive,
+                                activeTab === 'customer' &&
+                                    styles.segmentTabActive,
                             ]}
                             onPress={() => {
                                 setActiveTab('customer');
@@ -136,7 +140,8 @@ export default function CustomerLoginScreen() {
                             <Text
                                 style={[
                                     styles.segmentText,
-                                    activeTab === 'customer' && styles.segmentTextActive,
+                                    activeTab === 'customer' &&
+                                        styles.segmentTextActive,
                                 ]}
                             >
                                 Customer
@@ -146,7 +151,8 @@ export default function CustomerLoginScreen() {
                         <TouchableOpacity
                             style={[
                                 styles.segmentTab,
-                                activeTab === 'owner' && styles.segmentTabActive,
+                                activeTab === 'owner' &&
+                                    styles.segmentTabActive,
                             ]}
                             onPress={() => {
                                 setActiveTab('owner');
@@ -157,7 +163,8 @@ export default function CustomerLoginScreen() {
                             <Text
                                 style={[
                                     styles.segmentText,
-                                    activeTab === 'owner' && styles.segmentTextActive,
+                                    activeTab === 'owner' &&
+                                        styles.segmentTextActive,
                                 ]}
                             >
                                 Owner
@@ -167,7 +174,8 @@ export default function CustomerLoginScreen() {
 
                     {/* Disclosures Note */}
                     <Text style={styles.disclosureNotice}>
-                        Sign in to manage your reservations with transparent meal disclosures, payments, and verified reviews.
+                        Sign in to manage your reservations with transparent
+                        meal disclosures, payments, and verified reviews.
                     </Text>
 
                     {errorMessage ? (
@@ -194,7 +202,11 @@ export default function CustomerLoginScreen() {
                                     ? 'name@example.com or 9876543210'
                                     : 'owner@property.com'
                             }
-                            keyboardType={activeTab === 'customer' ? 'default' : 'email-address'}
+                            keyboardType={
+                                activeTab === 'customer'
+                                    ? 'default'
+                                    : 'email-address'
+                            }
                             autoCapitalize="none"
                             value={loginIdentifier}
                             onChangeText={setLoginIdentifier}
@@ -238,7 +250,9 @@ export default function CustomerLoginScreen() {
                                         <Check size={12} color={Colors.white} />
                                     ) : null}
                                 </View>
-                                <Text style={styles.rememberMeText}>Remember Me</Text>
+                                <Text style={styles.rememberMeText}>
+                                    Remember Me
+                                </Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -268,7 +282,9 @@ export default function CustomerLoginScreen() {
                         {/* Divider */}
                         <View style={styles.dividerRow}>
                             <View style={styles.dividerLine} />
-                            <Text style={styles.dividerText}>or continue with</Text>
+                            <Text style={styles.dividerText}>
+                                or continue with
+                            </Text>
                             <View style={styles.dividerLine} />
                         </View>
 
@@ -330,7 +346,9 @@ export default function CustomerLoginScreen() {
                     <View style={styles.modalOverlay}>
                         <View style={styles.modalContent}>
                             <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Reset Password</Text>
+                                <Text style={styles.modalTitle}>
+                                    Reset Password
+                                </Text>
                                 <TouchableOpacity
                                     onPress={() => setShowForgotModal(false)}
                                 >
@@ -338,7 +356,12 @@ export default function CustomerLoginScreen() {
                                 </TouchableOpacity>
                             </View>
                             <Text style={styles.modalSubtitle}>
-                                Enter your registered {activeTab === 'customer' ? 'customer' : 'partner'} email address and we'll send you instructions to reset your password.
+                                Enter your registered{' '}
+                                {activeTab === 'customer'
+                                    ? 'customer'
+                                    : 'partner'}{' '}
+                                email address and we'll send you instructions to
+                                reset your password.
                             </Text>
                             <Input
                                 label="Registered Email"
@@ -384,16 +407,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 2,
     },
-    roofIcon: {
-        width: 16,
-        height: 10,
-        borderTopWidth: 3,
-        borderLeftWidth: 3,
-        borderRightWidth: 3,
-        borderColor: Colors.coral,
-        marginRight: 6,
-        borderRadius: 2,
-    },
     brandTitle: {
         fontSize: 26,
         fontWeight: '800',
@@ -424,6 +437,22 @@ const styles = StyleSheet.create({
         elevation: 4,
         borderWidth: 1,
         borderColor: Colors.borderSubtle,
+    },
+    welcomeTitle: {
+        fontFamily: Typography.fontFamily.heading,
+        fontSize: 24,
+        lineHeight: 30,
+        color: Colors.deepPlum,
+        textAlign: 'center',
+        marginTop: 2,
+    },
+    welcomeSubtitle: {
+        fontFamily: Typography.fontFamily.body,
+        fontSize: 14,
+        color: Colors.inkSecondary,
+        textAlign: 'center',
+        marginTop: 4,
+        marginBottom: Spacing.md,
     },
     segmentedContainer: {
         flexDirection: 'row',

@@ -26,14 +26,11 @@ import { Colors } from '../../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../../src/theme/spacing';
 import { Typography } from '../../../../src/theme/typography';
 import {
-    AlertCircle,
     ArrowLeft,
     Calendar,
     CalendarOff,
-    CheckCircle2,
     Lock,
     Plus,
-    ShieldAlert,
     X,
 } from 'lucide-react-native';
 
@@ -50,18 +47,24 @@ export default function PropertyAvailabilityScreen() {
 
     // Create Modal
     const [modalVisible, setModalVisible] = useState(false);
-    const [scope, setScope] = useState<'property' | 'room_type' | 'physical_room'>('property');
-    const [blockType, setBlockType] = useState<string>('maintenance');
+    const [scope, setScope] = useState<'property' | 'room_type' | 'room'>(
+        'property',
+    );
+    const [blockType, setBlockType] = useState<
+        'closure' | 'maintenance' | 'stop_sell'
+    >('maintenance');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    const [selectedRoomTypeId, setSelectedRoomTypeId] = useState<number | null>(null);
+    const [selectedRoomTypeId, setSelectedRoomTypeId] = useState<number | null>(
+        null,
+    );
     const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
     const [reason, setReason] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
         if (propertyId) {
-            loadData();
+            void loadData();
         }
     }, [propertyId]);
 
@@ -90,7 +93,10 @@ export default function PropertyAvailabilityScreen() {
                 }
             }
         } catch (e: any) {
-            Alert.alert('Load Failed', e.message || 'Unable to retrieve availability blocks.');
+            Alert.alert(
+                'Load Failed',
+                e.message || 'Unable to retrieve availability blocks.',
+            );
         } finally {
             setLoading(false);
         }
@@ -104,7 +110,9 @@ export default function PropertyAvailabilityScreen() {
 
     const handleOpenCreate = () => {
         const today = new Date().toISOString().split('T')[0];
-        const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+        const nextWeek = new Date(Date.now() + 7 * 86400000)
+            .toISOString()
+            .split('T')[0];
         setStartDate(today);
         setEndDate(nextWeek);
         setScope('property');
@@ -114,12 +122,21 @@ export default function PropertyAvailabilityScreen() {
     };
 
     const handleCreateBlock = async () => {
-        if (!startDate.match(/^\d{4}-\d{2}-\d{2}$/) || !endDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
-            Alert.alert('Date Format Error', 'Please enter dates in YYYY-MM-DD format.');
+        if (
+            !startDate.match(/^\d{4}-\d{2}-\d{2}$/) ||
+            !endDate.match(/^\d{4}-\d{2}-\d{2}$/)
+        ) {
+            Alert.alert(
+                'Date Format Error',
+                'Please enter dates in YYYY-MM-DD format.',
+            );
             return;
         }
         if (!reason.trim()) {
-            Alert.alert('Validation Error', 'A reason for the availability block is required.');
+            Alert.alert(
+                'Validation Error',
+                'A reason for the availability block is required.',
+            );
             return;
         }
 
@@ -130,17 +147,24 @@ export default function PropertyAvailabilityScreen() {
                 block_type: blockType,
                 start_date: startDate,
                 end_date: endDate,
-                property_room_type_id: scope === 'room_type' ? selectedRoomTypeId : null,
-                property_room_id: scope === 'physical_room' ? selectedRoomId : null,
+                property_room_type_id:
+                    scope === 'room_type' ? selectedRoomTypeId : null,
+                property_room_id: scope === 'room' ? selectedRoomId : null,
                 reason: reason.trim(),
             };
 
             await OwnerApi.createAvailabilityBlock(propertyId, payload);
-            Alert.alert('Block Created', 'Inventory availability block applied successfully.');
+            Alert.alert(
+                'Block Created',
+                'Inventory availability block applied successfully.',
+            );
             setModalVisible(false);
             await loadData();
         } catch (e: any) {
-            Alert.alert('Block Creation Failed', e.message || 'Unable to create block.');
+            Alert.alert(
+                'Block Creation Failed',
+                e.message || 'Unable to create block.',
+            );
         } finally {
             setSubmitting(false);
         }
@@ -170,7 +194,10 @@ export default function PropertyAvailabilityScreen() {
                                 block.id,
                                 'Cancelled by partner via mobile app',
                             );
-                            Alert.alert('Success', 'Availability block cancelled.');
+                            Alert.alert(
+                                'Success',
+                                'Availability block cancelled.',
+                            );
                             await loadData();
                         } catch (e: any) {
                             Alert.alert('Error', e.message);
@@ -194,7 +221,9 @@ export default function PropertyAvailabilityScreen() {
                             {item.is_admin_restriction ? (
                                 <View style={styles.adminLockBadge}>
                                     <Lock size={11} color={Colors.coral} />
-                                    <Text style={styles.adminLockText}>Admin Restriction</Text>
+                                    <Text style={styles.adminLockText}>
+                                        Admin Restriction
+                                    </Text>
                                 </View>
                             ) : null}
                         </View>
@@ -261,9 +290,12 @@ export default function PropertyAvailabilityScreen() {
                     <ArrowLeft size={22} color={Colors.deepPlum} />
                 </TouchableOpacity>
                 <View style={styles.headerTitleBox}>
-                    <Text style={styles.headerTitle}>Availability & Blocks</Text>
+                    <Text style={styles.headerTitle}>
+                        Availability & Blocks
+                    </Text>
                     <Text style={styles.headerSubtitle}>
-                        Property #{propertyId} • {blocks.filter((b) => b.is_active).length} Active Blocks
+                        Property #{propertyId} •{' '}
+                        {blocks.filter((b) => b.is_active).length} Active Blocks
                     </Text>
                 </View>
                 <TouchableOpacity
@@ -279,12 +311,14 @@ export default function PropertyAvailabilityScreen() {
             {loading && !refreshing ? (
                 <View style={styles.center}>
                     <ActivityIndicator size="large" color={Colors.deepPlum} />
-                    <Text style={styles.loadingText}>Loading availability blocks...</Text>
+                    <Text style={styles.loadingText}>
+                        Loading availability blocks...
+                    </Text>
                 </View>
             ) : (
                 <FlatList
                     data={blocks}
-                    keyExtractor={(item) => item.id.toString()}
+                    keyExtractor={(item: any) => item.id.toString()}
                     renderItem={renderBlockCard}
                     contentContainerStyle={styles.listContent}
                     refreshControl={
@@ -297,9 +331,13 @@ export default function PropertyAvailabilityScreen() {
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
                             <CalendarOff size={48} color={Colors.gray300} />
-                            <Text style={styles.emptyTitle}>No Availability Blocks</Text>
+                            <Text style={styles.emptyTitle}>
+                                No Availability Blocks
+                            </Text>
                             <Text style={styles.emptySubtitle}>
-                                All room categories and physical rooms are open for verified instant guest bookings. You can apply maintenance or seasonal holds anytime.
+                                All room categories and physical rooms are open
+                                for verified instant guest bookings. You can
+                                apply maintenance or seasonal holds anytime.
                             </Text>
                             <Button
                                 title="+ Create Inventory Block"
@@ -322,10 +360,17 @@ export default function PropertyAvailabilityScreen() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Block Inventory</Text>
+                            <Text style={styles.modalTitle}>
+                                Block Inventory
+                            </Text>
                             <TouchableOpacity
                                 onPress={() => setModalVisible(false)}
-                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                hitSlop={{
+                                    top: 10,
+                                    bottom: 10,
+                                    left: 10,
+                                    right: 10,
+                                }}
                             >
                                 <X size={20} color={Colors.gray600} />
                             </TouchableOpacity>
@@ -334,23 +379,36 @@ export default function PropertyAvailabilityScreen() {
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <Text style={styles.label}>Block Scope *</Text>
                             <View style={styles.segmentedRow}>
-                                {[
-                                    { key: 'property', label: 'Property-Wide' },
-                                    { key: 'room_type', label: 'Room Category' },
-                                    { key: 'physical_room', label: 'Specific Room' },
-                                ].map((s) => (
+                                {(
+                                    [
+                                        {
+                                            key: 'property',
+                                            label: 'Property-Wide',
+                                        },
+                                        {
+                                            key: 'room_type',
+                                            label: 'Room Category',
+                                        },
+                                        {
+                                            key: 'room',
+                                            label: 'Specific Room',
+                                        },
+                                    ] as const
+                                ).map((s) => (
                                     <TouchableOpacity
                                         key={s.key}
                                         style={[
                                             styles.segmentBtn,
-                                            scope === s.key && styles.segmentBtnActive,
+                                            scope === s.key &&
+                                                styles.segmentBtnActive,
                                         ]}
-                                        onPress={() => setScope(s.key as any)}
+                                        onPress={() => setScope(s.key)}
                                     >
                                         <Text
                                             style={[
                                                 styles.segmentText,
-                                                scope === s.key && styles.segmentTextActive,
+                                                scope === s.key &&
+                                                    styles.segmentTextActive,
                                             ]}
                                         >
                                             {s.label}
@@ -362,21 +420,29 @@ export default function PropertyAvailabilityScreen() {
                             {/* Target selector if room_type */}
                             {scope === 'room_type' && (
                                 <View style={{ marginTop: Spacing.md }}>
-                                    <Text style={styles.label}>Select Room Category *</Text>
+                                    <Text style={styles.label}>
+                                        Select Room Category *
+                                    </Text>
                                     <View style={styles.pillsRow}>
                                         {roomTypes.map((rt) => (
                                             <TouchableOpacity
                                                 key={rt.id}
                                                 style={[
                                                     styles.pill,
-                                                    selectedRoomTypeId === rt.id && styles.pillActive,
+                                                    selectedRoomTypeId ===
+                                                        rt.id &&
+                                                        styles.pillActive,
                                                 ]}
-                                                onPress={() => setSelectedRoomTypeId(rt.id)}
+                                                onPress={() =>
+                                                    setSelectedRoomTypeId(rt.id)
+                                                }
                                             >
                                                 <Text
                                                     style={[
                                                         styles.pillText,
-                                                        selectedRoomTypeId === rt.id && styles.pillTextActive,
+                                                        selectedRoomTypeId ===
+                                                            rt.id &&
+                                                            styles.pillTextActive,
                                                     ]}
                                                 >
                                                     {rt.name}
@@ -387,24 +453,31 @@ export default function PropertyAvailabilityScreen() {
                                 </View>
                             )}
 
-                            {/* Target selector if physical_room */}
-                            {scope === 'physical_room' && (
+                            {/* Target selector if physical room */}
+                            {scope === 'room' && (
                                 <View style={{ marginTop: Spacing.md }}>
-                                    <Text style={styles.label}>Select Physical Room *</Text>
+                                    <Text style={styles.label}>
+                                        Select Physical Room *
+                                    </Text>
                                     <View style={styles.pillsRow}>
                                         {rooms.map((r) => (
                                             <TouchableOpacity
                                                 key={r.id}
                                                 style={[
                                                     styles.pill,
-                                                    selectedRoomId === r.id && styles.pillActive,
+                                                    selectedRoomId === r.id &&
+                                                        styles.pillActive,
                                                 ]}
-                                                onPress={() => setSelectedRoomId(r.id)}
+                                                onPress={() =>
+                                                    setSelectedRoomId(r.id)
+                                                }
                                             >
                                                 <Text
                                                     style={[
                                                         styles.pillText,
-                                                        selectedRoomId === r.id && styles.pillTextActive,
+                                                        selectedRoomId ===
+                                                            r.id &&
+                                                            styles.pillTextActive,
                                                     ]}
                                                 >
                                                     Room {r.room_number}
@@ -415,28 +488,45 @@ export default function PropertyAvailabilityScreen() {
                                 </View>
                             )}
 
-                            <Text style={[styles.label, { marginTop: Spacing.md }]}>
+                            <Text
+                                style={[
+                                    styles.label,
+                                    { marginTop: Spacing.md },
+                                ]}
+                            >
                                 Block Reason Type *
                             </Text>
                             <View style={styles.pillsRow}>
-                                {[
-                                    { key: 'maintenance', label: 'Maintenance / Repairs' },
-                                    { key: 'owner_use', label: 'Owner Use' },
-                                    { key: 'seasonal_closure', label: 'Seasonal Closure' },
-                                    { key: 'offline_booking', label: 'Offline / Direct Hold' },
-                                ].map((t) => (
+                                {(
+                                    [
+                                        {
+                                            key: 'maintenance',
+                                            label: 'Maintenance / Repairs',
+                                        },
+                                        {
+                                            key: 'closure',
+                                            label: 'Closure',
+                                        },
+                                        {
+                                            key: 'stop_sell',
+                                            label: 'Stop Sell',
+                                        },
+                                    ] as const
+                                ).map((t) => (
                                     <TouchableOpacity
                                         key={t.key}
                                         style={[
                                             styles.pill,
-                                            blockType === t.key && styles.pillActive,
+                                            blockType === t.key &&
+                                                styles.pillActive,
                                         ]}
                                         onPress={() => setBlockType(t.key)}
                                     >
                                         <Text
                                             style={[
                                                 styles.pillText,
-                                                blockType === t.key && styles.pillTextActive,
+                                                blockType === t.key &&
+                                                    styles.pillTextActive,
                                             ]}
                                         >
                                             {t.label}
@@ -445,7 +535,12 @@ export default function PropertyAvailabilityScreen() {
                                 ))}
                             </View>
 
-                            <View style={[styles.datesInputRow, { marginTop: Spacing.md }]}>
+                            <View
+                                style={[
+                                    styles.datesInputRow,
+                                    { marginTop: Spacing.md },
+                                ]}
+                            >
                                 <View style={{ flex: 1 }}>
                                     <Input
                                         label="Start Date (YYYY-MM-DD) *"
@@ -454,7 +549,9 @@ export default function PropertyAvailabilityScreen() {
                                         onChangeText={setStartDate}
                                     />
                                 </View>
-                                <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                                <View
+                                    style={{ flex: 1, marginLeft: Spacing.sm }}
+                                >
                                     <Input
                                         label="End Date (YYYY-MM-DD) *"
                                         placeholder="2026-11-27"

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    FlatList,
     KeyboardAvoidingView,
     Platform,
     RefreshControl,
@@ -16,23 +15,19 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { OwnerApi } from '../../../src/api/owner';
-import { CaseMessage, OwnerCase } from '../../../src/api/types';
+import { OwnerCase } from '../../../src/api/types';
 import { Badge } from '../../../src/components/Badge';
-import { Button } from '../../../src/components/Button';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 import {
     AlertCircle,
-    AlertTriangle,
     ArrowLeft,
     CheckCircle2,
     Clock,
-    FileText,
     MessageSquare,
     Send,
     Shield,
-    User,
 } from 'lucide-react-native';
 
 export default function CaseDetailScreen() {
@@ -53,7 +48,10 @@ export default function CaseDetailScreen() {
                 setCaseDetail(res.data);
             }
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to load case details.');
+            Alert.alert(
+                'Error',
+                error.message || 'Failed to load case details.',
+            );
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -61,12 +59,12 @@ export default function CaseDetailScreen() {
     };
 
     useEffect(() => {
-        fetchCase();
+        void fetchCase();
     }, [reference]);
 
     const onRefresh = () => {
         setRefreshing(true);
-        fetchCase();
+        void fetchCase();
     };
 
     const handleSendMessage = async () => {
@@ -76,15 +74,20 @@ export default function CaseDetailScreen() {
         try {
             await OwnerApi.addCaseMessage(reference, replyText.trim());
             setReplyText('');
-            fetchCase();
+            void fetchCase();
         } catch (error: any) {
-            Alert.alert('Send Failed', error.message || 'Could not send message.');
+            Alert.alert(
+                'Send Failed',
+                error.message || 'Could not send message.',
+            );
         } finally {
             setSending(false);
         }
     };
 
-    const getStatusVariant = (status: string): 'success' | 'warning' | 'info' | 'error' | 'neutral' => {
+    const getStatusVariant = (
+        status: string,
+    ): 'success' | 'warning' | 'info' | 'error' | 'neutral' => {
         switch (status?.toLowerCase()) {
             case 'action_required':
             case 'urgent':
@@ -156,7 +159,10 @@ export default function CaseDetailScreen() {
                     </Text>
                 </View>
                 {caseDetail?.status && (
-                    <Badge variant={getStatusVariant(caseDetail.status)} size="sm">
+                    <Badge
+                        variant={getStatusVariant(caseDetail.status)}
+                        size="sm"
+                    >
                         {caseDetail.status.replace('_', ' ').toUpperCase()}
                     </Badge>
                 )}
@@ -165,13 +171,17 @@ export default function CaseDetailScreen() {
             {loading ? (
                 <View style={styles.centered}>
                     <ActivityIndicator size="large" color={Colors.primary} />
-                    <Text style={styles.loadingText}>Loading case timeline...</Text>
+                    <Text style={styles.loadingText}>
+                        Loading case timeline...
+                    </Text>
                 </View>
             ) : !caseDetail ? (
                 <View style={styles.centered}>
                     <AlertCircle size={40} color={Colors.textTertiary} />
                     <Text style={styles.emptyTitle}>Case Not Found</Text>
-                    <Text style={styles.emptySubtitle}>Could not retrieve details for {reference}.</Text>
+                    <Text style={styles.emptySubtitle}>
+                        Could not retrieve details for {reference}.
+                    </Text>
                 </View>
             ) : (
                 <KeyboardAvoidingView
@@ -181,31 +191,52 @@ export default function CaseDetailScreen() {
                     <ScrollView
                         contentContainerStyle={styles.scrollContent}
                         refreshControl={
-                            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={onRefresh}
+                            />
                         }
                     >
                         {/* Case Overview Card */}
                         <View style={styles.overviewCard}>
-                            <Text style={styles.caseTitleText}>{caseDetail.title}</Text>
+                            <Text style={styles.caseTitleText}>
+                                {caseDetail.title}
+                            </Text>
 
-                            {(caseDetail.booking_reference || caseDetail.guest_name || caseDetail.property_name) && (
+                            {(caseDetail.booking_reference ||
+                                caseDetail.guest_name ||
+                                caseDetail.property_name) && (
                                 <View style={styles.contextGrid}>
                                     {caseDetail.property_name ? (
                                         <View style={styles.contextRow}>
-                                            <Text style={styles.contextLabel}>Property:</Text>
-                                            <Text style={styles.contextValue}>{caseDetail.property_name}</Text>
+                                            <Text style={styles.contextLabel}>
+                                                Property:
+                                            </Text>
+                                            <Text style={styles.contextValue}>
+                                                {caseDetail.property_name}
+                                            </Text>
                                         </View>
                                     ) : null}
                                     {caseDetail.booking_reference ? (
                                         <View style={styles.contextRow}>
-                                            <Text style={styles.contextLabel}>Booking Ref:</Text>
-                                            <Text style={styles.contextValueBold}>{caseDetail.booking_reference}</Text>
+                                            <Text style={styles.contextLabel}>
+                                                Booking Ref:
+                                            </Text>
+                                            <Text
+                                                style={styles.contextValueBold}
+                                            >
+                                                {caseDetail.booking_reference}
+                                            </Text>
                                         </View>
                                     ) : null}
                                     {caseDetail.guest_name ? (
                                         <View style={styles.contextRow}>
-                                            <Text style={styles.contextLabel}>Guest Name:</Text>
-                                            <Text style={styles.contextValue}>{caseDetail.guest_name}</Text>
+                                            <Text style={styles.contextLabel}>
+                                                Guest Name:
+                                            </Text>
+                                            <Text style={styles.contextValue}>
+                                                {caseDetail.guest_name}
+                                            </Text>
                                         </View>
                                     ) : null}
                                 </View>
@@ -213,10 +244,22 @@ export default function CaseDetailScreen() {
 
                             {caseDetail.resolution ? (
                                 <View style={styles.resolutionBox}>
-                                    <CheckCircle2 size={16} color={Colors.success} />
-                                    <View style={{ flex: 1, marginLeft: Spacing.xs }}>
-                                        <Text style={styles.resolutionTitle}>Resolution Note</Text>
-                                        <Text style={styles.resolutionText}>{caseDetail.resolution}</Text>
+                                    <CheckCircle2
+                                        size={16}
+                                        color={Colors.success}
+                                    />
+                                    <View
+                                        style={{
+                                            flex: 1,
+                                            marginLeft: Spacing.xs,
+                                        }}
+                                    >
+                                        <Text style={styles.resolutionTitle}>
+                                            Resolution Note
+                                        </Text>
+                                        <Text style={styles.resolutionText}>
+                                            {caseDetail.resolution}
+                                        </Text>
                                     </View>
                                 </View>
                             ) : null}
@@ -226,24 +269,77 @@ export default function CaseDetailScreen() {
                         <View style={styles.slaCard}>
                             <View style={styles.slaHeaderRow}>
                                 <Clock size={16} color={sla.color} />
-                                <Text style={[styles.slaTitle, { color: sla.color }]}>
-                                    First Action Target: {caseDetail.first_action_target_hours ? `${caseDetail.first_action_target_hours} Hours` : sla.target}
+                                <Text
+                                    style={[
+                                        styles.slaTitle,
+                                        { color: sla.color },
+                                    ]}
+                                >
+                                    First Action Target:{' '}
+                                    {caseDetail.first_action_target_hours
+                                        ? `${caseDetail.first_action_target_hours} Hours`
+                                        : sla.target}
                                 </Text>
-                                <Badge variant={caseDetail.priority === 'urgent' || caseDetail.priority === 'high' ? 'error' : caseDetail.priority === 'medium' ? 'warning' : 'neutral'} size="sm">
-                                    {(caseDetail.priority || 'standard').toUpperCase()}
+                                <Badge
+                                    variant={
+                                        caseDetail.priority === 'urgent' ||
+                                        caseDetail.priority === 'high'
+                                            ? 'error'
+                                            : caseDetail.priority === 'medium'
+                                              ? 'warning'
+                                              : 'neutral'
+                                    }
+                                    size="sm"
+                                >
+                                    {(
+                                        caseDetail.priority || 'standard'
+                                    ).toUpperCase()}
                                 </Badge>
                             </View>
                             <Text style={styles.slaDesc}>{sla.desc}</Text>
                             {caseDetail.first_action_due_at ? (
-                                <Text style={[styles.slaStatutoryText, { color: sla.color, marginTop: 4, fontWeight: '600' }]}>
-                                    First action due by: {new Date(caseDetail.first_action_due_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, {new Date(caseDetail.first_action_due_at).toLocaleDateString()}
+                                <Text
+                                    style={[
+                                        styles.slaStatutoryText,
+                                        {
+                                            color: sla.color,
+                                            marginTop: 4,
+                                            fontWeight: '600',
+                                        },
+                                    ]}
+                                >
+                                    First action due by:{' '}
+                                    {new Date(
+                                        caseDetail.first_action_due_at,
+                                    ).toLocaleTimeString([], {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                    })}
+                                    ,{' '}
+                                    {new Date(
+                                        caseDetail.first_action_due_at,
+                                    ).toLocaleDateString()}
                                 </Text>
                             ) : null}
                             <View style={styles.slaDivider} />
                             <View style={styles.slaStatutoryRow}>
                                 <Shield size={14} color={Colors.textTertiary} />
                                 <Text style={styles.slaStatutoryText}>
-                                    Statutory formal acknowledgement within 48h ({caseDetail.acknowledgement_due_at ? new Date(caseDetail.acknowledgement_due_at).toLocaleDateString() : 'within 48h'}) • Statutory resolution deadline: {caseDetail.resolution_due_at || caseDetail.sla_due_at ? new Date(caseDetail.resolution_due_at || caseDetail.sla_due_at).toLocaleDateString() : '30 days from filing'}
+                                    Statutory formal acknowledgement within 48h
+                                    (
+                                    {caseDetail.acknowledgement_due_at
+                                        ? new Date(
+                                              caseDetail.acknowledgement_due_at,
+                                          ).toLocaleDateString()
+                                        : 'within 48h'}
+                                    ) • Statutory resolution deadline:{' '}
+                                    {caseDetail.resolution_due_at ||
+                                    caseDetail.sla_due_at
+                                        ? new Date(
+                                              (caseDetail.resolution_due_at ||
+                                                  caseDetail.sla_due_at)!,
+                                          ).toLocaleDateString()
+                                        : '30 days from filing'}
                                 </Text>
                             </View>
                         </View>
@@ -252,39 +348,64 @@ export default function CaseDetailScreen() {
                         <View style={styles.timelineHeader}>
                             <MessageSquare size={16} color={Colors.primary} />
                             <Text style={styles.timelineTitle}>
-                                Discussion & Evidence Timeline ({messages.length})
+                                Discussion & Evidence Timeline (
+                                {messages.length})
                             </Text>
                         </View>
 
                         {messages.length === 0 ? (
                             <View style={styles.emptyTimeline}>
                                 <Text style={styles.emptyTimelineText}>
-                                    No communication messages logged yet. Post an update below.
+                                    No communication messages logged yet. Post
+                                    an update below.
                                 </Text>
                             </View>
                         ) : (
                             messages.map((msg) => {
-                                const isHost = msg.is_owner || msg.sender_role?.toLowerCase() === 'owner';
-                                const isAdmin = msg.sender_role?.toLowerCase() === 'admin' || msg.sender_role?.toLowerCase() === 'support';
+                                const isHost =
+                                    msg.is_owner ||
+                                    msg.sender_role?.toLowerCase() === 'owner';
+                                const isAdmin =
+                                    msg.sender_role?.toLowerCase() ===
+                                        'admin' ||
+                                    msg.sender_role?.toLowerCase() ===
+                                        'support';
 
                                 return (
                                     <View
                                         key={msg.id}
                                         style={[
                                             styles.messageBubble,
-                                            isHost ? styles.hostBubble : isAdmin ? styles.adminBubble : styles.guestBubble,
+                                            isHost
+                                                ? styles.hostBubble
+                                                : isAdmin
+                                                  ? styles.adminBubble
+                                                  : styles.guestBubble,
                                         ]}
                                     >
                                         <View style={styles.bubbleHeader}>
                                             <Text style={styles.senderName}>
-                                                {msg.sender_name || (isHost ? 'You (Host)' : isAdmin ? 'TIJUM Support' : 'Guest')}
+                                                {msg.sender_name ||
+                                                    (isHost
+                                                        ? 'You (Host)'
+                                                        : isAdmin
+                                                          ? 'TIJUM Support'
+                                                          : 'Guest')}
                                             </Text>
                                             <Text style={styles.senderRole}>
-                                                {isHost ? 'HOST' : isAdmin ? 'TIJUM DESK' : 'GUEST'}
+                                                {isHost
+                                                    ? 'HOST'
+                                                    : isAdmin
+                                                      ? 'TIJUM DESK'
+                                                      : 'GUEST'}
                                             </Text>
                                         </View>
-                                        <Text style={styles.messageContent}>{msg.message}</Text>
-                                        <Text style={styles.messageTime}>{msg.created_at}</Text>
+                                        <Text style={styles.messageContent}>
+                                            {msg.message}
+                                        </Text>
+                                        <Text style={styles.messageTime}>
+                                            {msg.created_at}
+                                        </Text>
                                     </View>
                                 );
                             })
@@ -305,14 +426,18 @@ export default function CaseDetailScreen() {
                         <TouchableOpacity
                             style={[
                                 styles.sendButton,
-                                (!replyText.trim() || sending) && styles.sendButtonDisabled,
+                                (!replyText.trim() || sending) &&
+                                    styles.sendButtonDisabled,
                             ]}
                             onPress={handleSendMessage}
                             disabled={!replyText.trim() || sending}
                             accessibilityLabel="Send Message"
                         >
                             {sending ? (
-                                <ActivityIndicator size="small" color={Colors.surface} />
+                                <ActivityIndicator
+                                    size="small"
+                                    color={Colors.surface}
+                                />
                             ) : (
                                 <Send size={18} color={Colors.surface} />
                             )}

@@ -19,6 +19,7 @@ import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import { useAuth } from '../../../src/auth/AuthContext';
 import { useRouter } from 'expo-router';
 import { Bell } from 'lucide-react-native';
+import { resolveDeepLinkPath } from '../../../src/utils/deepLinkRouting';
 
 export default function PartnerNotificationsScreen() {
     const router = useRouter();
@@ -27,20 +28,31 @@ export default function PartnerNotificationsScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [isUnauthenticated, setIsUnauthenticated] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     useEffect(() => {
         if (authLoading) return;
-        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+        if (
+            !token ||
+            authState === 'guest' ||
+            authState === 'session_expired' ||
+            authState === 'customer_authenticated'
+        ) {
             setIsUnauthenticated(true);
             setLoading(false);
             return;
         }
         setIsUnauthenticated(false);
-        loadNotifications();
+        void loadNotifications();
     }, [token, authState, authLoading]);
 
     const loadNotifications = async () => {
-        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+        if (
+            !token ||
+            authState === 'guest' ||
+            authState === 'session_expired' ||
+            authState === 'customer_authenticated'
+        ) {
             setIsUnauthenticated(true);
             setLoading(false);
             return;
@@ -48,15 +60,22 @@ export default function PartnerNotificationsScreen() {
         try {
             setLoading(true);
             setIsUnauthenticated(false);
+            setErrorMessage(null);
             const res = await OwnerApi.getNotifications();
             if (res.data) {
                 setNotifications(res.data);
             }
-        } catch (e: any) {
-            if (e?.status === 401 || e?.message?.includes('Unauthenticated')) {
+        } catch (loadError: unknown) {
+            const error = loadError as { status?: number; message?: string };
+            if (
+                error.status === 401 ||
+                error.message?.includes('Unauthenticated')
+            ) {
                 setIsUnauthenticated(true);
             } else {
-                console.error('Failed to load partner notifications', e);
+                setErrorMessage(
+                    error.message ?? 'Unable to load partner notifications.',
+                );
             }
         } finally {
             setLoading(false);
@@ -64,13 +83,21 @@ export default function PartnerNotificationsScreen() {
     };
 
     const onRefresh = async () => {
-        if (!token || authState === 'guest' || authState === 'session_expired' || authState === 'customer_authenticated') {
+        if (
+            !token ||
+            authState === 'guest' ||
+            authState === 'session_expired' ||
+            authState === 'customer_authenticated'
+        ) {
             setIsUnauthenticated(true);
             return;
         }
         setRefreshing(true);
-        await loadNotifications();
-        setRefreshing(false);
+        try {
+            await loadNotifications();
+        } finally {
+            setRefreshing(false);
+        }
     };
 
     const handleMarkRead = async (id: number) => {
@@ -79,9 +106,7 @@ export default function PartnerNotificationsScreen() {
             setNotifications((prev) =>
                 prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
             );
-        } catch (e) {
-            console.error('Mark read failed', e);
-        }
+        } catch {}
     };
 
     const handleMarkAllRead = async () => {
@@ -90,15 +115,49 @@ export default function PartnerNotificationsScreen() {
             setNotifications((prev) =>
                 prev.map((n) => ({ ...n, is_read: true })),
             );
-        } catch (e) {
-            console.error('Mark all read failed', e);
+        } catch {
+            setErrorMessage('Unable to mark notifications as read.');
+        }
+    };
+
+    const resolveNotificationTarget = (
+        item: NotificationItem,
+    ): string | null => {
+        const reference = item.related_reference;
+        if (reference && item.template_code.includes('reservation')) {
+            return `/(partner)/reservations/${reference}`;
+        }
+        if (reference && item.template_code.includes('settlement')) {
+            return `/(partner)/settlements/${reference}`;
+        }
+        if (reference && item.template_code.includes('case')) {
+            return `/(partner)/cases/${reference}`;
+        }
+        if (item.action_url) {
+            const target = resolveDeepLinkPath(item.action_url);
+            return target === '/' ? null : target;
+        }
+
+        return null;
+    };
+
+    const handleNotificationPress = async (item: NotificationItem) => {
+        if (!item.is_read) {
+            await handleMarkRead(item.id);
+        }
+
+        const target = resolveNotificationTarget(item);
+        if (target) {
+            router.push(target as never);
         }
     };
 
     const renderItem = ({ item }: { item: NotificationItem }) => (
         <TouchableOpacity
+            accessibilityLabel={`Open notification: ${item.title}`}
+            accessibilityRole="button"
             style={[styles.itemCard, !item.is_read && styles.itemUnread]}
-            onPress={() => handleMarkRead(item.id)}
+            onPress={() => handleNotificationPress(item)}
             activeOpacity={0.7}
         >
             <View style={styles.itemHeader}>
@@ -113,13 +172,21 @@ export default function PartnerNotificationsScreen() {
                         {item.title}
                     </Text>
                 </View>
-                <Text style={styles.itemDate}>{item.created_at}</Text>
+                <Text style={styles.itemDate}>
+                    {new Date(item.created_at).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                    })}
+                </Text>
             </View>
-            <Text style={styles.itemBody}>{item.message}</Text>
+            <Text style={styles.itemBody}>{item.message ?? item.body}</Text>
         </TouchableOpacity>
     );
 
-    if (!authLoading && (isUnauthenticated || !token || authState !== 'owner_authenticated')) {
+    if (
+        !authLoading &&
+        (isUnauthenticated || !token || authState !== 'owner_authenticated')
+    ) {
         return (
             <SafeAreaView style={styles.container}>
                 <AppHeader
@@ -134,7 +201,7 @@ export default function PartnerNotificationsScreen() {
                     primaryActionLabel="Sign In as Partner"
                     onPrimaryAction={() => router.push('/(auth)/owner-login')}
                     secondaryActionLabel="Explore Stays"
-                    onSecondaryAction={() => router.push('/(customer)/explore/index')}
+                    onSecondaryAction={() => router.push('/(customer)/explore')}
                 />
             </SafeAreaView>
         );
@@ -147,13 +214,26 @@ export default function PartnerNotificationsScreen() {
                 subtitle="Operations, arrivals & settlement updates"
                 variant="plum"
                 rightAction={
-                    <TouchableOpacity onPress={handleMarkAllRead} style={styles.headerMarkReadBtn}>
+                    <TouchableOpacity
+                        accessibilityLabel="Mark all notifications as read"
+                        accessibilityRole="button"
+                        onPress={handleMarkAllRead}
+                        style={styles.headerMarkReadBtn}
+                    >
                         <Text style={styles.headerMarkReadText}>Mark Read</Text>
                     </TouchableOpacity>
                 }
             />
 
-            {loading && !refreshing ? (
+            {errorMessage && notifications.length === 0 ? (
+                <ExceptionalState
+                    type="no-internet"
+                    title="Partner Alerts Unavailable"
+                    description={errorMessage}
+                    actionLabel="Try Again"
+                    onAction={loadNotifications}
+                />
+            ) : loading && !refreshing ? (
                 <View style={styles.center}>
                     <ActivityIndicator size="large" color={Colors.deepPlum} />
                     <Text style={styles.loadingText}>
@@ -163,7 +243,9 @@ export default function PartnerNotificationsScreen() {
             ) : (
                 <FlatList
                     data={notifications}
-                    keyExtractor={(item) => item.id.toString()}
+                    keyExtractor={(item: NotificationItem) =>
+                        item.id.toString()
+                    }
                     renderItem={renderItem}
                     contentContainerStyle={styles.listContent}
                     refreshControl={

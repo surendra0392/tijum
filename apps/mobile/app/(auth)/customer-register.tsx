@@ -13,7 +13,6 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthContext';
 import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
-import { PushNotificationService } from '../../src/notifications/PushNotificationService';
 import { Colors } from '../../src/theme/colors';
 import { Spacing } from '../../src/theme/spacing';
 import { Typography } from '../../src/theme/typography';
@@ -64,9 +63,6 @@ export default function CustomerRegisterScreen() {
                 terms_accepted: true,
                 marketing_consent: false,
             });
-            PushNotificationService.registerForPushNotifications(
-                'customer',
-            ).catch(() => {});
             router.replace('/(customer)/explore');
         } catch (err: any) {
             setErrorMessage(
@@ -86,8 +82,8 @@ export default function CustomerRegisterScreen() {
                 <View style={styles.header}>
                     <Text style={styles.title}>Join TIJUM</Text>
                     <Text style={styles.subtitle}>
-                        Create your customer account to book verified
-                        accommodations with daily homestyle meals included.
+                        Create your customer account to book verified stays with
+                        clear food and meal details.
                     </Text>
                 </View>
 

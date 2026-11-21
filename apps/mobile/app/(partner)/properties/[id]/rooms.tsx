@@ -22,7 +22,6 @@ import { Colors } from '../../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../../src/theme/spacing';
 import { Typography } from '../../../../src/theme/typography';
 import {
-    AlertCircle,
     ArrowLeft,
     CheckCircle2,
     DoorClosed,
@@ -44,13 +43,17 @@ export default function PropertyRoomsScreen() {
     const [refreshing, setRefreshing] = useState(false);
 
     // Filters
-    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'maintenance' | 'inactive'>('all');
+    const [statusFilter, setStatusFilter] = useState<
+        'all' | 'active' | 'maintenance' | 'inactive'
+    >('all');
 
     // Add / Edit Modal
     const [modalVisible, setModalVisible] = useState(false);
     const [editingRoom, setEditingRoom] = useState<PhysicalRoom | null>(null);
     const [roomNumber, setRoomNumber] = useState('');
-    const [selectedRoomTypeId, setSelectedRoomTypeId] = useState<number | null>(null);
+    const [selectedRoomTypeId, setSelectedRoomTypeId] = useState<number | null>(
+        null,
+    );
     const [floorNumber, setFloorNumber] = useState('');
     const [wingName, setWingName] = useState('');
     const [buildingName, setBuildingName] = useState('');
@@ -65,7 +68,7 @@ export default function PropertyRoomsScreen() {
 
     useEffect(() => {
         if (propertyId) {
-            loadData();
+            void loadData();
         }
     }, [propertyId]);
 
@@ -87,7 +90,10 @@ export default function PropertyRoomsScreen() {
                 }
             }
         } catch (e: any) {
-            Alert.alert('Load Failed', e.message || 'Unable to retrieve physical rooms.');
+            Alert.alert(
+                'Load Failed',
+                e.message || 'Unable to retrieve physical rooms.',
+            );
         } finally {
             setLoading(false);
         }
@@ -139,7 +145,10 @@ export default function PropertyRoomsScreen() {
 
     const handleSaveRoom = async () => {
         if (!roomNumber.trim()) {
-            Alert.alert('Validation Error', 'Room number is required (e.g., 101 or A-101).');
+            Alert.alert(
+                'Validation Error',
+                'Room number is required (e.g., 101 or A-101).',
+            );
             return;
         }
         if (!selectedRoomTypeId) {
@@ -162,13 +171,19 @@ export default function PropertyRoomsScreen() {
                 Alert.alert('Updated', `Physical room ${roomNumber} updated.`);
             } else {
                 await OwnerApi.createRoom(propertyId, payload);
-                Alert.alert('Added', `Physical room ${roomNumber} added to inventory.`);
+                Alert.alert(
+                    'Added',
+                    `Physical room ${roomNumber} added to inventory.`,
+                );
             }
 
             setModalVisible(false);
             await loadData();
         } catch (e: any) {
-            Alert.alert('Save Error', e.message || 'Failed to save physical room.');
+            Alert.alert(
+                'Save Error',
+                e.message || 'Failed to save physical room.',
+            );
         } finally {
             setSubmitting(false);
         }
@@ -199,7 +214,10 @@ export default function PropertyRoomsScreen() {
             setStatusModalVisible(false);
             await loadData();
         } catch (e: any) {
-            Alert.alert('Update Failed', e.message || 'Failed to update room operational status.');
+            Alert.alert(
+                'Update Failed',
+                e.message || 'Failed to update room operational status.',
+            );
         } finally {
             setUpdatingStatus(false);
         }
@@ -218,7 +236,9 @@ export default function PropertyRoomsScreen() {
                 <View style={styles.cardHeader}>
                     <View style={styles.roomBadge}>
                         <DoorClosed size={16} color={Colors.deepPlum} />
-                        <Text style={styles.roomNumber}>Room {item.room_number}</Text>
+                        <Text style={styles.roomNumber}>
+                            Room {item.room_number}
+                        </Text>
                     </View>
                     <Badge
                         label={item.is_active ? 'Active' : 'Maintenance'}
@@ -228,21 +248,29 @@ export default function PropertyRoomsScreen() {
 
                 <View style={styles.cardBody}>
                     <Text style={styles.roomTypeLabel}>
-                        Category: {item.room_type_name || `Type #${item.property_room_type_id}`}
+                        Category:{' '}
+                        {item.room_type_name ||
+                            `Type #${item.property_room_type_id}`}
                     </Text>
                     {item.floor ? (
-                        <Text style={styles.floorLabel}>Floor: {item.floor}</Text>
+                        <Text style={styles.floorLabel}>
+                            Floor: {item.floor}
+                        </Text>
                     ) : null}
 
                     {item.is_occupied ? (
                         <View style={styles.occupiedBadge}>
                             <Text style={styles.occupiedText}>
-                                Occupied • Guest: {item.current_allocation?.guest_name || 'Checked In'}
+                                Occupied • Guest:{' '}
+                                {item.current_allocation?.guest_name ||
+                                    'Checked In'}
                             </Text>
                         </View>
                     ) : (
                         <View style={styles.availableBadge}>
-                            <Text style={styles.availableText}>Available for allocation</Text>
+                            <Text style={styles.availableText}>
+                                Available for allocation
+                            </Text>
                         </View>
                     )}
                 </View>
@@ -258,12 +286,20 @@ export default function PropertyRoomsScreen() {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        style={[styles.actionBtn, { borderColor: Colors.gray300 }]}
+                        style={[
+                            styles.actionBtn,
+                            { borderColor: Colors.gray300 },
+                        ]}
                         onPress={() => handleOpenStatusModal(item)}
                         activeOpacity={0.8}
                     >
                         <Wrench size={13} color={Colors.gray700} />
-                        <Text style={[styles.actionBtnText, { color: Colors.gray700 }]}>
+                        <Text
+                            style={[
+                                styles.actionBtnText,
+                                { color: Colors.gray700 },
+                            ]}
+                        >
                             {item.is_active ? 'Set Maintenance' : 'Set Active'}
                         </Text>
                     </TouchableOpacity>
@@ -333,12 +369,14 @@ export default function PropertyRoomsScreen() {
             {loading && !refreshing ? (
                 <View style={styles.center}>
                     <ActivityIndicator size="large" color={Colors.deepPlum} />
-                    <Text style={styles.loadingText}>Loading physical rooms...</Text>
+                    <Text style={styles.loadingText}>
+                        Loading physical rooms...
+                    </Text>
                 </View>
             ) : (
                 <FlatList
                     data={filteredRooms}
-                    keyExtractor={(item) => item.id.toString()}
+                    keyExtractor={(item: any) => item.id.toString()}
                     renderItem={renderRoomCard}
                     contentContainerStyle={styles.listContent}
                     refreshControl={
@@ -351,9 +389,13 @@ export default function PropertyRoomsScreen() {
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
                             <Layers size={48} color={Colors.gray300} />
-                            <Text style={styles.emptyTitle}>No Physical Rooms Found</Text>
+                            <Text style={styles.emptyTitle}>
+                                No Physical Rooms Found
+                            </Text>
                             <Text style={styles.emptySubtitle}>
-                                Add individual physical room numbers (e.g. 101, 102) linked to your room categories to enable front-desk check-in.
+                                Add individual physical room numbers (e.g. 101,
+                                102) linked to your room categories to enable
+                                front-desk check-in.
                             </Text>
                             <Button
                                 title="+ Add Physical Room"
@@ -377,11 +419,18 @@ export default function PropertyRoomsScreen() {
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>
-                                {editingRoom ? 'Edit Physical Room' : 'Add Physical Room'}
+                                {editingRoom
+                                    ? 'Edit Physical Room'
+                                    : 'Add Physical Room'}
                             </Text>
                             <TouchableOpacity
                                 onPress={() => setModalVisible(false)}
-                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                hitSlop={{
+                                    top: 10,
+                                    bottom: 10,
+                                    left: 10,
+                                    right: 10,
+                                }}
                             >
                                 <X size={20} color={Colors.gray600} />
                             </TouchableOpacity>
@@ -406,14 +455,18 @@ export default function PropertyRoomsScreen() {
                                             key={rt.id}
                                             style={[
                                                 styles.roomTypePill,
-                                                isSel && styles.roomTypePillActive,
+                                                isSel &&
+                                                    styles.roomTypePillActive,
                                             ]}
-                                            onPress={() => setSelectedRoomTypeId(rt.id)}
+                                            onPress={() =>
+                                                setSelectedRoomTypeId(rt.id)
+                                            }
                                         >
                                             <Text
                                                 style={[
                                                     styles.roomTypePillText,
-                                                    isSel && styles.roomTypePillTextActive,
+                                                    isSel &&
+                                                        styles.roomTypePillTextActive,
                                                 ]}
                                             >
                                                 {rt.name}
@@ -438,7 +491,11 @@ export default function PropertyRoomsScreen() {
 
                             <View style={{ marginTop: Spacing.lg }}>
                                 <Button
-                                    title={editingRoom ? 'Update Room' : 'Add Room to Inventory'}
+                                    title={
+                                        editingRoom
+                                            ? 'Update Room'
+                                            : 'Add Room to Inventory'
+                                    }
                                     onPress={handleSaveRoom}
                                     variant="primary"
                                     loading={submitting}
@@ -468,23 +525,36 @@ export default function PropertyRoomsScreen() {
                         <View style={styles.statusOptions}>
                             {[
                                 { key: 'active', label: 'Active (Bookable)' },
-                                { key: 'maintenance', label: 'Maintenance (AC/Plumbing)' },
-                                { key: 'blocked', label: 'Blocked (Owner Hold)' },
+                                {
+                                    key: 'maintenance',
+                                    label: 'Maintenance (AC/Plumbing)',
+                                },
+                                {
+                                    key: 'blocked',
+                                    label: 'Blocked (Owner Hold)',
+                                },
                                 { key: 'inactive', label: 'Inactive' },
                             ].map((opt) => (
                                 <TouchableOpacity
                                     key={opt.key}
                                     style={[
                                         styles.statusOptionRow,
-                                        targetStatus === opt.key && styles.statusOptionRowActive,
+                                        targetStatus === opt.key &&
+                                            styles.statusOptionRowActive,
                                     ]}
                                     onPress={() => setTargetStatus(opt.key)}
                                 >
                                     <CheckCircle2
                                         size={18}
-                                        color={targetStatus === opt.key ? Colors.coral : Colors.gray300}
+                                        color={
+                                            targetStatus === opt.key
+                                                ? Colors.coral
+                                                : Colors.gray300
+                                        }
                                     />
-                                    <Text style={styles.statusOptionText}>{opt.label}</Text>
+                                    <Text style={styles.statusOptionText}>
+                                        {opt.label}
+                                    </Text>
                                 </TouchableOpacity>
                             ))}
                         </View>

@@ -1,8 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
-    ActivityIndicator,
     Alert,
-    Image,
     Modal,
     SafeAreaView,
     ScrollView,
@@ -13,14 +11,12 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-    Briefcase,
     Landmark,
     FileText,
     Bell,
     Headset,
     Info,
     Repeat,
-    Settings,
     ChevronRight,
     Edit3,
     LogOut,
@@ -28,49 +24,48 @@ import {
     X,
     User,
     Building2,
-    Check,
 } from 'lucide-react-native';
 import { useAuth } from '../../src/auth/AuthContext';
-import { OwnerApi } from '../../src/api/owner';
 import { ExceptionalState } from '../../src/components/ExceptionalState';
 import { Colors } from '../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../src/theme/spacing';
-import { SHOWCASE_PARTNER } from '../../src/data/showcaseData.ts';
 
 export default function PartnerAccountScreen() {
     const router = useRouter();
-    const { owner, token, authState, logout, switchAccountDomain } = useAuth();
+    const { owner, token, authState, logout } = useAuth();
     const [roleModalVisible, setRoleModalVisible] = useState(false);
-    const [selectedRole, setSelectedRole] = useState<'customer' | 'owner'>('owner');
+    const [selectedRole, setSelectedRole] = useState<'customer' | 'owner'>(
+        'owner',
+    );
 
     const isGuest = !token || authState !== 'owner_authenticated';
-    const partnerName = isGuest
-        ? SHOWCASE_PARTNER.name
-        : owner?.name || SHOWCASE_PARTNER.name;
-    const partnerId = isGuest
-        ? SHOWCASE_PARTNER.partner_id
-        : (owner as any)?.partner_id || SHOWCASE_PARTNER.partner_id || 'TP-001245';
+    const partnerName = isGuest ? 'Partner' : owner?.name || '—';
+    const partnerId = isGuest ? '—' : String(owner?.id ?? '—');
 
     const handleSwitchRole = async () => {
         setRoleModalVisible(false);
         if (selectedRole === 'customer') {
-            await switchAccountDomain('customer');
-            router.replace('/(customer)/explore');
+            await logout();
+            router.replace('/(auth)/customer-login');
         }
     };
 
     const handleLogOut = () => {
-        Alert.alert('Log Out', 'Are you sure you want to log out of Partner Portal?', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Log Out',
-                style: 'destructive',
-                onPress: async () => {
-                    await logout();
-                    router.replace('/(auth)/owner-login');
+        Alert.alert(
+            'Log Out',
+            'Are you sure you want to log out of Partner Portal?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Log Out',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await logout();
+                        router.replace('/(auth)/owner-login');
+                    },
                 },
-            },
-        ]);
+            ],
+        );
     };
 
     if (!token || authState !== 'owner_authenticated') {
@@ -82,7 +77,7 @@ export default function PartnerAccountScreen() {
                 <ExceptionalState
                     type="auth-required"
                     title="Partner Access Required"
-                    description="Please sign in to your verified partner portal to manage business settings, bank details, and active sessions."
+                    description="Please sign in to your verified partner portal to manage properties, reservations, and financial details."
                     actionLabel="Sign In as Partner"
                     onAction={() => router.push('/(auth)/owner-login')}
                 />
@@ -102,22 +97,21 @@ export default function PartnerAccountScreen() {
                         <View style={{ width: 24 }} />
                         <Text style={styles.headerTitle}>Profile</Text>
                         <TouchableOpacity
-                            onPress={() => router.push('/(partner)/notifications')}
+                            onPress={() =>
+                                router.push('/(partner)/notifications')
+                            }
                             activeOpacity={0.8}
                         >
-                            <Settings size={22} color={Colors.white} />
+                            <Bell size={22} color={Colors.white} />
                         </TouchableOpacity>
                     </View>
 
                     {/* Partner Avatar & Info Card */}
                     <View style={styles.userCard}>
                         <View style={styles.avatarWrapper}>
-                            <Image
-                                source={{
-                                    uri: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&q=80',
-                                }}
-                                style={styles.avatarImg}
-                            />
+                            <View style={styles.avatarImg}>
+                                <User size={38} color={Colors.deepPlum} />
+                            </View>
                             <View style={styles.editAvatarBadge}>
                                 <Edit3 size={11} color={Colors.white} />
                             </View>
@@ -128,9 +122,11 @@ export default function PartnerAccountScreen() {
                             Partner ID: {partnerId}
                         </Text>
 
-                        {isGuest && (
+                        {!isGuest && (
                             <View style={styles.guestNoticeBadge}>
-                                <Text style={styles.guestNoticeText}>Preview Mode</Text>
+                                <Text style={styles.guestNoticeText}>
+                                    Active
+                                </Text>
                             </View>
                         )}
                     </View>
@@ -138,21 +134,18 @@ export default function PartnerAccountScreen() {
 
                 {/* Menu List */}
                 <View style={styles.menuCard}>
-                    {/* 1. Business Profile */}
+                    {/* 1. Bank Details */}
                     <TouchableOpacity
                         style={styles.menuItem}
                         onPress={() =>
-                            Alert.alert(
-                                'Business Profile',
-                                `Partner Name: ${partnerName}\nBusiness Type: Individual Owner\nPhone: +91 98765 43210`,
-                            )
+                            router.push('/(partner)/financial-profile')
                         }
                         activeOpacity={0.7}
                     >
                         <View style={styles.menuItemLeft}>
-                            <Briefcase size={18} color={Colors.deepPlum} />
+                            <Landmark size={18} color={Colors.deepPlum} />
                             <Text style={styles.menuItemLabel}>
-                                Business Profile
+                                Bank Details
                             </Text>
                         </View>
                         <ChevronRight size={16} color={Colors.gray400} />
@@ -160,33 +153,12 @@ export default function PartnerAccountScreen() {
 
                     <View style={styles.menuDivider} />
 
-                    {/* 2. Bank Details */}
+                    {/* 2. Tax Information */}
                     <TouchableOpacity
                         style={styles.menuItem}
                         onPress={() =>
-                            Alert.alert(
-                                'Bank Details',
-                                'Bank: State Bank of India\nA/C: 123456789012\nIFSC: SBIN0001234\nStatus: Verified',
-                            )
-                        }
-                        activeOpacity={0.7}
-                    >
-                        <View style={styles.menuItemLeft}>
-                            <Landmark size={18} color={Colors.deepPlum} />
-                            <Text style={styles.menuItemLabel}>Bank Details</Text>
-                        </View>
-                        <ChevronRight size={16} color={Colors.gray400} />
-                    </TouchableOpacity>
-
-                    <View style={styles.menuDivider} />
-
-                    {/* 3. Tax Information */}
-                    <TouchableOpacity
-                        style={styles.menuItem}
-                        onPress={() =>
-                            Alert.alert(
-                                'Tax Information',
-                                'PAN: ABCDE1234F (Verified)\nGSTIN: 22ABCDE1234F1Z5\nTDS Rate: Section 393(1) 0.10%',
+                            router.push(
+                                '/(partner)/financial-profile/agreements',
                             )
                         }
                         activeOpacity={0.7}
@@ -202,7 +174,7 @@ export default function PartnerAccountScreen() {
 
                     <View style={styles.menuDivider} />
 
-                    {/* 4. Notifications */}
+                    {/* 3. Notifications */}
                     <TouchableOpacity
                         style={styles.menuItem}
                         onPress={() => router.push('/(partner)/notifications')}
@@ -210,56 +182,86 @@ export default function PartnerAccountScreen() {
                     >
                         <View style={styles.menuItemLeft}>
                             <Bell size={18} color={Colors.coral} />
-                            <Text style={styles.menuItemLabel}>Notifications</Text>
+                            <Text style={styles.menuItemLabel}>
+                                Notifications
+                            </Text>
                         </View>
                         <View style={styles.badgeCountPill}>
-                            <Text style={styles.badgeCountText}>2</Text>
+                            <Text style={styles.badgeCountText}>{0}</Text>
                         </View>
                     </TouchableOpacity>
 
                     <View style={styles.menuDivider} />
 
-                    {/* 5. Help & Support */}
+                    {/* 4. Help & Support */}
                     <TouchableOpacity
                         style={styles.menuItem}
-                        onPress={() =>
-                            Alert.alert(
-                                'Help & Support',
-                                'Official Host Desk: support@tijum.com\nHelpline: +91 81423 34033',
-                            )
-                        }
+                        onPress={() => router.push('/help')}
                         activeOpacity={0.7}
                     >
                         <View style={styles.menuItemLeft}>
                             <Headset size={18} color={Colors.deepPlum} />
-                            <Text style={styles.menuItemLabel}>Help & Support</Text>
+                            <Text style={styles.menuItemLabel}>
+                                Help & Support
+                            </Text>
                         </View>
                         <ChevronRight size={16} color={Colors.gray400} />
                     </TouchableOpacity>
 
                     <View style={styles.menuDivider} />
 
-                    {/* 6. About TIJUM */}
+                    {/* 5. About TIJUM */}
                     <TouchableOpacity
                         style={styles.menuItem}
-                        onPress={() =>
-                            Alert.alert(
-                                'About TIJUM Partner',
-                                'TIJUM Partner Platform\nVersion 1.0.0 (Build 2)\nList • Manage • Grow',
-                            )
-                        }
+                        onPress={() => router.push('/legal/about')}
                         activeOpacity={0.7}
                     >
                         <View style={styles.menuItemLeft}>
                             <Info size={18} color={Colors.deepPlum} />
-                            <Text style={styles.menuItemLabel}>About TIJUM</Text>
+                            <Text style={styles.menuItemLabel}>
+                                About TIJUM
+                            </Text>
                         </View>
                         <ChevronRight size={16} color={Colors.gray400} />
                     </TouchableOpacity>
 
                     <View style={styles.menuDivider} />
 
-                    {/* 7. Switch Role */}
+                    {/* 6. Terms & Conditions */}
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => router.push('/legal/terms')}
+                        activeOpacity={0.7}
+                    >
+                        <View style={styles.menuItemLeft}>
+                            <FileText size={18} color={Colors.deepPlum} />
+                            <Text style={styles.menuItemLabel}>
+                                Terms & Conditions
+                            </Text>
+                        </View>
+                        <ChevronRight size={16} color={Colors.gray400} />
+                    </TouchableOpacity>
+
+                    <View style={styles.menuDivider} />
+
+                    {/* 7. Privacy Policy */}
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => router.push('/legal/privacy')}
+                        activeOpacity={0.7}
+                    >
+                        <View style={styles.menuItemLeft}>
+                            <Info size={18} color={Colors.deepPlum} />
+                            <Text style={styles.menuItemLabel}>
+                                Privacy Policy
+                            </Text>
+                        </View>
+                        <ChevronRight size={16} color={Colors.gray400} />
+                    </TouchableOpacity>
+
+                    <View style={styles.menuDivider} />
+
+                    {/* 8. Switch Role */}
                     <TouchableOpacity
                         style={styles.menuItem}
                         onPress={() => setRoleModalVisible(true)}
@@ -267,7 +269,9 @@ export default function PartnerAccountScreen() {
                     >
                         <View style={styles.menuItemLeft}>
                             <Repeat size={18} color={Colors.coral} />
-                            <Text style={styles.menuItemLabel}>Switch Role</Text>
+                            <Text style={styles.menuItemLabel}>
+                                Switch Role
+                            </Text>
                         </View>
                         <ChevronRight size={16} color={Colors.gray400} />
                     </TouchableOpacity>
@@ -276,18 +280,37 @@ export default function PartnerAccountScreen() {
                 {/* Log Out or Sign In */}
                 <TouchableOpacity
                     style={styles.authActionButton}
-                    onPress={isGuest ? () => router.push('/(auth)/owner-login') : handleLogOut}
+                    onPress={
+                        isGuest
+                            ? () => router.push('/(auth)/owner-login')
+                            : handleLogOut
+                    }
                     activeOpacity={0.85}
                 >
                     {isGuest ? (
                         <>
-                            <LogIn size={18} color={Colors.deepPlum} style={{ marginRight: 8 }} />
-                            <Text style={styles.authActionText}>Host Sign In</Text>
+                            <LogIn
+                                size={18}
+                                color={Colors.deepPlum}
+                                style={{ marginRight: 8 }}
+                            />
+                            <Text style={styles.authActionText}>
+                                Host Sign In
+                            </Text>
                         </>
                     ) : (
                         <>
-                            <LogOut size={18} color={Colors.coral} style={{ marginRight: 8 }} />
-                            <Text style={[styles.authActionText, { color: Colors.coral }]}>
+                            <LogOut
+                                size={18}
+                                color={Colors.coral}
+                                style={{ marginRight: 8 }}
+                            />
+                            <Text
+                                style={[
+                                    styles.authActionText,
+                                    { color: Colors.coral },
+                                ]}
+                            >
                                 Log Out
                             </Text>
                         </>
@@ -296,11 +319,11 @@ export default function PartnerAccountScreen() {
 
                 {/* Footer Copyright */}
                 <Text style={styles.copyrightText}>
-                    © 2025 TIJUM Partner. All rights reserved.
+                    © 2026 TIJUM Partner. All rights reserved.
                 </Text>
             </ScrollView>
 
-            {/* Switch Role Modal (Matching Showcase Flow) */}
+            {/* Switch Role Modal */}
             <Modal
                 visible={roleModalVisible}
                 animationType="fade"
@@ -311,7 +334,9 @@ export default function PartnerAccountScreen() {
                     <View style={styles.roleModalContainer}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Switch Role</Text>
-                            <TouchableOpacity onPress={() => setRoleModalVisible(false)}>
+                            <TouchableOpacity
+                                onPress={() => setRoleModalVisible(false)}
+                            >
                                 <X size={20} color={Colors.gray600} />
                             </TouchableOpacity>
                         </View>
@@ -320,7 +345,8 @@ export default function PartnerAccountScreen() {
                         <TouchableOpacity
                             style={[
                                 styles.roleCard,
-                                selectedRole === 'customer' && styles.roleCardActive,
+                                selectedRole === 'customer' &&
+                                    styles.roleCardActive,
                             ]}
                             onPress={() => setSelectedRole('customer')}
                             activeOpacity={0.8}
@@ -329,20 +355,13 @@ export default function PartnerAccountScreen() {
                                 <User size={20} color={Colors.deepPlum} />
                             </View>
                             <View style={{ flex: 1, marginLeft: 12 }}>
-                                <Text style={styles.roleCardTitle}>Customer</Text>
-                                <Text style={styles.roleCardDesc}>
-                                    Book stays, find properties and enjoy services.
+                                <Text style={styles.roleCardTitle}>
+                                    Customer
                                 </Text>
-                            </View>
-                            <View
-                                style={[
-                                    styles.radioCircle,
-                                    selectedRole === 'customer' && styles.radioCircleActive,
-                                ]}
-                            >
-                                {selectedRole === 'customer' && (
-                                    <View style={styles.radioDot} />
-                                )}
+                                <Text style={styles.roleCardDesc}>
+                                    Book stays, find properties and enjoy
+                                    services.
+                                </Text>
                             </View>
                         </TouchableOpacity>
 
@@ -350,7 +369,8 @@ export default function PartnerAccountScreen() {
                         <TouchableOpacity
                             style={[
                                 styles.roleCard,
-                                selectedRole === 'owner' && styles.roleCardActive,
+                                selectedRole === 'owner' &&
+                                    styles.roleCardActive,
                             ]}
                             onPress={() => setSelectedRole('owner')}
                             activeOpacity={0.8}
@@ -361,18 +381,9 @@ export default function PartnerAccountScreen() {
                             <View style={{ flex: 1, marginLeft: 12 }}>
                                 <Text style={styles.roleCardTitle}>Owner</Text>
                                 <Text style={styles.roleCardDesc}>
-                                    List properties, manage bookings and grow business.
+                                    List properties, manage bookings and grow
+                                    business.
                                 </Text>
-                            </View>
-                            <View
-                                style={[
-                                    styles.radioCircle,
-                                    selectedRole === 'owner' && styles.radioCircleActive,
-                                ]}
-                            >
-                                {selectedRole === 'owner' && (
-                                    <View style={styles.radioDot} />
-                                )}
                             </View>
                         </TouchableOpacity>
 
@@ -438,7 +449,9 @@ const styles = StyleSheet.create({
         borderRadius: 41,
         borderWidth: 3,
         borderColor: Colors.coral,
-        backgroundColor: Colors.surfaceSubtle,
+        backgroundColor: Colors.warmCream,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     editAvatarBadge: {
         position: 'absolute',

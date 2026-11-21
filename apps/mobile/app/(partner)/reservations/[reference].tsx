@@ -13,7 +13,6 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { OwnerApi } from '../../../src/api/owner';
 import { PhysicalRoom, Reservation } from '../../../src/api/types';
-import { SHOWCASE_BOOKINGS } from '../../../src/data/showcaseData';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
@@ -56,7 +55,7 @@ export default function PartnerReservationDetailScreen() {
 
     useEffect(() => {
         if (reference) {
-            loadReservation();
+            void loadReservation();
         }
     }, [reference]);
 
@@ -68,16 +67,9 @@ export default function PartnerReservationDetailScreen() {
                 setReservation(res.data);
                 return;
             }
+            setReservation(null);
         } catch (e: any) {
-            const fallback = SHOWCASE_BOOKINGS.find(
-                (b) =>
-                    b.reference === reference ||
-                    b.booking_reference === reference,
-            );
-            if (fallback) {
-                setReservation(fallback);
-                return;
-            }
+            setReservation(null);
             Alert.alert(
                 'Error',
                 e.message || 'Failed to load booking details.',
@@ -407,8 +399,15 @@ export default function PartnerReservationDetailScreen() {
                                             },
                                         ]}
                                     >
-                                        Room #{reservation.allocated_room_number ||
-                                            reservation.physical_room?.room_number} (Floor {reservation.allocated_floor ?? reservation.physical_room?.floor ?? 'Main'})
+                                        Room #
+                                        {reservation.allocated_room_number ||
+                                            reservation.physical_room
+                                                ?.room_number}{' '}
+                                        (Floor{' '}
+                                        {reservation.allocated_floor ??
+                                            reservation.physical_room?.floor ??
+                                            'Main'}
+                                        )
                                     </Text>
                                 </View>
                             ) : null}
@@ -510,7 +509,8 @@ export default function PartnerReservationDetailScreen() {
                                 <Text style={styles.totalValue}>
                                     ₹
                                     {(
-                                        reservation.owner_payable_paise / 100 ||
+                                        (reservation.owner_payable_paise ?? 0) /
+                                            100 ||
                                         reservation.total_amount_paise / 100
                                     ).toLocaleString('en-IN')}
                                 </Text>
@@ -572,10 +572,9 @@ export default function PartnerReservationDetailScreen() {
                                                 Allocated
                                             </Text>
                                         </View>
-                                        {[
-                                            'confirmed',
-                                            'checked_in',
-                                        ].includes(reservation.status) ? (
+                                        {['confirmed', 'checked_in'].includes(
+                                            reservation.status,
+                                        ) ? (
                                             <TouchableOpacity
                                                 onPress={openAllocateModal}
                                                 activeOpacity={0.7}
@@ -649,10 +648,9 @@ export default function PartnerReservationDetailScreen() {
                                             </Text>
                                         </View>
                                     </View>
-                                    {[
-                                        'confirmed',
-                                        'checked_in',
-                                    ].includes(reservation.status) ? (
+                                    {['confirmed', 'checked_in'].includes(
+                                        reservation.status,
+                                    ) ? (
                                         <Button
                                             title="Assign Physical Room"
                                             variant="primary"
@@ -685,7 +683,8 @@ export default function PartnerReservationDetailScreen() {
                                     Guest Arrival & Key Handover
                                 </Text>
                                 <Text style={styles.frontDeskDesc}>
-                                    When the guest arrives, verify identity and record check-in to mark the room occupied.
+                                    When the guest arrives, verify identity and
+                                    record check-in to mark the room occupied.
                                 </Text>
                                 <Input
                                     label="Check-In Notes (Optional)"
@@ -706,7 +705,9 @@ export default function PartnerReservationDetailScreen() {
                                     Guest Departure & Room Turnover
                                 </Text>
                                 <Text style={styles.frontDeskDesc}>
-                                    When the guest vacates the room, inspect premises, retrieve keys, and finalize checkout.
+                                    When the guest vacates the room, inspect
+                                    premises, retrieve keys, and finalize
+                                    checkout.
                                 </Text>
                                 <Input
                                     label="Checkout Notes (Optional)"
@@ -734,14 +735,19 @@ export default function PartnerReservationDetailScreen() {
                                         Stay Finalized & Checked Out
                                     </Text>
                                     <Text style={styles.completedNoticeText}>
-                                        Guest departure is recorded. Room is released for housekeeping and turnover.
+                                        Guest departure is recorded. Room is
+                                        released for housekeeping and turnover.
                                     </Text>
                                 </View>
                             </View>
                         ) : (
                             <View style={styles.infoCard}>
                                 <Text style={styles.infoLabel}>
-                                    Front-desk check-in/out is enabled once booking is confirmed. Current status: {reservation.status_label || reservation.status}.
+                                    Front-desk check-in/out is enabled once
+                                    booking is confirmed. Current status:{' '}
+                                    {reservation.status_label ||
+                                        reservation.status}
+                                    .
                                 </Text>
                             </View>
                         )}
@@ -856,7 +862,10 @@ export default function PartnerReservationDetailScreen() {
                                                         styles.roomChoiceCardDisabled,
                                                 ]}
                                                 onPress={() => {
-                                                    if (!isOccupied || isCurrent) {
+                                                    if (
+                                                        !isOccupied ||
+                                                        isCurrent
+                                                    ) {
                                                         setSelectedRoomId(
                                                             room.id,
                                                         );
@@ -870,8 +879,10 @@ export default function PartnerReservationDetailScreen() {
                                                 <View style={{ flex: 1 }}>
                                                     <View
                                                         style={{
-                                                            flexDirection: 'row',
-                                                            alignItems: 'center',
+                                                            flexDirection:
+                                                                'row',
+                                                            alignItems:
+                                                                'center',
                                                         }}
                                                     >
                                                         <Text
@@ -879,7 +890,8 @@ export default function PartnerReservationDetailScreen() {
                                                                 styles.roomChoiceNumber
                                                             }
                                                         >
-                                                            Room {room.room_number}
+                                                            Room{' '}
+                                                            {room.room_number}
                                                         </Text>
                                                         {room.floor !==
                                                             undefined &&
@@ -925,7 +937,8 @@ export default function PartnerReservationDetailScreen() {
                                                         alignItems: 'flex-end',
                                                     }}
                                                 >
-                                                    {isOccupied && !isCurrent ? (
+                                                    {isOccupied &&
+                                                    !isCurrent ? (
                                                         <View
                                                             style={
                                                                 styles.occupiedTag

@@ -107,6 +107,13 @@ export class RazorpayPaymentService {
             const initRes = await CustomerApi.initiatePayment(bookingReference);
             const payload = initRes.data;
 
+            if (!payload) {
+                return {
+                    success: false,
+                    error: 'Payment order could not be created.',
+                };
+            }
+
             // Handle deferred / simulated gateway
             if (!this.isAvailable()) {
                 return {

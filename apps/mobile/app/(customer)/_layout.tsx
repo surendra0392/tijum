@@ -12,14 +12,15 @@ export default function CustomerTabsLayout() {
                 tabBarStyle: {
                     backgroundColor: Colors.white,
                     borderTopColor: Colors.gray200,
-                    height: 60,
-                    paddingBottom: 8,
+                    height: 64,
+                    paddingBottom: 10,
                     paddingTop: 6,
                 },
                 tabBarLabelStyle: {
                     fontSize: 11,
                     fontWeight: '700',
                 },
+                tabBarHideOnKeyboard: true,
                 headerStyle: {
                     backgroundColor: Colors.white,
                 },
@@ -105,6 +106,20 @@ export default function CustomerTabsLayout() {
                 }}
             />
             <Tabs.Screen
+                name="support/tickets"
+                options={{
+                    href: null,
+                    headerShown: false,
+                }}
+            />
+            <Tabs.Screen
+                name="support/ticket/[reference]"
+                options={{
+                    href: null,
+                    headerShown: false,
+                }}
+            />
+            <Tabs.Screen
                 name="rewards/index"
                 options={{
                     href: null,
@@ -130,6 +145,27 @@ export default function CustomerTabsLayout() {
                 options={{
                     href: null,
                     headerTitle: 'Available Coupons',
+                }}
+            />
+            <Tabs.Screen
+                name="profile/edit"
+                options={{
+                    href: null,
+                    headerTitle: 'Edit Profile',
+                }}
+            />
+            <Tabs.Screen
+                name="profile/security"
+                options={{
+                    href: null,
+                    headerTitle: 'Account Security',
+                }}
+            />
+            <Tabs.Screen
+                name="reviews/index"
+                options={{
+                    href: null,
+                    headerTitle: 'My Reviews',
                 }}
             />
             <Tabs.Screen

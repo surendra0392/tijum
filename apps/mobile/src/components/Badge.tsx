@@ -28,7 +28,13 @@ interface BadgeProps {
     style?: ViewStyle;
 }
 
-export function Badge({ label, children, variant = 'default', size = 'md', style }: BadgeProps) {
+export function Badge({
+    label,
+    children,
+    variant = 'default',
+    size = 'md',
+    style,
+}: BadgeProps) {
     const getBackgroundColor = () => {
         switch (variant) {
             case 'emerald':
@@ -99,7 +105,13 @@ export function Badge({ label, children, variant = 'default', size = 'md', style
             ]}
         >
             {typeof content === 'string' ? (
-                <Text style={[styles.text, size === 'sm' && styles.textSm, { color: getTextColor() }]}>
+                <Text
+                    style={[
+                        styles.text,
+                        size === 'sm' && styles.textSm,
+                        { color: getTextColor() },
+                    ]}
+                >
                     {content}
                 </Text>
             ) : (

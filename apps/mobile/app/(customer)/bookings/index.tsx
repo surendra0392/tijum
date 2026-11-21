@@ -13,9 +13,9 @@ import {
 import { useRouter } from 'expo-router';
 import {
     Calendar,
+    AlertCircle,
+    Building2,
     ChevronRight,
-    MapPin,
-    LogIn,
     CheckCircle2,
 } from 'lucide-react-native';
 import { CustomerApi } from '../../../src/api/customer';
@@ -24,10 +24,9 @@ import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import { useAuth } from '../../../src/auth/AuthContext';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
-import { SHOWCASE_BOOKINGS } from '../../../src/data/showcaseData.ts';
 
 const FILTER_TABS = [
-    { label: 'Upcoming (1)', value: 'upcoming' },
+    { label: 'Upcoming', value: 'upcoming' },
     { label: 'Awaiting Action', value: 'awaiting_payment' },
     { label: 'Past', value: 'past' },
     { label: 'Cancelled', value: 'cancelled' },
@@ -36,82 +35,87 @@ const FILTER_TABS = [
 export default function CustomerBookingsScreen() {
     const router = useRouter();
     const { token, authState, isLoading: authLoading } = useAuth();
-    const [reservations, setReservations] = useState<Reservation[]>(SHOWCASE_BOOKINGS);
+    const [reservations, setReservations] = useState<Reservation[]>([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [activeTab, setActiveTab] = useState('upcoming');
     const [isUnauthenticated, setIsUnauthenticated] = useState(false);
-    const isGuest = !token || authState === 'guest' || authState === 'session_expired';
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     useEffect(() => {
         if (authLoading) return;
-        if (!token || authState === 'guest' || authState === 'session_expired') {
+        if (
+            !token ||
+            authState === 'guest' ||
+            authState === 'session_expired'
+        ) {
             setIsUnauthenticated(true);
             setLoading(false);
             return;
         }
         setIsUnauthenticated(false);
-        loadReservations();
+        void loadReservations();
     }, [activeTab, token, authState, authLoading]);
 
     const loadReservations = async () => {
-        if (!token || authState === 'guest' || authState === 'session_expired') {
+        if (
+            !token ||
+            authState === 'guest' ||
+            authState === 'session_expired'
+        ) {
             setIsUnauthenticated(true);
             setLoading(false);
             return;
         }
         try {
             setLoading(true);
+            setErrorMessage(null);
             setIsUnauthenticated(false);
-            const res = await CustomerApi.getReservations();
+            const res = await CustomerApi.getReservations(
+                activeTab as
+                    | 'upcoming'
+                    | 'awaiting_action'
+                    | 'past'
+                    | 'cancelled',
+            );
             if (res.data && res.data.length > 0) {
                 setReservations(res.data);
             } else {
-                setReservations(SHOWCASE_BOOKINGS);
+                setReservations([]);
             }
         } catch (e: any) {
-            setReservations(SHOWCASE_BOOKINGS);
+            setErrorMessage(
+                e.message ||
+                    'Failed to load your reservations. Please try again.',
+            );
+            setReservations([]);
         } finally {
             setLoading(false);
         }
     };
 
     const onRefresh = async () => {
-        if (!token || authState === 'guest' || authState === 'session_expired') {
+        if (
+            !token ||
+            authState === 'guest' ||
+            authState === 'session_expired'
+        ) {
             setIsUnauthenticated(true);
             return;
         }
         setRefreshing(true);
+        setErrorMessage(null);
         await loadReservations();
         setRefreshing(false);
     };
 
-    const filteredReservations = reservations.filter((item) => {
-        if (activeTab === 'cancelled') {
-            return item.status === 'cancelled';
-        }
-        if (activeTab === 'past') {
-            return item.status === 'checked_out' || item.status === 'completed';
-        }
-        return item.status !== 'cancelled' && item.status !== 'checked_out';
-    });
-
-    const displayList =
-        filteredReservations.length > 0
-            ? filteredReservations
-            : activeTab === 'upcoming'
-              ? SHOWCASE_BOOKINGS
-              : [];
+    const displayList = reservations;
 
     const renderReservationCard = ({ item }: { item: Reservation }) => {
-        const anyItem = item as any;
-        const rawAmount =
-            anyItem.total_amount ??
-            (item.total_amount_paise ? Math.round(item.total_amount_paise / 100) : 9560);
-        const nights = anyItem.nights || item.duration_quantity || 3;
-        const photoUrl =
-            anyItem.property_photo ||
-            'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=800&q=80';
+        const reference = item.reference ?? item.booking_reference;
+        const rawAmount = item.total_amount_paise / 100;
+        const nights = item.total_stay_days ?? item.duration_quantity;
+        const photoUrl = item.property.cover_image_url;
         const isAwaitingPayment = item.status === 'awaiting_payment';
 
         return (
@@ -119,17 +123,26 @@ export default function CustomerBookingsScreen() {
                 style={styles.card}
                 activeOpacity={0.88}
                 onPress={() =>
-                    router.push(
-                        `/(customer)/bookings/${item.reference || 'TJM25042500123'}` as any,
-                    )
+                    router.push(`/(customer)/bookings/${reference}`)
                 }
             >
                 <View style={styles.cardRow}>
-                    <Image
-                        source={{ uri: photoUrl }}
-                        style={styles.propertyThumb}
-                        resizeMode="cover"
-                    />
+                    {photoUrl ? (
+                        <Image
+                            source={{ uri: photoUrl }}
+                            style={styles.propertyThumb}
+                            resizeMode="cover"
+                        />
+                    ) : (
+                        <View
+                            style={[
+                                styles.propertyThumb,
+                                styles.propertyPlaceholder,
+                            ]}
+                        >
+                            <Building2 size={28} color={Colors.gray400} />
+                        </View>
+                    )}
 
                     <View style={styles.cardInfo}>
                         <View style={styles.statusRow}>
@@ -140,16 +153,14 @@ export default function CustomerBookingsScreen() {
                                     style={{ marginRight: 3 }}
                                 />
                                 <Text style={styles.confirmedBadgeText}>
-                                    {item.status === 'checked_in'
-                                        ? 'Checked In'
-                                        : 'Confirmed'}
+                                    {item.status_label}
                                 </Text>
                             </View>
                             <ChevronRight size={16} color={Colors.coral} />
                         </View>
 
                         <Text style={styles.propertyName} numberOfLines={1}>
-                            {item.property_name || 'Greenview PG'}
+                            {item.property_name ?? item.property.name}
                         </Text>
 
                         <View style={styles.metaRow}>
@@ -159,14 +170,13 @@ export default function CustomerBookingsScreen() {
                                 style={{ marginRight: 4 }}
                             />
                             <Text style={styles.metaText}>
-                                {item.check_in_date || '25 Apr'} -{' '}
-                                {item.check_out_date || '28 Apr 2025'} ({nights}{' '}
-                                {nights === 1 ? 'Night' : 'Nights'})
+                                {item.check_in_date} - {item.check_out_date} (
+                                {nights} {nights === 1 ? 'Night' : 'Nights'})
                             </Text>
                         </View>
 
                         <Text style={styles.bookingIdText}>
-                            Booking ID: {item.reference || 'TJM25042500123'}
+                            Booking ID: {reference}
                         </Text>
                     </View>
                 </View>
@@ -180,8 +190,8 @@ export default function CustomerBookingsScreen() {
                         onPress={() =>
                             router.push(
                                 isAwaitingPayment
-                                    ? (`/(customer)/bookings/create?reference=${item.reference}` as any)
-                                    : (`/(customer)/bookings/${item.reference || 'TJM25042500123'}` as any),
+                                    ? `/(customer)/bookings/create?reference=${reference}`
+                                    : `/(customer)/bookings/${reference}`,
                             )
                         }
                     >
@@ -194,7 +204,13 @@ export default function CustomerBookingsScreen() {
         );
     };
 
-    if (!authLoading && (isUnauthenticated || !token || authState === 'guest' || authState === 'session_expired')) {
+    if (
+        !authLoading &&
+        (isUnauthenticated ||
+            !token ||
+            authState === 'guest' ||
+            authState === 'session_expired')
+    ) {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.plumHeader}>
@@ -226,25 +242,6 @@ export default function CustomerBookingsScreen() {
                 </Text>
             </View>
 
-            {/* Guest Banner if not logged in */}
-            {isGuest && (
-                <View style={styles.guestBanner}>
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.guestBannerTitle}>Guest Preview Mode</Text>
-                        <Text style={styles.guestBannerDesc}>
-                            Sign in to link and manage your actual reservations.
-                        </Text>
-                    </View>
-                    <TouchableOpacity
-                        style={styles.guestSignInBtn}
-                        onPress={() => router.push('/(auth)/customer-login')}
-                    >
-                        <LogIn size={14} color={Colors.white} style={{ marginRight: 4 }} />
-                        <Text style={styles.guestSignInBtnText}>Sign In</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
-
             {/* Filter Tabs */}
             <View style={styles.tabsContainer}>
                 {FILTER_TABS.map((tab) => {
@@ -273,11 +270,29 @@ export default function CustomerBookingsScreen() {
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={Colors.deepPlum} />
                 </View>
+            ) : errorMessage ? (
+                <SafeAreaView style={styles.container}>
+                    <View style={styles.errorContainer}>
+                        <AlertCircle size={48} color={Colors.coral} />
+                        <Text style={styles.errorTitle}>
+                            Unable to Load Stays
+                        </Text>
+                        <Text style={styles.errorSubtitle}>{errorMessage}</Text>
+                        <TouchableOpacity
+                            style={styles.retryBtn}
+                            onPress={onRefresh}
+                        >
+                            <Text style={styles.retryBtnText}>Try Again</Text>
+                        </TouchableOpacity>
+                    </View>
+                </SafeAreaView>
             ) : (
                 <FlatList
                     data={displayList}
                     renderItem={renderReservationCard}
-                    keyExtractor={(item) => String(item.id || item.reference)}
+                    keyExtractor={(item: Reservation) =>
+                        String(item.id || item.reference)
+                    }
                     contentContainerStyle={styles.listContainer}
                     refreshControl={
                         <RefreshControl
@@ -296,7 +311,9 @@ export default function CustomerBookingsScreen() {
                             </Text>
                             <TouchableOpacity
                                 style={styles.exploreBtn}
-                                onPress={() => router.push('/(customer)/explore')}
+                                onPress={() =>
+                                    router.push('/(customer)/explore')
+                                }
                             >
                                 <Text style={styles.exploreBtnText}>
                                     Explore Stays
@@ -422,6 +439,10 @@ const styles = StyleSheet.create({
         borderRadius: BorderRadius.md,
         backgroundColor: Colors.surfaceSubtle,
     },
+    propertyPlaceholder: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     cardInfo: {
         flex: 1,
         marginLeft: Spacing.md,
@@ -523,5 +544,38 @@ const styles = StyleSheet.create({
         color: Colors.white,
         fontWeight: '700',
         fontSize: 13,
+    },
+    errorContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: Spacing.xl,
+        backgroundColor: Colors.canvas,
+    },
+    errorTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: Colors.deepPlum,
+        marginTop: Spacing.md,
+        textAlign: 'center',
+    },
+    errorSubtitle: {
+        fontSize: 13,
+        color: Colors.inkSecondary,
+        marginTop: 4,
+        textAlign: 'center',
+        maxWidth: 280,
+    },
+    retryBtn: {
+        backgroundColor: Colors.deepPlum,
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.xs + 2,
+        borderRadius: BorderRadius.md,
+        marginTop: Spacing.md,
+    },
+    retryBtnText: {
+        color: Colors.white,
+        fontSize: 12,
+        fontWeight: '700',
     },
 });

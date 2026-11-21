@@ -1,13 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import {
-    Home,
-    Building2,
-    ClipboardList,
-    User,
-    IndianRupee,
-    Bell,
-} from 'lucide-react-native';
+import { Home, Building2, ClipboardList, User } from 'lucide-react-native';
 import { Colors } from '../../src/theme/colors';
 
 export default function PartnerTabsLayout() {
@@ -19,8 +12,8 @@ export default function PartnerTabsLayout() {
                 tabBarStyle: {
                     backgroundColor: Colors.white,
                     borderTopColor: Colors.gray200,
-                    height: 60,
-                    paddingBottom: 8,
+                    height: 64,
+                    paddingBottom: 10,
                     paddingTop: 6,
                 },
                 tabBarLabelStyle: {

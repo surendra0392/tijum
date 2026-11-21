@@ -12,7 +12,6 @@ import {
     Clock,
     ShieldAlert,
     AlertCircle,
-    RotateCcw,
     Sparkles,
     User,
 } from 'lucide-react-native';
@@ -150,7 +149,9 @@ export function ExceptionalState({
 
     return (
         <View style={[styles.container, style]}>
-            <View style={[styles.iconCircle, { backgroundColor: config.iconBg }]}>
+            <View
+                style={[styles.iconCircle, { backgroundColor: config.iconBg }]}
+            >
                 <IconComponent size={36} color={config.iconColor} />
             </View>
 
@@ -159,9 +160,14 @@ export function ExceptionalState({
                 {description || config.defaultDesc}
             </Text>
 
-            {type === 'resume-booking' && typeof countdownSeconds === 'number' ? (
+            {type === 'resume-booking' &&
+            typeof countdownSeconds === 'number' ? (
                 <View style={styles.timerBadge}>
-                    <Clock size={16} color={Colors.warningText} style={{ marginRight: 6 }} />
+                    <Clock
+                        size={16}
+                        color={Colors.warningText}
+                        style={{ marginRight: 6 }}
+                    />
                     <Text style={styles.timerText}>
                         Hold Expires In: {formatTime(countdownSeconds)}
                     </Text>
@@ -171,18 +177,28 @@ export function ExceptionalState({
             <View style={styles.buttonContainer}>
                 {onPrimaryAction || onAction ? (
                     <TouchableOpacity
+                        accessibilityLabel={
+                            primaryActionLabel ||
+                            actionLabel ||
+                            config.defaultPrimary
+                        }
+                        accessibilityRole="button"
                         style={styles.primaryButton}
                         onPress={onPrimaryAction || onAction}
                         activeOpacity={0.8}
                     >
                         <Text style={styles.primaryButtonText}>
-                            {primaryActionLabel || actionLabel || config.defaultPrimary}
+                            {primaryActionLabel ||
+                                actionLabel ||
+                                config.defaultPrimary}
                         </Text>
                     </TouchableOpacity>
                 ) : null}
 
                 {onSecondaryAction && secondaryActionLabel ? (
                     <TouchableOpacity
+                        accessibilityLabel={secondaryActionLabel}
+                        accessibilityRole="button"
                         style={styles.secondaryButton}
                         onPress={onSecondaryAction}
                         activeOpacity={0.8}
@@ -254,6 +270,7 @@ const styles = StyleSheet.create({
         gap: Spacing.sm,
     },
     primaryButton: {
+        minHeight: 48,
         backgroundColor: Colors.plumPrimary,
         paddingVertical: Spacing.md,
         borderRadius: BorderRadius.pill,
@@ -267,6 +284,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     secondaryButton: {
+        minHeight: 48,
         backgroundColor: 'transparent',
         paddingVertical: Spacing.sm,
         borderRadius: BorderRadius.pill,

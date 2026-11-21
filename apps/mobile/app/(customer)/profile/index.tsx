@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    Image,
     SafeAreaView,
     ScrollView,
     StyleSheet,
@@ -11,6 +10,7 @@ import {
     View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import {
     User,
     Calendar,
@@ -20,11 +20,13 @@ import {
     Bell,
     HelpCircle,
     Info,
-    Settings,
+    ShieldCheck,
     ChevronRight,
     Edit3,
     LogOut,
-    LogIn,
+    FileText,
+    Lock,
+    Repeat,
 } from 'lucide-react-native';
 import { useAuth } from '../../../src/auth/AuthContext';
 import { CustomerApi } from '../../../src/api/customer';
@@ -32,52 +34,92 @@ import { CustomerProfile } from '../../../src/api/types';
 import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
-import { SHOWCASE_CUSTOMER } from '../../../src/data/showcaseData.ts';
 
 export default function CustomerProfileScreen() {
     const router = useRouter();
     const { user, token, authState, logout } = useAuth();
-    const [profile, setProfile] = useState<CustomerProfile>(SHOWCASE_CUSTOMER);
-    const [wishlistCount, setWishlistCount] = useState(12);
+    const isFocused = useIsFocused();
+    const [profile, setProfile] = useState<CustomerProfile | null>(null);
+    const [wishlistCount, setWishlistCount] = useState(0);
+    const [loading, setLoading] = useState(false);
 
-    const isGuest = !token || authState === 'guest' || authState === 'session_expired';
+    const isGuest =
+        !token || authState === 'guest' || authState === 'session_expired';
+
+    const loadProfile = useCallback(async () => {
+        if (isGuest) {
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const [profileRes, wishlistRes] = await Promise.all([
+                CustomerApi.getProfile(),
+                CustomerApi.getWishlist().catch(() => null),
+            ]);
+
+            if (profileRes.data) {
+                setProfile(profileRes.data);
+            }
+            if (Array.isArray(wishlistRes?.data)) {
+                setWishlistCount(wishlistRes.data.length);
+            }
+        } catch {
+            // Keep the last known profile; the screen remains usable offline.
+        } finally {
+            setLoading(false);
+        }
+    }, [isGuest]);
 
     useEffect(() => {
-        if (!isGuest) {
-            CustomerApi.getProfile()
-                .then((res) => {
-                    if (res.data) setProfile(res.data);
-                })
-                .catch(() => {});
+        if (isFocused) {
+            void loadProfile();
+        }
+    }, [isFocused, loadProfile]);
 
-            CustomerApi.getWishlist()
-                .then((res) => {
-                    if (Array.isArray(res.data)) {
-                        setWishlistCount(res.data.length);
-                    }
-                })
-                .catch(() => {});
+    useEffect(() => {
+        if (isGuest) {
+            setProfile(null);
+            setWishlistCount(0);
         }
     }, [isGuest]);
 
     const handleSignOut = async () => {
-        Alert.alert('Sign Out', 'Are you sure you want to log out of your account?', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Log Out',
-                style: 'destructive',
-                onPress: async () => {
-                    await logout();
-                    router.replace('/(auth)/customer-login');
+        Alert.alert(
+            'Sign Out',
+            'Are you sure you want to log out of your account?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Log Out',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await logout();
+                        router.replace('/(auth)/customer-login');
+                    },
                 },
-            },
-        ]);
+            ],
+        );
     };
 
-    const displayName = isGuest ? 'Rahul Sharma' : profile.name || user?.name || 'Rahul Sharma';
-    const displayEmail = isGuest ? 'rahul.sharma@gmail.com' : profile.email || user?.email || 'rahul.sharma@gmail.com';
+    const handleSwitchToPartner = () => {
+        Alert.alert(
+            'Switch to Partner',
+            'You will be signed out of your customer account and can sign in to the partner portal.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Continue',
+                    onPress: async () => {
+                        await logout();
+                        router.replace('/(auth)/owner-login');
+                    },
+                },
+            ],
+        );
+    };
 
-    if (!token || authState === 'guest' || authState === 'session_expired') {
+    if (isGuest) {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.plumHeader}>
@@ -94,224 +136,204 @@ export default function CustomerProfileScreen() {
         );
     }
 
+    const displayName = profile?.name || user?.name || 'TIJUM Guest';
+    const displayEmail = profile?.email || user?.email || 'Email not available';
+    const displayPhone = profile?.phone || user?.phone || '';
+    const initial = displayName.trim().charAt(0).toUpperCase() || 'T';
+
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
             >
-                {/* Curved Plum Header with Profile & Settings Gear */}
                 <View style={styles.plumHeader}>
                     <View style={styles.headerTopRow}>
                         <View style={{ width: 24 }} />
                         <Text style={styles.headerTitle}>My Profile</Text>
                         <TouchableOpacity
-                            onPress={() => router.push('/(customer)/notifications')}
+                            onPress={() =>
+                                router.push('/(customer)/notifications')
+                            }
                             activeOpacity={0.8}
                         >
-                            <Settings size={22} color={Colors.white} />
+                            <Bell size={22} color={Colors.white} />
                         </TouchableOpacity>
                     </View>
 
-                    {/* User Avatar & Info Card */}
                     <View style={styles.userCard}>
                         <View style={styles.avatarWrapper}>
-                            <Image
-                                source={{
-                                    uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&q=80',
-                                }}
-                                style={styles.avatarImg}
-                            />
-                            <View style={styles.editAvatarBadge}>
-                                <Edit3 size={11} color={Colors.white} />
+                            <View style={styles.avatarImg}>
+                                <Text style={styles.avatarInitial}>
+                                    {initial}
+                                </Text>
                             </View>
+                            <TouchableOpacity
+                                style={styles.editAvatarBadge}
+                                onPress={() =>
+                                    router.push('/(customer)/profile/edit')
+                                }
+                                accessibilityLabel="Edit profile"
+                            >
+                                <Edit3 size={11} color={Colors.white} />
+                            </TouchableOpacity>
                         </View>
 
                         <Text style={styles.userName}>{displayName}</Text>
                         <Text style={styles.userEmail}>{displayEmail}</Text>
+                        {displayPhone ? (
+                            <Text style={styles.userPhone}>{displayPhone}</Text>
+                        ) : null}
 
-                        {isGuest && (
-                            <View style={styles.guestNoticeBadge}>
-                                <Text style={styles.guestNoticeText}>Preview Mode</Text>
-                            </View>
-                        )}
+                        {loading ? (
+                            <ActivityIndicator
+                                size="small"
+                                color={Colors.coral}
+                                style={{ marginTop: Spacing.sm }}
+                            />
+                        ) : null}
                     </View>
                 </View>
 
-                {/* Account Navigation Menu List */}
                 <View style={styles.menuCard}>
-                    {/* 1. Edit Profile */}
-                    <TouchableOpacity
-                        style={styles.menuItem}
-                        onPress={() => {
-                            if (isGuest) {
-                                router.push('/(auth)/customer-login');
-                            } else {
-                                Alert.alert('Edit Profile', `Name: ${displayName}\nEmail: ${displayEmail}\nPhone: ${profile.phone || '+91 98765 43210'}`);
-                            }
-                        }}
-                        activeOpacity={0.7}
-                    >
-                        <View style={styles.menuItemLeft}>
-                            <User size={18} color={Colors.deepPlum} />
-                            <Text style={styles.menuItemLabel}>Edit Profile</Text>
-                        </View>
-                        <ChevronRight size={16} color={Colors.gray400} />
-                    </TouchableOpacity>
-
-                    <View style={styles.menuDivider} />
-
-                    {/* 2. My Bookings */}
-                    <TouchableOpacity
-                        style={styles.menuItem}
+                    <MenuRow
+                        icon={<User size={18} color={Colors.deepPlum} />}
+                        label="Edit Profile"
+                        onPress={() => router.push('/(customer)/profile/edit')}
+                    />
+                    <Divider />
+                    <MenuRow
+                        icon={<Lock size={18} color={Colors.deepPlum} />}
+                        label="Change Password"
+                        onPress={() =>
+                            router.push('/(customer)/profile/security')
+                        }
+                    />
+                    <Divider />
+                    <MenuRow
+                        icon={<Calendar size={18} color={Colors.deepPlum} />}
+                        label="My Bookings"
                         onPress={() => router.push('/(customer)/bookings')}
-                        activeOpacity={0.7}
-                    >
-                        <View style={styles.menuItemLeft}>
-                            <Calendar size={18} color={Colors.deepPlum} />
-                            <Text style={styles.menuItemLabel}>My Bookings</Text>
-                        </View>
-                        <ChevronRight size={16} color={Colors.gray400} />
-                    </TouchableOpacity>
-
-                    <View style={styles.menuDivider} />
-
-                    {/* 3. My Wishlist with badge count */}
-                    <TouchableOpacity
-                        style={styles.menuItem}
+                    />
+                    <Divider />
+                    <MenuRow
+                        icon={<Heart size={18} color={Colors.coral} />}
+                        label="My Wishlist"
+                        badge={wishlistCount}
                         onPress={() => router.push('/(customer)/wishlist')}
-                        activeOpacity={0.7}
-                    >
-                        <View style={styles.menuItemLeft}>
-                            <Heart size={18} color={Colors.coral} />
-                            <Text style={styles.menuItemLabel}>My Wishlist</Text>
-                        </View>
-                        <View style={styles.badgeCountPill}>
-                            <Text style={styles.badgeCountText}>{wishlistCount}</Text>
-                        </View>
-                    </TouchableOpacity>
-
-                    <View style={styles.menuDivider} />
-
-                    {/* 4. My Reviews */}
-                    <TouchableOpacity
-                        style={styles.menuItem}
-                        onPress={() =>
-                            Alert.alert(
-                                'My Reviews',
-                                'Overall Rating: 4.6 (124 reviews)\nYour reviews help our verified food & stay community!',
-                            )
-                        }
-                        activeOpacity={0.7}
-                    >
-                        <View style={styles.menuItemLeft}>
-                            <Star size={18} color={Colors.amber} />
-                            <Text style={styles.menuItemLabel}>My Reviews</Text>
-                        </View>
-                        <ChevronRight size={16} color={Colors.gray400} />
-                    </TouchableOpacity>
-
-                    <View style={styles.menuDivider} />
-
-                    {/* 5. Support & Protection */}
-                    <TouchableOpacity
-                        style={styles.menuItem}
+                    />
+                    <Divider />
+                    <MenuRow
+                        icon={<Star size={18} color={Colors.amber} />}
+                        label="My Reviews"
+                        onPress={() => router.push('/(customer)/reviews')}
+                    />
+                    <Divider />
+                    <MenuRow
+                        icon={<Headset size={18} color={Colors.deepPlum} />}
+                        label="Support & Protection"
                         onPress={() => router.push('/(customer)/support')}
-                        activeOpacity={0.7}
-                    >
-                        <View style={styles.menuItemLeft}>
-                            <Headset size={18} color={Colors.deepPlum} />
-                            <Text style={styles.menuItemLabel}>
-                                Support & Protection
-                            </Text>
-                        </View>
-                        <ChevronRight size={16} color={Colors.gray400} />
-                    </TouchableOpacity>
-
-                    <View style={styles.menuDivider} />
-
-                    {/* 6. Notifications */}
-                    <TouchableOpacity
-                        style={styles.menuItem}
+                    />
+                    <Divider />
+                    <MenuRow
+                        icon={<Bell size={18} color={Colors.coral} />}
+                        label="Notification Settings"
                         onPress={() => router.push('/(customer)/notifications')}
-                        activeOpacity={0.7}
-                    >
-                        <View style={styles.menuItemLeft}>
-                            <Bell size={18} color={Colors.coral} />
-                            <Text style={styles.menuItemLabel}>Notifications</Text>
-                        </View>
-                        <ChevronRight size={16} color={Colors.gray400} />
-                    </TouchableOpacity>
-
-                    <View style={styles.menuDivider} />
-
-                    {/* 7. Help Centre */}
-                    <TouchableOpacity
-                        style={styles.menuItem}
-                        onPress={() =>
-                            Alert.alert(
-                                'Help Centre',
-                                'Browse popular topics: Booking & Payment, Safety & Protection, Refund & Cancellation.',
-                            )
-                        }
-                        activeOpacity={0.7}
-                    >
-                        <View style={styles.menuItemLeft}>
-                            <HelpCircle size={18} color={Colors.deepPlum} />
-                            <Text style={styles.menuItemLabel}>Help Centre</Text>
-                        </View>
-                        <ChevronRight size={16} color={Colors.gray400} />
-                    </TouchableOpacity>
-
-                    <View style={styles.menuDivider} />
-
-                    {/* 8. About TIJUM */}
-                    <TouchableOpacity
-                        style={styles.menuItem}
-                        onPress={() =>
-                            Alert.alert(
-                                'About TIJUM',
-                                'TIJUM Stay • Dine • Belong\nVersion 1.0.0 (Build 2)\nA complete accommodation and food ecosystem.',
-                            )
-                        }
-                        activeOpacity={0.7}
-                    >
-                        <View style={styles.menuItemLeft}>
-                            <Info size={18} color={Colors.deepPlum} />
-                            <Text style={styles.menuItemLabel}>About TIJUM</Text>
-                        </View>
-                        <ChevronRight size={16} color={Colors.gray400} />
-                    </TouchableOpacity>
+                    />
+                    <Divider />
+                    <MenuRow
+                        icon={<HelpCircle size={18} color={Colors.deepPlum} />}
+                        label="Help Centre"
+                        onPress={() => router.push('/help')}
+                    />
                 </View>
 
-                {/* Sign Out or Sign In Button */}
+                <View style={styles.menuCard}>
+                    <MenuRow
+                        icon={<FileText size={18} color={Colors.deepPlum} />}
+                        label="Terms & Conditions"
+                        onPress={() => router.push('/legal/terms')}
+                    />
+                    <Divider />
+                    <MenuRow
+                        icon={<ShieldCheck size={18} color={Colors.deepPlum} />}
+                        label="Privacy Policy"
+                        onPress={() => router.push('/legal/privacy')}
+                    />
+                    <Divider />
+                    <MenuRow
+                        icon={<Info size={18} color={Colors.deepPlum} />}
+                        label="About TIJUM"
+                        onPress={() => router.push('/legal/about')}
+                    />
+                    <Divider />
+                    <MenuRow
+                        icon={<Repeat size={18} color={Colors.coral} />}
+                        label="Switch to Partner"
+                        onPress={handleSwitchToPartner}
+                    />
+                </View>
+
                 <TouchableOpacity
                     style={styles.authActionButton}
-                    onPress={isGuest ? () => router.push('/(auth)/customer-login') : handleSignOut}
+                    onPress={handleSignOut}
                     activeOpacity={0.85}
                 >
-                    {isGuest ? (
-                        <>
-                            <LogIn size={18} color={Colors.deepPlum} style={{ marginRight: 8 }} />
-                            <Text style={styles.authActionText}>Sign In to Account</Text>
-                        </>
-                    ) : (
-                        <>
-                            <LogOut size={18} color={Colors.coral} style={{ marginRight: 8 }} />
-                            <Text style={[styles.authActionText, { color: Colors.coral }]}>
-                                Sign Out
-                            </Text>
-                        </>
-                    )}
+                    <LogOut
+                        size={18}
+                        color={Colors.coral}
+                        style={{ marginRight: 8 }}
+                    />
+                    <Text
+                        style={[styles.authActionText, { color: Colors.coral }]}
+                    >
+                        Sign Out
+                    </Text>
                 </TouchableOpacity>
 
-                {/* Footer Copyright */}
                 <Text style={styles.copyrightText}>
-                    © 2025 TIJUM. All rights reserved.
+                    © 2026 TIJUM. All rights reserved.
                 </Text>
             </ScrollView>
         </SafeAreaView>
     );
+}
+
+function MenuRow({
+    icon,
+    label,
+    badge,
+    onPress,
+}: {
+    icon: React.ReactNode;
+    label: string;
+    badge?: number;
+    onPress: () => void;
+}) {
+    return (
+        <TouchableOpacity
+            style={styles.menuItem}
+            onPress={onPress}
+            activeOpacity={0.7}
+        >
+            <View style={styles.menuItemLeft}>
+                {icon}
+                <Text style={styles.menuItemLabel}>{label}</Text>
+            </View>
+            <View style={styles.menuItemRight}>
+                {badge !== undefined && badge > 0 ? (
+                    <View style={styles.badgeCountPill}>
+                        <Text style={styles.badgeCountText}>{badge}</Text>
+                    </View>
+                ) : null}
+                <ChevronRight size={16} color={Colors.gray400} />
+            </View>
+        </TouchableOpacity>
+    );
+}
+
+function Divider() {
+    return <View style={styles.menuDivider} />;
 }
 
 const styles = StyleSheet.create({
@@ -355,7 +377,14 @@ const styles = StyleSheet.create({
         borderRadius: 41,
         borderWidth: 3,
         borderColor: Colors.coral,
-        backgroundColor: Colors.surfaceSubtle,
+        backgroundColor: Colors.peachSoft,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    avatarInitial: {
+        fontSize: 34,
+        fontWeight: '800',
+        color: Colors.deepPlum,
     },
     editAvatarBadge: {
         position: 'absolute',
@@ -381,17 +410,11 @@ const styles = StyleSheet.create({
         marginTop: 2,
         opacity: 0.9,
     },
-    guestNoticeBadge: {
-        backgroundColor: Colors.peachCream,
-        paddingHorizontal: 10,
-        paddingVertical: 3,
-        borderRadius: BorderRadius.full,
-        marginTop: 6,
-    },
-    guestNoticeText: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: Colors.plumPrimary,
+    userPhone: {
+        fontSize: 12,
+        color: Colors.warmCream,
+        marginTop: 2,
+        opacity: 0.75,
     },
     menuCard: {
         backgroundColor: Colors.white,
@@ -412,6 +435,11 @@ const styles = StyleSheet.create({
     menuItemLeft: {
         flexDirection: 'row',
         alignItems: 'center',
+    },
+    menuItemRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
     menuItemLabel: {
         fontSize: 14,

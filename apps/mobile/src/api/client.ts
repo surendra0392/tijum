@@ -2,6 +2,14 @@ import { SecureTokenStorage } from '../auth/SecureTokenStorage.ts';
 
 const DEFAULT_BASE_URL = 'https://tijum.com/api/v1';
 
+type UnauthorizedHandler = () => void;
+
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
+    unauthorizedHandler = handler;
+}
+
 export class ApiError extends Error {
     readonly status: number;
     readonly errorCode?: string;
@@ -23,9 +31,9 @@ export class ApiError extends Error {
 
 export class ApiClient {
     private static getBaseUrl(): string {
-        const envUrl = process.env.EXPO_PUBLIC_API_URL;
-        if (envUrl && !envUrl.includes('staging.tijum.com')) {
-            return envUrl;
+        const envUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+        if (envUrl) {
+            return envUrl.replace(/\/+$/, '');
         }
         return DEFAULT_BASE_URL;
     }
@@ -52,7 +60,11 @@ export class ApiClient {
         };
 
         const method = (options.method || 'GET').toUpperCase();
-        if (!isFormData && !headers['Content-Type'] && (options.body || ['POST', 'PUT', 'PATCH'].includes(method))) {
+        if (
+            !isFormData &&
+            !headers['Content-Type'] &&
+            (options.body || ['POST', 'PUT', 'PATCH'].includes(method))
+        ) {
             headers['Content-Type'] = 'application/json';
         }
 
@@ -81,11 +93,10 @@ export class ApiClient {
             }
 
             if (!response.ok) {
-                if (response.status === 401) {
-                    // Token expired or invalid (preserve local demo sessions)
-                    if (token && !token.startsWith('demo_')) {
-                        await SecureTokenStorage.clearAll();
-                    }
+                if (response.status === 401 && token) {
+                    // Token expired or revoked: purge it and let the auth layer react.
+                    await SecureTokenStorage.clearActiveSession();
+                    unauthorizedHandler?.();
                 }
 
                 const fallbackMessage =
@@ -101,6 +112,16 @@ export class ApiClient {
                         (response.status >= 500
                             ? 'SERVER_ERROR'
                             : 'HTTP_ERROR'),
+                    json?.errors,
+                );
+            }
+
+            // Explicit server-side failure on a 2xx HTTP status: reject the envelope.
+            if (json && typeof json === 'object' && json.success === false) {
+                throw new ApiError(
+                    json?.message || 'Request failed.',
+                    response.status,
+                    json?.error_code || 'API_ERROR',
                     json?.errors,
                 );
             }

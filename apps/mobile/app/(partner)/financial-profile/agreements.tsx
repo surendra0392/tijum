@@ -25,7 +25,6 @@ import {
     CheckCircle2,
     FileCheck2,
     FileText,
-    Percent,
     Shield,
 } from 'lucide-react-native';
 
@@ -34,7 +33,9 @@ export default function CommissionAgreementsScreen() {
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [agreements, setAgreements] = useState<OwnerCommissionAgreement[]>([]);
+    const [agreements, setAgreements] = useState<OwnerCommissionAgreement[]>(
+        [],
+    );
     const [acceptingId, setAcceptingId] = useState<number | null>(null);
 
     const fetchAgreements = async () => {
@@ -44,7 +45,10 @@ export default function CommissionAgreementsScreen() {
                 setAgreements(res.data);
             }
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to load commission agreements.');
+            Alert.alert(
+                'Error',
+                error.message || 'Failed to load commission agreements.',
+            );
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -52,12 +56,12 @@ export default function CommissionAgreementsScreen() {
     };
 
     useEffect(() => {
-        fetchAgreements();
+        void fetchAgreements();
     }, []);
 
     const onRefresh = () => {
         setRefreshing(true);
-        fetchAgreements();
+        void fetchAgreements();
     };
 
     const handleAccept = (agreement: OwnerCommissionAgreement) => {
@@ -72,11 +76,19 @@ export default function CommissionAgreementsScreen() {
                     onPress: async () => {
                         setAcceptingId(agreement.id);
                         try {
-                            await OwnerApi.acceptCommissionAgreement(agreement.id);
-                            Alert.alert('Agreement Signed', 'Commission agreement accepted successfully.');
-                            fetchAgreements();
+                            await OwnerApi.acceptCommissionAgreement(
+                                agreement.id,
+                            );
+                            Alert.alert(
+                                'Agreement Signed',
+                                'Commission agreement accepted successfully.',
+                            );
+                            void fetchAgreements();
                         } catch (error: any) {
-                            Alert.alert('Error', error.message || 'Failed to accept agreement.');
+                            Alert.alert(
+                                'Error',
+                                error.message || 'Failed to accept agreement.',
+                            );
                         } finally {
                             setAcceptingId(null);
                         }
@@ -86,7 +98,9 @@ export default function CommissionAgreementsScreen() {
         );
     };
 
-    const getStatusVariant = (status: string): 'success' | 'warning' | 'info' | 'error' | 'neutral' => {
+    const getStatusVariant = (
+        status: string,
+    ): 'success' | 'warning' | 'info' | 'error' | 'neutral' => {
         switch (status?.toLowerCase()) {
             case 'active':
             case 'accepted':
@@ -114,37 +128,50 @@ export default function CommissionAgreementsScreen() {
                     <ArrowLeft size={22} color={Colors.textPrimary} />
                 </TouchableOpacity>
                 <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerTitle}>Commission Agreements</Text>
-                    <Text style={styles.headerSubtitle}>Contractual Rates & Service Terms</Text>
+                    <Text style={styles.headerTitle}>
+                        Commission Agreements
+                    </Text>
+                    <Text style={styles.headerSubtitle}>
+                        Contractual Rates & Service Terms
+                    </Text>
                 </View>
             </View>
 
             {loading ? (
                 <View style={styles.centered}>
                     <ActivityIndicator size="large" color={Colors.primary} />
-                    <Text style={styles.loadingText}>Loading agreements...</Text>
+                    <Text style={styles.loadingText}>
+                        Loading agreements...
+                    </Text>
                 </View>
             ) : (
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                        />
                     }
                 >
                     {/* Notice */}
                     <View style={styles.noticeBanner}>
                         <Shield size={18} color={Colors.primary} />
                         <Text style={styles.noticeText}>
-                            Platform commissions are deducted automatically from gross guest payments during settlement calculation.
+                            Platform commissions are deducted automatically from
+                            gross guest payments during settlement calculation.
                         </Text>
                     </View>
 
                     {agreements.length === 0 ? (
                         <View style={styles.emptyContainer}>
                             <FileText size={48} color={Colors.textTertiary} />
-                            <Text style={styles.emptyTitle}>No Agreements Found</Text>
+                            <Text style={styles.emptyTitle}>
+                                No Agreements Found
+                            </Text>
                             <Text style={styles.emptySubtitle}>
-                                Standard platform commission terms will apply once your property is approved.
+                                Standard platform commission terms will apply
+                                once your property is approved.
                             </Text>
                         </View>
                     ) : (
@@ -154,15 +181,26 @@ export default function CommissionAgreementsScreen() {
                                 !agreement.accepted_at;
 
                             return (
-                                <View key={agreement.id} style={styles.agreementCard}>
+                                <View
+                                    key={agreement.id}
+                                    style={styles.agreementCard}
+                                >
                                     <View style={styles.cardHeader}>
                                         <View style={styles.titleRow}>
-                                            <FileCheck2 size={20} color={Colors.primary} />
+                                            <FileCheck2
+                                                size={20}
+                                                color={Colors.primary}
+                                            />
                                             <Text style={styles.agreementTitle}>
                                                 Terms {agreement.terms_version}
                                             </Text>
                                         </View>
-                                        <Badge variant={getStatusVariant(agreement.status)} size="sm">
+                                        <Badge
+                                            variant={getStatusVariant(
+                                                agreement.status,
+                                            )}
+                                            size="sm"
+                                        >
                                             {agreement.status.toUpperCase()}
                                         </Badge>
                                     </View>
@@ -170,50 +208,124 @@ export default function CommissionAgreementsScreen() {
                                     {/* Commission Metric Box */}
                                     <View style={styles.rateBox}>
                                         <View style={styles.rateRow}>
-                                            <Text style={styles.rateLabel}>Commission Rate</Text>
+                                            <Text style={styles.rateLabel}>
+                                                Commission Rate
+                                            </Text>
                                             <Text style={styles.rateValue}>
-                                                {agreement.commission_rate_percentage}%
+                                                {
+                                                    agreement.commission_rate_percentage
+                                                }
+                                                %
                                             </Text>
                                         </View>
                                         <Text style={styles.rateSubtext}>
-                                            Base: {agreement.base_type || 'Gross Booking Value'} • {agreement.gst_treatment || 'Exclusive of GST'}
+                                            Base:{' '}
+                                            {agreement.base_type ||
+                                                'Gross Booking Value'}{' '}
+                                            •{' '}
+                                            {agreement.gst_treatment ||
+                                                'Exclusive of GST'}
                                         </Text>
                                     </View>
 
                                     {/* Agreement Details */}
                                     <View style={styles.detailsList}>
                                         <View style={styles.detailRow}>
-                                            <Calendar size={14} color={Colors.textSecondary} />
-                                            <Text style={styles.detailLabel}>Effective From:</Text>
+                                            <Calendar
+                                                size={14}
+                                                color={Colors.textSecondary}
+                                            />
+                                            <Text style={styles.detailLabel}>
+                                                Effective From:
+                                            </Text>
                                             <Text style={styles.detailValue}>
-                                                {agreement.effective_from || 'Platform Onboarding'}
+                                                {agreement.effective_from ||
+                                                    'Platform Onboarding'}
                                             </Text>
                                         </View>
 
                                         {agreement.accepted_at ? (
                                             <>
                                                 <View style={styles.detailRow}>
-                                                    <CheckCircle2 size={14} color={Colors.success} />
-                                                    <Text style={styles.detailLabel}>Accepted At:</Text>
-                                                    <Text style={[styles.detailValue, { color: Colors.success, fontWeight: '700' }]}>
+                                                    <CheckCircle2
+                                                        size={14}
+                                                        color={Colors.success}
+                                                    />
+                                                    <Text
+                                                        style={
+                                                            styles.detailLabel
+                                                        }
+                                                    >
+                                                        Accepted At:
+                                                    </Text>
+                                                    <Text
+                                                        style={[
+                                                            styles.detailValue,
+                                                            {
+                                                                color: Colors.success,
+                                                                fontWeight:
+                                                                    '700',
+                                                            },
+                                                        ]}
+                                                    >
                                                         {agreement.accepted_at}
                                                     </Text>
                                                 </View>
                                                 {agreement.terms_hash ? (
-                                                    <View style={styles.detailRow}>
-                                                        <Shield size={14} color={Colors.primary} />
-                                                        <Text style={styles.detailLabel}>SHA-256 Hash:</Text>
-                                                        <Text style={[styles.detailValue, { fontSize: 11 }]} numberOfLines={1}>
-                                                            {agreement.terms_hash.slice(0, 16)}...
+                                                    <View
+                                                        style={styles.detailRow}
+                                                    >
+                                                        <Shield
+                                                            size={14}
+                                                            color={
+                                                                Colors.primary
+                                                            }
+                                                        />
+                                                        <Text
+                                                            style={
+                                                                styles.detailLabel
+                                                            }
+                                                        >
+                                                            SHA-256 Hash:
+                                                        </Text>
+                                                        <Text
+                                                            style={[
+                                                                styles.detailValue,
+                                                                {
+                                                                    fontSize: 11,
+                                                                },
+                                                            ]}
+                                                            numberOfLines={1}
+                                                        >
+                                                            {agreement.terms_hash.slice(
+                                                                0,
+                                                                16,
+                                                            )}
+                                                            ...
                                                         </Text>
                                                     </View>
                                                 ) : null}
                                             </>
                                         ) : (
                                             <View style={styles.detailRow}>
-                                                <AlertCircle size={14} color={Colors.warning} />
-                                                <Text style={styles.detailLabel}>Status:</Text>
-                                                <Text style={[styles.detailValue, { color: Colors.warning, fontWeight: '700' }]}>
+                                                <AlertCircle
+                                                    size={14}
+                                                    color={Colors.warning}
+                                                />
+                                                <Text
+                                                    style={styles.detailLabel}
+                                                >
+                                                    Status:
+                                                </Text>
+                                                <Text
+                                                    style={[
+                                                        styles.detailValue,
+                                                        {
+                                                            color: Colors.warning,
+                                                            fontWeight: '700',
+                                                        },
+                                                    ]}
+                                                >
                                                     Signature Pending
                                                 </Text>
                                             </View>
@@ -223,9 +335,17 @@ export default function CommissionAgreementsScreen() {
                                     {/* Action button if pending */}
                                     {isPending && (
                                         <Button
-                                            title={acceptingId === agreement.id ? 'Accepting...' : 'Review & Sign Agreement'}
-                                            onPress={() => handleAccept(agreement)}
-                                            disabled={acceptingId === agreement.id}
+                                            title={
+                                                acceptingId === agreement.id
+                                                    ? 'Accepting...'
+                                                    : 'Review & Sign Agreement'
+                                            }
+                                            onPress={() =>
+                                                handleAccept(agreement)
+                                            }
+                                            disabled={
+                                                acceptingId === agreement.id
+                                            }
                                             style={styles.acceptButton}
                                         />
                                     )}

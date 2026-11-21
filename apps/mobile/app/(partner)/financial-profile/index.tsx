@@ -23,12 +23,9 @@ import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 import {
-    AlertCircle,
     AlertTriangle,
     ArrowLeft,
     Building,
-    CheckCircle2,
-    CreditCard,
     Edit3,
     FileText,
     Landmark,
@@ -79,7 +76,10 @@ export default function FinancialProfileScreen() {
                 setHolderName(res.data.bank_account_holder_name || '');
             }
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to load financial profile.');
+            Alert.alert(
+                'Error',
+                error.message || 'Failed to load financial profile.',
+            );
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -87,12 +87,12 @@ export default function FinancialProfileScreen() {
     };
 
     useEffect(() => {
-        fetchProfile();
+        void fetchProfile();
     }, []);
 
     const onRefresh = () => {
         setRefreshing(true);
-        fetchProfile();
+        void fetchProfile();
     };
 
     const handleSave = async () => {
@@ -112,24 +112,38 @@ export default function FinancialProfileScreen() {
                 business_constitution: constitution,
                 pan: pan.trim().toUpperCase(),
                 gstin: gstin.trim() ? gstin.trim().toUpperCase() : undefined,
-                bank_account_number: bankAccountNumber.trim() ? bankAccountNumber.trim() : undefined,
-                bank_ifsc: bankIfsc.trim() ? bankIfsc.trim().toUpperCase() : undefined,
+                bank_account_number: bankAccountNumber.trim()
+                    ? bankAccountNumber.trim()
+                    : undefined,
+                bank_ifsc: bankIfsc.trim()
+                    ? bankIfsc.trim().toUpperCase()
+                    : undefined,
                 bank_name: bankName.trim() ? bankName.trim() : undefined,
-                bank_account_holder_name: holderName.trim() ? holderName.trim() : undefined,
+                bank_account_holder_name: holderName.trim()
+                    ? holderName.trim()
+                    : undefined,
             });
 
             setIsEditModalOpen(false);
             setBankAccountNumber('');
-            Alert.alert('Success', 'Financial details submitted for verification.');
-            fetchProfile();
+            Alert.alert(
+                'Success',
+                'Financial details submitted for verification.',
+            );
+            void fetchProfile();
         } catch (error: any) {
-            Alert.alert('Update Failed', error.message || 'Could not update financial profile.');
+            Alert.alert(
+                'Update Failed',
+                error.message || 'Could not update financial profile.',
+            );
         } finally {
             setSaving(false);
         }
     };
 
-    const getStatusVariant = (status?: string): 'success' | 'warning' | 'info' | 'error' | 'neutral' => {
+    const getStatusVariant = (
+        status?: string,
+    ): 'success' | 'warning' | 'info' | 'error' | 'neutral' => {
         switch (status?.toLowerCase()) {
             case 'verified':
             case 'approved':
@@ -157,7 +171,9 @@ export default function FinancialProfileScreen() {
                 </TouchableOpacity>
                 <View style={styles.headerTitleContainer}>
                     <Text style={styles.headerTitle}>Financial Profile</Text>
-                    <Text style={styles.headerSubtitle}>Banking, Tax & Settlement KYC</Text>
+                    <Text style={styles.headerSubtitle}>
+                        Banking, Tax & Settlement KYC
+                    </Text>
                 </View>
                 <TouchableOpacity
                     style={styles.editButton}
@@ -171,24 +187,45 @@ export default function FinancialProfileScreen() {
             {loading ? (
                 <View style={styles.centered}>
                     <ActivityIndicator size="large" color={Colors.primary} />
-                    <Text style={styles.loadingText}>Loading financial profile...</Text>
+                    <Text style={styles.loadingText}>
+                        Loading financial profile...
+                    </Text>
                 </View>
             ) : (
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                        />
                     }
                 >
                     {/* Status & Eligibility Banner */}
                     <View style={styles.statusBanner}>
                         <View style={styles.bannerHeader}>
                             <View style={styles.bannerTitleRow}>
-                                <ShieldCheck size={20} color={profile?.settlement_eligible ? Colors.success : Colors.warning} />
-                                <Text style={styles.bannerTitle}>Payout Eligibility</Text>
+                                <ShieldCheck
+                                    size={20}
+                                    color={
+                                        profile?.settlement_eligible
+                                            ? Colors.success
+                                            : Colors.warning
+                                    }
+                                />
+                                <Text style={styles.bannerTitle}>
+                                    Payout Eligibility
+                                </Text>
                             </View>
-                            <Badge variant={getStatusVariant(profile?.verification_status)} size="sm">
-                                {(profile?.verification_status || 'PENDING').toUpperCase()}
+                            <Badge
+                                variant={getStatusVariant(
+                                    profile?.verification_status,
+                                )}
+                                size="sm"
+                            >
+                                {(
+                                    profile?.verification_status || 'PENDING'
+                                ).toUpperCase()}
                             </Badge>
                         </View>
                         <Text style={styles.bannerDesc}>
@@ -199,27 +236,44 @@ export default function FinancialProfileScreen() {
                     </View>
 
                     {/* Rejection Reasons if applicable */}
-                    {profile?.rejection_reasons && profile.rejection_reasons.length > 0 && (
-                        <View style={styles.rejectionCard}>
-                            <View style={styles.rejectionHeader}>
-                                <AlertTriangle size={18} color={Colors.error} />
-                                <Text style={styles.rejectionTitle}>Action Required</Text>
+                    {profile?.rejection_reasons &&
+                        profile.rejection_reasons.length > 0 && (
+                            <View style={styles.rejectionCard}>
+                                <View style={styles.rejectionHeader}>
+                                    <AlertTriangle
+                                        size={18}
+                                        color={Colors.error}
+                                    />
+                                    <Text style={styles.rejectionTitle}>
+                                        Action Required
+                                    </Text>
+                                </View>
+                                {profile.rejection_reasons.map(
+                                    (reason, idx) => (
+                                        <Text
+                                            key={idx}
+                                            style={styles.rejectionItem}
+                                        >
+                                            • {reason}
+                                        </Text>
+                                    ),
+                                )}
                             </View>
-                            {profile.rejection_reasons.map((reason, idx) => (
-                                <Text key={idx} style={styles.rejectionItem}>• {reason}</Text>
-                            ))}
-                        </View>
-                    )}
+                        )}
 
                     {/* Legal & Business Entity Card */}
                     <View style={styles.sectionCard}>
                         <View style={styles.sectionHeader}>
                             <Building size={18} color={Colors.primary} />
-                            <Text style={styles.sectionTitle}>Business & Tax Entity</Text>
+                            <Text style={styles.sectionTitle}>
+                                Business & Tax Entity
+                            </Text>
                         </View>
 
                         <View style={styles.fieldRow}>
-                            <Text style={styles.fieldLabel}>Legal Entity Name</Text>
+                            <Text style={styles.fieldLabel}>
+                                Legal Entity Name
+                            </Text>
                             <Text style={styles.fieldValue}>
                                 {profile?.legal_business_name || 'Not provided'}
                             </Text>
@@ -228,14 +282,20 @@ export default function FinancialProfileScreen() {
                         <View style={styles.fieldRow}>
                             <Text style={styles.fieldLabel}>Constitution</Text>
                             <Text style={styles.fieldValue}>
-                                {CONSTITUTION_OPTIONS.find((c) => c.value === profile?.business_constitution)?.label ||
+                                {CONSTITUTION_OPTIONS.find(
+                                    (c) =>
+                                        c.value ===
+                                        profile?.business_constitution,
+                                )?.label ||
                                     profile?.business_constitution ||
                                     'Individual'}
                             </Text>
                         </View>
 
                         <View style={styles.fieldRow}>
-                            <Text style={styles.fieldLabel}>Income Tax PAN</Text>
+                            <Text style={styles.fieldLabel}>
+                                Income Tax PAN
+                            </Text>
                             <Text style={styles.fieldValueBold}>
                                 {profile?.pan || 'Not provided'}
                             </Text>
@@ -253,7 +313,9 @@ export default function FinancialProfileScreen() {
                     <View style={styles.sectionCard}>
                         <View style={styles.sectionHeader}>
                             <Landmark size={18} color={Colors.primary} />
-                            <Text style={styles.sectionTitle}>Settlement Bank Account</Text>
+                            <Text style={styles.sectionTitle}>
+                                Settlement Bank Account
+                            </Text>
                         </View>
 
                         <View style={styles.fieldRow}>
@@ -264,21 +326,30 @@ export default function FinancialProfileScreen() {
                         </View>
 
                         <View style={styles.fieldRow}>
-                            <Text style={styles.fieldLabel}>Account Holder Name</Text>
+                            <Text style={styles.fieldLabel}>
+                                Account Holder Name
+                            </Text>
                             <Text style={styles.fieldValue}>
-                                {profile?.bank_account_holder_name || profile?.legal_business_name || 'Not specified'}
+                                {profile?.bank_account_holder_name ||
+                                    profile?.legal_business_name ||
+                                    'Not specified'}
                             </Text>
                         </View>
 
                         <View style={styles.fieldRow}>
-                            <Text style={styles.fieldLabel}>Account Number</Text>
+                            <Text style={styles.fieldLabel}>
+                                Account Number
+                            </Text>
                             <Text style={styles.fieldValueBold}>
-                                {profile?.bank_account_masked || '•••• •••• ••••'}
+                                {profile?.bank_account_masked ||
+                                    '•••• •••• ••••'}
                             </Text>
                         </View>
 
                         <View style={styles.fieldRow}>
-                            <Text style={styles.fieldLabel}>NEFT / RTGS IFSC</Text>
+                            <Text style={styles.fieldLabel}>
+                                NEFT / RTGS IFSC
+                            </Text>
                             <Text style={styles.fieldValueBold}>
                                 {profile?.bank_ifsc || 'Not specified'}
                             </Text>
@@ -288,13 +359,19 @@ export default function FinancialProfileScreen() {
                     {/* Commission Agreement Link Card */}
                     <TouchableOpacity
                         style={styles.agreementCard}
-                        onPress={() => router.push('/(partner)/financial-profile/agreements')}
+                        onPress={() =>
+                            router.push(
+                                '/(partner)/financial-profile/agreements',
+                            )
+                        }
                         accessibilityLabel="View Commission Agreements"
                     >
                         <View style={styles.agreementLeft}>
                             <FileText size={20} color={Colors.primary} />
                             <View style={{ marginLeft: Spacing.sm }}>
-                                <Text style={styles.agreementTitle}>Commission Agreements</Text>
+                                <Text style={styles.agreementTitle}>
+                                    Commission Agreements
+                                </Text>
                                 <Text style={styles.agreementSubtitle}>
                                     View contractual commission tiers and terms
                                 </Text>
@@ -318,16 +395,24 @@ export default function FinancialProfileScreen() {
                 >
                     <View style={styles.modalContainer}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Edit Financial KYC</Text>
-                            <TouchableOpacity onPress={() => setIsEditModalOpen(false)}>
+                            <Text style={styles.modalTitle}>
+                                Edit Financial KYC
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => setIsEditModalOpen(false)}
+                            >
                                 <X size={22} color={Colors.textSecondary} />
                             </TouchableOpacity>
                         </View>
 
                         <ScrollView style={styles.modalForm}>
-                            <Text style={styles.formSectionTitle}>Legal Business Identity</Text>
-                            
-                            <Text style={styles.inputLabel}>Legal Entity / Trade Name *</Text>
+                            <Text style={styles.formSectionTitle}>
+                                Legal Business Identity
+                            </Text>
+
+                            <Text style={styles.inputLabel}>
+                                Legal Entity / Trade Name *
+                            </Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="Enter legal business name"
@@ -336,21 +421,25 @@ export default function FinancialProfileScreen() {
                                 onChangeText={setLegalName}
                             />
 
-                            <Text style={styles.inputLabel}>Business Constitution *</Text>
+                            <Text style={styles.inputLabel}>
+                                Business Constitution *
+                            </Text>
                             <View style={styles.constitutionGrid}>
                                 {CONSTITUTION_OPTIONS.map((c) => (
                                     <TouchableOpacity
                                         key={c.value}
                                         style={[
                                             styles.constitutionChip,
-                                            constitution === c.value && styles.constitutionChipActive,
+                                            constitution === c.value &&
+                                                styles.constitutionChipActive,
                                         ]}
                                         onPress={() => setConstitution(c.value)}
                                     >
                                         <Text
                                             style={[
                                                 styles.constitutionChipText,
-                                                constitution === c.value && styles.constitutionChipTextActive,
+                                                constitution === c.value &&
+                                                    styles.constitutionChipTextActive,
                                             ]}
                                         >
                                             {c.label}
@@ -370,7 +459,9 @@ export default function FinancialProfileScreen() {
                                 maxLength={10}
                             />
 
-                            <Text style={styles.inputLabel}>GSTIN (Optional)</Text>
+                            <Text style={styles.inputLabel}>
+                                GSTIN (Optional)
+                            </Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="e.g. 29ABCDE1234F1Z5"
@@ -381,14 +472,24 @@ export default function FinancialProfileScreen() {
                                 maxLength={15}
                             />
 
-                            <Text style={[styles.formSectionTitle, { marginTop: Spacing.md }]}>
+                            <Text
+                                style={[
+                                    styles.formSectionTitle,
+                                    { marginTop: Spacing.md },
+                                ]}
+                            >
                                 Settlement Bank Account
                             </Text>
 
-                            <Text style={styles.inputLabel}>Account Number</Text>
+                            <Text style={styles.inputLabel}>
+                                Account Number
+                            </Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder={profile?.bank_account_masked || 'Enter bank account number'}
+                                placeholder={
+                                    profile?.bank_account_masked ||
+                                    'Enter bank account number'
+                                }
                                 placeholderTextColor={Colors.textTertiary}
                                 value={bankAccountNumber}
                                 onChangeText={setBankAccountNumber}
@@ -401,7 +502,9 @@ export default function FinancialProfileScreen() {
                                 placeholder="e.g. HDFC0001234"
                                 placeholderTextColor={Colors.textTertiary}
                                 value={bankIfsc}
-                                onChangeText={(t) => setBankIfsc(t.toUpperCase())}
+                                onChangeText={(t) =>
+                                    setBankIfsc(t.toUpperCase())
+                                }
                                 autoCapitalize="characters"
                                 maxLength={11}
                             />
@@ -415,7 +518,9 @@ export default function FinancialProfileScreen() {
                                 onChangeText={setBankName}
                             />
 
-                            <Text style={styles.inputLabel}>Account Holder Name</Text>
+                            <Text style={styles.inputLabel}>
+                                Account Holder Name
+                            </Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="Name as per bank records"
@@ -433,7 +538,9 @@ export default function FinancialProfileScreen() {
                                 style={{ flex: 1, marginRight: Spacing.sm }}
                             />
                             <Button
-                                title={saving ? 'Submitting...' : 'Save & Submit'}
+                                title={
+                                    saving ? 'Submitting...' : 'Save & Submit'
+                                }
                                 onPress={handleSave}
                                 disabled={saving}
                                 style={{ flex: 1 }}

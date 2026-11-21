@@ -10,20 +10,20 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { AlertCircle, Mail, X } from 'lucide-react-native';
+import { AlertCircle, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthContext';
 import { PublicApi } from '../../src/api/public';
+import { BrandLogo } from '../../src/components/BrandLogo';
 import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
-import { PushNotificationService } from '../../src/notifications/PushNotificationService';
 import { Colors } from '../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../src/theme/spacing';
 import { Typography } from '../../src/theme/typography';
 
 export default function OwnerLoginScreen() {
     const router = useRouter();
-    const { loginPartner, loginDemoPartner } = useAuth();
+    const { loginPartner } = useAuth();
 
     const [loginIdentifier, setLoginIdentifier] = useState('');
     const [password, setPassword] = useState('');
@@ -47,9 +47,6 @@ export default function OwnerLoginScreen() {
         setErrorMessage('');
         try {
             await loginPartner(loginIdentifier.trim(), password);
-            PushNotificationService.registerForPushNotifications(
-                'partner',
-            ).catch(() => {});
             router.replace('/(partner)/dashboard');
         } catch (err: any) {
             setErrorMessage(
@@ -97,15 +94,16 @@ export default function OwnerLoginScreen() {
         >
             <ScrollView contentContainerStyle={styles.container}>
                 <View style={styles.header}>
+                    <BrandLogo size={138} tone="dark" />
                     <View style={styles.partnerBadge}>
                         <Text style={styles.partnerBadgeText}>
                             ACCOMMODATION PARTNER
                         </Text>
                     </View>
-                    <Text style={styles.title}>Partner Command Center</Text>
+                    <Text style={styles.title}>Welcome Back, Partner</Text>
                     <Text style={styles.subtitle}>
-                        Manage incoming reservation requests, room allocations,
-                        property status, and settlement statements.
+                        Sign in to manage your properties, bookings, guests and
+                        payouts.
                     </Text>
                 </View>
 
@@ -198,9 +196,9 @@ export default function OwnerLoginScreen() {
                                 </TouchableOpacity>
                             </View>
                             <Text style={styles.modalSubtitle}>
-                                Enter your registered accommodation partner email.
-                                We will send you instructions to securely reset
-                                your dashboard password.
+                                Enter your registered accommodation partner
+                                email. We will send you instructions to securely
+                                reset your dashboard password.
                             </Text>
 
                             <Input

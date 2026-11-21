@@ -53,10 +53,14 @@ export function AppHeader({
             <View style={styles.contentRow}>
                 {showBack ? (
                     <TouchableOpacity
+                        accessibilityLabel="Go back"
+                        accessibilityRole="button"
                         onPress={handleBack}
                         style={[
                             styles.backButton,
-                            isPlum ? styles.plumBackButton : styles.whiteBackButton,
+                            isPlum
+                                ? styles.plumBackButton
+                                : styles.whiteBackButton,
                         ]}
                         activeOpacity={0.7}
                     >
@@ -83,7 +87,9 @@ export function AppHeader({
                         <Text
                             style={[
                                 styles.subtitle,
-                                isPlum ? styles.plumSubtitle : styles.whiteSubtitle,
+                                isPlum
+                                    ? styles.plumSubtitle
+                                    : styles.whiteSubtitle,
                             ]}
                             numberOfLines={1}
                         >
@@ -93,7 +99,9 @@ export function AppHeader({
                 </View>
 
                 {rightAction ? (
-                    <View style={styles.rightActionContainer}>{rightAction}</View>
+                    <View style={styles.rightActionContainer}>
+                        {rightAction}
+                    </View>
                 ) : (
                     <View style={styles.spacer} />
                 )}
@@ -124,8 +132,8 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
     backButton: {
-        width: 36,
-        height: 36,
+        width: 48,
+        height: 48,
         borderRadius: BorderRadius.pill,
         alignItems: 'center',
         justifyContent: 'center',
@@ -162,10 +170,10 @@ const styles = StyleSheet.create({
         color: Colors.inkSecondary,
     },
     rightActionContainer: {
-        minWidth: 36,
+        minWidth: 48,
         alignItems: 'flex-end',
     },
     spacer: {
-        width: 36,
+        width: 48,
     },
 });

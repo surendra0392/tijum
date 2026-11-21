@@ -1,10 +1,5 @@
 import React from 'react';
-import {
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Building2, Home, Users } from 'lucide-react-native';
 import { CanonicalCategorySlug } from '../constants/categories';
 import { Colors } from '../theme/colors';
@@ -19,12 +14,12 @@ interface CategoryCardProps {
 const CATEGORY_META = {
     'hostels-pg': {
         title: 'Hostels & PGs',
-        subtitle: 'Student & single worker stays with meals',
+        subtitle: 'Student and professional shared stays',
         Icon: Building2,
     },
-    'homestays': {
+    homestays: {
         title: 'Homestays',
-        subtitle: 'Authentic local hosts & home-style food',
+        subtitle: 'Local hosts and residential stays',
         Icon: Home,
     },
     'co-living': {
@@ -49,9 +44,14 @@ export function CategoryCard({
 
     return (
         <TouchableOpacity
+            accessibilityLabel={`${meta.title}. ${meta.subtitle}`}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isSelected }}
             style={[
                 styles.container,
-                isSelected ? styles.selectedContainer : styles.unselectedContainer,
+                isSelected
+                    ? styles.selectedContainer
+                    : styles.unselectedContainer,
             ]}
             onPress={onPress}
             activeOpacity={0.8}
@@ -59,7 +59,9 @@ export function CategoryCard({
             <View
                 style={[
                     styles.iconCircle,
-                    isSelected ? styles.selectedIconCircle : styles.unselectedIconCircle,
+                    isSelected
+                        ? styles.selectedIconCircle
+                        : styles.unselectedIconCircle,
                 ]}
             >
                 <IconComponent
@@ -79,7 +81,9 @@ export function CategoryCard({
             <Text
                 style={[
                     styles.subtitle,
-                    isSelected ? styles.selectedSubtitle : styles.unselectedSubtitle,
+                    isSelected
+                        ? styles.selectedSubtitle
+                        : styles.unselectedSubtitle,
                 ]}
                 numberOfLines={2}
             >

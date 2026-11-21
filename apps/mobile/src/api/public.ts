@@ -2,7 +2,6 @@ import { ApiClient } from './client';
 import {
     ApiResponse,
     CanonicalCategory,
-    CanonicalCategorySlug,
     City,
     GuestContactValidationResult,
     LocationPrediction,
@@ -30,7 +29,7 @@ export const PublicApi = {
         locality?: string;
         lat?: number;
         lng?: number;
-        category?: CanonicalCategorySlug | string;
+        category?: string;
         breakfast?: boolean;
         lunch?: boolean;
         dinner?: boolean;
@@ -76,7 +75,7 @@ export const PublicApi = {
         data: {
             property_room_type_id: number;
             check_in_date: string;
-            duration_type: 'daily' | 'weekly' | 'monthly' | string;
+            duration_type: 'daily' | 'weekly' | 'monthly';
             duration_quantity: number;
             quantity: number;
             guest_count?: number;
@@ -128,7 +127,7 @@ export const PublicApi = {
         name: string;
         email: string;
         mobile: string;
-        subject: 'booking' | 'partner' | 'general' | string;
+        subject: 'booking' | 'partner' | 'general';
         message: string;
     }) => ApiClient.post<ApiResponse<any>>('public/contact', payload),
 

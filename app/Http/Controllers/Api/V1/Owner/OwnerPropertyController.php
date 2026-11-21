@@ -241,8 +241,8 @@ class OwnerPropertyController extends ApiController
 
     public function referenceData(Request $request): JsonResponse
     {
-        $cities = City::query()->active()->orderBy('display_order')->orderBy('name')->get(['id', 'name', 'slug', 'state', 'country_code']);
-        $categories = PropertyCategory::query()->active()->orderBy('display_order')->get(['id', 'name', 'slug', 'code', 'description']);
+        $cities = City::query()->active()->orderBy('name')->get(['id', 'name', 'slug', 'state', 'country_code']);
+        $categories = PropertyCategory::query()->active()->orderBy('sort_order')->get(['id', 'name', 'slug', 'code', 'description']);
         $amenities = Amenity::query()->active()->with('category')->orderBy('display_order')->get();
 
         return $this->success([

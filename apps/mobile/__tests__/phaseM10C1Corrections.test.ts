@@ -87,15 +87,20 @@ describe('Phase M10C.1 Production Acceptance Corrections Specification', () => {
                 created_at: '2026-11-20T10:00:00.000000Z',
             };
 
-            const displayedFirstActionHours = serverCasePayload.first_action_target_hours;
+            const displayedFirstActionHours =
+                serverCasePayload.first_action_target_hours;
             assert.equal(displayedFirstActionHours, 2);
 
-            const firstActionDue = new Date(serverCasePayload.first_action_due_at).getTime();
+            const firstActionDue = new Date(
+                serverCasePayload.first_action_due_at,
+            ).getTime();
             const created = new Date(serverCasePayload.created_at).getTime();
             const diffHours = (firstActionDue - created) / (1000 * 60 * 60);
             assert.equal(diffHours, 2);
 
-            const ackDue = new Date(serverCasePayload.acknowledgement_due_at).getTime();
+            const ackDue = new Date(
+                serverCasePayload.acknowledgement_due_at,
+            ).getTime();
             const ackDiffHours = (ackDue - created) / (1000 * 60 * 60);
             assert.equal(ackDiffHours, 48);
         });
@@ -107,7 +112,9 @@ describe('Phase M10C.1 Production Acceptance Corrections Specification', () => {
             let promptedUser = false;
             let tokenRegistered = false;
 
-            const checkInitialStatus = (status: 'undetermined' | 'granted' | 'denied') => {
+            const checkInitialStatus = (
+                status: 'undetermined' | 'granted' | 'denied',
+            ) => {
                 if (status === 'granted') {
                     tokenRegistered = true;
                 }
@@ -116,8 +123,43 @@ describe('Phase M10C.1 Production Acceptance Corrections Specification', () => {
             };
 
             const firstLaunch = checkInitialStatus('undetermined');
-            assert.equal(firstLaunch.prompted, false, 'First launch must never trigger automatic prompt');
-            assert.equal(firstLaunch.registered, false, 'First launch must never register token without permission');
+            assert.equal(
+                firstLaunch.prompted,
+                false,
+                'First launch must never trigger automatic prompt',
+            );
+            assert.equal(
+                firstLaunch.registered,
+                false,
+                'First launch must never register token without permission',
+            );
+        });
+
+        it('keeps permission requests behind the explicit onboarding action', () => {
+            const rootLayoutSource = fs.readFileSync(
+                path.resolve(__dirname, '../app/_layout.tsx'),
+                'utf8',
+            );
+            const welcomeSource = fs.readFileSync(
+                path.resolve(__dirname, '../app/index.tsx'),
+                'utf8',
+            );
+
+            assert.ok(
+                !rootLayoutSource.includes(
+                    'requestInitialPermissionsOnInstall()',
+                ),
+                'Root layout must not request notification permission during startup',
+            );
+            assert.match(
+                welcomeSource,
+                /const handlePermissionContinue = async \(\) => \{\s*await requestAllPermissions\(\)/,
+            );
+            assert.match(
+                welcomeSource,
+                /const handleSkip = \(\) => \{\s*goToAccountHome\(\)/,
+                'Skipping onboarding must not request permissions',
+            );
         });
 
         it('requests permission contextually during user-initiated settings toggle', () => {
@@ -164,12 +206,18 @@ describe('Phase M10C.1 Production Acceptance Corrections Specification', () => {
 
             // Third automatic attempt should be suppressed
             const attempt3 = requestPermission('in_app_prompt', false);
-            assert.equal(attempt3.prompted, false, 'Third prompt must be suppressed to prevent nagging');
+            assert.equal(
+                attempt3.prompted,
+                false,
+                'Third prompt must be suppressed to prevent nagging',
+            );
             assert.equal(promptAttempts, 2);
         });
 
         it('unregisters push token on logout and role-switch', () => {
-            const registeredTokens: string[] = ['ExponentPushToken[customer_123]'];
+            const registeredTokens: string[] = [
+                'ExponentPushToken[customer_123]',
+            ];
 
             const unregisterDevice = (tokenToRevoke: string) => {
                 const idx = registeredTokens.indexOf(tokenToRevoke);
@@ -180,7 +228,26 @@ describe('Phase M10C.1 Production Acceptance Corrections Specification', () => {
 
             // User logs out as Customer
             unregisterDevice('ExponentPushToken[customer_123]');
-            assert.equal(registeredTokens.length, 0, 'Device push token must be unregistered on logout');
+            assert.equal(
+                registeredTokens.length,
+                0,
+                'Device push token must be unregistered on logout',
+            );
+        });
+    });
+
+    describe('2b. React Hook Lifecycle Safety', () => {
+        it('reads navigation focus at component scope', () => {
+            const profileSource = fs.readFileSync(
+                path.resolve(__dirname, '../app/(customer)/profile/index.tsx'),
+                'utf8',
+            );
+
+            assert.ok(
+                profileSource.includes('const isFocused = useIsFocused();'),
+            );
+            assert.ok(!profileSource.includes('if (useIsFocused())'));
+            assert.ok(!profileSource.includes('[loadProfile, useIsFocused()]'));
         });
     });
 
@@ -195,15 +262,21 @@ describe('Phase M10C.1 Production Acceptance Corrections Specification', () => {
                 cumulativeSalesMinor: number,
                 currentBookingGrossMinor: number,
             ) => {
-                const projectedSales = cumulativeSalesMinor + currentBookingGrossMinor;
+                const projectedSales =
+                    cumulativeSalesMinor + currentBookingGrossMinor;
                 const isIndividual = constitution === 'individual';
-                const isExempt = isIndividual && panVerified && projectedSales <= TDS_THRESHOLD_MINOR;
+                const isExempt =
+                    isIndividual &&
+                    panVerified &&
+                    projectedSales <= TDS_THRESHOLD_MINOR;
 
                 if (isExempt) {
                     return { rateBps: 0, amountMinor: 0 };
                 }
 
-                const amountMinor = Math.round((currentBookingGrossMinor * TDS_RATE_BPS) / 10000);
+                const amountMinor = Math.round(
+                    (currentBookingGrossMinor * TDS_RATE_BPS) / 10000,
+                );
                 return { rateBps: TDS_RATE_BPS, amountMinor };
             };
 
@@ -235,7 +308,11 @@ describe('Phase M10C.1 Production Acceptance Corrections Specification', () => {
             const tdsMinor = 5000; // INR 50 (0.10% TDS)
 
             // Net payable = Gross - Commission - GST on Commission - TDS
-            const netPayableMinor = grossRentMinor - commissionAmountMinor - commissionGstMinor - tdsMinor;
+            const netPayableMinor =
+                grossRentMinor -
+                commissionAmountMinor -
+                commissionGstMinor -
+                tdsMinor;
 
             assert.equal(netPayableMinor, 4405000); // INR 44,050
             // Verify commission GST is deducted exactly once
@@ -245,108 +322,249 @@ describe('Phase M10C.1 Production Acceptance Corrections Specification', () => {
 
     describe('4. Unauthenticated Guest State & Session Expiration Guards', () => {
         it('verifies customer bookings index guards guest state and renders ExceptionalState', () => {
-            const bookingsPath = path.resolve(__dirname, '../app/(customer)/bookings/index.tsx');
+            const bookingsPath = path.resolve(
+                __dirname,
+                '../app/(customer)/bookings/index.tsx',
+            );
             const content = fs.readFileSync(bookingsPath, 'utf8');
 
-            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(
+                content.includes('ExceptionalState'),
+                'Must import ExceptionalState',
+            );
             assert.ok(content.includes('useAuth'), 'Must import useAuth');
-            assert.ok(content.includes("authState === 'guest'"), 'Must guard against guest authState');
-            assert.ok(content.includes("authState === 'session_expired'"), 'Must guard against session_expired');
-            assert.ok(content.includes('Sign In as Customer'), 'Must provide Customer Sign In CTA');
-            assert.ok(content.includes('Explore Stays'), 'Must provide Explore Stays secondary CTA');
-            assert.ok(content.includes('isUnauthenticated'), 'Must track unauthenticated state');
+            assert.ok(
+                content.includes("authState === 'guest'"),
+                'Must guard against guest authState',
+            );
+            assert.ok(
+                content.includes("authState === 'session_expired'"),
+                'Must guard against session_expired',
+            );
+            assert.ok(
+                content.includes('Sign In as Customer'),
+                'Must provide Customer Sign In CTA',
+            );
+            assert.ok(
+                content.includes('Explore Stays'),
+                'Must provide Explore Stays secondary CTA',
+            );
+            assert.ok(
+                content.includes('isUnauthenticated'),
+                'Must track unauthenticated state',
+            );
         });
 
         it('verifies customer notifications index guards guest state and renders ExceptionalState', () => {
-            const notifPath = path.resolve(__dirname, '../app/(customer)/notifications/index.tsx');
+            const notifPath = path.resolve(
+                __dirname,
+                '../app/(customer)/notifications/index.tsx',
+            );
             const content = fs.readFileSync(notifPath, 'utf8');
 
-            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(
+                content.includes('ExceptionalState'),
+                'Must import ExceptionalState',
+            );
             assert.ok(content.includes('useAuth'), 'Must import useAuth');
-            assert.ok(content.includes("authState === 'guest'"), 'Must guard against guest authState');
-            assert.ok(content.includes('Sign In for Alerts'), 'Must display Sign In for Alerts state');
-            assert.ok(content.includes('Sign In as Customer'), 'Must provide Customer Sign In CTA');
+            assert.ok(
+                content.includes("authState === 'guest'"),
+                'Must guard against guest authState',
+            );
+            assert.ok(
+                content.includes('Sign In for Alerts'),
+                'Must display Sign In for Alerts state',
+            );
+            assert.ok(
+                content.includes('Sign In as Customer'),
+                'Must provide Customer Sign In CTA',
+            );
         });
 
         it('verifies customer wishlist index guards guest state and renders ExceptionalState', () => {
-            const wishlistPath = path.resolve(__dirname, '../app/(customer)/wishlist/index.tsx');
+            const wishlistPath = path.resolve(
+                __dirname,
+                '../app/(customer)/wishlist/index.tsx',
+            );
             const content = fs.readFileSync(wishlistPath, 'utf8');
 
-            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(
+                content.includes('ExceptionalState'),
+                'Must import ExceptionalState',
+            );
             assert.ok(content.includes('useAuth'), 'Must import useAuth');
-            assert.ok(content.includes("authState === 'guest'"), 'Must guard against guest authState');
-            assert.ok(content.includes('Sign In to View Saved Stays'), 'Must display Sign In to View Saved Stays');
-            assert.ok(content.includes('Sign In as Customer'), 'Must provide Customer Sign In CTA');
+            assert.ok(
+                content.includes("authState === 'guest'"),
+                'Must guard against guest authState',
+            );
+            assert.ok(
+                content.includes('Sign In to View Saved Stays'),
+                'Must display Sign In to View Saved Stays',
+            );
+            assert.ok(
+                content.includes('Sign In as Customer'),
+                'Must provide Customer Sign In CTA',
+            );
         });
 
         it('verifies customer profile index guards guest state and renders ExceptionalState', () => {
-            const profilePath = path.resolve(__dirname, '../app/(customer)/profile/index.tsx');
+            const profilePath = path.resolve(
+                __dirname,
+                '../app/(customer)/profile/index.tsx',
+            );
             const content = fs.readFileSync(profilePath, 'utf8');
 
-            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
-            assert.ok(content.includes("authState === 'guest'"), 'Must guard against guest authState');
-            assert.ok(content.includes('Sign In to Your Account'), 'Must display Sign In to Your Account');
-            assert.ok(content.includes('Sign In as Customer'), 'Must provide Customer Sign In CTA');
+            assert.ok(
+                content.includes('ExceptionalState'),
+                'Must import ExceptionalState',
+            );
+            assert.ok(
+                content.includes("authState === 'guest'"),
+                'Must guard against guest authState',
+            );
+            assert.ok(
+                content.includes('Sign In to Your Account'),
+                'Must display Sign In to Your Account',
+            );
+            assert.ok(
+                content.includes('Sign In as Customer'),
+                'Must provide Customer Sign In CTA',
+            );
         });
 
         it('verifies partner dashboard guards guest/customer state and renders ExceptionalState', () => {
-            const dashboardPath = path.resolve(__dirname, '../app/(partner)/dashboard.tsx');
+            const dashboardPath = path.resolve(
+                __dirname,
+                '../app/(partner)/dashboard.tsx',
+            );
             const content = fs.readFileSync(dashboardPath, 'utf8');
 
-            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(
+                content.includes('ExceptionalState'),
+                'Must import ExceptionalState',
+            );
             assert.ok(content.includes('useAuth'), 'Must import useAuth');
-            assert.ok(content.includes("authState !== 'owner_authenticated'"), 'Must require owner_authenticated state');
-            assert.ok(content.includes('Sign In as Partner'), 'Must provide Partner Sign In CTA');
-            assert.ok(content.includes('/(auth)/owner-login'), 'Must route to owner login');
+            assert.ok(
+                content.includes("authState !== 'owner_authenticated'"),
+                'Must require owner_authenticated state',
+            );
+            assert.ok(
+                content.includes('Sign In as Partner'),
+                'Must provide Partner Sign In CTA',
+            );
+            assert.ok(
+                content.includes('/(auth)/owner-login'),
+                'Must route to owner login',
+            );
         });
 
         it('verifies partner reservations index guards guest state and renders ExceptionalState', () => {
-            const reservationsPath = path.resolve(__dirname, '../app/(partner)/reservations/index.tsx');
+            const reservationsPath = path.resolve(
+                __dirname,
+                '../app/(partner)/reservations/index.tsx',
+            );
             const content = fs.readFileSync(reservationsPath, 'utf8');
 
-            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(
+                content.includes('ExceptionalState'),
+                'Must import ExceptionalState',
+            );
             assert.ok(content.includes('useAuth'), 'Must import useAuth');
-            assert.ok(content.includes("authState !== 'owner_authenticated'"), 'Must require owner_authenticated state');
-            assert.ok(content.includes('Sign In as Partner'), 'Must provide Partner Sign In CTA');
+            assert.ok(
+                content.includes("authState !== 'owner_authenticated'"),
+                'Must require owner_authenticated state',
+            );
+            assert.ok(
+                content.includes('Sign In as Partner'),
+                'Must provide Partner Sign In CTA',
+            );
         });
 
         it('verifies partner properties index guards guest state and renders ExceptionalState', () => {
-            const propertiesPath = path.resolve(__dirname, '../app/(partner)/properties/index.tsx');
+            const propertiesPath = path.resolve(
+                __dirname,
+                '../app/(partner)/properties/index.tsx',
+            );
             const content = fs.readFileSync(propertiesPath, 'utf8');
 
-            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(
+                content.includes('ExceptionalState'),
+                'Must import ExceptionalState',
+            );
             assert.ok(content.includes('useAuth'), 'Must import useAuth');
-            assert.ok(content.includes("authState !== 'owner_authenticated'"), 'Must require owner_authenticated state');
-            assert.ok(content.includes('Sign In as Partner'), 'Must provide Partner Sign In CTA');
+            assert.ok(
+                content.includes("authState !== 'owner_authenticated'"),
+                'Must require owner_authenticated state',
+            );
+            assert.ok(
+                content.includes('Sign In as Partner'),
+                'Must provide Partner Sign In CTA',
+            );
         });
 
         it('verifies partner settlements index guards guest state and renders ExceptionalState', () => {
-            const settlementsPath = path.resolve(__dirname, '../app/(partner)/settlements/index.tsx');
+            const settlementsPath = path.resolve(
+                __dirname,
+                '../app/(partner)/settlements/index.tsx',
+            );
             const content = fs.readFileSync(settlementsPath, 'utf8');
 
-            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(
+                content.includes('ExceptionalState'),
+                'Must import ExceptionalState',
+            );
             assert.ok(content.includes('useAuth'), 'Must import useAuth');
-            assert.ok(content.includes("authState !== 'owner_authenticated'"), 'Must require owner_authenticated state');
-            assert.ok(content.includes('Sign In as Partner'), 'Must provide Partner Sign In CTA');
+            assert.ok(
+                content.includes("authState !== 'owner_authenticated'"),
+                'Must require owner_authenticated state',
+            );
+            assert.ok(
+                content.includes('Sign In as Partner'),
+                'Must provide Partner Sign In CTA',
+            );
         });
 
         it('verifies partner notifications index guards guest state and renders ExceptionalState', () => {
-            const notifPath = path.resolve(__dirname, '../app/(partner)/notifications/index.tsx');
+            const notifPath = path.resolve(
+                __dirname,
+                '../app/(partner)/notifications/index.tsx',
+            );
             const content = fs.readFileSync(notifPath, 'utf8');
 
-            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
+            assert.ok(
+                content.includes('ExceptionalState'),
+                'Must import ExceptionalState',
+            );
             assert.ok(content.includes('useAuth'), 'Must import useAuth');
-            assert.ok(content.includes("authState !== 'owner_authenticated'"), 'Must require owner_authenticated state');
-            assert.ok(content.includes('Sign In as Partner'), 'Must provide Partner Sign In CTA');
+            assert.ok(
+                content.includes("authState !== 'owner_authenticated'"),
+                'Must require owner_authenticated state',
+            );
+            assert.ok(
+                content.includes('Sign In as Partner'),
+                'Must provide Partner Sign In CTA',
+            );
         });
 
         it('verifies partner account guards guest state and renders ExceptionalState', () => {
-            const accountPath = path.resolve(__dirname, '../app/(partner)/account.tsx');
+            const accountPath = path.resolve(
+                __dirname,
+                '../app/(partner)/account.tsx',
+            );
             const content = fs.readFileSync(accountPath, 'utf8');
 
-            assert.ok(content.includes('ExceptionalState'), 'Must import ExceptionalState');
-            assert.ok(content.includes("authState !== 'owner_authenticated'"), 'Must require owner_authenticated state');
-            assert.ok(content.includes('Sign In as Partner'), 'Must provide Partner Sign In CTA');
+            assert.ok(
+                content.includes('ExceptionalState'),
+                'Must import ExceptionalState',
+            );
+            assert.ok(
+                content.includes("authState !== 'owner_authenticated'"),
+                'Must require owner_authenticated state',
+            );
+            assert.ok(
+                content.includes('Sign In as Partner'),
+                'Must provide Partner Sign In CTA',
+            );
         });
     });
 });

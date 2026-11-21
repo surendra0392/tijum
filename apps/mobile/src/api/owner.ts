@@ -25,8 +25,7 @@ import {
 
 export const OwnerApi = {
     // Profile & Security
-    getProfile: () =>
-        ApiClient.get<ApiResponse<OwnerProfile>>('owner/profile'),
+    getProfile: () => ApiClient.get<ApiResponse<OwnerProfile>>('owner/profile'),
     updateProfile: (data: { name: string; email?: string; phone?: string }) =>
         ApiClient.put<ApiResponse<OwnerProfile>>('owner/profile', data),
     changePassword: (data: {
@@ -193,7 +192,7 @@ export const OwnerApi = {
             `owner/properties/${propertyId}/rooms/${roomId}/status`,
             {
                 operational_status: operationalStatus,
-                internal_description: description,
+                description,
             },
         ),
 
@@ -230,8 +229,8 @@ export const OwnerApi = {
     createAvailabilityBlock: (
         propertyId: number,
         data: {
-            scope: 'property' | 'room_type' | 'physical_room';
-            block_type: string;
+            scope: 'property' | 'room_type' | 'room';
+            block_type: 'closure' | 'maintenance' | 'stop_sell';
             start_date: string;
             end_date: string;
             property_room_type_id?: number | null;
@@ -288,14 +287,17 @@ export const OwnerApi = {
 
     // Amenities
     getAmenities: (propertyId: number) =>
-        ApiClient.get<ApiResponse<{ assigned: OwnerPropertyAmenity[]; catalogue: AmenityCatalogCategory[] }>>(
-            `owner/properties/${propertyId}/amenities`,
-        ),
+        ApiClient.get<
+            ApiResponse<{
+                assigned: OwnerPropertyAmenity[];
+                catalogue: AmenityCatalogCategory[];
+            }>
+        >(`owner/properties/${propertyId}/amenities`),
     assignAmenity: (
         propertyId: number,
         data: {
             amenity_id: number;
-            availability?: string;
+            availability?: 'included' | 'not_available';
             details?: string;
         },
     ) =>
@@ -309,9 +311,12 @@ export const OwnerApi = {
         ),
 
     // Reservations
-    getReservations: (status?: string, page: number = 1) =>
+    getReservations: (
+        stage?: 'upcoming' | 'past' | 'cancelled',
+        page: number = 1,
+    ) =>
         ApiClient.get<ApiResponse<Reservation[]>>('owner/reservations', {
-            status,
+            stage,
             page,
         }),
     getReservation: (reference: string) =>
@@ -370,11 +375,7 @@ export const OwnerApi = {
         bank_ifsc?: string;
         bank_name?: string;
         bank_account_holder_name?: string;
-    }) =>
-        ApiClient.put<ApiResponse<any>>(
-            'owner/financial-profile',
-            data,
-        ),
+    }) => ApiClient.put<ApiResponse<any>>('owner/financial-profile', data),
     getCommissionAgreements: () =>
         ApiClient.get<ApiResponse<OwnerCommissionAgreement[]>>(
             'owner/commission-agreements',
@@ -419,5 +420,7 @@ export const OwnerApi = {
     }) => ApiClient.post<ApiResponse<any>>('owner/devices/register', data),
 
     unregisterDevice: (deviceInstallationId: string) =>
-        ApiClient.delete<ApiResponse<null>>('owner/devices/unregister'),
+        ApiClient.delete<ApiResponse<null>>('owner/devices/unregister', {
+            device_installation_id: deviceInstallationId,
+        }),
 };

@@ -109,7 +109,7 @@ class ReservationResource extends JsonResource
                 'address' => $this->property->address_line_1,
                 'latitude' => $this->property->latitude !== null ? (float) $this->property->latitude : null,
                 'longitude' => $this->property->longitude !== null ? (float) $this->property->longitude : null,
-                'cover_image_url' => $this->property->coverImageUrl() ?: '/images/public/hero-stay.jpg',
+                'cover_image_url' => $this->property->coverImageUrl(),
                 'food_provided' => (bool) $this->property->food_provided,
                 'breakfast_included' => (bool) $this->property->breakfast_included,
                 'lunch_included' => (bool) $this->property->lunch_included,

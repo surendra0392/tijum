@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     FlatList,
     Image,
     Modal,
@@ -9,7 +10,6 @@ import {
     SafeAreaView,
     ScrollView,
     StyleSheet,
-    Switch,
     Text,
     TextInput,
     TouchableOpacity,
@@ -22,7 +22,6 @@ import {
     Globe,
     MapPin,
     Snowflake,
-    AlertCircle,
     Building2,
     Home,
     Users,
@@ -30,31 +29,26 @@ import {
     User,
     SlidersHorizontal,
     Utensils,
-    Calendar,
-    Check,
     Bell,
     ChevronDown,
 } from 'lucide-react-native';
 import { PublicApi } from '../../../src/api/public';
 import { CustomerApi } from '../../../src/api/customer';
+import { useAuth } from '../../../src/auth/AuthContext';
 import { PropertyCard as PropertyCardType } from '../../../src/api/types';
 import {
-    CANONICAL_CATEGORIES,
     CanonicalCategorySlug,
     getCategoryDisplayName,
     normalizeCategorySlug,
 } from '../../../src/constants/categories';
 import { ExceptionalState } from '../../../src/components/ExceptionalState';
+import { BrandLogo } from '../../../src/components/BrandLogo';
 import { PropertyCard } from '../../../src/components/PropertyCard';
 import { Input } from '../../../src/components/Input';
 import { Button } from '../../../src/components/Button';
-import { Badge } from '../../../src/components/Badge';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
-import { SHOWCASE_PROPERTIES } from '../../../src/data/showcaseData.ts';
-
-const CITIES = ['All', 'Hyderabad', 'Guntur', 'Vijayawada', 'Visakhapatnam'];
 
 interface CategoryTabItem {
     key: 'all' | CanonicalCategorySlug;
@@ -99,6 +93,7 @@ const GENDER_OPTIONS: Array<{ key: 'all' | 'male' | 'female'; label: string }> =
 
 export default function ExploreScreen() {
     const router = useRouter();
+    const { token, authState } = useAuth();
     const [properties, setProperties] = useState<PropertyCardType[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -106,6 +101,9 @@ export default function ExploreScreen() {
         'all' | CanonicalCategorySlug
     >('all');
     const [selectedCity, setSelectedCity] = useState('All');
+    const [cities, setCities] = useState<{ label: string; value: string }[]>([
+        { label: 'All', value: 'All' },
+    ]);
     const [selectedGender, setSelectedGender] = useState<
         'all' | 'male' | 'female'
     >('all');
@@ -125,27 +123,63 @@ export default function ExploreScreen() {
 
     // Restore customer wishlist state on mount
     useEffect(() => {
-        CustomerApi.getWishlist()
+        if (!token || authState !== 'customer_authenticated') {
+            setWishlistedIds(new Set());
+            return;
+        }
+
+        void CustomerApi.getWishlist()
             .then((res) => {
                 if (Array.isArray(res?.data)) {
                     setWishlistedIds(new Set(res.data.map((p) => p.id)));
                 }
             })
             .catch(() => {});
-    }, []);
+    }, [authState, token]);
 
     const handleToggleWishlist = async (propertyId: number) => {
-        setWishlistedIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(propertyId)) {
+        if (!token || authState !== 'customer_authenticated') {
+            router.push('/(auth)/customer-login');
+            return;
+        }
+
+        const wasWishlisted = wishlistedIds.has(propertyId);
+        setWishlistedIds((current) => {
+            const next = new Set(current);
+            if (wasWishlisted) {
                 next.delete(propertyId);
-                CustomerApi.removeFromWishlist(propertyId).catch(() => {});
             } else {
                 next.add(propertyId);
-                CustomerApi.addToWishlist(propertyId).catch(() => {});
             }
             return next;
         });
+
+        try {
+            const response = await CustomerApi.toggleWishlist(propertyId);
+            setWishlistedIds((current) => {
+                const next = new Set(current);
+                if (response.data.wishlisted) {
+                    next.add(propertyId);
+                } else {
+                    next.delete(propertyId);
+                }
+                return next;
+            });
+        } catch {
+            setWishlistedIds((current) => {
+                const next = new Set(current);
+                if (wasWishlisted) {
+                    next.add(propertyId);
+                } else {
+                    next.delete(propertyId);
+                }
+                return next;
+            });
+            Alert.alert(
+                'Wishlist Not Updated',
+                'Please check your connection and try again.',
+            );
+        }
     };
 
     const activeFiltersCount =
@@ -221,38 +255,34 @@ export default function ExploreScreen() {
             }
 
             const res = await PublicApi.getProperties(filters);
-            let list = res.data || [];
+            let nextProperties = res.data || [];
 
             // Local normalization filter to ensure client displays strictly matching canonical category
             if (selectedCategory !== 'all') {
-                list = list.filter((p) => {
+                nextProperties = nextProperties.filter((p) => {
                     const rawCat = p.category?.slug || p.category?.name;
                     const normalized = normalizeCategorySlug(rawCat);
                     return normalized === selectedCategory;
                 });
             }
 
-            if (list.length === 0 && !searchQuery.trim() && !minPrice && !maxPrice) {
-                let fallback = SHOWCASE_PROPERTIES;
-                if (selectedCategory !== 'all') {
-                    fallback = fallback.filter((p) => {
-                        const rawCat = p.category?.slug || p.category?.name;
-                        return normalizeCategorySlug(rawCat) === selectedCategory;
-                    });
-                }
-                list = fallback;
+            if (
+                nextProperties.length === 0 &&
+                !searchQuery.trim() &&
+                !minPrice &&
+                !maxPrice
+            ) {
+                nextProperties = [];
             }
 
-            setProperties(list);
-        } catch {
-            let fallback = SHOWCASE_PROPERTIES;
-            if (selectedCategory !== 'all') {
-                fallback = fallback.filter((p) => {
-                    const rawCat = p.category?.slug || p.category?.name;
-                    return normalizeCategorySlug(rawCat) === selectedCategory;
-                });
-            }
-            setProperties(fallback);
+            setProperties(nextProperties);
+        } catch (propertyLoadError: unknown) {
+            setProperties([]);
+            setErrorMessage(
+                propertyLoadError instanceof Error
+                    ? propertyLoadError.message
+                    : 'Unable to load stays. Please try again.',
+            );
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -260,7 +290,7 @@ export default function ExploreScreen() {
     };
 
     useEffect(() => {
-        loadProperties();
+        void loadProperties();
     }, [
         selectedCity,
         selectedCategory,
@@ -272,8 +302,25 @@ export default function ExploreScreen() {
         selectedSharing,
     ]);
 
+    // Fetch cities from API for city selector
+    useEffect(() => {
+        PublicApi.getCities()
+            .then((res) => {
+                if (res.data && Array.isArray(res.data)) {
+                    const cityOptions = res.data.map((city: any) => ({
+                        label: city.name || city.slug || 'Unknown',
+                        value: city.slug || '',
+                    }));
+                    setCities([{ label: 'All', value: 'All' }, ...cityOptions]);
+                }
+            })
+            .catch(() => {
+                setCities([{ label: 'All', value: 'All' }]);
+            });
+    }, []);
+
     const handleSearchSubmit = () => {
-        loadProperties();
+        void loadProperties();
     };
 
     const getGuaranteeContent = () => {
@@ -315,23 +362,31 @@ export default function ExploreScreen() {
                     <View style={styles.plumHeaderTopRow}>
                         <TouchableOpacity
                             style={styles.locationSelector}
-                            onPress={() => {
-                                const currentIndex = CITIES.indexOf(selectedCity);
-                                const nextIndex = (currentIndex + 1) % CITIES.length;
-                                setSelectedCity(CITIES[nextIndex]);
-                            }}
+                            onPress={() => setAdvancedModalVisible(true)}
                             activeOpacity={0.8}
                         >
-                            <MapPin size={15} color={Colors.coral} style={{ marginRight: 4 }} />
+                            <MapPin
+                                size={15}
+                                color={Colors.coral}
+                                style={{ marginRight: 4 }}
+                            />
                             <Text style={styles.locationText}>
-                                {selectedCity === 'All' ? 'Hyderabad, Telangana' : selectedCity}
+                                {selectedCity === 'All'
+                                    ? 'All Cities'
+                                    : selectedCity}
                             </Text>
-                            <ChevronDown size={14} color={Colors.white} style={{ marginLeft: 4 }} />
+                            <ChevronDown
+                                size={14}
+                                color={Colors.white}
+                                style={{ marginLeft: 4 }}
+                            />
                         </TouchableOpacity>
 
                         <TouchableOpacity
                             style={styles.notificationBell}
-                            onPress={() => router.push('/(customer)/notifications')}
+                            onPress={() =>
+                                router.push('/(customer)/notifications')
+                            }
                             activeOpacity={0.8}
                         >
                             <Bell size={18} color={Colors.white} />
@@ -340,11 +395,7 @@ export default function ExploreScreen() {
                     </View>
 
                     <View style={styles.brandHeroCenter}>
-                        <View style={styles.logoBadgeRow}>
-                            <View style={styles.roofMark} />
-                            <Text style={styles.brandLogoText}>TIJUM</Text>
-                        </View>
-                        <Text style={styles.brandTaglineText}>Stay • Dine • Belong</Text>
+                        <BrandLogo size={122} tone="light" />
                     </View>
 
                     <View style={styles.searchBar}>
@@ -366,7 +417,7 @@ export default function ExploreScreen() {
                             <TouchableOpacity
                                 onPress={() => {
                                     setSearchQuery('');
-                                    loadProperties();
+                                    void loadProperties();
                                 }}
                                 style={{ marginRight: 6 }}
                             >
@@ -378,7 +429,14 @@ export default function ExploreScreen() {
                             style={styles.searchFilterBtn}
                             activeOpacity={0.8}
                         >
-                            <SlidersHorizontal size={15} color={activeFiltersCount > 0 ? Colors.coral : Colors.gray500} />
+                            <SlidersHorizontal
+                                size={15}
+                                color={
+                                    activeFiltersCount > 0
+                                        ? Colors.coral
+                                        : Colors.gray500
+                                }
+                            />
                         </TouchableOpacity>
                     </View>
                 </SafeAreaView>
@@ -447,13 +505,18 @@ export default function ExploreScreen() {
                     >
                         <SlidersHorizontal
                             size={12}
-                            color={activeFiltersCount > 0 ? Colors.white : Colors.deepPlum}
+                            color={
+                                activeFiltersCount > 0
+                                    ? Colors.white
+                                    : Colors.deepPlum
+                            }
                             style={{ marginRight: 4 }}
                         />
                         <Text
                             style={[
                                 styles.cityPillText,
-                                activeFiltersCount > 0 && styles.cityPillTextActive,
+                                activeFiltersCount > 0 &&
+                                    styles.cityPillTextActive,
                                 { fontWeight: '700' },
                             ]}
                         >
@@ -465,19 +528,19 @@ export default function ExploreScreen() {
 
                     <View style={styles.pillDivider} />
 
-                    {CITIES.map((city) => {
-                        const isSelected = selectedCity === city;
+                    {cities.map((city) => {
+                        const isSelected = selectedCity === city.value;
                         return (
                             <TouchableOpacity
-                                key={city}
+                                key={city.value}
                                 activeOpacity={0.8}
-                                onPress={() => setSelectedCity(city)}
+                                onPress={() => setSelectedCity(city.value)}
                                 style={[
                                     styles.cityPill,
                                     isSelected && styles.cityPillActive,
                                 ]}
                             >
-                                {city === 'All' ? (
+                                {city.value === 'All' ? (
                                     <Globe
                                         size={12}
                                         color={
@@ -504,7 +567,9 @@ export default function ExploreScreen() {
                                         isSelected && styles.cityPillTextActive,
                                     ]}
                                 >
-                                    {city === 'All' ? 'All Cities' : city}
+                                    {city.value === 'All'
+                                        ? 'All Cities'
+                                        : city.label}
                                 </Text>
                             </TouchableOpacity>
                         );
@@ -573,7 +638,10 @@ export default function ExploreScreen() {
             {/* Main List */}
             {loading ? (
                 <View style={styles.centerContainer}>
-                    <ActivityIndicator size="large" color={Colors.plumPrimary} />
+                    <ActivityIndicator
+                        size="large"
+                        color={Colors.plumPrimary}
+                    />
                     <Text style={styles.loadingText}>
                         Finding verified food-inclusive stays...
                     </Text>
@@ -591,7 +659,7 @@ export default function ExploreScreen() {
             ) : (
                 <FlatList
                     data={properties}
-                    keyExtractor={(item) => String(item.id)}
+                    keyExtractor={(item: any) => String(item.id)}
                     contentContainerStyle={styles.listContent}
                     refreshControl={
                         <RefreshControl
@@ -604,12 +672,18 @@ export default function ExploreScreen() {
                             {/* Stay Categories Visual Showcase */}
                             <View style={styles.categoriesSection}>
                                 <View style={styles.sectionHeaderRow}>
-                                    <Text style={styles.sectionHeading}>Stay Categories</Text>
+                                    <Text style={styles.sectionHeading}>
+                                        Stay Categories
+                                    </Text>
                                     <TouchableOpacity
-                                        onPress={() => setSelectedCategory('all')}
+                                        onPress={() =>
+                                            setSelectedCategory('all')
+                                        }
                                         activeOpacity={0.8}
                                     >
-                                        <Text style={styles.seeAllText}>See All &gt;</Text>
+                                        <Text style={styles.seeAllText}>
+                                            See All &gt;
+                                        </Text>
                                     </TouchableOpacity>
                                 </View>
 
@@ -622,7 +696,8 @@ export default function ExploreScreen() {
                                         ]}
                                         onPress={() =>
                                             setSelectedCategory(
-                                                selectedCategory === 'hostels-pg'
+                                                selectedCategory ===
+                                                    'hostels-pg'
                                                     ? 'all'
                                                     : 'hostels-pg',
                                             )
@@ -630,15 +705,14 @@ export default function ExploreScreen() {
                                         activeOpacity={0.85}
                                     >
                                         <Image
-                                            source={{
-                                                uri: 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=400&q=80',
-                                            }}
+                                            source={require('../../../assets/onboarding/stays.jpg')}
                                             style={styles.visualCatImg}
                                         />
                                         <Text
                                             style={[
                                                 styles.visualCatLabel,
-                                                selectedCategory === 'hostels-pg' &&
+                                                selectedCategory ===
+                                                    'hostels-pg' &&
                                                     styles.visualCatLabelActive,
                                             ]}
                                         >
@@ -662,15 +736,14 @@ export default function ExploreScreen() {
                                         activeOpacity={0.85}
                                     >
                                         <Image
-                                            source={{
-                                                uri: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400&q=80',
-                                            }}
+                                            source={require('../../../assets/onboarding/home.jpg')}
                                             style={styles.visualCatImg}
                                         />
                                         <Text
                                             style={[
                                                 styles.visualCatLabel,
-                                                selectedCategory === 'homestays' &&
+                                                selectedCategory ===
+                                                    'homestays' &&
                                                     styles.visualCatLabelActive,
                                             ]}
                                         >
@@ -694,15 +767,14 @@ export default function ExploreScreen() {
                                         activeOpacity={0.85}
                                     >
                                         <Image
-                                            source={{
-                                                uri: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=400&q=80',
-                                            }}
+                                            source={require('../../../assets/onboarding/food.jpg')}
                                             style={styles.visualCatImg}
                                         />
                                         <Text
                                             style={[
                                                 styles.visualCatLabel,
-                                                selectedCategory === 'co-living' &&
+                                                selectedCategory ===
+                                                    'co-living' &&
                                                     styles.visualCatLabelActive,
                                             ]}
                                         >
@@ -728,13 +800,22 @@ export default function ExploreScreen() {
                             </View>
 
                             {/* Featured Properties Section Heading */}
-                            <View style={[styles.sectionHeaderRow, { marginTop: Spacing.md }]}>
-                                <Text style={styles.sectionHeading}>Featured Properties</Text>
+                            <View
+                                style={[
+                                    styles.sectionHeaderRow,
+                                    { marginTop: Spacing.md },
+                                ]}
+                            >
+                                <Text style={styles.sectionHeading}>
+                                    Featured Properties
+                                </Text>
                                 <TouchableOpacity
                                     onPress={() => loadProperties(true)}
                                     activeOpacity={0.8}
                                 >
-                                    <Text style={styles.seeAllText}>See All &gt;</Text>
+                                    <Text style={styles.seeAllText}>
+                                        See All &gt;
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -756,11 +837,11 @@ export default function ExploreScreen() {
                                 setFilterAc(false);
                                 setSelectedGender('all');
                                 resetAdvancedFilters();
-                                loadProperties();
+                                void loadProperties();
                             }}
                         />
                     }
-                    renderItem={({ item }) => (
+                    renderItem={({ item }: { item: any }) => (
                         <PropertyCard
                             property={item}
                             isWishlisted={wishlistedIds.has(item.id)}
@@ -787,9 +868,20 @@ export default function ExploreScreen() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
                         <View style={styles.modalHeader}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <SlidersHorizontal size={18} color={Colors.deepPlum} />
-                                <Text style={styles.modalTitle}>Stay Filters</Text>
+                            <View
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                }}
+                            >
+                                <SlidersHorizontal
+                                    size={18}
+                                    color={Colors.deepPlum}
+                                />
+                                <Text style={styles.modalTitle}>
+                                    Stay Filters
+                                </Text>
                             </View>
                             <TouchableOpacity
                                 onPress={() => setAdvancedModalVisible(false)}
@@ -804,7 +896,9 @@ export default function ExploreScreen() {
                             showsVerticalScrollIndicator={false}
                         >
                             {/* Dates */}
-                            <Text style={styles.filterGroupTitle}>Stay Dates</Text>
+                            <Text style={styles.filterGroupTitle}>
+                                Stay Dates
+                            </Text>
                             <View style={styles.dateInputsRow}>
                                 <View style={{ flex: 1 }}>
                                     <Input
@@ -826,27 +920,38 @@ export default function ExploreScreen() {
                             </View>
 
                             {/* Meal Inclusions */}
-                            <Text style={styles.filterGroupTitle}>Meal Inclusions</Text>
+                            <Text style={styles.filterGroupTitle}>
+                                Meal Inclusions
+                            </Text>
                             <Text style={styles.filterGroupSub}>
-                                Filter properties offering verified meal services.
+                                Filter properties offering verified meal
+                                services.
                             </Text>
                             <View style={styles.chipsWrap}>
                                 <TouchableOpacity
                                     style={[
                                         styles.filterChip,
-                                        filterBreakfast && styles.filterChipActive,
+                                        filterBreakfast &&
+                                            styles.filterChipActive,
                                     ]}
-                                    onPress={() => setFilterBreakfast(!filterBreakfast)}
+                                    onPress={() =>
+                                        setFilterBreakfast(!filterBreakfast)
+                                    }
                                 >
                                     <Utensils
                                         size={14}
-                                        color={filterBreakfast ? Colors.white : Colors.gray700}
+                                        color={
+                                            filterBreakfast
+                                                ? Colors.white
+                                                : Colors.gray700
+                                        }
                                         style={{ marginRight: 6 }}
                                     />
                                     <Text
                                         style={[
                                             styles.filterChipText,
-                                            filterBreakfast && styles.filterChipTextActive,
+                                            filterBreakfast &&
+                                                styles.filterChipTextActive,
                                         ]}
                                     >
                                         Breakfast
@@ -862,13 +967,18 @@ export default function ExploreScreen() {
                                 >
                                     <Utensils
                                         size={14}
-                                        color={filterLunch ? Colors.white : Colors.gray700}
+                                        color={
+                                            filterLunch
+                                                ? Colors.white
+                                                : Colors.gray700
+                                        }
                                         style={{ marginRight: 6 }}
                                     />
                                     <Text
                                         style={[
                                             styles.filterChipText,
-                                            filterLunch && styles.filterChipTextActive,
+                                            filterLunch &&
+                                                styles.filterChipTextActive,
                                         ]}
                                     >
                                         Lunch
@@ -880,17 +990,24 @@ export default function ExploreScreen() {
                                         styles.filterChip,
                                         filterDinner && styles.filterChipActive,
                                     ]}
-                                    onPress={() => setFilterDinner(!filterDinner)}
+                                    onPress={() =>
+                                        setFilterDinner(!filterDinner)
+                                    }
                                 >
                                     <Utensils
                                         size={14}
-                                        color={filterDinner ? Colors.white : Colors.gray700}
+                                        color={
+                                            filterDinner
+                                                ? Colors.white
+                                                : Colors.gray700
+                                        }
                                         style={{ marginRight: 6 }}
                                     />
                                     <Text
                                         style={[
                                             styles.filterChipText,
-                                            filterDinner && styles.filterChipTextActive,
+                                            filterDinner &&
+                                                styles.filterChipTextActive,
                                         ]}
                                     >
                                         Dinner
@@ -899,37 +1016,48 @@ export default function ExploreScreen() {
                             </View>
 
                             {/* Sharing Capacity */}
-                            <Text style={styles.filterGroupTitle}>Room Sharing Capacity</Text>
+                            <Text style={styles.filterGroupTitle}>
+                                Room Sharing Capacity
+                            </Text>
                             <View style={styles.chipsWrap}>
                                 {[
                                     { capacity: 1, label: 'Single / 1-Share' },
                                     { capacity: 2, label: '2-Share' },
                                     { capacity: 3, label: '3-Share' },
                                     { capacity: 4, label: '4+ Share' },
-                                ].map((item) => {
-                                    const isSelected = selectedSharing === item.capacity;
+                                ].map((item: any) => {
+                                    const isSelected =
+                                        selectedSharing === item.capacity;
                                     return (
                                         <TouchableOpacity
                                             key={item.capacity}
                                             style={[
                                                 styles.filterChip,
-                                                isSelected && styles.filterChipActive,
+                                                isSelected &&
+                                                    styles.filterChipActive,
                                             ]}
                                             onPress={() =>
                                                 setSelectedSharing(
-                                                    isSelected ? null : item.capacity,
+                                                    isSelected
+                                                        ? null
+                                                        : item.capacity,
                                                 )
                                             }
                                         >
                                             <Users
                                                 size={14}
-                                                color={isSelected ? Colors.white : Colors.gray700}
+                                                color={
+                                                    isSelected
+                                                        ? Colors.white
+                                                        : Colors.gray700
+                                                }
                                                 style={{ marginRight: 6 }}
                                             />
                                             <Text
                                                 style={[
                                                     styles.filterChipText,
-                                                    isSelected && styles.filterChipTextActive,
+                                                    isSelected &&
+                                                        styles.filterChipTextActive,
                                                 ]}
                                             >
                                                 {item.label}
@@ -940,7 +1068,9 @@ export default function ExploreScreen() {
                             </View>
 
                             {/* Monthly Price Range */}
-                            <Text style={styles.filterGroupTitle}>Monthly Budget Range</Text>
+                            <Text style={styles.filterGroupTitle}>
+                                Monthly Budget Range
+                            </Text>
                             <View style={styles.dateInputsRow}>
                                 <View style={{ flex: 1 }}>
                                     <Input
@@ -975,7 +1105,7 @@ export default function ExploreScreen() {
                                     title="Apply Filters"
                                     onPress={() => {
                                         setAdvancedModalVisible(false);
-                                        loadProperties();
+                                        void loadProperties();
                                     }}
                                     style={{ flex: 1 }}
                                 />

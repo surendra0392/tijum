@@ -577,18 +577,6 @@ parameters:
 			path: app/Http/Resources/Api/V1/OwnerProfileResource.php
 
 		-
-			message: '#^Using nullsafe property access "\?\-\>published_review_count" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Http/Resources/Api/V1/PropertyCardResource.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>published_review_count" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Http/Resources/Api/V1/PropertyDetailResource.php
-
-		-
 			message: '#^Access to an undefined property App\\Http\\Resources\\Api\\V1\\ReservationResource\:\:\$check_out_date\.$#'
 			identifier: property.notFound
 			count: 1

@@ -7,7 +7,6 @@ import {
     SafeAreaView,
     ScrollView,
     StyleSheet,
-    Switch,
     Text,
     TouchableOpacity,
     View,
@@ -15,7 +14,6 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { OwnerApi } from '../../../../src/api/owner';
 import {
-    City,
     OwnerReferenceData,
     PropertyDetail,
     PropertyVerificationEvaluation,
@@ -26,20 +24,11 @@ import { Input } from '../../../../src/components/Input';
 import {
     CANONICAL_CATEGORIES,
     CanonicalCategorySlug,
-    getCategoryDisplayName,
 } from '../../../../src/constants/categories';
 import { Colors } from '../../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../../src/theme/spacing';
 import { Typography } from '../../../../src/theme/typography';
-import {
-    AlertCircle,
-    ArrowLeft,
-    Building2,
-    CheckCircle2,
-    FileCheck,
-    MapPin,
-    ShieldAlert,
-} from 'lucide-react-native';
+import { ArrowLeft, Building2, FileCheck } from 'lucide-react-native';
 
 export default function EditPropertyScreen() {
     const router = useRouter();
@@ -71,7 +60,7 @@ export default function EditPropertyScreen() {
 
     useEffect(() => {
         if (propertyId) {
-            loadInitialData();
+            void loadInitialData();
         }
     }, [propertyId]);
 
@@ -93,7 +82,9 @@ export default function EditPropertyScreen() {
                 setContactPhone((p as any).contact_phone || '');
                 setContactEmail((p as any).contact_email || '');
                 setLocality(p.locality || '');
-                setAddressLine1(p.address_line || (p as any).address_line_1 || '');
+                setAddressLine1(
+                    p.address_line || (p as any).address_line_1 || '',
+                );
                 setAddressLine2((p as any).address_line_2 || '');
                 setLandmark(p.landmark || '');
                 setPostalCode(p.pincode || (p as any).postal_code || '');
@@ -101,7 +92,8 @@ export default function EditPropertyScreen() {
                 if (p.city?.id) {
                     setSelectedCityId(p.city.id);
                 }
-                const catSlug = (p.category?.slug as CanonicalCategorySlug) || 'hostels-pg';
+                const catSlug =
+                    (p.category?.slug as CanonicalCategorySlug) || 'hostels-pg';
                 if (CANONICAL_CATEGORIES.some((c) => c.slug === catSlug)) {
                     setSelectedCategorySlug(catSlug);
                 }
@@ -113,7 +105,10 @@ export default function EditPropertyScreen() {
                 setEvalStatus(evalRes.data);
             }
         } catch (e: any) {
-            Alert.alert('Load Failed', e.message || 'Unable to load property details.');
+            Alert.alert(
+                'Load Failed',
+                e.message || 'Unable to load property details.',
+            );
         } finally {
             setLoading(false);
         }
@@ -125,7 +120,10 @@ export default function EditPropertyScreen() {
             return;
         }
         if (!/^[6-9]\d{9}$/.test(contactPhone.trim())) {
-            Alert.alert('Validation Error', 'Enter a valid 10-digit Indian phone number.');
+            Alert.alert(
+                'Validation Error',
+                'Enter a valid 10-digit Indian phone number.',
+            );
             return;
         }
 
@@ -155,7 +153,10 @@ export default function EditPropertyScreen() {
             Alert.alert('Updated', 'Property details updated successfully.');
             await loadInitialData();
         } catch (e: any) {
-            Alert.alert('Update Error', e.message || 'Failed to update property.');
+            Alert.alert(
+                'Update Error',
+                e.message || 'Failed to update property.',
+            );
         } finally {
             setSaving(false);
         }
@@ -193,7 +194,9 @@ export default function EditPropertyScreen() {
         return (
             <SafeAreaView style={styles.center}>
                 <ActivityIndicator size="large" color={Colors.deepPlum} />
-                <Text style={styles.loadingText}>Loading property details...</Text>
+                <Text style={styles.loadingText}>
+                    Loading property details...
+                </Text>
             </SafeAreaView>
         );
     }
@@ -217,9 +220,13 @@ export default function EditPropertyScreen() {
                         <ArrowLeft size={22} color={Colors.deepPlum} />
                     </TouchableOpacity>
                     <View style={styles.headerTitleBox}>
-                        <Text style={styles.headerTitle}>Edit Property Details</Text>
+                        <Text style={styles.headerTitle}>
+                            Edit Property Details
+                        </Text>
                         <Text style={styles.headerSubtitle} numberOfLines={1}>
-                            {(property as any)?.property_reference || `ID #${propertyId}`} • {property?.name}
+                            {(property as any)?.property_reference ||
+                                `ID #${propertyId}`}{' '}
+                            • {property?.name}
                         </Text>
                     </View>
                 </View>
@@ -232,7 +239,9 @@ export default function EditPropertyScreen() {
                     <View style={styles.statusCard}>
                         <View style={styles.statusHeader}>
                             <FileCheck size={18} color={Colors.deepPlum} />
-                            <Text style={styles.statusTitle}>Verification Status</Text>
+                            <Text style={styles.statusTitle}>
+                                Verification Status
+                            </Text>
                             <Badge
                                 label={
                                     application?.status_label ||
@@ -261,7 +270,9 @@ export default function EditPropertyScreen() {
                     </View>
 
                     {/* Accommodation Category */}
-                    <Text style={styles.sectionTitle}>1. Accommodation Category</Text>
+                    <Text style={styles.sectionTitle}>
+                        1. Accommodation Category
+                    </Text>
                     <View style={styles.categoryPills}>
                         {CANONICAL_CATEGORIES.map((cat) => {
                             const isSelected =
@@ -301,7 +312,9 @@ export default function EditPropertyScreen() {
                     </View>
 
                     {/* Basic Info */}
-                    <Text style={[styles.sectionTitle, { marginTop: Spacing.lg }]}>
+                    <Text
+                        style={[styles.sectionTitle, { marginTop: Spacing.lg }]}
+                    >
                         2. General Information
                     </Text>
                     <Input
@@ -338,7 +351,9 @@ export default function EditPropertyScreen() {
                     />
 
                     {/* Address & Location */}
-                    <Text style={[styles.sectionTitle, { marginTop: Spacing.lg }]}>
+                    <Text
+                        style={[styles.sectionTitle, { marginTop: Spacing.lg }]}
+                    >
                         3. Location & Address
                     </Text>
                     <Input

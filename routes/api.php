@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\Customer\CustomerProtectionController;
 use App\Http\Controllers\Api\V1\Customer\CustomerReservationController;
 use App\Http\Controllers\Api\V1\Customer\CustomerReviewController;
 use App\Http\Controllers\Api\V1\Customer\CustomerRewardsController;
+use App\Http\Controllers\Api\V1\Customer\CustomerSupportTicketController;
 use App\Http\Controllers\Api\V1\Customer\CustomerWishlistController;
 use App\Http\Controllers\Api\V1\Owner\OwnerAmenityController;
 use App\Http\Controllers\Api\V1\Owner\OwnerAvailabilityBlockController;
@@ -125,6 +126,13 @@ Route::prefix('v1')->group(function (): void {
         Route::post('cases', [CustomerProtectionController::class, 'store'])->name('api.v1.customer.cases.store');
         Route::get('cases/{reference}', [CustomerProtectionController::class, 'show'])->name('api.v1.customer.cases.show');
         Route::post('cases/{reference}/messages', [CustomerProtectionController::class, 'addMessage'])->name('api.v1.customer.cases.messages.store');
+
+        // General Customer Helpdesk Tickets
+        Route::get('support-tickets', [CustomerSupportTicketController::class, 'index'])->name('api.v1.customer.support-tickets.index');
+        Route::post('support-tickets', [CustomerSupportTicketController::class, 'store'])->name('api.v1.customer.support-tickets.store');
+        Route::get('support-tickets/{reference}', [CustomerSupportTicketController::class, 'show'])->name('api.v1.customer.support-tickets.show');
+        Route::post('support-tickets/{reference}/messages', [CustomerSupportTicketController::class, 'addMessage'])->name('api.v1.customer.support-tickets.messages.store');
+        Route::post('support-tickets/{reference}/close', [CustomerSupportTicketController::class, 'close'])->name('api.v1.customer.support-tickets.close');
 
         // In-App Notifications & Communication Preferences
         Route::get('notifications', [CustomerNotificationController::class, 'index'])->name('api.v1.customer.notifications.index');

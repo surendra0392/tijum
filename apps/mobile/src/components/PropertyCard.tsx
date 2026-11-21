@@ -4,14 +4,12 @@ import {
     CheckCircle2,
     Star,
     MapPin,
-    ArrowRight,
     Heart,
+    Building2,
 } from 'lucide-react-native';
 import { PropertyCard as PropertyCardType } from '../api/types';
 import { Colors } from '../theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../theme/spacing';
-import { Typography } from '../theme/typography';
-import { MealBadge } from './MealBadge';
 import { CategoryBadge } from './CategoryBadge';
 
 interface Props {
@@ -32,32 +30,27 @@ export function PropertyCard({
         ? isWishlisted
         : localWishlisted;
 
-    const anyProp = property as any;
-    const rawPrice =
-        property.starting_price_monthly_paise ??
-        anyProp.starting_price ??
-        800000;
-    const priceRupees = rawPrice > 100000 ? Math.round(rawPrice / 100) : rawPrice;
-    const formattedPrice = `₹${priceRupees.toLocaleString('en-IN')}`;
+    const formattedPrice =
+        property.starting_price_monthly_paise !== null
+            ? `₹${Math.round(
+                  property.starting_price_monthly_paise / 100,
+              ).toLocaleString('en-IN')}`
+            : null;
 
     const baseUrl = process.env.EXPO_PUBLIC_API_URL
         ? process.env.EXPO_PUBLIC_API_URL.replace(/\/api\/v1\/?$/, '')
         : 'https://tijum.com';
 
-    const rawImage =
-        anyProp.primary_photo_url ||
-        property.cover_image_url ||
-        (Array.isArray(anyProp.photos) && anyProp.photos[0]) ||
-        '';
+    const rawImage = property.cover_image_url || '';
 
     const imageUri = rawImage.startsWith('http')
         ? rawImage
         : rawImage
           ? `${baseUrl}${rawImage.startsWith('/') ? '' : '/'}${rawImage}`
-          : 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=800&q=80';
+          : null;
 
-    const ratingVal = property.rating_average || anyProp.rating || 4.7;
-    const reviewsCount = property.reviews_count || 124;
+    const hasReviews =
+        property.rating_average > 0 && property.reviews_count > 0;
 
     return (
         <TouchableOpacity
@@ -66,31 +59,47 @@ export function PropertyCard({
             style={styles.container}
         >
             <View style={styles.imageContainer}>
-                <Image
-                    source={{ uri: imageUri }}
-                    style={styles.image}
-                    resizeMode="cover"
-                />
-                <View style={styles.verifiedBadge}>
-                    <CheckCircle2
-                        size={12}
-                        color={Colors.successText}
-                        style={styles.badgeIcon}
+                {imageUri ? (
+                    <Image
+                        source={{ uri: imageUri }}
+                        style={styles.image}
+                        resizeMode="cover"
                     />
-                    <Text style={styles.verifiedText}>Verified</Text>
-                </View>
-                <View style={styles.ratingBadge}>
-                    <Star
-                        size={11}
-                        color={Colors.white}
-                        fill={Colors.white}
-                        style={styles.badgeIcon}
-                    />
-                    <Text style={styles.ratingText}>
-                        {typeof ratingVal === 'number' ? ratingVal.toFixed(1) : ratingVal}
-                    </Text>
-                </View>
+                ) : (
+                    <View style={styles.imagePlaceholder}>
+                        <Building2 size={44} color={Colors.gray400} />
+                    </View>
+                )}
+                {property.is_verified ? (
+                    <View style={styles.verifiedBadge}>
+                        <CheckCircle2
+                            size={12}
+                            color={Colors.successText}
+                            style={styles.badgeIcon}
+                        />
+                        <Text style={styles.verifiedText}>Verified</Text>
+                    </View>
+                ) : null}
+                {hasReviews ? (
+                    <View style={styles.ratingBadge}>
+                        <Star
+                            size={11}
+                            color={Colors.white}
+                            fill={Colors.white}
+                            style={styles.badgeIcon}
+                        />
+                        <Text style={styles.ratingText}>
+                            {property.rating_average.toFixed(1)}
+                        </Text>
+                    </View>
+                ) : null}
                 <TouchableOpacity
+                    accessibilityLabel={
+                        effectiveWishlisted
+                            ? `Remove ${property.name} from wishlist`
+                            : `Add ${property.name} to wishlist`
+                    }
+                    accessibilityRole="button"
                     style={styles.wishlistButton}
                     activeOpacity={0.8}
                     onPress={() => {
@@ -122,8 +131,10 @@ export function PropertyCard({
                         <Text style={styles.locality} numberOfLines={1}>
                             {property.locality ||
                                 property.city?.name ||
-                                'Koramangala, Bengaluru'}
-                            {property.distance_km ? ` • ${property.distance_km} km` : ''}
+                                'Location not provided'}
+                            {property.distance_km
+                                ? ` • ${property.distance_km} km`
+                                : ''}
                         </Text>
                     </View>
                 </View>
@@ -132,34 +143,35 @@ export function PropertyCard({
                     <Text numberOfLines={1} style={styles.name}>
                         {property.name}
                     </Text>
-                    <Text style={styles.reviewsCountText}>({reviewsCount} reviews)</Text>
+                    {hasReviews ? (
+                        <Text style={styles.reviewsCountText}>
+                            ({property.reviews_count} reviews)
+                        </Text>
+                    ) : null}
                 </View>
 
                 <View style={styles.amenityChipsRow}>
-                    {(anyProp.has_ac || anyProp.amenities?.includes('ac')) && (
+                    {property.food_provided ? (
                         <View style={styles.amenityChip}>
-                            <Text style={styles.amenityChipText}>❄️ AC</Text>
+                            <Text style={styles.amenityChipText}>
+                                Food available
+                            </Text>
                         </View>
-                    )}
-                    {(anyProp.food_included || property.food_provided || anyProp.amenities?.includes('food_included')) && (
-                        <View style={styles.amenityChip}>
-                            <Text style={styles.amenityChipText}>🥗 Veg Food</Text>
-                        </View>
-                    )}
-                    <View style={styles.amenityChip}>
-                        <Text style={styles.amenityChipText}>📶 WiFi</Text>
-                    </View>
-                    <View style={styles.amenityChip}>
-                        <Text style={styles.amenityChipText}>👥 Shared</Text>
-                    </View>
+                    ) : null}
                 </View>
 
                 <View style={styles.footer}>
                     <View>
-                        <Text style={styles.price}>
-                            {formattedPrice}
-                            <Text style={styles.priceUnit}> / month</Text>
-                        </Text>
+                        {formattedPrice ? (
+                            <Text style={styles.price}>
+                                {formattedPrice}
+                                <Text style={styles.priceUnit}> / month</Text>
+                            </Text>
+                        ) : (
+                            <Text style={styles.priceUnavailable}>
+                                Price unavailable
+                            </Text>
+                        )}
                     </View>
 
                     <View style={styles.bookNowButton}>
@@ -189,6 +201,12 @@ const styles = StyleSheet.create({
     image: {
         width: '100%',
         height: '100%',
+    },
+    imagePlaceholder: {
+        width: '100%',
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     verifiedBadge: {
         position: 'absolute',
@@ -231,8 +249,8 @@ const styles = StyleSheet.create({
         bottom: Spacing.sm,
         right: Spacing.sm,
         backgroundColor: 'rgba(17, 24, 39, 0.55)',
-        width: 32,
-        height: 32,
+        width: 44,
+        height: 44,
         borderRadius: BorderRadius.full,
         alignItems: 'center',
         justifyContent: 'center',
@@ -314,6 +332,11 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: Colors.inkSecondary,
         fontWeight: 'normal',
+    },
+    priceUnavailable: {
+        color: Colors.inkMuted,
+        fontSize: 13,
+        fontWeight: '600',
     },
     bookNowButton: {
         backgroundColor: Colors.deepPlum,

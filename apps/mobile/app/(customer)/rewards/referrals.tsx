@@ -12,15 +12,12 @@ import {
     View,
 } from 'react-native';
 import {
-    Gift,
     Share2,
     Copy,
     CheckCircle2,
     Clock,
     Users,
     Sparkles,
-    ShieldCheck,
-    Coins,
 } from 'lucide-react-native';
 import { RewardsApi } from '../../../src/api/rewards';
 import { ReferralItem, ReferralProfile } from '../../../src/api/types';
@@ -57,7 +54,7 @@ export default function ReferralsScreen() {
     };
 
     useEffect(() => {
-        loadReferrals();
+        void loadReferrals();
     }, []);
 
     const handleCopyCode = () => {
@@ -79,7 +76,7 @@ export default function ReferralsScreen() {
             const refereeReward = profile.referee_reward_points
                 ? `${profile.referee_reward_points} loyalty points`
                 : 'bonus loyalty points';
-            const message = `Join me on TIJUM for verified hostels, homestays, and co-living with daily meals included! Sign up using my referral link to get ${refereeReward} on your stay: ${profile.referral_link} or use code ${profile.referral_code}`;
+            const message = `Join me on TIJUM for verified hostels, homestays, and co-living stays. Sign up using my referral link to get ${refereeReward} on your stay: ${profile.referral_link} or use code ${profile.referral_code}`;
             const RNShare = (ReactNative as any).Share;
             if (RNShare && typeof RNShare.share === 'function') {
                 await RNShare.share({
@@ -115,8 +112,9 @@ export default function ReferralsScreen() {
                     Invite Friends, Earn Free Stays
                 </Text>
                 <Text style={styles.heroDesc}>
-                    Give friends {refereePointsLabel} for their first stay. You'll receive{' '}
-                    {referrerPointsLabel} when their check-out is completed!
+                    Give friends {refereePointsLabel} for their first stay.
+                    You'll receive {referrerPointsLabel} when their check-out is
+                    completed!
                 </Text>
 
                 {/* Referral Code & Share Controls */}
@@ -212,7 +210,8 @@ export default function ReferralsScreen() {
                             Friend joins and books
                         </Text>
                         <Text style={styles.stepDesc}>
-                            Your friend creates an account and gets {refereePointsLabel} applied on their stay.
+                            Your friend creates an account and gets{' '}
+                            {refereePointsLabel} applied on their stay.
                         </Text>
                     </View>
                 </View>
@@ -230,7 +229,9 @@ export default function ReferralsScreen() {
                             You get {referrerPointsLabel}
                         </Text>
                         <Text style={styles.stepDesc}>
-                            Once your friend successfully checks out, {referrerPointsLabel} credit straight to your wallet.
+                            Once your friend successfully checks out,{' '}
+                            {referrerPointsLabel} credit straight to your
+                            wallet.
                         </Text>
                     </View>
                 </View>
@@ -254,7 +255,7 @@ export default function ReferralsScreen() {
             ) : (
                 <FlatList
                     data={referrals}
-                    keyExtractor={(item) => String(item.id)}
+                    keyExtractor={(item: any) => String(item.id)}
                     contentContainerStyle={styles.listContent}
                     ListHeaderComponent={renderHeader}
                     refreshControl={
@@ -279,7 +280,7 @@ export default function ReferralsScreen() {
                             </Text>
                         </View>
                     }
-                    renderItem={({ item }) => {
+                    renderItem={({ item }: { item: any }) => {
                         const isCompleted = item.status === 'stay_completed';
                         return (
                             <View style={styles.referralCard}>

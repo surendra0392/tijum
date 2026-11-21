@@ -18,7 +18,6 @@ import { PhysicalRoom, PropertyDetail } from '../../../src/api/types';
 import { Badge } from '../../../src/components/Badge';
 import { CategoryBadge } from '../../../src/components/CategoryBadge';
 import {
-    CANONICAL_CATEGORIES,
     CanonicalCategorySlug,
     getCategoryDisplayName,
     normalizeCategorySlug,
@@ -30,7 +29,7 @@ import { StayTimingBadge } from '../../../src/components/StayTimingBadge';
 import { AppHeader } from '../../../src/components/AppHeader';
 import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import { useAuth } from '../../../src/auth/AuthContext';
-import { SHOWCASE_PROPERTIES } from '../../../src/data/showcaseData';
+
 import {
     BedDouble,
     Building2,
@@ -75,7 +74,9 @@ export default function PartnerPropertiesScreen() {
                 setPhysicalRooms(res.data);
             }
         } catch (e: any) {
-            setRoomsError(e.message || 'Failed to retrieve physical room list.');
+            setRoomsError(
+                e.message || 'Failed to retrieve physical room list.',
+            );
         } finally {
             setLoadingRooms(false);
         }
@@ -95,13 +96,13 @@ export default function PartnerPropertiesScreen() {
             return;
         }
         setIsUnauthenticated(false);
-        loadProperties();
+        void loadProperties();
     }, [token, authState, authLoading]);
 
     const loadProperties = async () => {
         if (!token || authState !== 'owner_authenticated') {
             setIsUnauthenticated(true);
-            setProperties(SHOWCASE_PROPERTIES as any);
+            setProperties([]);
             setLoading(false);
             return;
         }
@@ -112,10 +113,10 @@ export default function PartnerPropertiesScreen() {
             if (res.data && res.data.length > 0) {
                 setProperties(res.data);
             } else {
-                setProperties(SHOWCASE_PROPERTIES as any);
+                setProperties([]);
             }
         } catch {
-            setProperties(SHOWCASE_PROPERTIES as any);
+            setProperties([]);
         } finally {
             setLoading(false);
         }
@@ -124,7 +125,7 @@ export default function PartnerPropertiesScreen() {
     const onRefresh = async () => {
         if (!token || authState !== 'owner_authenticated') {
             setIsUnauthenticated(true);
-            setProperties(SHOWCASE_PROPERTIES as any);
+            setProperties([]);
             return;
         }
         setRefreshing(true);
@@ -264,14 +265,15 @@ export default function PartnerPropertiesScreen() {
                         item.room_types.map((rt) => (
                             <View key={rt.id} style={styles.roomTypeRow}>
                                 <Text style={styles.roomTypeName}>
-                                    • {rt.name} ({rt.sharing_type})
+                                    • {rt.name} ({rt.sharing_label})
                                 </Text>
                                 <Text style={styles.roomTypePrice}>
                                     ₹
                                     {(
                                         rt.price_daily_paise / 100
                                     ).toLocaleString('en-IN')}
-                                    /day • {rt.available_rooms_count} rooms
+                                    /day • {rt.pricing_basis_label} •{' '}
+                                    {rt.total_rooms} physical room(s)
                                 </Text>
                             </View>
                         ))
@@ -395,7 +397,10 @@ export default function PartnerPropertiesScreen() {
         </View>
     );
 
-    if (!authLoading && (isUnauthenticated || !token || authState !== 'owner_authenticated')) {
+    if (
+        !authLoading &&
+        (isUnauthenticated || !token || authState !== 'owner_authenticated')
+    ) {
         return (
             <SafeAreaView style={styles.container}>
                 <AppHeader
@@ -424,30 +429,15 @@ export default function PartnerPropertiesScreen() {
                 rightAction={
                     <TouchableOpacity
                         style={styles.addPropertyBtn}
-                        onPress={() => router.push('/(partner)/properties/create')}
+                        onPress={() =>
+                            router.push('/(partner)/properties/create')
+                        }
                         activeOpacity={0.8}
                     >
                         <Plus size={18} color={Colors.white} />
                     </TouchableOpacity>
                 }
             />
-
-            {isUnauthenticated && (
-                <View style={styles.guestBanner}>
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.guestBannerTitle}>Partner Preview Mode</Text>
-                        <Text style={styles.guestBannerDesc}>
-                            Showing sample properties. Sign in to manage your real properties.
-                        </Text>
-                    </View>
-                    <TouchableOpacity
-                        style={styles.guestSignInBtn}
-                        onPress={() => router.push('/(auth)/owner-login')}
-                    >
-                        <Text style={styles.guestSignInBtnText}>Host Sign In</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
 
             {/* Category Filter Tabs */}
             <View style={styles.filterSection}>
@@ -519,7 +509,7 @@ export default function PartnerPropertiesScreen() {
             ) : (
                 <FlatList
                     data={filteredProperties}
-                    keyExtractor={(item) => item.id.toString()}
+                    keyExtractor={(item: any) => item.id.toString()}
                     renderItem={renderPropertyCard}
                     contentContainerStyle={styles.listContent}
                     refreshControl={
@@ -656,8 +646,7 @@ export default function PartnerPropertiesScreen() {
                                                         Room {room.room_number}
                                                     </Text>
                                                     {room.floor !== null &&
-                                                    room.floor !==
-                                                        undefined ? (
+                                                    room.floor !== undefined ? (
                                                         <Text
                                                             style={
                                                                 styles.roomItemFloor
@@ -1084,39 +1073,5 @@ const styles = StyleSheet.create({
         fontSize: 11,
         fontWeight: '700',
         color: '#15803D',
-    },
-    guestBanner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: Colors.peachCream,
-        marginHorizontal: Spacing.base,
-        marginTop: Spacing.sm,
-        marginBottom: Spacing.xs,
-        padding: Spacing.md,
-        borderRadius: BorderRadius.lg,
-        borderWidth: 1,
-        borderColor: Colors.peachSoft,
-    },
-    guestBannerTitle: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: Colors.plumPrimary,
-    },
-    guestBannerDesc: {
-        fontSize: 11,
-        color: Colors.inkSecondary,
-        marginTop: 2,
-    },
-    guestSignInBtn: {
-        backgroundColor: Colors.deepPlum,
-        paddingHorizontal: 12,
-        paddingVertical: 7,
-        borderRadius: BorderRadius.pill,
-        marginLeft: 8,
-    },
-    guestSignInBtnText: {
-        color: Colors.white,
-        fontSize: 12,
-        fontWeight: '700',
     },
 });

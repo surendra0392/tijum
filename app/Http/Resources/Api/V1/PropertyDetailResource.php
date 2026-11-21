@@ -37,10 +37,10 @@ class PropertyDetailResource extends JsonResource
             ? $this->roomTypes->where('is_active', true)->values()
             : collect();
 
-        $minMonthlyPrice = ($activeRoomTypes->where('monthly_rate_minor', '>', 0)->min('monthly_rate_minor')) ?: 600000;
+        $minMonthlyPrice = $activeRoomTypes->where('monthly_rate_minor', '>', 0)->min('monthly_rate_minor');
         $minDailyPrice = $activeRoomTypes->where('daily_rate_minor', '>', 0)->min('daily_rate_minor');
         $minWeeklyPrice = $activeRoomTypes->where('weekly_rate_minor', '>', 0)->min('weekly_rate_minor');
-        $coverImage = $this->coverImageUrl() ?? '/images/public/hero-stay.jpg';
+        $coverImage = $this->coverImageUrl();
 
         $gallery = [];
         if ($this->relationLoaded('media')) {
@@ -145,9 +145,9 @@ class PropertyDetailResource extends JsonResource
             'gender_eligibility' => $this->relationLoaded('roomTypes') ? $this->gender_eligibility : 'All Genders',
             'starting_price_daily_paise' => $minDailyPrice !== null ? (int) $minDailyPrice : null,
             'starting_price_weekly_paise' => $minWeeklyPrice !== null ? (int) $minWeeklyPrice : null,
-            'starting_price_monthly_paise' => (int) $minMonthlyPrice,
-            'rating_average' => $this->ratingSummary?->average_rating ? (float) $this->ratingSummary->average_rating : 4.8,
-            'reviews_count' => (int) ($this->ratingSummary?->published_review_count ?? 0),
+            'starting_price_monthly_paise' => $minMonthlyPrice !== null ? (int) $minMonthlyPrice : null,
+            'rating_average' => (float) ($this->ratingSummary->average_rating ?? 0),
+            'reviews_count' => (int) ($this->ratingSummary->published_review_count ?? 0),
             'cover_image_url' => $coverImage,
             'gallery' => $gallery,
             'food_provided' => (bool) $this->food_provided,
@@ -161,7 +161,7 @@ class PropertyDetailResource extends JsonResource
                 'dinner' => (bool) $this->dinner_included,
             ],
             'included_meals' => $meals,
-            'included_meals_label' => ! empty($meals) ? implode(' • ', $meals) : 'Food Included',
+            'included_meals_label' => ! empty($meals) ? implode(' • ', $meals) : null,
             'amenities' => $amenities,
             'room_types' => RoomTypeResource::collection($activeRoomTypes),
             'reviews' => $reviews,

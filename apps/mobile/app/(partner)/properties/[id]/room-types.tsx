@@ -3,9 +3,7 @@ import {
     ActivityIndicator,
     Alert,
     FlatList,
-    KeyboardAvoidingView,
     Modal,
-    Platform,
     RefreshControl,
     SafeAreaView,
     ScrollView,
@@ -58,16 +56,14 @@ export default function PropertyRoomTypesScreen() {
     const [genderPolicy, setGenderPolicy] = useState<
         'all_genders' | 'male_only' | 'female_only'
     >('all_genders');
-    const [compositions, setCompositions] = useState<string[]>([
-        'individuals',
-    ]);
+    const [compositions, setCompositions] = useState<string[]>(['individuals']);
     const [isAirConditioned, setIsAirConditioned] = useState(true);
     const [earlyCheckInEnabled, setEarlyCheckInEnabled] = useState(false);
     const [description, setDescription] = useState('');
 
     useEffect(() => {
         if (propertyId) {
-            loadRoomTypes();
+            void loadRoomTypes();
         }
     }, [propertyId]);
 
@@ -123,7 +119,8 @@ export default function PropertyRoomTypesScreen() {
                 : 'all_genders',
         );
         setCompositions(
-            rt.guest_composition_policy && rt.guest_composition_policy.length > 0
+            rt.guest_composition_policy &&
+                rt.guest_composition_policy.length > 0
                 ? rt.guest_composition_policy
                 : ['individuals'],
         );
@@ -225,7 +222,14 @@ export default function PropertyRoomTypesScreen() {
                     <View style={{ flex: 1 }}>
                         <Text style={styles.cardTitle}>{item.name}</Text>
                         <Text style={styles.cardSubtitle}>
-                            {item.sharing_label || (item.is_shared ? `${item.sharing_capacity} Sharing` : 'Single Room')} • {item.is_air_conditioned ? 'Air Conditioned' : 'Non-AC'}
+                            {item.sharing_label ||
+                                (item.is_shared
+                                    ? `${item.sharing_capacity} Sharing`
+                                    : 'Single Room')}{' '}
+                            •{' '}
+                            {item.is_air_conditioned
+                                ? 'Air Conditioned'
+                                : 'Non-AC'}
                         </Text>
                     </View>
                     <Badge
@@ -238,7 +242,9 @@ export default function PropertyRoomTypesScreen() {
                     <View style={styles.detailItem}>
                         <Users size={14} color={Colors.gray500} />
                         <Text style={styles.detailText}>
-                            Max {item.max_guests_per_room || item.sharing_capacity} Guests
+                            Max{' '}
+                            {item.max_guests_per_room || item.sharing_capacity}{' '}
+                            Guests
                         </Text>
                     </View>
                     <View style={styles.detailItem}>
@@ -352,7 +358,7 @@ export default function PropertyRoomTypesScreen() {
             ) : (
                 <FlatList
                     data={roomTypes}
-                    keyExtractor={(item) => item.id.toString()}
+                    keyExtractor={(item: any) => item.id.toString()}
                     renderItem={renderRoomTypeItem}
                     contentContainerStyle={styles.listContent}
                     refreshControl={
@@ -369,7 +375,9 @@ export default function PropertyRoomTypesScreen() {
                                 No Room Categories Added
                             </Text>
                             <Text style={styles.emptySubtitle}>
-                                Define your accommodation room types (e.g. 2 Sharing AC, Single Private Room) to link physical rooms and rates.
+                                Define your accommodation room types (e.g. 2
+                                Sharing AC, Single Private Room) to link
+                                physical rooms and rates.
                             </Text>
                             <Button
                                 title="+ Add First Room Category"
@@ -511,10 +519,16 @@ export default function PropertyRoomTypesScreen() {
                             </Text>
                             <View style={styles.segmentedRow}>
                                 {[
-                                    { key: 'all_genders', label: 'All Genders' },
+                                    {
+                                        key: 'all_genders',
+                                        label: 'All Genders',
+                                    },
                                     { key: 'male_only', label: 'Male Only' },
-                                    { key: 'female_only', label: 'Female Only' },
-                                ].map((item) => (
+                                    {
+                                        key: 'female_only',
+                                        label: 'Female Only',
+                                    },
+                                ].map((item: any) => (
                                     <TouchableOpacity
                                         key={item.key}
                                         style={[
@@ -549,12 +563,17 @@ export default function PropertyRoomTypesScreen() {
                             </Text>
                             <View style={styles.tagsRow}>
                                 {[
-                                    { key: 'individuals', label: 'Individuals / Students' },
+                                    {
+                                        key: 'individuals',
+                                        label: 'Individuals / Students',
+                                    },
                                     { key: 'families', label: 'Families' },
                                     { key: 'couples', label: 'Couples' },
                                     { key: 'groups', label: 'Groups' },
                                 ].map((comp) => {
-                                    const isSel = compositions.includes(comp.key);
+                                    const isSel = compositions.includes(
+                                        comp.key,
+                                    );
                                     return (
                                         <TouchableOpacity
                                             key={comp.key}
@@ -581,12 +600,22 @@ export default function PropertyRoomTypesScreen() {
                             </View>
 
                             {/* Toggles */}
-                            <View style={[styles.toggleRow, { marginTop: Spacing.lg }]}>
-                                <Text style={styles.toggleLabel}>Air Conditioned (AC)</Text>
+                            <View
+                                style={[
+                                    styles.toggleRow,
+                                    { marginTop: Spacing.lg },
+                                ]}
+                            >
+                                <Text style={styles.toggleLabel}>
+                                    Air Conditioned (AC)
+                                </Text>
                                 <Switch
                                     value={isAirConditioned}
                                     onValueChange={setIsAirConditioned}
-                                    trackColor={{ false: Colors.gray300, true: Colors.coral }}
+                                    trackColor={{
+                                        false: Colors.gray300,
+                                        true: Colors.coral,
+                                    }}
                                     thumbColor={Colors.white}
                                 />
                             </View>
@@ -598,7 +627,10 @@ export default function PropertyRoomTypesScreen() {
                                 <Switch
                                     value={earlyCheckInEnabled}
                                     onValueChange={setEarlyCheckInEnabled}
-                                    trackColor={{ false: Colors.gray300, true: Colors.coral }}
+                                    trackColor={{
+                                        false: Colors.gray300,
+                                        true: Colors.coral,
+                                    }}
                                     thumbColor={Colors.white}
                                 />
                             </View>

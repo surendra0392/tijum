@@ -53,7 +53,10 @@ describe('Phase M10B Customer Mobile Application & API Parity Specification', ()
                 __dirname,
                 '../app/(customer)/support/[reference].tsx',
             );
-            assert.ok(fs.existsSync(screenPath), 'support/[reference].tsx must exist');
+            assert.ok(
+                fs.existsSync(screenPath),
+                'support/[reference].tsx must exist',
+            );
 
             const source = fs.readFileSync(screenPath, 'utf8');
             assert.ok(
@@ -149,11 +152,15 @@ describe('Phase M10B Customer Mobile Application & API Parity Specification', ()
                 'Must persist updated channel preferences',
             );
             assert.ok(
-                source.includes('Transactional booking confirmations, invoices, and grievance updates sent to your registered email'),
+                source.includes(
+                    'Transactional booking confirmations, invoices, and grievance updates sent to your registered email',
+                ),
                 'Must truthfully disclose active email channel status',
             );
             assert.ok(
-                source.includes('Instant push notifications for check-in reminders, status alerts, and important updates via Expo Push'),
+                source.includes(
+                    'Instant push notifications for check-in reminders, status alerts, and important updates via Expo Push',
+                ),
                 'Must truthfully disclose active push channel status',
             );
             assert.ok(
@@ -188,10 +195,14 @@ describe('Phase M10B Customer Mobile Application & API Parity Specification', ()
         });
 
         it('correctly maps notifications to deep-link routes for bookings, support cases, and rewards', () => {
-            const resolveDeepLink = (actionUrl: string, combinedText: string) => {
+            const resolveDeepLink = (
+                actionUrl: string,
+                combinedText: string,
+            ) => {
                 const caseRefMatch =
-                    actionUrl.match(/(?:my-support|support|cases)\/([A-Za-z0-9_-]+)/i) ||
-                    combinedText.match(/\b(CAS-[A-Z0-9-]+)\b/i);
+                    actionUrl.match(
+                        /(?:my-support|support|cases)\/([A-Za-z0-9_-]+)/i,
+                    ) || combinedText.match(/\b(CAS-[A-Z0-9-]+)\b/i);
                 if (caseRefMatch) {
                     return `/(customer)/support/${caseRefMatch[1]}`;
                 }
@@ -203,7 +214,10 @@ describe('Phase M10B Customer Mobile Application & API Parity Specification', ()
                     return `/(customer)/bookings/${bookingMatch[1]}`;
                 }
 
-                if (actionUrl.includes('rewards') || combinedText.includes('points')) {
+                if (
+                    actionUrl.includes('rewards') ||
+                    combinedText.includes('points')
+                ) {
                     return '/(customer)/rewards';
                 }
 
@@ -215,7 +229,10 @@ describe('Phase M10B Customer Mobile Application & API Parity Specification', ()
                 '/(customer)/support/CAS-202611-001',
             );
             assert.strictEqual(
-                resolveDeepLink('', 'Your stay grievance CAS-202611-999 was updated'),
+                resolveDeepLink(
+                    '',
+                    'Your stay grievance CAS-202611-999 was updated',
+                ),
                 '/(customer)/support/CAS-202611-999',
             );
             assert.strictEqual(
@@ -223,7 +240,10 @@ describe('Phase M10B Customer Mobile Application & API Parity Specification', ()
                 '/(customer)/bookings/TIJ-202611-XYZ',
             );
             assert.strictEqual(
-                resolveDeepLink('', 'Check-in confirmed for booking TIJ-202611-ABC'),
+                resolveDeepLink(
+                    '',
+                    'Check-in confirmed for booking TIJ-202611-ABC',
+                ),
                 '/(customer)/bookings/TIJ-202611-ABC',
             );
             assert.strictEqual(
@@ -350,6 +370,58 @@ describe('Phase M10B Customer Mobile Application & API Parity Specification', ()
             assert.ok(
                 source.includes('refundAmountText'),
                 'Must render refund amount in INR minor units / 100',
+            );
+        });
+    });
+
+    describe('Production Data Integrity', () => {
+        it('contains no showcase records or fabricated API fallbacks in production code', () => {
+            const roots = [
+                path.resolve(__dirname, '../app'),
+                path.resolve(__dirname, '../src'),
+            ];
+            const sourceFiles: string[] = [];
+
+            const collectSourceFiles = (directory: string) => {
+                for (const entry of fs.readdirSync(directory, {
+                    withFileTypes: true,
+                })) {
+                    const entryPath = path.join(directory, entry.name);
+                    if (entry.isDirectory()) {
+                        collectSourceFiles(entryPath);
+                    } else if (/\.(ts|tsx)$/.test(entry.name)) {
+                        sourceFiles.push(entryPath);
+                    }
+                }
+            };
+
+            roots.forEach(collectSourceFiles);
+
+            const bannedMarkers = [
+                'SHOWCASE_',
+                'showcaseData',
+                'images.unsplash.com',
+                'TJM25042500123',
+                'Greenview PG',
+                'getFallbackProperty',
+                'FALLBACK_REF_DATA',
+            ];
+
+            for (const sourceFile of sourceFiles) {
+                const source = fs.readFileSync(sourceFile, 'utf8');
+                for (const marker of bannedMarkers) {
+                    assert.ok(
+                        !source.includes(marker),
+                        `${path.relative(path.resolve(__dirname, '..'), sourceFile)} contains banned production marker ${marker}`,
+                    );
+                }
+            }
+
+            assert.ok(
+                !fs.existsSync(
+                    path.resolve(__dirname, '../src/data/showcaseData.ts'),
+                ),
+                'Showcase data must not ship in the production mobile bundle',
             );
         });
     });

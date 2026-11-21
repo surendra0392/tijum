@@ -10,22 +10,13 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import {
-    Ticket,
-    Copy,
-    Sparkles,
-    Calendar,
-    ArrowRight,
-    Tag,
-    Building2,
-    ShieldCheck,
-} from 'lucide-react-native';
+import { Ticket, Copy, Tag } from 'lucide-react-native';
 import { RewardsApi } from '../../../src/api/rewards';
 import { CouponItem } from '../../../src/api/types';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
+import { ExceptionalState } from '../../../src/components/ExceptionalState';
 
 const FILTER_TABS = [
     { key: 'all', label: 'All Coupons' },
@@ -34,54 +25,13 @@ const FILTER_TABS = [
     { key: 'points', label: 'Points Rewards' },
 ];
 
-const SHOWCASE_COUPONS: CouponItem[] = [
-    {
-        id: 1,
-        code: 'TIJUMWELCOME',
-        title: 'Welcome Discount',
-        description: 'Flat ₹500 off on your first monthly stay reservation',
-        discount_amount_paise: 50000,
-        min_subtotal_paise: 500000,
-        expires_at: '2026-12-31',
-        offer_type: 'fixed_amount',
-        funding_source: 'platform',
-        is_eligible: true,
-    },
-    {
-        id: 2,
-        code: 'STUDENTSTAY',
-        title: 'Student Special',
-        description: '10% discount on verified hostels and PG stays',
-        discount_percentage: 10,
-        min_subtotal_paise: 0,
-        max_discount_paise: 100000,
-        expires_at: '2026-12-31',
-        offer_type: 'percentage',
-        funding_source: 'platform',
-        is_eligible: true,
-    },
-    {
-        id: 3,
-        code: 'COLIVING300',
-        title: 'Co-Living Pass',
-        description: '₹300 off on co-living private or shared suites',
-        discount_amount_paise: 30000,
-        min_subtotal_paise: 300000,
-        expires_at: '2026-12-31',
-        offer_type: 'fixed_amount',
-        funding_source: 'platform',
-        is_eligible: true,
-    },
-];
-
 export default function CouponsScreen() {
-    const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [selectedTab, setSelectedTab] = useState<
         'all' | 'fixed' | 'percentage' | 'points'
     >('all');
-    const [coupons, setCoupons] = useState<CouponItem[]>(SHOWCASE_COUPONS);
+    const [coupons, setCoupons] = useState<CouponItem[]>([]);
     const [copiedCode, setCopiedCode] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -97,11 +47,9 @@ export default function CouponsScreen() {
             const res = await RewardsApi.getAvailableCoupons();
             if (res.data && res.data.length > 0) {
                 setCoupons(res.data);
-            } else {
-                setCoupons(SHOWCASE_COUPONS);
             }
         } catch {
-            setCoupons(SHOWCASE_COUPONS);
+            // Keep existing data on error; do not fall back to showcase
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -109,7 +57,7 @@ export default function CouponsScreen() {
     };
 
     useEffect(() => {
-        loadCoupons();
+        void loadCoupons();
     }, []);
 
     const handleCopy = (code: string) => {
@@ -164,7 +112,15 @@ export default function CouponsScreen() {
                 })}
             </View>
 
-            {loading ? (
+            {errorMessage && coupons.length === 0 ? (
+                <ExceptionalState
+                    type="no-internet"
+                    title="Coupons Unavailable"
+                    description={errorMessage}
+                    actionLabel="Try Again"
+                    onAction={() => loadCoupons()}
+                />
+            ) : loading ? (
                 <View style={styles.center}>
                     <ActivityIndicator size="large" color={Colors.coral} />
                     <Text style={styles.loadingText}>
@@ -174,7 +130,7 @@ export default function CouponsScreen() {
             ) : (
                 <FlatList
                     data={filteredCoupons}
-                    keyExtractor={(item) => String(item.id)}
+                    keyExtractor={(item: any) => String(item.id)}
                     contentContainerStyle={styles.listContent}
                     refreshControl={
                         <RefreshControl
@@ -198,7 +154,7 @@ export default function CouponsScreen() {
                             </Text>
                         </View>
                     }
-                    renderItem={({ item }) => {
+                    renderItem={({ item }: { item: any }) => {
                         const isPercentage = item.offer_type === 'percentage';
                         const isPoints = item.offer_type === 'points_reward';
                         const discountDisplay = isPercentage

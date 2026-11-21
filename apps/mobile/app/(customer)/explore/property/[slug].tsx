@@ -29,7 +29,7 @@ import {
     X,
 } from 'lucide-react-native';
 import { PublicApi } from '../../../../src/api/public';
-import { PropertyDetail, RoomType } from '../../../../src/api/types';
+import { PropertyDetail } from '../../../../src/api/types';
 import { Colors } from '../../../../src/theme/colors';
 import { Spacing } from '../../../../src/theme/spacing';
 import { Typography } from '../../../../src/theme/typography';
@@ -48,88 +48,12 @@ export default function PropertyDetailScreen() {
     const [error, setError] = useState<string | null>(null);
     const [galleryModalVisible, setGalleryModalVisible] = useState(false);
     const [activeGalleryIndex, setActiveGalleryIndex] = useState(0);
-    const [galleryCategory, setGalleryCategory] = useState<'all' | 'room' | 'dining' | 'exterior'>('all');
 
     useEffect(() => {
         if (slug) {
-            loadProperty();
+            void loadProperty();
         }
     }, [slug]);
-
-    const getFallbackProperty = (targetSlug: string): PropertyDetail => {
-        return {
-            id: 1,
-            slug: targetSlug || 'greenview-pg',
-            name: targetSlug === 'sunrise-homestay' ? 'Sunrise Homestay' : 'Greenview PG',
-            category: { id: 1, name: 'Hostels / PG', slug: 'hostels-pg' },
-            city: { id: 1, name: 'Bengaluru', slug: 'bengaluru' },
-            locality: 'Koramangala, Bengaluru',
-            address_line: '12th Main Road, 4th Block, Koramangala',
-            rating: 4.7,
-            reviews_count: 124,
-            starting_price: 8000,
-            cover_image_url:
-                'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=800&q=80',
-            gallery: [
-                {
-                    id: 1,
-                    url: 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=800&q=80',
-                    caption: 'Front Exterior',
-                    is_primary: true,
-                    category: 'exterior',
-                },
-                {
-                    id: 2,
-                    url: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80',
-                    caption: 'Shared Room',
-                    is_primary: false,
-                    category: 'room',
-                },
-                {
-                    id: 3,
-                    url: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&q=80',
-                    caption: 'Dining Hall',
-                    is_primary: false,
-                    category: 'dining',
-                },
-            ],
-            description:
-                'Comfortable PG with modern amenities, 24x7 security and home-style nutritious food.',
-            food_provided: true,
-            food_included: true,
-            breakfast_included: true,
-            lunch_included: true,
-            dinner_included: true,
-            food_description:
-                'Nutritious and delicious meals prepared fresh daily. Veg & Non-Veg options available.',
-            room_types: [
-                {
-                    id: 101,
-                    name: 'Shared Room (Per Guest)',
-                    sharing_type: 'Double Sharing',
-                    capacity: 2,
-                    price_daily_paise: 30000,
-                    price_monthly_paise: 800000,
-                    available_rooms_count: 5,
-                    amenities: ['ac', 'attached_bathroom', 'cupboard'],
-                },
-                {
-                    id: 102,
-                    name: 'Private Room',
-                    sharing_type: 'Single Room',
-                    capacity: 1,
-                    price_daily_paise: 50000,
-                    price_monthly_paise: 1200000,
-                    available_rooms_count: 2,
-                    amenities: ['ac', 'attached_bathroom', 'tv', 'balcony'],
-                },
-            ],
-            amenities: ['wifi', 'ac', 'food_included', 'cctv', 'power_backup', 'laundry'],
-            check_in_time: '12:00 PM',
-            check_out_time: '11:00 AM',
-            is_verified: true,
-        } as unknown as PropertyDetail;
-    };
 
     const loadProperty = async () => {
         try {
@@ -139,10 +63,16 @@ export default function PropertyDetailScreen() {
             if (res.data) {
                 setProperty(res.data);
             } else {
-                setProperty(getFallbackProperty(slug));
+                setProperty(null);
+                setError('Property details are unavailable.');
             }
-        } catch {
-            setProperty(getFallbackProperty(slug));
+        } catch (loadError: unknown) {
+            setProperty(null);
+            setError(
+                loadError instanceof Error
+                    ? loadError.message
+                    : 'Unable to load this property. Please try again.',
+            );
         } finally {
             setLoading(false);
         }
@@ -176,15 +106,26 @@ export default function PropertyDetailScreen() {
         property.gallery && property.gallery.length > 0
             ? property.gallery
             : property.cover_image_url
-            ? [
-                  {
-                      id: 1,
-                      url: property.cover_image_url,
-                      caption: property.name,
-                      is_primary: true,
-                  },
-              ]
-            : [];
+              ? [
+                    {
+                        id: 1,
+                        url: property.cover_image_url,
+                        caption: property.name,
+                        is_primary: true,
+                    },
+                ]
+              : [];
+
+    const startingPrice = property.starting_price_daily_paise
+        ? { amount: property.starting_price_daily_paise / 100, unit: 'day' }
+        : property.starting_price_weekly_paise
+          ? { amount: property.starting_price_weekly_paise / 100, unit: 'week' }
+          : property.starting_price_monthly_paise
+            ? {
+                  amount: property.starting_price_monthly_paise / 100,
+                  unit: 'month',
+              }
+            : null;
 
     return (
         <SafeAreaView style={styles.container}>
@@ -206,7 +147,9 @@ export default function PropertyDetailScreen() {
                             style={styles.coverImage}
                         />
                     ) : (
-                        <View style={[styles.coverImage, styles.placeholderCover]}>
+                        <View
+                            style={[styles.coverImage, styles.placeholderCover]}
+                        >
                             <Building2 size={48} color={Colors.gray400} />
                         </View>
                     )}
@@ -311,7 +254,7 @@ export default function PropertyDetailScreen() {
                                 style={{ marginRight: 6 }}
                             />
                             <Text style={styles.sectionTitle}>
-                                Food & Meals Included
+                                Food & Meal Details
                             </Text>
                         </View>
                         {property.food_provided ? (
@@ -390,7 +333,9 @@ export default function PropertyDetailScreen() {
                                             label={
                                                 room.sharing_type ||
                                                 room.sharing_label ||
-                                                (room.is_shared ? 'Shared Room' : 'Private Room')
+                                                (room.is_shared
+                                                    ? 'Shared Room'
+                                                    : 'Private Room')
                                             }
                                             variant="secondary"
                                         />
@@ -448,7 +393,9 @@ export default function PropertyDetailScreen() {
                                             </Text>
                                         </View>
                                         <View style={styles.inlineMetaRow}>
-                                            {(room.available_rooms_count ?? room.total_rooms ?? 1) > 0 ? (
+                                            {(room.available_rooms_count ??
+                                                room.total_rooms ??
+                                                1) > 0 ? (
                                                 <>
                                                     <CheckCircle2
                                                         size={13}
@@ -465,7 +412,9 @@ export default function PropertyDetailScreen() {
                                                             },
                                                         ]}
                                                     >
-                                                        {room.available_rooms_count ?? room.total_rooms ?? 'Available'}{' '}
+                                                        {room.available_rooms_count ??
+                                                            room.total_rooms ??
+                                                            'Available'}{' '}
                                                         rooms available
                                                     </Text>
                                                 </>
@@ -571,12 +520,12 @@ export default function PropertyDetailScreen() {
                             </View>
                             <Badge
                                 label={
-                                    property.rating > 0
-                                        ? `${property.rating.toFixed(1)} (${property.reviews_count})`
+                                    (property.rating ?? 0) > 0
+                                        ? `${(property.rating ?? 0).toFixed(1)} (${property.reviews_count})`
                                         : 'New'
                                 }
                                 variant={
-                                    property.rating >= 4
+                                    (property.rating ?? 0) >= 4
                                         ? 'accent'
                                         : 'secondary'
                                 }
@@ -645,11 +594,9 @@ export default function PropertyDetailScreen() {
                 <View>
                     <Text style={styles.bottomPriceLabel}>Starting from</Text>
                     <Text style={styles.bottomPriceValue}>
-                        ₹
-                        {(
-                            (property.starting_price_daily_paise || ((property as any).starting_price ? (property as any).starting_price * 100 : 80000)) / 100
-                        ).toLocaleString('en-IN')}
-                        /day
+                        {startingPrice
+                            ? `₹${startingPrice.amount.toLocaleString('en-IN')}/${startingPrice.unit}`
+                            : 'Price unavailable'}
                     </Text>
                 </View>
                 <Button
@@ -663,6 +610,7 @@ export default function PropertyDetailScreen() {
                             },
                         })
                     }
+                    disabled={!property.booking_eligible || !startingPrice}
                     style={{ paddingHorizontal: Spacing.xl }}
                 />
             </View>
@@ -694,10 +642,15 @@ export default function PropertyDetailScreen() {
                     <View style={styles.galleryMainView}>
                         {galleryList.length > 1 && (
                             <TouchableOpacity
-                                style={[styles.galleryNavBtn, styles.galleryNavLeft]}
+                                style={[
+                                    styles.galleryNavBtn,
+                                    styles.galleryNavLeft,
+                                ]}
                                 onPress={() =>
                                     setActiveGalleryIndex((prev) =>
-                                        prev > 0 ? prev - 1 : galleryList.length - 1,
+                                        prev > 0
+                                            ? prev - 1
+                                            : galleryList.length - 1,
                                     )
                                 }
                             >
@@ -707,7 +660,9 @@ export default function PropertyDetailScreen() {
 
                         {galleryList[activeGalleryIndex] ? (
                             <Image
-                                source={{ uri: galleryList[activeGalleryIndex].url }}
+                                source={{
+                                    uri: galleryList[activeGalleryIndex].url,
+                                }}
                                 style={styles.galleryMainImage}
                                 resizeMode="contain"
                             />
@@ -715,10 +670,15 @@ export default function PropertyDetailScreen() {
 
                         {galleryList.length > 1 && (
                             <TouchableOpacity
-                                style={[styles.galleryNavBtn, styles.galleryNavRight]}
+                                style={[
+                                    styles.galleryNavBtn,
+                                    styles.galleryNavRight,
+                                ]}
                                 onPress={() =>
                                     setActiveGalleryIndex((prev) =>
-                                        prev < galleryList.length - 1 ? prev + 1 : 0,
+                                        prev < galleryList.length - 1
+                                            ? prev + 1
+                                            : 0,
                                     )
                                 }
                             >
@@ -748,10 +708,13 @@ export default function PropertyDetailScreen() {
                                 return (
                                     <TouchableOpacity
                                         key={item.id || idx}
-                                        onPress={() => setActiveGalleryIndex(idx)}
+                                        onPress={() =>
+                                            setActiveGalleryIndex(idx)
+                                        }
                                         style={[
                                             styles.galleryThumb,
-                                            isActive && styles.galleryThumbActive,
+                                            isActive &&
+                                                styles.galleryThumbActive,
                                         ]}
                                     >
                                         <Image

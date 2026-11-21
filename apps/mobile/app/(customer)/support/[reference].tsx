@@ -19,7 +19,6 @@ import { Badge } from '../../../src/components/Badge';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
-import { SHOWCASE_CASES } from '../../../src/data/showcaseData';
 import {
     AlertCircle,
     ArrowLeft,
@@ -50,14 +49,9 @@ export default function CustomerCaseDetailScreen() {
                 setCaseData(data);
                 return;
             }
+            setCaseData(null);
         } catch (error: any) {
-            const fallback = SHOWCASE_CASES.find(
-                (c) => c.reference === reference || (c as any).case_number === reference,
-            );
-            if (fallback) {
-                setCaseData(fallback);
-                return;
-            }
+            setCaseData(null);
             Alert.alert(
                 'Error',
                 error.message || 'Failed to load support case details.',
@@ -69,12 +63,12 @@ export default function CustomerCaseDetailScreen() {
     };
 
     useEffect(() => {
-        fetchCase();
+        void fetchCase();
     }, [reference]);
 
     const onRefresh = () => {
         setRefreshing(true);
-        fetchCase();
+        void fetchCase();
     };
 
     const handleSendMessage = async () => {
@@ -82,7 +76,10 @@ export default function CustomerCaseDetailScreen() {
         if (!text || !reference) return;
 
         if (text.length < 2) {
-            Alert.alert('Message Too Short', 'Please enter at least 2 characters.');
+            Alert.alert(
+                'Message Too Short',
+                'Please enter at least 2 characters.',
+            );
             return;
         }
 
@@ -90,7 +87,7 @@ export default function CustomerCaseDetailScreen() {
         try {
             await CustomerApi.addCaseMessage(reference, text);
             setReplyText('');
-            fetchCase();
+            void fetchCase();
         } catch (error: any) {
             Alert.alert(
                 'Send Failed',
@@ -182,14 +179,17 @@ export default function CustomerCaseDetailScreen() {
             {loading ? (
                 <View style={styles.centered}>
                     <ActivityIndicator size="large" color={Colors.coral} />
-                    <Text style={styles.loadingText}>Loading case details...</Text>
+                    <Text style={styles.loadingText}>
+                        Loading case details...
+                    </Text>
                 </View>
             ) : !caseData ? (
                 <View style={styles.centered}>
                     <AlertCircle size={40} color={Colors.gray400} />
                     <Text style={styles.emptyTitle}>Case Not Found</Text>
                     <Text style={styles.emptySubtitle}>
-                        Could not retrieve case details for reference {reference}.
+                        Could not retrieve case details for reference{' '}
+                        {reference}.
                     </Text>
                 </View>
             ) : (
@@ -211,7 +211,9 @@ export default function CustomerCaseDetailScreen() {
                         <View style={styles.card}>
                             <View style={styles.cardHeaderRow}>
                                 <ShieldCheck size={20} color="#166534" />
-                                <Text style={styles.cardTitle}>Grievance Summary</Text>
+                                <Text style={styles.cardTitle}>
+                                    Grievance Summary
+                                </Text>
                             </View>
 
                             <View style={styles.infoRow}>
@@ -221,7 +223,9 @@ export default function CustomerCaseDetailScreen() {
                                 </Text>
                             </View>
                             <View style={styles.infoRow}>
-                                <Text style={styles.infoLabel}>Booking Ref:</Text>
+                                <Text style={styles.infoLabel}>
+                                    Booking Ref:
+                                </Text>
                                 <Text style={styles.infoValueBold}>
                                     {caseData.booking_reference || 'N/A'}
                                 </Text>
@@ -230,20 +234,31 @@ export default function CustomerCaseDetailScreen() {
                                 <Text style={styles.infoLabel}>Filed On:</Text>
                                 <Text style={styles.infoValue}>
                                     {caseData.created_at
-                                        ? new Date(caseData.created_at).toLocaleDateString()
+                                        ? new Date(
+                                              caseData.created_at,
+                                          ).toLocaleDateString()
                                         : 'N/A'}
                                 </Text>
                             </View>
 
                             <View style={styles.descBox}>
-                                <Text style={styles.descLabel}>Your Initial Grievance:</Text>
-                                <Text style={styles.descText}>{caseData.description}</Text>
+                                <Text style={styles.descLabel}>
+                                    Your Initial Grievance:
+                                </Text>
+                                <Text style={styles.descText}>
+                                    {caseData.description}
+                                </Text>
                             </View>
 
                             {caseData.resolution_notes ? (
                                 <View style={styles.resolutionBox}>
                                     <CheckCircle2 size={16} color="#166534" />
-                                    <View style={{ flex: 1, marginLeft: Spacing.xs }}>
+                                    <View
+                                        style={{
+                                            flex: 1,
+                                            marginLeft: Spacing.xs,
+                                        }}
+                                    >
                                         <Text style={styles.resolutionTitle}>
                                             Resolution Notes:
                                         </Text>
@@ -259,25 +274,68 @@ export default function CustomerCaseDetailScreen() {
                         <View style={styles.slaCard}>
                             <View style={styles.slaHeaderRow}>
                                 <Clock size={16} color={sla.color} />
-                                <Text style={[styles.slaTitle, { color: sla.color }]}>
-                                    First Action Target: {caseData.first_action_target_hours ? `${caseData.first_action_target_hours} Hours` : sla.target}
+                                <Text
+                                    style={[
+                                        styles.slaTitle,
+                                        { color: sla.color },
+                                    ]}
+                                >
+                                    First Action Target:{' '}
+                                    {caseData.first_action_target_hours
+                                        ? `${caseData.first_action_target_hours} Hours`
+                                        : sla.target}
                                 </Text>
                                 <Badge
-                                    label={(caseData.priority || 'standard').toUpperCase()}
+                                    label={(
+                                        caseData.priority || 'standard'
+                                    ).toUpperCase()}
                                     variant="secondary"
                                 />
                             </View>
                             <Text style={styles.slaDesc}>{sla.desc}</Text>
                             {caseData.first_action_due_at ? (
-                                <Text style={[styles.slaStatutoryText, { color: sla.color, marginTop: 4, fontWeight: '600' }]}>
-                                    First action target due: {new Date(caseData.first_action_due_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, {new Date(caseData.first_action_due_at).toLocaleDateString()}
+                                <Text
+                                    style={[
+                                        styles.slaStatutoryText,
+                                        {
+                                            color: sla.color,
+                                            marginTop: 4,
+                                            fontWeight: '600',
+                                        },
+                                    ]}
+                                >
+                                    First action target due:{' '}
+                                    {new Date(
+                                        caseData.first_action_due_at,
+                                    ).toLocaleTimeString([], {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                    })}
+                                    ,{' '}
+                                    {new Date(
+                                        caseData.first_action_due_at,
+                                    ).toLocaleDateString()}
                                 </Text>
                             ) : null}
                             <View style={styles.slaDivider} />
                             <View style={styles.slaStatutoryRow}>
                                 <Shield size={14} color={Colors.gray500} />
                                 <Text style={styles.slaStatutoryText}>
-                                    Statutory formal acknowledgement within 48h ({caseData.acknowledgement_due_at ? new Date(caseData.acknowledgement_due_at).toLocaleDateString() : 'within 48h'}) • Statutory resolution deadline: {caseData.resolution_due_at || caseData.sla_due_at ? new Date(caseData.resolution_due_at || caseData.sla_due_at).toLocaleDateString() : '30 days from filing'}
+                                    Statutory formal acknowledgement within 48h
+                                    (
+                                    {caseData.acknowledgement_due_at
+                                        ? new Date(
+                                              caseData.acknowledgement_due_at,
+                                          ).toLocaleDateString()
+                                        : 'within 48h'}
+                                    ) • Statutory resolution deadline:{' '}
+                                    {caseData.resolution_due_at ||
+                                    caseData.sla_due_at
+                                        ? new Date(
+                                              caseData.resolution_due_at ||
+                                                  caseData.sla_due_at,
+                                          ).toLocaleDateString()
+                                        : '30 days from filing'}
                                 </Text>
                             </View>
                         </View>
@@ -293,7 +351,8 @@ export default function CustomerCaseDetailScreen() {
                         {messages.length === 0 ? (
                             <View style={styles.emptyTimeline}>
                                 <Text style={styles.emptyTimelineText}>
-                                    No updates posted yet. You can post a message or evidence below.
+                                    No updates posted yet. You can post a
+                                    message or evidence below.
                                 </Text>
                             </View>
                         ) : (
@@ -301,10 +360,12 @@ export default function CustomerCaseDetailScreen() {
                                 const isCustomer =
                                     msg.sender_type === 'User' ||
                                     msg.sender_role?.toLowerCase() === 'user' ||
-                                    msg.sender_role?.toLowerCase() === 'customer';
+                                    msg.sender_role?.toLowerCase() ===
+                                        'customer';
                                 const isHost =
                                     msg.sender_type === 'Owner' ||
-                                    msg.sender_role?.toLowerCase() === 'owner' ||
+                                    msg.sender_role?.toLowerCase() ===
+                                        'owner' ||
                                     msg.sender_role?.toLowerCase() === 'host';
 
                                 return (
@@ -315,8 +376,8 @@ export default function CustomerCaseDetailScreen() {
                                             isCustomer
                                                 ? styles.customerBubble
                                                 : isHost
-                                                ? styles.hostBubble
-                                                : styles.deskBubble,
+                                                  ? styles.hostBubble
+                                                  : styles.deskBubble,
                                         ]}
                                     >
                                         <View style={styles.bubbleHeader}>
@@ -325,15 +386,15 @@ export default function CustomerCaseDetailScreen() {
                                                     (isCustomer
                                                         ? 'You (Guest)'
                                                         : isHost
-                                                        ? 'Property Host'
-                                                        : 'TIJUM Support Desk')}
+                                                          ? 'Property Host'
+                                                          : 'TIJUM Support Desk')}
                                             </Text>
                                             <Text style={styles.senderRole}>
                                                 {isCustomer
                                                     ? 'YOU'
                                                     : isHost
-                                                    ? 'HOST'
-                                                    : 'TIJUM DESK'}
+                                                      ? 'HOST'
+                                                      : 'TIJUM DESK'}
                                             </Text>
                                         </View>
                                         <Text style={styles.messageContent}>
@@ -341,7 +402,9 @@ export default function CustomerCaseDetailScreen() {
                                         </Text>
                                         <Text style={styles.messageTime}>
                                             {msg.created_at
-                                                ? new Date(msg.created_at).toLocaleString()
+                                                ? new Date(
+                                                      msg.created_at,
+                                                  ).toLocaleString()
                                                 : ''}
                                         </Text>
                                     </View>
@@ -355,7 +418,8 @@ export default function CustomerCaseDetailScreen() {
                         <View style={styles.closedNoticeBar}>
                             <CheckCircle2 size={16} color="#166534" />
                             <Text style={styles.closedNoticeText}>
-                                This grievance has been marked {caseData.status}.
+                                This grievance has been marked {caseData.status}
+                                .
                             </Text>
                         </View>
                     ) : (

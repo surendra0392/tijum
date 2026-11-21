@@ -24,6 +24,9 @@ export function Button({
     loading = false,
     disabled,
     style,
+    accessibilityLabel,
+    accessibilityState,
+    accessibilityRole,
     ...props
 }: ButtonProps) {
     const getBackgroundColor = () => {
@@ -65,6 +68,13 @@ export function Button({
     return (
         <TouchableOpacity
             activeOpacity={0.8}
+            accessibilityLabel={accessibilityLabel ?? title}
+            accessibilityRole={accessibilityRole ?? 'button'}
+            accessibilityState={{
+                ...accessibilityState,
+                busy: loading,
+                disabled: disabled || loading,
+            }}
             disabled={disabled || loading}
             style={[
                 styles.base,
@@ -91,6 +101,7 @@ export function Button({
 
 const styles = StyleSheet.create({
     base: {
+        minHeight: 48,
         borderRadius: BorderRadius.base,
         alignItems: 'center',
         justifyContent: 'center',

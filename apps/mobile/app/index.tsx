@@ -8,24 +8,18 @@ import {
     TouchableOpacity,
     View,
     Platform,
+    Alert,
 } from 'react-native';
-import {
-    BedDouble,
-    Utensils,
-    Home,
-    Bell,
-    ArrowRight,
-    Building2,
-    ShieldCheck,
-} from 'lucide-react-native';
+import { BedDouble, Utensils, Home, Bell } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '../src/auth/AuthContext';
+import { BrandLogo } from '../src/components/BrandLogo';
 import { PushNotificationService } from '../src/notifications/PushNotificationService';
 import { Colors } from '../src/theme/colors';
-import { BorderRadius, Spacing } from '../src/theme/spacing';
-import { Typography } from '../src/theme/typography';
+import { Spacing } from '../src/theme/spacing';
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 
 const ONBOARDING_SLIDES = [
     {
@@ -33,24 +27,21 @@ const ONBOARDING_SLIDES = [
         title: 'Comfortable Stays',
         subtitle: 'Hostels, PGs, Homestays & Co-living spaces',
         Icon: BedDouble,
-        imageUrl:
-            'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=800&q=80',
+        image: require('../assets/onboarding/stays.jpg'),
     },
     {
         id: 'food',
         title: 'Delicious Food',
         subtitle: 'Nutritious meals, when you need them',
         Icon: Utensils,
-        imageUrl:
-            'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=800&q=80',
+        image: require('../assets/onboarding/food.jpg'),
     },
     {
         id: 'home',
         title: 'A Feeling of Home',
         subtitle: 'Safe, secure and trusted accommodation',
         Icon: Home,
-        imageUrl:
-            'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800&q=80',
+        image: require('../assets/onboarding/home.jpg'),
     },
     {
         id: 'permissions',
@@ -59,7 +50,7 @@ const ONBOARDING_SLIDES = [
         note: "We'll ask for permission to send notifications.",
         Icon: Bell,
         isPermissionSlide: true,
-        imageUrl: '',
+        image: null,
     },
 ];
 
@@ -67,26 +58,6 @@ export default function WelcomeScreen() {
     const router = useRouter();
     const { token, accountType, isLoading } = useAuth();
     const [activeSlide, setActiveSlide] = useState(0);
-
-    useEffect(() => {
-        // Request install permissions on launch
-        PushNotificationService.requestInitialPermissionsOnInstall().catch(() => {});
-        if (
-            Platform.OS === 'web' &&
-            typeof window !== 'undefined' &&
-            'Notification' in window &&
-            (window as any).Notification.permission === 'default'
-        ) {
-            (window as any).Notification.requestPermission().catch(() => {});
-        }
-        if (
-            Platform.OS === 'web' &&
-            typeof navigator !== 'undefined' &&
-            'geolocation' in navigator
-        ) {
-            navigator.geolocation.getCurrentPosition(() => {}, () => {});
-        }
-    }, []);
 
     useEffect(() => {
         if (!isLoading && token && accountType) {
@@ -102,43 +73,57 @@ export default function WelcomeScreen() {
         if (activeSlide < ONBOARDING_SLIDES.length - 1) {
             setActiveSlide(activeSlide + 1);
         } else {
-            handlePermissionContinue();
+            void handlePermissionContinue();
         }
     };
 
     const requestAllPermissions = async () => {
+        let granted = false;
         try {
-            await PushNotificationService.requestInitialPermissionsOnInstall();
-        } catch {}
-
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-            try {
-                if ('Notification' in window && (window as any).Notification.permission === 'default') {
-                    await (window as any).Notification.requestPermission();
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                if (
+                    'Notification' in window &&
+                    (window as any).Notification.permission === 'default'
+                ) {
+                    const permission = await (
+                        window as any
+                    ).Notification.requestPermission();
+                    granted = permission === 'granted';
+                } else if ('Notification' in window) {
+                    granted =
+                        (window as any).Notification.permission === 'granted';
                 }
-            } catch {}
-            try {
-                if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
-                    await new Promise<void>((resolve) => {
-                        navigator.geolocation.getCurrentPosition(
-                            () => resolve(),
-                            () => resolve(),
-                            { timeout: 3000, enableHighAccuracy: false }
-                        );
-                    });
-                }
-            } catch {}
+            } else {
+                granted =
+                    await PushNotificationService.requestInitialPermissionsOnInstall();
+            }
+        } catch {
+            granted = false;
         }
+
+        if (!granted) {
+            Alert.alert(
+                'Notifications Not Enabled',
+                'You can enable notifications later from notification settings.',
+            );
+        }
+    };
+
+    const goToAccountHome = () => {
+        router.replace(
+            accountType === 'partner'
+                ? '/(partner)/dashboard'
+                : '/(customer)/explore',
+        );
     };
 
     const handlePermissionContinue = async () => {
         await requestAllPermissions();
-        router.replace('/(customer)/explore');
+        goToAccountHome();
     };
 
-    const handleSkip = async () => {
-        await requestAllPermissions();
-        router.replace('/(customer)/explore');
+    const handleSkip = () => {
+        goToAccountHome();
     };
 
     const currentSlide = ONBOARDING_SLIDES[activeSlide];
@@ -147,6 +132,7 @@ export default function WelcomeScreen() {
 
     return (
         <View style={styles.container}>
+            <StatusBar style="light" />
             {/* Top Half: Visual Hero Image or Illustration */}
             <View style={styles.topHeroContainer}>
                 {isPermissionSlide ? (
@@ -162,7 +148,7 @@ export default function WelcomeScreen() {
                     </View>
                 ) : (
                     <Image
-                        source={{ uri: currentSlide.imageUrl }}
+                        source={currentSlide.image}
                         style={styles.heroImage}
                         resizeMode="cover"
                     />
@@ -172,13 +158,18 @@ export default function WelcomeScreen() {
                 <SafeAreaView style={styles.topBarSafe}>
                     <View style={styles.topBar}>
                         <View style={styles.logoBadge}>
-                            <Text style={styles.logoText}>TIJUM</Text>
-                            <Text style={styles.logoSubtext}>Stay • Dine • Belong</Text>
+                            <BrandLogo
+                                size={78}
+                                tone="light"
+                                showTagline={false}
+                            />
                         </View>
                         {!isPermissionSlide && (
                             <TouchableOpacity
                                 style={styles.skipBtn}
-                                onPress={() => setActiveSlide(ONBOARDING_SLIDES.length - 1)}
+                                onPress={() =>
+                                    setActiveSlide(ONBOARDING_SLIDES.length - 1)
+                                }
                                 activeOpacity={0.8}
                             >
                                 <Text style={styles.skipBtnText}>Skip</Text>
@@ -202,33 +193,53 @@ export default function WelcomeScreen() {
                     {isPermissionSlide ? (
                         <View style={styles.permissionCardsBox}>
                             <View style={styles.permissionItem}>
-                                <View style={[styles.permissionIconBadge, { backgroundColor: '#FFF3EA' }]}>
+                                <View
+                                    style={[
+                                        styles.permissionIconBadge,
+                                        { backgroundColor: '#FFF3EA' },
+                                    ]}
+                                >
                                     <Bell size={18} color={Colors.coral} />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.permissionItemTitle}>Push Notifications</Text>
+                                    <Text style={styles.permissionItemTitle}>
+                                        Push Notifications
+                                    </Text>
                                     <Text style={styles.permissionItemSubtitle}>
-                                        Booking confirmations, check-in codes & meal timing alerts
+                                        Booking confirmations, check-in codes &
+                                        meal timing alerts
                                     </Text>
                                 </View>
                             </View>
                             <View style={styles.permissionItem}>
-                                <View style={[styles.permissionIconBadge, { backgroundColor: '#EFF6FF' }]}>
+                                <View
+                                    style={[
+                                        styles.permissionIconBadge,
+                                        { backgroundColor: '#EFF6FF' },
+                                    ]}
+                                >
                                     <Home size={18} color="#2563EB" />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.permissionItemTitle}>Nearby Stays Discovery</Text>
+                                    <Text style={styles.permissionItemTitle}>
+                                        Nearby Stays Discovery
+                                    </Text>
                                     <Text style={styles.permissionItemSubtitle}>
-                                        Explore verified hostels, homestays, and co-living closest to you
+                                        Explore verified hostels, homestays, and
+                                        co-living closest to you
                                     </Text>
                                 </View>
                             </View>
                         </View>
                     ) : (
                         <>
-                            <Text style={styles.slideSubtitle}>{currentSlide.subtitle}</Text>
+                            <Text style={styles.slideSubtitle}>
+                                {currentSlide.subtitle}
+                            </Text>
                             {currentSlide.note && (
-                                <Text style={styles.slideNote}>{currentSlide.note}</Text>
+                                <Text style={styles.slideNote}>
+                                    {currentSlide.note}
+                                </Text>
                             )}
                         </>
                     )}
@@ -251,7 +262,11 @@ export default function WelcomeScreen() {
                     {/* Primary Action Button */}
                     <TouchableOpacity
                         style={styles.primaryButton}
-                        onPress={isPermissionSlide ? handlePermissionContinue : handleNext}
+                        onPress={
+                            isPermissionSlide
+                                ? handlePermissionContinue
+                                : handleNext
+                        }
                         activeOpacity={0.85}
                     >
                         <Text style={styles.primaryButtonText}>
@@ -273,17 +288,23 @@ export default function WelcomeScreen() {
                     ) : (
                         <View style={styles.footerLinksRow}>
                             <TouchableOpacity
-                                onPress={() => router.push('/(auth)/customer-login')}
+                                onPress={() =>
+                                    router.push('/(auth)/customer-login')
+                                }
                                 activeOpacity={0.8}
                             >
                                 <Text style={styles.linkText}>
                                     Have an account?{' '}
-                                    <Text style={styles.linkTextHighlight}>Sign In</Text>
+                                    <Text style={styles.linkTextHighlight}>
+                                        Sign In
+                                    </Text>
                                 </Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                onPress={() => router.push('/(auth)/owner-login')}
+                                onPress={() =>
+                                    router.push('/(auth)/owner-login')
+                                }
                                 activeOpacity={0.8}
                             >
                                 <Text style={styles.partnerLinkText}>

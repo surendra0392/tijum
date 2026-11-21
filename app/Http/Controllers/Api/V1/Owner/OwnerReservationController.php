@@ -12,6 +12,7 @@ use App\Models\Property;
 use App\Models\Reservation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class OwnerReservationController extends ApiController
 {
@@ -24,10 +25,25 @@ class OwnerReservationController extends ApiController
 
         $query = Reservation::query()
             ->whereIn('property_id', $propertyIds)
-            ->with(['property.city', 'roomType', 'user'])
+            ->with(['property.city', 'property.media', 'roomType', 'user'])
             ->latest('created_at');
 
-        if ($request->filled('status')) {
+        $validated = $request->validate([
+            'stage' => ['nullable', Rule::in(['upcoming', 'past', 'cancelled'])],
+        ]);
+
+        match ($validated['stage'] ?? null) {
+            'upcoming' => $query
+                ->where('status', ReservationStatus::Confirmed)
+                ->whereDate('checkout_date', '>=', now()->toDateString()),
+            'past' => $query
+                ->where('status', ReservationStatus::Confirmed)
+                ->whereDate('checkout_date', '<', now()->toDateString()),
+            'cancelled' => $query->where('status', ReservationStatus::Cancelled),
+            default => null,
+        };
+
+        if ($request->filled('status') && ! $request->filled('stage')) {
             $query->where('status', (string) $request->query('status'));
         }
 
@@ -54,7 +70,7 @@ class OwnerReservationController extends ApiController
         $reservation = Reservation::query()
             ->where('booking_reference', $reference)
             ->whereHas('property', fn ($p) => $p->where('owner_id', $owner->id))
-            ->with(['property.city', 'roomType', 'user', 'payments'])
+            ->with(['property.city', 'property.media', 'roomType', 'user', 'payments'])
             ->first();
 
         if ($reservation === null) {
@@ -72,7 +88,7 @@ class OwnerReservationController extends ApiController
         $reservation = Reservation::query()
             ->where('booking_reference', $reference)
             ->whereHas('property', fn ($p) => $p->where('owner_id', $owner->id))
-            ->with(['property.city', 'roomType', 'user', 'payments'])
+            ->with(['property.city', 'property.media', 'roomType', 'user', 'payments'])
             ->first();
 
         if ($reservation === null) {
@@ -90,7 +106,7 @@ class OwnerReservationController extends ApiController
         $reservation->markCheckedIn('owner', $owner->id, $validated['notes'] ?? null);
 
         return $this->success(
-            new ReservationResource($reservation->fresh(['property.city', 'roomType', 'user', 'payments'])),
+            new ReservationResource($reservation->fresh(['property.city', 'property.media', 'roomType', 'user', 'payments'])),
             "Guest for booking {$reservation->booking_reference} marked as checked in."
         );
     }
@@ -103,7 +119,7 @@ class OwnerReservationController extends ApiController
         $reservation = Reservation::query()
             ->where('booking_reference', $reference)
             ->whereHas('property', fn ($p) => $p->where('owner_id', $owner->id))
-            ->with(['property.city', 'roomType', 'user', 'payments'])
+            ->with(['property.city', 'property.media', 'roomType', 'user', 'payments'])
             ->first();
 
         if ($reservation === null) {
@@ -121,7 +137,7 @@ class OwnerReservationController extends ApiController
         $reservation->markCheckedOut('owner', $owner->id, $validated['notes'] ?? null);
 
         return $this->success(
-            new ReservationResource($reservation->fresh(['property.city', 'roomType', 'user', 'payments'])),
+            new ReservationResource($reservation->fresh(['property.city', 'property.media', 'roomType', 'user', 'payments'])),
             "Guest for booking {$reservation->booking_reference} marked as checked out."
         );
     }

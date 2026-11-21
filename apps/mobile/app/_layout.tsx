@@ -1,59 +1,22 @@
-import React, { useEffect } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
-import * as Linking from 'expo-linking';
+import React from 'react';
+import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../src/auth/AuthContext';
-import { PushNotificationService } from '../src/notifications/PushNotificationService';
+import { NotificationNavigationHandler } from '../src/components/NotificationNavigationHandler';
 import { Colors } from '../src/theme/colors';
-import { sanitizeDeepLink } from '../src/utils/deepLinkSanitizer';
 
 export default function RootLayout() {
-    useEffect(() => {
-        PushNotificationService.requestInitialPermissionsOnInstall().catch(() => {});
-        if (
-            Platform.OS === 'web' &&
-            typeof window !== 'undefined' &&
-            'Notification' in window &&
-            (window as any).Notification.permission === 'default'
-        ) {
-            (window as any).Notification.requestPermission().catch(() => {});
-        }
-        if (
-            Platform.OS === 'web' &&
-            typeof navigator !== 'undefined' &&
-            'geolocation' in navigator
-        ) {
-            navigator.geolocation.getCurrentPosition(() => {}, () => {});
-        }
-
-        Linking.getInitialURL().then((url) => {
-            if (url) {
-                const sanitized = sanitizeDeepLink(url);
-                if (!sanitized.isValid) {
-                    console.warn(
-                        '[DeepLink] Rejected initial incoming URL:',
-                        sanitized.rejectionReason,
-                    );
-                }
-            }
-        });
-
-        const subscription = Linking.addEventListener('url', (event) => {
-            const sanitized = sanitizeDeepLink(event.url);
-            if (!sanitized.isValid) {
-                console.warn(
-                    '[DeepLink] Rejected live incoming URL:',
-                    sanitized.rejectionReason,
-                );
-            }
-        });
-
-        return () => {
-            subscription.remove();
-        };
-    }, []);
+    const [fontsLoaded, fontError] = useFonts({
+        'Montserrat-SemiBold': require('../assets/fonts/Montserrat-600.ttf'),
+        'Montserrat-Bold': require('../assets/fonts/Montserrat-700.ttf'),
+        'Montserrat-ExtraBold': require('../assets/fonts/Montserrat-800.ttf'),
+        'Nunito-Regular': require('../assets/fonts/Nunito-400.ttf'),
+        'Nunito-SemiBold': require('../assets/fonts/Nunito-600.ttf'),
+        'Nunito-Bold': require('../assets/fonts/Nunito-700.ttf'),
+    });
 
     const content = (
         <Stack
@@ -70,34 +33,44 @@ export default function RootLayout() {
                 },
             }}
         >
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+            <Stack.Screen name="(customer)" options={{ headerShown: false }} />
+            <Stack.Screen name="(partner)" options={{ headerShown: false }} />
             <Stack.Screen
-                name="index"
-                options={{ headerShown: false }}
+                name="help"
+                options={{ headerTitle: 'Help Centre' }}
             />
             <Stack.Screen
-                name="(auth)"
-                options={{ headerShown: false }}
-            />
-            <Stack.Screen
-                name="(customer)"
-                options={{ headerShown: false }}
-            />
-            <Stack.Screen
-                name="(partner)"
-                options={{ headerShown: false }}
+                name="legal/[slug]"
+                options={{ headerTitle: 'TIJUM' }}
             />
         </Stack>
     );
 
+    if (fontError) {
+        throw fontError;
+    }
+
+    if (!fontsLoaded) {
+        return (
+            <SafeAreaProvider>
+                <View style={styles.loading}>
+                    <StatusBar style="light" />
+                    <ActivityIndicator color={Colors.coral} size="large" />
+                </View>
+            </SafeAreaProvider>
+        );
+    }
+
     return (
         <SafeAreaProvider>
             <AuthProvider>
+                <NotificationNavigationHandler />
                 <StatusBar style="dark" />
                 {Platform.OS === 'web' ? (
                     <View style={styles.webOuter}>
-                        <View style={styles.webFrame}>
-                            {content}
-                        </View>
+                        <View style={styles.webFrame}>{content}</View>
                     </View>
                 ) : (
                     content
@@ -108,6 +81,12 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
+    loading: {
+        flex: 1,
+        backgroundColor: Colors.deepPlum,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     webOuter: {
         flex: 1,
         backgroundColor: '#1E121E',
@@ -130,4 +109,3 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
 });
-

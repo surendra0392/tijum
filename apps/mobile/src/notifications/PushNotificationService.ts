@@ -4,11 +4,14 @@ import * as SecureStore from 'expo-secure-store';
 import { CustomerApi } from '../api/customer';
 import { OwnerApi } from '../api/owner';
 import { SecureTokenStorage } from '../auth/SecureTokenStorage';
+import { resolveDeepLinkPath } from '../utils/deepLinkRouting';
 
 // Configure notification presentation for foreground alerts
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
         shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
     }),
@@ -31,7 +34,7 @@ export type PushRequestContext =
 
 export class PushNotificationService {
     /**
-     * Request permissions on initial app install / first launch.
+     * Request notification permission after an explicit user action.
      * Triggers native OS notification permission dialog on Android 13+ and iOS.
      */
     static async requestInitialPermissionsOnInstall(): Promise<boolean> {
@@ -99,9 +102,17 @@ export class PushNotificationService {
             const historyRaw = await SecureStore.getItemAsync(
                 PUSH_PROMPT_RECORD_KEY,
             ).catch(() => null);
-            if (historyRaw && !forcePrompt && context === 'in_app_prompt') {
-                const history = JSON.parse(historyRaw);
-                if (history[context]?.declinedCount >= 2) {
+                if (historyRaw && !forcePrompt && context === 'in_app_prompt') {
+                let history: Record<string, unknown> = {};
+                try {
+                    history = JSON.parse(historyRaw);
+                } catch {
+                    return { granted: false, pushToken: null };
+                }
+                const declined = (history[context] as {
+                    declinedCount?: number;
+                } | undefined)?.declinedCount;
+                if (declined !== undefined && declined >= 2) {
                     return { granted: false, pushToken: null };
                 }
             }
@@ -120,11 +131,15 @@ export class PushNotificationService {
             ) {
                 // Record prompt outcome
                 try {
-                    const history = historyRaw ? JSON.parse(historyRaw) : {};
+                    const history = historyRaw
+                        ? (JSON.parse(historyRaw) as Record<string, unknown>)
+                        : {};
+                    const prev = (history[context] as {
+                        declinedCount?: number;
+                    } | undefined)?.declinedCount || 0;
                     history[context] = {
                         lastPromptedAt: Date.now(),
-                        declinedCount:
-                            (history[context]?.declinedCount || 0) + 1,
+                        declinedCount: prev + 1,
                     };
                     await SecureStore.setItemAsync(
                         PUSH_PROMPT_RECORD_KEY,
@@ -213,7 +228,15 @@ export class PushNotificationService {
      */
     static validateDeepLink(
         rawPayload:
-            | { url?: string; route?: string; data?: Record<string, unknown> }
+            | {
+                  url?: string;
+                  route?: string;
+                  action_url?: string;
+                  booking_reference?: string;
+                  case_reference?: string;
+                  settlement_reference?: string;
+                  data?: Record<string, unknown>;
+              }
             | string,
         currentPrincipalType: 'customer' | 'owner' | null,
     ): DeepLinkValidationResult {
@@ -221,11 +244,19 @@ export class PushNotificationService {
 
         if (typeof rawPayload === 'string') {
             route = rawPayload;
+        } else if (rawPayload?.booking_reference) {
+            route = rawPayload.action_url?.includes('/owner/')
+                ? `/(partner)/reservations/${rawPayload.booking_reference}`
+                : `/(customer)/bookings/${rawPayload.booking_reference}`;
+        } else if (rawPayload?.case_reference) {
+            route = `/(customer)/support/${rawPayload.case_reference}`;
+        } else if (rawPayload?.settlement_reference) {
+            route = `/(partner)/settlements/${rawPayload.settlement_reference}`;
         } else if (rawPayload?.route) {
             route = rawPayload.route;
-        } else if (rawPayload?.url) {
+        } else if (rawPayload?.url || rawPayload?.action_url) {
             // Strip scheme (e.g. tijum:// or exp://)
-            route = rawPayload.url.replace(/^[a-zA-Z0-9_-]+:\/\//, '/');
+            route = rawPayload.url ?? rawPayload.action_url ?? '';
         }
 
         if (!route || typeof route !== 'string') {
@@ -236,30 +267,14 @@ export class PushNotificationService {
             };
         }
 
-        // Ensure leading slash
-        if (!route.startsWith('/')) {
-            route = '/' + route;
-        }
-
-        // Sanitize and reject dangerous URI schemes
-        if (
-            route.includes('javascript:') ||
-            route.includes('data:') ||
-            route.includes('file:')
-        ) {
-            return {
-                allowed: false,
-                targetRoute: null,
-                reason: 'Dangerous URI scheme detected',
-            };
-        }
+        route = resolveDeepLinkPath(route);
 
         // Customer route verification
-        if (route.startsWith('/customer') || route.startsWith('/(customer)')) {
+        if (route.startsWith('/(customer)')) {
             if (currentPrincipalType !== 'customer') {
                 return {
                     allowed: false,
-                    targetRoute: '/login',
+                    targetRoute: '/(auth)/customer-login',
                     reason: 'Customer authentication required for this destination',
                 };
             }
@@ -267,11 +282,11 @@ export class PushNotificationService {
         }
 
         // Partner/Owner route verification
-        if (route.startsWith('/partner') || route.startsWith('/(partner)')) {
+        if (route.startsWith('/(partner)')) {
             if (currentPrincipalType !== 'owner') {
                 return {
                     allowed: false,
-                    targetRoute: '/login',
+                    targetRoute: '/(auth)/owner-login',
                     reason: 'Partner authentication required for this destination',
                 };
             }
@@ -279,17 +294,11 @@ export class PushNotificationService {
         }
 
         // Public / generic routes (e.g., search, property details, home)
-        const allowedPublicPrefixes = [
-            '/search',
-            '/property',
-            '/city',
-            '/help',
-            '/login',
-            '/about',
-        ];
         const isPublic =
-            allowedPublicPrefixes.some((p) => route.startsWith(p)) ||
-            route === '/';
+            route === '/' ||
+            route === '/help' ||
+            route.startsWith('/legal/') ||
+            route.startsWith('/(auth)/');
 
         if (isPublic) {
             return { allowed: true, targetRoute: route };
@@ -318,5 +327,9 @@ export class PushNotificationService {
         callback: (response: Notifications.NotificationResponse) => void,
     ) {
         return Notifications.addNotificationResponseReceivedListener(callback);
+    }
+
+    static getLastNotificationResponseAsync() {
+        return Notifications.getLastNotificationResponseAsync();
     }
 }

@@ -3,8 +3,10 @@ import { CanonicalCategorySlug } from '../constants/categories';
 export * from '../constants/categories';
 
 export interface ApiResponse<T> {
+    success: boolean;
     data: T;
     message?: string;
+    error_code?: string;
     meta?: {
         request_id?: string;
         timestamp?: string;
@@ -32,12 +34,12 @@ export interface PropertyCard {
     category: {
         id: number;
         name: string;
-        slug: CanonicalCategorySlug | string;
+        slug: string;
         code?: string;
     } | null;
     city: { id: number; name: string; slug: string } | null;
-    locality: string;
-    address_line: string;
+    locality: string | null;
+    address_line: string | null;
     latitude?: number | null;
     longitude?: number | null;
     distance_km?: number | null;
@@ -46,10 +48,10 @@ export interface PropertyCard {
     gender_eligibility?: string;
     starting_price_daily_paise?: number | null;
     starting_price_weekly_paise?: number | null;
-    starting_price_monthly_paise: number;
+    starting_price_monthly_paise: number | null;
     rating_average: number;
     reviews_count: number;
-    cover_image_url: string;
+    cover_image_url: string | null;
     food_provided: boolean;
     breakfast_included: boolean;
     lunch_included: boolean;
@@ -64,7 +66,7 @@ export interface PropertyCard {
         dinner_timing?: string;
     };
     included_meals: string[];
-    included_meals_label: string;
+    included_meals_label: string | null;
     is_verified: boolean;
     booking_eligible: boolean;
 }
@@ -227,6 +229,7 @@ export interface Reservation {
     duration_quantity: number;
     total_stay_days?: number;
     quantity: number;
+    quantity_basis?: 'guest_places' | 'private_rooms';
     guest_count: number;
     original_amount_paise?: number;
     total_amount_paise: number;
@@ -314,6 +317,17 @@ export interface Reservation {
         checkout_time?: string;
         earliest_arrival_time?: string;
     };
+    refunds?: RefundItem[];
+}
+
+export interface RefundItem {
+    id: number;
+    amount_minor: number;
+    status: string;
+    status_label?: string;
+    utr?: string | null;
+    gateway_processed_at?: string | null;
+    created_at: string;
 }
 
 export interface LocationPrediction {
@@ -491,6 +505,7 @@ export interface NotificationItem {
     category: string;
     channel: string;
     template_code: string;
+    related_reference?: string | null;
     title: string;
     body: string;
     message?: string;
@@ -498,6 +513,67 @@ export interface NotificationItem {
     is_read: boolean;
     read_at?: string;
     created_at: string;
+}
+
+export interface NotificationPreferences {
+    channels: {
+        in_app?: { enabled: boolean };
+        email?: { enabled: boolean };
+        push?: { enabled: boolean };
+        sms?: { enabled: boolean };
+        whatsapp?: { enabled: boolean };
+    };
+}
+
+export interface CustomerCaseSummary {
+    id: number;
+    case_reference: string;
+    category: string;
+    status: string;
+    priority: string;
+    description?: string | null;
+    created_at: string;
+}
+
+export interface SupportTicketSummary {
+    id: number;
+    ticket_reference: string;
+    subject: string;
+    category: string;
+    status: string;
+    status_label: string;
+    priority: string;
+    priority_label: string;
+    booking_reference?: string | null;
+    property_name?: string | null;
+    created_at: string;
+    last_reply_at?: string | null;
+}
+
+export interface SupportTicketDetail extends SupportTicketSummary {
+    message: string;
+    sla_due_at?: string | null;
+    resolved_at?: string | null;
+    resolution_summary?: string | null;
+    closed_at?: string | null;
+}
+
+export interface SupportTicketMessage {
+    id: number;
+    sender_type: string;
+    sender_name: string;
+    message: string;
+    created_at: string;
+}
+
+export interface SupportTicketIndexData {
+    tickets: SupportTicketSummary[];
+    categories: Array<{ value: string; label: string }>;
+    reservations: Array<{
+        id: number;
+        booking_reference: string;
+        property_name: string;
+    }>;
 }
 
 export interface PartnerDashboardData {
@@ -511,9 +587,28 @@ export interface PartnerDashboardData {
     statistics: {
         total_properties: number;
         active_properties: number;
-        pending_requests: number;
+        awaiting_payment: number;
         confirmed_stays: number;
         upcoming_checkins_7_days: number;
+        today_arrivals: number;
+        today_departures: number;
+        in_house_guests: number;
+        active_reservations: number;
+        pending_reviews: number;
+        open_complaints: number;
+        unsettled_payout_paise: number;
+    };
+    property_summary: {
+        properties_total: number;
+        verified_properties: number;
+        room_types_total: number;
+        rooms_total: number;
+    };
+    onboarding: {
+        email_verified: boolean;
+        account_status: string;
+        account_status_label: string;
+        can_publish_properties: boolean;
     };
     pending_reservations_count?: number;
     confirmed_reservations_count?: number;
@@ -621,7 +716,6 @@ export interface PromotionQuoteResult {
     points_to_earn_on_completion: number;
 }
 
-
 // ==========================================
 // Phase M10A: Owner Property Operations Types
 // ==========================================
@@ -689,9 +783,9 @@ export interface PropertyPricingData {
 export interface PropertyAvailabilityBlock {
     id: number;
     property_id: number;
-    scope: 'property' | 'room_type' | 'physical_room';
+    scope: 'property' | 'room_type' | 'room';
     scope_label: string;
-    block_type: string;
+    block_type: 'closure' | 'maintenance' | 'stop_sell';
     block_type_label: string;
     status: 'active' | 'cancelled' | 'expired';
     status_label?: string;
@@ -757,7 +851,7 @@ export interface OwnerPropertyAmenity {
     code: string;
     category: string;
     icon_key?: string;
-    availability: string;
+    availability: 'included' | 'not_available';
     status: string;
     is_current: boolean;
     is_customer_visible: boolean;
@@ -810,12 +904,19 @@ export interface OwnerCommissionAgreement {
 export interface SettlementLineItem {
     id: number;
     booking_reference: string;
+    reservation_id?: number | null;
     guest_name: string;
+    property_name?: string | null;
     check_in_date: string;
     check_out_date: string;
     gross_minor: number;
     commission_minor: number;
     net_minor: number;
+    tax_deduction_minor?: number;
+    net_payable_minor?: number;
+    gross_amount_minor?: number;
+    commission_amount_minor?: number;
+    stay_dates?: string;
 }
 
 export interface SettlementDetail {
@@ -830,8 +931,16 @@ export interface SettlementDetail {
     deductions_amount_minor: number;
     net_payable_minor: number;
     status: string;
+    status_label?: string;
     payment_reference?: string | null;
+    provider_transfer_id?: string | null;
     settled_at?: string | null;
+    net_settlement_amount_minor?: number;
+    gross_booking_value_minor?: number;
+    statutory_deductions_minor?: number;
+    refund_adjustments_minor?: number;
+    other_adjustments_minor?: number;
+    items?: SettlementLineItem[];
     line_items?: SettlementLineItem[];
 }
 

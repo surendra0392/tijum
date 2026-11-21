@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { ApiClient } from '../api/client';
+import { ApiClient, setUnauthorizedHandler } from '../api/client';
 import { ApiResponse, CustomerProfile, OwnerProfile } from '../api/types';
 import {
     PrincipalType,
@@ -7,7 +7,7 @@ import {
     reconcilePendingRevocationQueue,
 } from './SecureTokenStorage';
 import { PushNotificationService } from '../notifications/PushNotificationService';
-import { SHOWCASE_CUSTOMER, SHOWCASE_PARTNER } from '../data/showcaseData.ts';
+import { buildLoginPayload, withPasswordConfirmation } from './payloads';
 
 export type AuthState =
     | 'idle'
@@ -33,8 +33,8 @@ interface AuthContextType {
         email: string;
         phone: string;
         password: string;
-        terms?: boolean;
-        terms_accepted?: boolean;
+        terms_accepted: boolean;
+        consent_version?: string;
         marketing_consent?: boolean;
     }) => Promise<void>;
     loginPartner: (email: string, password: string) => Promise<void>;
@@ -50,16 +50,11 @@ interface AuthContextType {
         location?: string;
         locality: string;
         description?: string;
-        terms?: boolean;
+        terms: boolean;
         terms_accepted?: boolean;
     }) => Promise<void>;
     logout: () => Promise<void>;
-    switchAccountDomain: (
-        targetDomain: 'customer' | 'partner',
-    ) => Promise<void>;
     refreshProfile: () => Promise<void>;
-    loginDemoCustomer: () => Promise<void>;
-    loginDemoPartner: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -77,7 +72,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isLoading, setIsLoading] = useState<boolean>(true);
 
     useEffect(() => {
-        restoreAndVerifySession();
+        void restoreAndVerifySession();
+    }, []);
+
+    useEffect(() => {
+        setUnauthorizedHandler(() => {
+            setToken(null);
+            setPrincipalType(null);
+            setCustomerUser(null);
+            setPartnerUser(null);
+            setAuthState('session_expired');
+        });
+
+        return () => setUnauthorizedHandler(null);
     }, []);
 
     /**
@@ -88,7 +95,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
      * 4. Restore state or safely purge credentials if revoked/expired.
      */
     const restoreAndVerifySession = async () => {
-        let currentSession: { token: string; principalType: PrincipalType } | null = null;
+        let currentSession: {
+            token: string;
+            principalType: PrincipalType;
+        } | null = null;
         try {
             setIsLoading(true);
 
@@ -102,47 +112,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
+            if (session.token.startsWith('demo_')) {
+                await SecureTokenStorage.clearActiveSession();
+                setToken(null);
+                setPrincipalType(null);
+                setAuthState('guest');
+                return;
+            }
+
             setToken(session.token);
             setPrincipalType(session.principalType);
 
             if (session.principalType === 'customer') {
-                if (session.token.startsWith('demo_')) {
-                    setCustomerUser(SHOWCASE_CUSTOMER);
+                const res =
+                    await ApiClient.get<ApiResponse<CustomerProfile>>(
+                        'customer/profile',
+                    );
+                if (res.data) {
+                    setCustomerUser(res.data);
                     setPartnerUser(null);
                     setAuthState('customer_authenticated');
                 } else {
-                    const res =
-                        await ApiClient.get<ApiResponse<CustomerProfile>>(
-                            'customer/profile',
-                        );
-                    if (res.data) {
-                        setCustomerUser(res.data);
-                        setPartnerUser(null);
-                        setAuthState('customer_authenticated');
-                    } else {
-                        throw new Error('Invalid customer session');
-                    }
+                    throw new Error('Invalid customer session');
                 }
             } else if (session.principalType === 'owner') {
-                if (session.token.startsWith('demo_')) {
-                    setPartnerUser(SHOWCASE_PARTNER as any);
+                const res =
+                    await ApiClient.get<ApiResponse<OwnerProfile>>(
+                        'owner/profile',
+                    );
+                if (res.data) {
+                    setPartnerUser(res.data);
                     setCustomerUser(null);
                     setAuthState('owner_authenticated');
                 } else {
-                    const res =
-                        await ApiClient.get<ApiResponse<any>>('owner/dashboard');
-                    if (res.data && res.data.partner_profile) {
-                        setPartnerUser(res.data.partner_profile as OwnerProfile);
-                        setCustomerUser(null);
-                        setAuthState('owner_authenticated');
-                    } else {
-                        throw new Error('Invalid partner session');
-                    }
+                    throw new Error('Invalid partner session');
                 }
             }
         } catch (err: any) {
             // Only clear session if server explicitly rejects token with 401 Unauthenticated
-            if (err?.status === 401 || err?.errorCode === 'UNAUTHENTICATED' || err?.message?.includes('Unauthenticated')) {
+            if (
+                err?.status === 401 ||
+                err?.errorCode === 'UNAUTHENTICATED' ||
+                err?.message?.includes('Unauthenticated')
+            ) {
                 await SecureTokenStorage.clearActiveSession();
                 setToken(null);
                 setPrincipalType(null);
@@ -150,16 +162,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setPartnerUser(null);
                 setAuthState('session_expired');
             } else if (currentSession) {
-                // Network failure or temporary server timeout: preserve session optimistically
+                // Network failure or temporary server timeout: keep the token and
+                // principal so requests can resume, but do not invent an identity.
                 setToken(currentSession.token);
                 setPrincipalType(currentSession.principalType);
-                if (currentSession.principalType === 'customer') {
-                    setCustomerUser(SHOWCASE_CUSTOMER);
-                    setAuthState('customer_authenticated');
-                } else if (currentSession.principalType === 'owner') {
-                    setPartnerUser(SHOWCASE_PARTNER as any);
-                    setAuthState('owner_authenticated');
-                }
+                setCustomerUser(null);
+                setPartnerUser(null);
+                setAuthState(
+                    currentSession.principalType === 'customer'
+                        ? 'customer_authenticated'
+                        : 'owner_authenticated',
+                );
+            } else {
+                setAuthState('guest');
             }
         } finally {
             setIsLoading(false);
@@ -191,60 +206,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 await logoutInternal(false);
             }
 
-            try {
-                const res = await ApiClient.post<
-                    ApiResponse<{ token: string; user: CustomerProfile }>
-                >('auth/customer/login', {
-                    login: emailOrPhone,
-                    email: emailOrPhone,
-                    phone: emailOrPhone,
-                    password,
-                    device_name: 'TIJUM Mobile App',
-                });
+            const res = await ApiClient.post<
+                ApiResponse<{ token: string; user: CustomerProfile }>
+            >('auth/customer/login', buildLoginPayload(emailOrPhone, password));
 
-                const newToken = res.data.token;
-                await SecureTokenStorage.setActiveSession(newToken, 'customer');
-
-                setToken(newToken);
-                setPrincipalType('customer');
-                setCustomerUser(res.data.user);
-                setPartnerUser(null);
-                setAuthState('customer_authenticated');
-
-                // Register device for push alerts under this customer principal
-                PushNotificationService.registerForPushNotifications(
-                    'customer',
-                ).catch(() => {});
-            } catch (err: any) {
-                const lower = emailOrPhone.toLowerCase();
-                const isDemo =
-                    lower.includes('demo') ||
-                    lower.includes('customer') ||
-                    lower.includes('rahul');
-                if (isDemo) {
-                    await loginDemoCustomer();
-                    return;
-                }
-                throw err;
+            if (!res.success || !res.data) {
+                throw new Error(
+                    res.message || 'Login failed. Please try again.',
+                );
             }
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
-    const loginDemoCustomer = async () => {
-        setIsLoading(true);
-        try {
-            if (token) {
-                await logoutInternal(false);
+            const newToken = res.data.token;
+            if (!newToken || typeof newToken !== 'string') {
+                throw new Error('Authentication failed: no token received.');
             }
-            const demoToken = 'demo_cust_token_' + Date.now();
-            await SecureTokenStorage.setActiveSession(demoToken, 'customer');
-            setToken(demoToken);
+            if (!res.data.user) {
+                throw new Error(
+                    'Authentication failed: no user profile received.',
+                );
+            }
+
+            await SecureTokenStorage.setActiveSession(newToken, 'customer');
+
+            setToken(newToken);
             setPrincipalType('customer');
-            setCustomerUser(SHOWCASE_CUSTOMER);
+            setCustomerUser(res.data.user);
             setPartnerUser(null);
             setAuthState('customer_authenticated');
+
+            // Register device for push alerts under this customer principal
+            PushNotificationService.registerForPushNotifications(
+                'customer',
+            ).catch(() => {});
         } finally {
             setIsLoading(false);
         }
@@ -258,7 +251,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: string;
         phone: string;
         password: string;
-        terms_accepted?: boolean;
+        terms_accepted: boolean;
+        consent_version?: string;
         marketing_consent?: boolean;
     }) => {
         setIsLoading(true);
@@ -270,13 +264,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const res = await ApiClient.post<
                 ApiResponse<{ token: string; user: CustomerProfile }>
             >('auth/customer/register', {
-                ...data,
-                terms: true,
-                terms_accepted: true,
+                name: data.name,
+                email: data.email,
+                phone: data.phone,
+                password: data.password,
+                terms: data.terms_accepted,
+                terms_accepted: data.terms_accepted,
+                consent_version: data.consent_version ?? 'mobile-1.0',
+                marketing_consent: data.marketing_consent ?? false,
                 device_name: 'TIJUM Mobile App',
             });
 
+            if (!res.success || !res.data) {
+                throw new Error(
+                    res.message || 'Registration failed. Please try again.',
+                );
+            }
+
             const newToken = res.data.token;
+            if (!newToken || typeof newToken !== 'string') {
+                throw new Error('Registration failed: no token received.');
+            }
+            if (!res.data.user) {
+                throw new Error(
+                    'Registration failed: no user profile received.',
+                );
+            }
+
             await SecureTokenStorage.setActiveSession(newToken, 'customer');
 
             setToken(newToken);
@@ -304,60 +318,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 await logoutInternal(false);
             }
 
-            try {
-                const res = await ApiClient.post<
-                    ApiResponse<{ token: string; owner: OwnerProfile }>
-                >('auth/owner/login', {
-                    login: emailOrPhone,
-                    email: emailOrPhone,
-                    phone: emailOrPhone,
+            const res = await ApiClient.post<
+                ApiResponse<{ token: string; owner: OwnerProfile }>
+            >(
+                'auth/owner/login',
+                buildLoginPayload(
+                    emailOrPhone,
                     password,
-                    device_name: 'TIJUM Partner Mobile',
-                });
+                    'TIJUM Partner Mobile',
+                ),
+            );
 
-                const newToken = res.data.token;
-                await SecureTokenStorage.setActiveSession(newToken, 'owner');
-
-                setToken(newToken);
-                setPrincipalType('owner');
-                setPartnerUser(res.data.owner);
-                setCustomerUser(null);
-                setAuthState('owner_authenticated');
-
-                PushNotificationService.registerForPushNotifications(
-                    'partner',
-                ).catch(() => {});
-            } catch (err: any) {
-                const lower = emailOrPhone.toLowerCase();
-                const isDemo =
-                    lower.includes('demo') ||
-                    lower.includes('owner') ||
-                    lower.includes('priya') ||
-                    lower.includes('partner');
-                if (isDemo) {
-                    await loginDemoPartner();
-                    return;
-                }
-                throw err;
+            if (!res.success || !res.data) {
+                throw new Error(
+                    res.message || 'Login failed. Please try again.',
+                );
             }
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
-    const loginDemoPartner = async () => {
-        setIsLoading(true);
-        try {
-            if (token) {
-                await logoutInternal(false);
+            const newToken = res.data.token;
+            if (!newToken || typeof newToken !== 'string') {
+                throw new Error('Authentication failed: no token received.');
             }
-            const demoToken = 'demo_part_token_' + Date.now();
-            await SecureTokenStorage.setActiveSession(demoToken, 'owner');
-            setToken(demoToken);
+            if (!res.data.owner) {
+                throw new Error(
+                    'Authentication failed: no owner profile received.',
+                );
+            }
+
+            await SecureTokenStorage.setActiveSession(newToken, 'owner');
+
+            setToken(newToken);
             setPrincipalType('owner');
-            setPartnerUser(SHOWCASE_PARTNER as any);
+            setPartnerUser(res.data.owner);
             setCustomerUser(null);
             setAuthState('owner_authenticated');
+
+            PushNotificationService.registerForPushNotifications(
+                'partner',
+            ).catch(() => {});
         } finally {
             setIsLoading(false);
         }
@@ -389,14 +387,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             const res = await ApiClient.post<
                 ApiResponse<{ token: string; owner: OwnerProfile }>
-            >('auth/owner/register', {
-                ...data,
-                terms: true,
-                terms_accepted: true,
-                device_name: 'TIJUM Partner Mobile',
-            });
+            >(
+                'auth/owner/register',
+                withPasswordConfirmation({
+                    name: data.name,
+                    email: data.email,
+                    phone: data.phone,
+                    password: data.password,
+                    property_name: data.property_name,
+                    property_type: data.property_type,
+                    available_for: data.available_for,
+                    city_id: data.city_id,
+                    location: data.location,
+                    locality: data.locality,
+                    description: data.description,
+                    terms: true,
+                    terms_accepted: true,
+                    device_name: 'TIJUM Partner Mobile',
+                }),
+            );
+
+            if (!res.success || !res.data) {
+                throw new Error(
+                    res.message || 'Registration failed. Please try again.',
+                );
+            }
 
             const newToken = res.data.token;
+            if (!newToken || typeof newToken !== 'string') {
+                throw new Error('Registration failed: no token received.');
+            }
+            if (!res.data.owner) {
+                throw new Error(
+                    'Registration failed: no owner profile received.',
+                );
+            }
+
             await SecureTokenStorage.setActiveSession(newToken, 'owner');
 
             setToken(newToken);
@@ -470,17 +496,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await logoutInternal(true);
     };
 
-    /**
-     * Strict Account Domain Switching:
-     * Requires complete logout of active principal before entering another domain.
-     */
-    const switchAccountDomain = async (
-        targetDomain: 'customer' | 'partner',
-    ) => {
-        await logoutInternal(false);
-        setAuthState('guest');
-    };
-
     const refreshProfile = async () => {
         if (principalType === 'customer') {
             const res =
@@ -490,8 +505,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setCustomerUser(res.data);
         } else if (principalType === 'owner') {
             const res =
-                await ApiClient.get<ApiResponse<any>>('owner/dashboard');
-            setPartnerUser(res.data.partner_profile as OwnerProfile);
+                await ApiClient.get<ApiResponse<OwnerProfile>>('owner/profile');
+            setPartnerUser(res.data);
         }
     };
 
@@ -517,10 +532,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 loginPartner,
                 registerPartner,
                 logout,
-                switchAccountDomain,
                 refreshProfile,
-                loginDemoCustomer,
-                loginDemoPartner,
             }}
         >
             {children}

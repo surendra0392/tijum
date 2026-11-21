@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     RefreshControl,
     SafeAreaView,
     ScrollView,
@@ -16,14 +15,12 @@ import { Badge } from '../../../src/components/Badge';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
+import { SettlementDetail } from '../../../src/api/types';
 import {
     ArrowLeft,
-    Building2,
     Calendar,
     CheckCircle2,
     Clock,
-    FileSpreadsheet,
-    IndianRupee,
     Info,
     Receipt,
 } from 'lucide-react-native';
@@ -34,7 +31,7 @@ export default function SettlementDetailScreen() {
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [statement, setStatement] = useState<any>(null);
+    const [statement, setStatement] = useState<SettlementDetail | null>(null);
 
     const fetchStatement = async () => {
         if (!reference) return;
@@ -44,39 +41,7 @@ export default function SettlementDetailScreen() {
                 setStatement(res.data);
             }
         } catch {
-            setStatement({
-                id: 1,
-                settlement_reference: reference,
-                reference: reference,
-                settled_at: '2026-11-20',
-                created_at: '2026-11-20',
-                status: 'settled',
-                net_amount_paise: 1245000,
-                net_payout_minor: 1245000,
-                gross_amount_paise: 1350000,
-                gross_booking_minor: 1350000,
-                commission_paise: 100000,
-                commission_amount_minor: 100000,
-                tds_paise: 5000,
-                tds_amount_minor: 5000,
-                payout_utr: 'SBI2026112000918',
-                bank_name: 'State Bank of India',
-                account_number_masked: 'XXXXXX1234',
-                line_items: [
-                    {
-                        id: 1,
-                        reservation_reference: 'TJM25042500123',
-                        property_name: 'Greenview PG',
-                        guest_name: 'Rahul Sharma',
-                        room_type_name: 'Shared Room (Per Guest)',
-                        stay_dates: '2026-11-01 to 2026-11-30',
-                        gross_booking_paise: 1350000,
-                        commission_paise: 100000,
-                        tds_paise: 5000,
-                        net_payable_paise: 1245000,
-                    },
-                ],
-            });
+            setStatement(null);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -84,15 +49,17 @@ export default function SettlementDetailScreen() {
     };
 
     useEffect(() => {
-        fetchStatement();
+        void fetchStatement();
     }, [reference]);
 
     const onRefresh = () => {
         setRefreshing(true);
-        fetchStatement();
+        void fetchStatement();
     };
 
-    const getStatusVariant = (status: string): 'success' | 'warning' | 'info' | 'error' | 'neutral' => {
+    const getStatusVariant = (
+        status: string,
+    ): 'success' | 'warning' | 'info' | 'error' | 'neutral' => {
         switch (status?.toLowerCase()) {
             case 'settled':
             case 'completed':
@@ -124,8 +91,12 @@ export default function SettlementDetailScreen() {
                     <Text style={styles.headerSubtitle}>{reference}</Text>
                 </View>
                 {statement?.status && (
-                    <Badge variant={getStatusVariant(statement.status)} size="sm">
-                        {statement.status_label || statement.status.toUpperCase()}
+                    <Badge
+                        variant={getStatusVariant(statement.status)}
+                        size="sm"
+                    >
+                        {statement.status_label ||
+                            statement.status.toUpperCase()}
                     </Badge>
                 )}
             </View>
@@ -133,46 +104,72 @@ export default function SettlementDetailScreen() {
             {loading ? (
                 <View style={styles.centered}>
                     <ActivityIndicator size="large" color={Colors.primary} />
-                    <Text style={styles.loadingText}>Loading statement breakdown...</Text>
+                    <Text style={styles.loadingText}>
+                        Loading statement breakdown...
+                    </Text>
                 </View>
             ) : !statement ? (
                 <View style={styles.centered}>
                     <Info size={40} color={Colors.textTertiary} />
                     <Text style={styles.emptyTitle}>Statement Not Found</Text>
-                    <Text style={styles.emptySubtitle}>Could not retrieve details for {reference}.</Text>
+                    <Text style={styles.emptySubtitle}>
+                        Could not retrieve details for {reference}.
+                    </Text>
                 </View>
             ) : (
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                        />
                     }
                 >
                     {/* Period Banner */}
                     <View style={styles.periodBanner}>
                         <Calendar size={18} color={Colors.primary} />
                         <Text style={styles.periodText}>
-                            Period: {statement.period_start} to {statement.period_end}
+                            Period: {statement.period_start} to{' '}
+                            {statement.period_end}
                         </Text>
                     </View>
 
                     {/* Net Payout Highlight Card */}
                     <View style={styles.netCard}>
-                        <Text style={styles.netLabel}>Net Settlement Payout</Text>
+                        <Text style={styles.netLabel}>
+                            Net Settlement Payout
+                        </Text>
                         <Text style={styles.netAmount}>
-                            ₹{((statement.net_settlement_amount_minor || statement.net_payable_minor || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            ₹
+                            {(
+                                (statement.net_settlement_amount_minor ||
+                                    statement.net_payable_minor ||
+                                    0) / 100
+                            ).toLocaleString('en-IN', {
+                                minimumFractionDigits: 2,
+                            })}
                         </Text>
                         {statement.provider_transfer_id ? (
                             <View style={styles.utrRow}>
-                                <CheckCircle2 size={14} color={Colors.success} />
+                                <CheckCircle2
+                                    size={14}
+                                    color={Colors.success}
+                                />
                                 <Text style={styles.utrText}>
-                                    Transfer ID / UTR: {statement.provider_transfer_id}
+                                    Transfer ID / UTR:{' '}
+                                    {statement.provider_transfer_id}
                                 </Text>
                             </View>
                         ) : (
                             <View style={styles.utrRow}>
                                 <Clock size={14} color={Colors.warning} />
-                                <Text style={[styles.utrText, { color: Colors.warning }]}>
+                                <Text
+                                    style={[
+                                        styles.utrText,
+                                        { color: Colors.warning },
+                                    ]}
+                                >
                                     Transfer processing via Razorpay Route
                                 </Text>
                             </View>
@@ -181,55 +178,127 @@ export default function SettlementDetailScreen() {
 
                     {/* Financial Computation Breakdown */}
                     <View style={styles.breakdownCard}>
-                        <Text style={styles.sectionTitle}>Payout Computation</Text>
+                        <Text style={styles.sectionTitle}>
+                            Payout Computation
+                        </Text>
 
                         <View style={styles.calcRow}>
-                            <Text style={styles.calcLabel}>Gross Booking Value</Text>
-                            <Text style={styles.calcValue}>
-                                ₹{((statement.gross_booking_value_minor || statement.gross_amount_minor || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            <Text style={styles.calcLabel}>
+                                Gross Booking Value
                             </Text>
-                        </View>
-
-                        <View style={styles.calcRow}>
-                            <Text style={styles.calcLabel}>TIJUM Platform Commission</Text>
-                            <Text style={[styles.calcValue, { color: Colors.error }]}>
-                                - ₹{((statement.commission_amount_minor || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            <Text style={styles.calcValue}>
+                                ₹
+                                {(
+                                    (statement.gross_booking_value_minor ||
+                                        statement.gross_amount_minor ||
+                                        0) / 100
+                                ).toLocaleString('en-IN', {
+                                    minimumFractionDigits: 2,
+                                })}
                             </Text>
                         </View>
 
                         <View style={styles.calcRow}>
                             <Text style={styles.calcLabel}>
-                                GST on Commission{statement.commission_tax_amount_minor === 0 ? ' (Inclusive)' : ''}
+                                TIJUM Platform Commission
                             </Text>
-                            <Text style={[styles.calcValue, (statement.commission_tax_amount_minor || 0) > 0 && { color: Colors.error }]}>
-                                {(statement.commission_tax_amount_minor || 0) > 0
+                            <Text
+                                style={[
+                                    styles.calcValue,
+                                    { color: Colors.error },
+                                ]}
+                            >
+                                - ₹
+                                {(
+                                    (statement.commission_amount_minor || 0) /
+                                    100
+                                ).toLocaleString('en-IN', {
+                                    minimumFractionDigits: 2,
+                                })}
+                            </Text>
+                        </View>
+
+                        <View style={styles.calcRow}>
+                            <Text style={styles.calcLabel}>
+                                GST on Commission
+                                {statement.commission_tax_amount_minor === 0
+                                    ? ' (Inclusive)'
+                                    : ''}
+                            </Text>
+                            <Text
+                                style={[
+                                    styles.calcValue,
+                                    (statement.commission_tax_amount_minor ||
+                                        0) > 0 && { color: Colors.error },
+                                ]}
+                            >
+                                {(statement.commission_tax_amount_minor || 0) >
+                                0
                                     ? `- ₹${((statement.commission_tax_amount_minor || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
                                     : '₹0.00 (Included)'}
                             </Text>
                         </View>
 
                         <View style={styles.calcRow}>
-                            <Text style={styles.calcLabel}>TDS Withholding (Sec 393)</Text>
-                            <Text style={[styles.calcValue, (statement.statutory_deductions_minor || statement.tds_amount_minor || 0) > 0 && { color: Colors.error }]}>
-                                {(statement.statutory_deductions_minor || statement.tds_amount_minor || 0) > 0
-                                    ? `- ₹${(((statement.statutory_deductions_minor || statement.tds_amount_minor || 0)) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                            <Text style={styles.calcLabel}>
+                                TDS Withholding (Sec 393)
+                            </Text>
+                            <Text
+                                style={[
+                                    styles.calcValue,
+                                    (statement.statutory_deductions_minor ||
+                                        statement.tds_amount_minor ||
+                                        0) > 0 && { color: Colors.error },
+                                ]}
+                            >
+                                {(statement.statutory_deductions_minor ||
+                                    statement.tds_amount_minor ||
+                                    0) > 0
+                                    ? `- ₹${((statement.statutory_deductions_minor || statement.tds_amount_minor || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
                                     : '₹0.00 (Exempt)'}
                             </Text>
                         </View>
 
-                        {((statement.refund_adjustments_minor || 0) + (statement.other_adjustments_minor || 0)) > 0 && (
+                        {(statement.refund_adjustments_minor || 0) +
+                            (statement.other_adjustments_minor || 0) >
+                            0 && (
                             <View style={styles.calcRow}>
-                                <Text style={styles.calcLabel}>Refund / Relocation Adjustments</Text>
-                                <Text style={[styles.calcValue, { color: Colors.error }]}>
-                                    - ₹{(((statement.refund_adjustments_minor || 0) + (statement.other_adjustments_minor || 0)) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                <Text style={styles.calcLabel}>
+                                    Refund / Relocation Adjustments
+                                </Text>
+                                <Text
+                                    style={[
+                                        styles.calcValue,
+                                        { color: Colors.error },
+                                    ]}
+                                >
+                                    - ₹
+                                    {(
+                                        ((statement.refund_adjustments_minor ||
+                                            0) +
+                                            (statement.other_adjustments_minor ||
+                                                0)) /
+                                        100
+                                    ).toLocaleString('en-IN', {
+                                        minimumFractionDigits: 2,
+                                    })}
                                 </Text>
                             </View>
                         )}
 
                         <View style={[styles.calcRow, styles.totalRow]}>
-                            <Text style={styles.totalLabel}>Total Net Transferred</Text>
+                            <Text style={styles.totalLabel}>
+                                Total Net Transferred
+                            </Text>
                             <Text style={styles.totalValue}>
-                                ₹{((statement.net_settlement_amount_minor || statement.net_payable_minor || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                ₹
+                                {(
+                                    (statement.net_settlement_amount_minor ||
+                                        statement.net_payable_minor ||
+                                        0) / 100
+                                ).toLocaleString('en-IN', {
+                                    minimumFractionDigits: 2,
+                                })}
                             </Text>
                         </View>
                     </View>
@@ -239,43 +308,68 @@ export default function SettlementDetailScreen() {
                         <View style={styles.itemsHeader}>
                             <Receipt size={18} color={Colors.primary} />
                             <Text style={styles.sectionTitle}>
-                                Included Reservations ({statement.items?.length || 0})
+                                Included Reservations (
+                                {statement.items?.length || 0})
                             </Text>
                         </View>
 
-                        {(!statement.items || statement.items.length === 0) ? (
+                        {!statement.items || statement.items.length === 0 ? (
                             <Text style={styles.noItemsText}>
-                                No itemized reservations recorded for this settlement period.
+                                No itemized reservations recorded for this
+                                settlement period.
                             </Text>
                         ) : (
-                            statement.items.map((item: any) => (
+                            statement.items.map((item) => (
                                 <View key={item.id} style={styles.itemRow}>
                                     <View style={styles.itemTop}>
                                         <Text style={styles.itemRef}>
-                                            {item.booking_reference || `Booking #${item.reservation_id}`}
+                                            {item.booking_reference ||
+                                                `Booking #${item.reservation_id}`}
                                         </Text>
                                         <Text style={styles.itemNet}>
-                                            ₹{((item.net_payable_minor || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                            ₹
+                                            {(
+                                                (item.net_payable_minor || 0) /
+                                                100
+                                            ).toLocaleString('en-IN', {
+                                                minimumFractionDigits: 2,
+                                            })}
                                         </Text>
                                     </View>
 
                                     {item.property_name && (
-                                        <Text style={styles.itemProperty}>{item.property_name}</Text>
+                                        <Text style={styles.itemProperty}>
+                                            {item.property_name}
+                                        </Text>
                                     )}
 
                                     {item.stay_dates && (
-                                        <Text style={styles.itemStay}>Stay: {item.stay_dates}</Text>
+                                        <Text style={styles.itemStay}>
+                                            Stay: {item.stay_dates}
+                                        </Text>
                                     )}
 
                                     <View style={styles.itemSubCalc}>
                                         <Text style={styles.itemSubText}>
-                                            Gross: ₹{((item.gross_amount_minor || 0) / 100).toLocaleString('en-IN')}
+                                            Gross: ₹
+                                            {(
+                                                (item.gross_amount_minor || 0) /
+                                                100
+                                            ).toLocaleString('en-IN')}
                                         </Text>
                                         <Text style={styles.itemSubText}>
-                                            Comm: ₹{((item.commission_amount_minor || 0) / 100).toLocaleString('en-IN')}
+                                            Comm: ₹
+                                            {(
+                                                (item.commission_amount_minor ||
+                                                    0) / 100
+                                            ).toLocaleString('en-IN')}
                                         </Text>
                                         <Text style={styles.itemSubText}>
-                                            TDS: ₹{((item.tax_deduction_minor || 0) / 100).toLocaleString('en-IN')}
+                                            TDS: ₹
+                                            {(
+                                                (item.tax_deduction_minor ||
+                                                    0) / 100
+                                            ).toLocaleString('en-IN')}
                                         </Text>
                                     </View>
                                 </View>
