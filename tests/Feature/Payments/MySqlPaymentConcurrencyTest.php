@@ -34,6 +34,14 @@ class MySqlPaymentConcurrencyTest extends TestCase
             || ! str_ends_with((string) DB::getDatabaseName(), '_test')) {
             $this->markTestSkipped('Requires an isolated MySQL database ending in _test.');
         }
+
+        config([
+            'tijum.payments.live_enabled' => false,
+            'tijum.payments.razorpay.key_id' => 'rzp_test_checkout',
+            'tijum.payments.razorpay.key_secret' => 'test-checkout-secret',
+        ]);
+
+        $this->app->forgetInstance(PaymentGateway::class);
     }
 
     /**
