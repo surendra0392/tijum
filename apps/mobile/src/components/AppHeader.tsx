@@ -8,14 +8,17 @@ import {
 } from 'react-native';
 import { ChevronLeft } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import { BorderRadius, Spacing } from '../theme/spacing';
+import { Typography } from '../theme/typography';
 
 interface AppHeaderProps {
     title: string;
     subtitle?: string;
     showBack?: boolean;
     onBack?: () => void;
+    fallbackRoute?: string;
     rightAction?: React.ReactNode;
     style?: ViewStyle;
     variant?: 'plum' | 'white';
@@ -26,17 +29,21 @@ export function AppHeader({
     subtitle,
     showBack = false,
     onBack,
+    fallbackRoute = '/(customer)/explore',
     rightAction,
     style,
     variant = 'plum',
 }: AppHeaderProps) {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
 
     const handleBack = () => {
         if (onBack) {
             onBack();
-        } else {
+        } else if (router.canGoBack()) {
             router.back();
+        } else {
+            router.replace(fallbackRoute as never);
         }
     };
 
@@ -46,6 +53,7 @@ export function AppHeader({
         <View
             style={[
                 styles.container,
+                { paddingTop: Math.max(insets.top, Spacing.sm) + Spacing.xs },
                 isPlum ? styles.plumContainer : styles.whiteContainer,
                 style,
             ]}
@@ -113,11 +121,10 @@ export function AppHeader({
 const styles = StyleSheet.create({
     container: {
         paddingHorizontal: Spacing.base,
-        paddingTop: Spacing.md,
         paddingBottom: Spacing.base,
     },
     plumContainer: {
-        backgroundColor: Colors.plumDeep,
+        backgroundColor: Colors.deepPlum,
         borderBottomLeftRadius: BorderRadius.xl,
         borderBottomRightRadius: BorderRadius.xl,
     },
@@ -130,6 +137,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        minHeight: 48,
     },
     backButton: {
         width: 48,
@@ -139,7 +147,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     plumBackButton: {
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        backgroundColor: 'rgba(255, 255, 255, 0.16)',
     },
     whiteBackButton: {
         backgroundColor: Colors.surfaceSubtle,
@@ -150,16 +158,17 @@ const styles = StyleSheet.create({
         paddingHorizontal: Spacing.sm,
     },
     title: {
+        fontFamily: Typography.fontFamily.heading,
         fontSize: 18,
-        fontWeight: '700',
     },
     plumTitle: {
         color: Colors.white,
     },
     whiteTitle: {
-        color: Colors.inkPrimary,
+        color: Colors.deepPlum,
     },
     subtitle: {
+        fontFamily: Typography.fontFamily.bodyMedium,
         fontSize: 12,
         marginTop: 2,
     },
@@ -171,6 +180,8 @@ const styles = StyleSheet.create({
     },
     rightActionContainer: {
         minWidth: 48,
+        minHeight: 48,
+        justifyContent: 'center',
         alignItems: 'flex-end',
     },
     spacer: {

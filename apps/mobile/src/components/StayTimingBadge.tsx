@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Clock } from 'lucide-react-native';
 import { Colors } from '../theme/colors';
 import { BorderRadius, Spacing } from '../theme/spacing';
+import { Typography } from '../theme/typography';
 
 export interface StayTimingBadgeProps {
     checkIn?: string;
@@ -62,8 +63,8 @@ const styles = StyleSheet.create({
         marginRight: 4,
     },
     text: {
-        color: Colors.gray700,
+        color: Colors.inkSecondary,
+        fontFamily: Typography.fontFamily.bodyMedium,
         fontSize: 11,
-        fontWeight: '600',
     },
 });

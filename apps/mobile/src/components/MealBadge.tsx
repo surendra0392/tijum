@@ -96,10 +96,10 @@ const styles = StyleSheet.create({
     },
     text: {
         color: '#065F46',
+        fontFamily: Typography.fontFamily.bodyBold,
         fontSize: Typography.fontSize.xs,
-        fontWeight: '700',
     },
     notIncludedText: {
-        color: Colors.gray500,
+        color: Colors.inkSecondary,
     },
 });

@@ -47,17 +47,20 @@ export function BrandLogo({
                     style={[
                         styles.tagline,
                         {
-                            color: Colors.coral,
-                            fontSize: Typography.fontSize.lg,
-                            lineHeight: Typography.lineHeight.xl,
+                            color:
+                                tone === 'light'
+                                    ? Colors.softPeach
+                                    : Colors.coralDark,
+                            fontSize: Typography.fontSize.sm,
+                            lineHeight: Typography.lineHeight.sm,
                             fontFamily: Typography.fontFamily.subheading,
-                            letterSpacing: 0.4,
+                            letterSpacing: 0.3,
                             textAlign: 'center',
                             marginTop: 4,
                         },
                     ]}
                 >
-                    Stay • Dine • Belong
+                    Stay easy. Eat well. Spend less.
                 </Text>
             )}
         </View>

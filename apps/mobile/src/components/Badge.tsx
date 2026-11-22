@@ -51,14 +51,14 @@ export function Badge({
                 return '#E0F2FE';
             case 'secondary':
             case 'accent':
-                return Colors.softPeach;
+                return Colors.peachSoft;
             case 'primary':
                 return Colors.deepPlum;
             case 'outline':
                 return 'transparent';
             case 'neutral':
             default:
-                return Colors.gray100;
+                return Colors.surfaceSubtle;
         }
     };
 
@@ -66,26 +66,26 @@ export function Badge({
         switch (variant) {
             case 'emerald':
             case 'success':
-                return '#065F46'; // Dark Emerald
+                return Colors.successText;
             case 'amber':
             case 'warning':
-                return '#92400E'; // Dark Amber
+                return Colors.warningText;
             case 'rose':
             case 'error':
             case 'danger':
-                return '#9F1239'; // Dark Rose
+                return Colors.dangerText;
             case 'info':
-                return '#0369A1'; // Dark Sky
+                return Colors.infoText;
             case 'secondary':
             case 'accent':
-                return Colors.coral;
+                return Colors.coralDark;
             case 'primary':
                 return Colors.white;
             case 'outline':
-                return Colors.gray700;
+                return Colors.deepPlum;
             case 'neutral':
             default:
-                return Colors.gray800;
+                return Colors.inkPrimary;
         }
     };
 
@@ -96,10 +96,13 @@ export function Badge({
             style={[
                 styles.badge,
                 size === 'sm' && styles.badgeSm,
+                size === 'lg' && styles.badgeLg,
                 {
                     backgroundColor: getBackgroundColor(),
                     borderColor:
-                        variant === 'outline' ? Colors.gray300 : 'transparent',
+                        variant === 'outline'
+                            ? Colors.borderStrong
+                            : 'transparent',
                 },
                 style,
             ]}
@@ -109,6 +112,7 @@ export function Badge({
                     style={[
                         styles.text,
                         size === 'sm' && styles.textSm,
+                        size === 'lg' && styles.textLg,
                         { color: getTextColor() },
                     ]}
                 >
@@ -124,7 +128,7 @@ export function Badge({
 const styles = StyleSheet.create({
     badge: {
         paddingHorizontal: Spacing.sm,
-        paddingVertical: 3,
+        paddingVertical: 4,
         borderRadius: BorderRadius.full,
         borderWidth: 1,
         alignSelf: 'flex-start',
@@ -133,12 +137,20 @@ const styles = StyleSheet.create({
         paddingHorizontal: 6,
         paddingVertical: 2,
     },
+    badgeLg: {
+        paddingHorizontal: Spacing.md,
+        paddingVertical: 6,
+    },
     text: {
+        fontFamily: Typography.fontFamily.bodyBold,
         fontSize: Typography.fontSize.xs,
-        fontWeight: '700',
     },
     textSm: {
+        fontFamily: Typography.fontFamily.bodyBold,
         fontSize: 10,
-        fontWeight: '700',
+    },
+    textLg: {
+        fontFamily: Typography.fontFamily.bodyBold,
+        fontSize: Typography.fontSize.sm,
     },
 });

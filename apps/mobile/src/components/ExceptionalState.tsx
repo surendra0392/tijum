@@ -17,6 +17,7 @@ import {
 } from 'lucide-react-native';
 import { Colors } from '../theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../theme/spacing';
+import { Typography } from '../theme/typography';
 
 export type ExceptionalStateType =
     | 'no-internet'
@@ -234,13 +235,14 @@ const styles = StyleSheet.create({
         marginBottom: Spacing.lg,
     },
     title: {
+        fontFamily: Typography.fontFamily.heading,
         fontSize: 18,
-        fontWeight: '800',
-        color: Colors.inkPrimary,
+        color: Colors.deepPlum,
         textAlign: 'center',
         marginBottom: Spacing.xs,
     },
     description: {
+        fontFamily: Typography.fontFamily.body,
         fontSize: 13,
         lineHeight: 20,
         color: Colors.inkSecondary,
@@ -260,8 +262,8 @@ const styles = StyleSheet.create({
         marginBottom: Spacing.lg,
     },
     timerText: {
+        fontFamily: Typography.fontFamily.bodyBold,
         fontSize: 13,
-        fontWeight: '700',
         color: Colors.warningText,
     },
     buttonContainer: {
@@ -271,7 +273,7 @@ const styles = StyleSheet.create({
     },
     primaryButton: {
         minHeight: 48,
-        backgroundColor: Colors.plumPrimary,
+        backgroundColor: Colors.deepPlum,
         paddingVertical: Spacing.md,
         borderRadius: BorderRadius.pill,
         alignItems: 'center',
@@ -280,8 +282,8 @@ const styles = StyleSheet.create({
     },
     primaryButtonText: {
         color: Colors.white,
+        fontFamily: Typography.fontFamily.heading,
         fontSize: 14,
-        fontWeight: '700',
     },
     secondaryButton: {
         minHeight: 48,
@@ -293,7 +295,7 @@ const styles = StyleSheet.create({
     },
     secondaryButtonText: {
         color: Colors.inkSecondary,
+        fontFamily: Typography.fontFamily.bodyMedium,
         fontSize: 13,
-        fontWeight: '600',
     },
 });

@@ -15,6 +15,7 @@ interface ButtonProps extends TouchableOpacityProps {
     variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
     size?: 'sm' | 'md' | 'lg';
     loading?: boolean;
+    fullWidth?: boolean;
 }
 
 export function Button({
@@ -22,6 +23,7 @@ export function Button({
     variant = 'primary',
     size = 'md',
     loading = false,
+    fullWidth = false,
     disabled,
     style,
     accessibilityLabel,
@@ -40,19 +42,19 @@ export function Button({
             case 'ghost':
                 return 'transparent';
             case 'danger':
-                return Colors.rose;
+                return Colors.danger;
         }
     };
 
     const getTextColor = () => {
-        if (disabled || loading) return Colors.gray400;
+        if (disabled || loading) return Colors.gray600;
         switch (variant) {
             case 'primary':
-            case 'secondary':
             case 'danger':
                 return Colors.white;
-            case 'outline':
+            case 'secondary':
                 return Colors.deepPlum;
+            case 'outline':
             case 'ghost':
                 return Colors.deepPlum;
         }
@@ -79,6 +81,7 @@ export function Button({
             style={[
                 styles.base,
                 styles[size],
+                fullWidth && styles.fullWidth,
                 {
                     backgroundColor: getBackgroundColor(),
                     borderColor: getBorderColor(),
@@ -102,10 +105,13 @@ export function Button({
 const styles = StyleSheet.create({
     base: {
         minHeight: 48,
-        borderRadius: BorderRadius.base,
+        borderRadius: BorderRadius.pill,
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
+    },
+    fullWidth: {
+        width: '100%',
     },
     sm: {
         paddingVertical: Spacing.sm,
@@ -120,7 +126,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: Spacing.xl,
     },
     text: {
+        fontFamily: Typography.fontFamily.heading,
         fontSize: Typography.fontSize.base,
-        fontWeight: '700',
     },
 });

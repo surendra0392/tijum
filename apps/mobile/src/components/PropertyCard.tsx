@@ -11,6 +11,7 @@ import { PropertyCard as PropertyCardType } from '../api/types';
 import { resolveApiOrigin } from '../api/client';
 import { Colors } from '../theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../theme/spacing';
+import { Typography } from '../theme/typography';
 import { CategoryBadge } from './CategoryBadge';
 
 interface Props {
@@ -83,8 +84,8 @@ export function PropertyCard({
                     <View style={styles.ratingBadge}>
                         <Star
                             size={11}
-                            color={Colors.white}
-                            fill={Colors.white}
+                            color={Colors.softPeach}
+                            fill={Colors.softPeach}
                             style={styles.badgeIcon}
                         />
                         <Text style={styles.ratingText}>
@@ -223,14 +224,14 @@ const styles = StyleSheet.create({
     },
     verifiedText: {
         color: Colors.successText,
+        fontFamily: Typography.fontFamily.bodyBold,
         fontSize: 11,
-        fontWeight: '700',
     },
     ratingBadge: {
         position: 'absolute',
         top: Spacing.md,
         right: Spacing.md,
-        backgroundColor: Colors.coral,
+        backgroundColor: Colors.deepPlum,
         paddingHorizontal: Spacing.sm,
         paddingVertical: 4,
         borderRadius: BorderRadius.full,
@@ -240,16 +241,16 @@ const styles = StyleSheet.create({
     },
     ratingText: {
         color: Colors.white,
+        fontFamily: Typography.fontFamily.bodyBold,
         fontSize: 11,
-        fontWeight: '700',
     },
     wishlistButton: {
         position: 'absolute',
         bottom: Spacing.sm,
         right: Spacing.sm,
-        backgroundColor: 'rgba(17, 24, 39, 0.55)',
-        width: 44,
-        height: 44,
+        backgroundColor: 'rgba(38, 24, 36, 0.72)',
+        width: 48,
+        height: 48,
         borderRadius: BorderRadius.full,
         alignItems: 'center',
         justifyContent: 'center',
@@ -268,9 +269,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     locality: {
+        fontFamily: Typography.fontFamily.bodyMedium,
         fontSize: 12,
         color: Colors.inkSecondary,
-        fontWeight: '600',
     },
     titleRatingRow: {
         flexDirection: 'row',
@@ -279,16 +280,16 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     name: {
+        fontFamily: Typography.fontFamily.heading,
         fontSize: 17,
-        fontWeight: '700',
-        color: Colors.inkPrimary,
+        color: Colors.deepPlum,
         flex: 1,
         marginRight: 6,
     },
     reviewsCountText: {
+        fontFamily: Typography.fontFamily.body,
         fontSize: 12,
         color: Colors.inkMuted,
-        fontWeight: '500',
     },
     amenityChipsRow: {
         flexDirection: 'row',
@@ -305,9 +306,9 @@ const styles = StyleSheet.create({
         borderColor: Colors.borderSubtle,
     },
     amenityChipText: {
+        fontFamily: Typography.fontFamily.bodyMedium,
         fontSize: 11,
         color: Colors.inkSecondary,
-        fontWeight: '600',
     },
     footer: {
         flexDirection: 'row',
@@ -318,24 +319,25 @@ const styles = StyleSheet.create({
         paddingTop: Spacing.md,
     },
     priceLabel: {
+        fontFamily: Typography.fontFamily.body,
         fontSize: 11,
         color: Colors.inkMuted,
         marginBottom: 1,
     },
     price: {
+        fontFamily: Typography.fontFamily.heading,
         fontSize: 17,
-        fontWeight: '800',
-        color: Colors.plumPrimary,
+        color: Colors.deepPlum,
     },
     priceUnit: {
+        fontFamily: Typography.fontFamily.body,
         fontSize: 12,
         color: Colors.inkSecondary,
-        fontWeight: 'normal',
     },
     priceUnavailable: {
         color: Colors.inkMuted,
+        fontFamily: Typography.fontFamily.bodyMedium,
         fontSize: 13,
-        fontWeight: '600',
     },
     bookNowButton: {
         backgroundColor: Colors.deepPlum,
@@ -346,7 +348,7 @@ const styles = StyleSheet.create({
     },
     bookNowButtonText: {
         color: Colors.white,
+        fontFamily: Typography.fontFamily.heading,
         fontSize: 13,
-        fontWeight: '700',
     },
 });

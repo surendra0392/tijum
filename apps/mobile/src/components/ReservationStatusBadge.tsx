@@ -10,8 +10,12 @@ export function ReservationStatusBadge({ status, label }: Props) {
     const getVariant = () => {
         switch (status) {
             case 'confirmed':
+            case 'checked_in':
+            case 'checked_out':
+            case 'completed':
                 return 'emerald';
             case 'awaiting_payment':
+            case 'pending':
                 return 'amber';
             case 'cancelled':
             case 'expired':
@@ -26,6 +30,12 @@ export function ReservationStatusBadge({ status, label }: Props) {
         switch (status) {
             case 'confirmed':
                 return 'Confirmed';
+            case 'checked_in':
+                return 'Checked In';
+            case 'checked_out':
+                return 'Checked Out';
+            case 'completed':
+                return 'Completed';
             case 'awaiting_payment':
                 return 'Payment Required';
             case 'cancelled':

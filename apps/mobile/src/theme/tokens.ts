@@ -1,61 +1,129 @@
-/**
- * TIJUM Design Token System
- * Authoritative visual design tokens extracted directly from reference sheets:
- * E:\tijum\All app UI screens direction
- */
-
 export const Palette = {
-    // Brand Core
-    plumDark: '#2A122A', // Deepest eggplant / splash screen canvas
-    plumDeep: '#381E38', // Header app bars, cards, brand anchors
-    plumPrimary: '#4A154B', // Primary brand CTA buttons, active accents
-    plumLight: '#6B3A6C', // Subtle plum hover / highlight
+    deepPlum: '#442F41',
+    deepPlumDark: '#2E1E2C',
+    deepPlumLight: '#5E425A',
+    coral: '#FF7A67',
+    coralDark: '#B83B2A',
+    coralLight: '#FF8A73',
+    softPeach: '#FFB6A3',
+    peachSoft: '#FFEBDD',
+    peachCream: '#FFF3EA',
+    cream: '#FFF4EE',
+    surfaceSubtle: '#F6F2EE',
+    neutralSurface: '#E6E0DB',
+    borderStrong: '#D6CBC2',
+    mutedLavender: '#8B6B82',
+    mutedLavenderText: '#6D5166',
+    inkPrimary: '#261824',
+    inkSecondary: '#5E4B5B',
+    white: '#FFFFFF',
+    black: '#111827',
+    foodEmerald: '#10B981',
+    emeraldLight: '#D1FAE5',
+    emeraldText: '#065F46',
+    amber: '#F59E0B',
+    amberLight: '#FEF3C7',
+    amberText: '#92400E',
+    rose: '#E11D48',
+    roseLight: '#FFE4E6',
+    roseText: '#9F1239',
+    info: '#0284C7',
+    infoLight: '#E0F2FE',
+    infoText: '#0369A1',
+} as const;
 
-    // Coral & Peach Accents
-    coralDark: '#C94534', // Dark coral pressed state
-    coralPrimary: '#E05A47', // Primary roof mark, active chips, key CTAs
-    coralLight: '#E85D4E', // Vivid coral link / icon highlight
-    peachHighlight: '#FF8A73', // Secondary badges & highlights
-    peachSoft: '#FFEBDD', // Soft peach chip backgrounds
-    peachCream: '#FFF3EA', // Lightest tint for active container surfaces
+export const Colors = {
+    // Official TIJUM Brand Palette (Single Source of Truth)
+    deepPlum: Palette.deepPlum,
+    plumDark: Palette.deepPlumDark,
+    plumDeep: Palette.deepPlum,
+    plumPrimary: Palette.deepPlum,
+    plumLight: Palette.deepPlumLight,
 
-    // Warm Canvas & Surfaces
-    canvas: '#FFF9F5', // Primary warm cream screen background
-    surface: '#FFFFFF', // Card surfaces & elevated containers
-    surfaceSubtle: '#F6F2EE', // Subtle input fields, dividers, inactive chips
-    borderSubtle: '#EBE3DC', // Fine hair-line borders
-    borderStrong: '#D6CBC2', // Focused or outlined inputs
+    coral: Palette.coral,
+    coralDark: Palette.coralDark,
+    coralPrimary: Palette.coralDark,
+    coralLight: Palette.coralLight,
 
-    // Typography & Ink
-    inkPrimary: '#1E121E', // Primary headings & heavy text (deep charcoal-plum)
-    inkSecondary: '#6B5E6B', // Body text, descriptive labels, subtitles
-    inkMuted: '#9E919E', // Placeholder text, inactive icons, timestamps
-    inkInverse: '#FFFFFF', // White text on deep plum/coral
+    softPeach: Palette.softPeach,
+    peachHighlight: Palette.coralLight,
+    peachSoft: Palette.peachSoft,
+    peachCream: Palette.peachCream,
 
-    // Functional & Semantic States
-    success: '#2E7D32', // Verified checkmark, available room dot, confirmed badge
-    successLight: '#E8F5E9', // Success pill background
-    successText: '#1B5E20', // Success badge label
+    cream: Palette.cream,
+    warmCream: Palette.cream,
+    warmOffWhite: Palette.cream,
+    canvas: Palette.cream,
 
-    warning: '#ED6C02', // 15-min countdown timer, pending hold, cleaning status
-    warningLight: '#FFF3E0', // Warning pill background
-    warningText: '#E65100', // Warning badge label
+    mutedLavender: Palette.mutedLavender,
+    neutralSurface: Palette.neutralSurface,
+    surfaceSubtle: Palette.surfaceSubtle,
+    borderSubtle: Palette.neutralSurface,
+    borderStrong: Palette.borderStrong,
 
-    danger: '#D32F2F', // Error state, cancelled badge, delete account action
-    dangerLight: '#FFEBEE', // Danger pill background
-    dangerText: '#B71C1C', // Danger badge label
+    // Strictly reserved for positive food-included indicators
+    emerald: Palette.foodEmerald,
+    emeraldLight: Palette.emeraldLight,
+    forestGreen: Palette.foodEmerald,
 
-    info: '#0284C7', // Info alert, case tracking link
-    infoLight: '#E0F2FE', // Info pill background
-    infoText: '#0369A1', // Info badge label
+    // Semantic statuses (WCAG AA compliant foreground/background pairings)
+    goldenMustard: '#B45309',
+    amber: Palette.amber,
+    amberLight: Palette.amberLight,
+    rose: Palette.rose,
+    roseLight: Palette.roseLight,
 
-    // Category Theming (Canonical 3)
-    categoryHostel: '#4A154B',
-    categoryHomestay: '#E05A47',
-    categoryColiving: '#2A52BE',
-};
+    // Surfaces & Neutrals
+    white: Palette.white,
+    black: Palette.black,
+    gray50: '#F9FAFB',
+    gray100: '#F3F4F6',
+    gray200: '#E5E7EB',
+    gray300: '#D1D5DB',
+    gray400: '#6B7280',
+    gray500: '#6B7280',
+    gray600: '#4B5563',
+    gray700: '#374151',
+    gray800: '#1F2937',
+    gray900: '#111827',
 
-export const SpacingTokens = {
+    // Theme Semantic Aliases
+    primary: Palette.deepPlum,
+    primaryForeground: Palette.white,
+    secondary: Palette.coral,
+    secondaryForeground: Palette.deepPlum,
+    background: Palette.cream,
+    card: Palette.white,
+    cardBorder: Palette.neutralSurface,
+    text: Palette.inkPrimary,
+    textMuted: Palette.mutedLavenderText,
+    inkPrimary: Palette.inkPrimary,
+    inkSecondary: Palette.inkSecondary,
+    inkMuted: Palette.mutedLavenderText,
+    inkInverse: Palette.white,
+
+    success: '#15803D',
+    successLight: Palette.emeraldLight,
+    successText: Palette.emeraldText,
+    warning: '#B45309',
+    warningLight: Palette.amberLight,
+    warningText: Palette.amberText,
+    danger: '#B91C1C',
+    dangerLight: Palette.roseLight,
+    dangerText: Palette.roseText,
+    info: Palette.info,
+    infoLight: Palette.infoLight,
+    infoText: Palette.infoText,
+
+    surface: Palette.white,
+    border: Palette.neutralSurface,
+    textPrimary: Palette.inkPrimary,
+    textSecondary: Palette.inkSecondary,
+    textTertiary: Palette.mutedLavenderText,
+    error: '#B91C1C',
+} as const;
+
+export const Spacing = {
     xxs: 2,
     xs: 4,
     sm: 8,
@@ -66,9 +134,9 @@ export const SpacingTokens = {
     xxl: 32,
     xxxl: 40,
     hero: 48,
-};
+} as const;
 
-export const RadiusTokens = {
+export const BorderRadius = {
     xs: 4,
     sm: 6,
     md: 10,
@@ -77,9 +145,9 @@ export const RadiusTokens = {
     xl: 22,
     pill: 9999,
     full: 9999,
-};
+} as const;
 
-export const ShadowTokens = {
+export const Shadows = {
     none: {
         shadowColor: 'transparent',
         shadowOffset: { width: 0, height: 0 },
@@ -88,49 +156,56 @@ export const ShadowTokens = {
         elevation: 0,
     },
     subtle: {
-        shadowColor: '#1E121E',
+        shadowColor: Palette.inkPrimary,
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
+        shadowOpacity: 0.05,
         shadowRadius: 6,
         elevation: 1,
     },
     card: {
-        shadowColor: '#1E121E',
+        shadowColor: Palette.inkPrimary,
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.06,
-        shadowRadius: 10,
+        shadowOpacity: 0.07,
+        shadowRadius: 12,
         elevation: 2,
     },
     elevated: {
-        shadowColor: '#1E121E',
+        shadowColor: Palette.inkPrimary,
         shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.1,
-        shadowRadius: 14,
+        shadowOpacity: 0.11,
+        shadowRadius: 16,
         elevation: 4,
     },
     floating: {
-        shadowColor: '#381E38',
+        shadowColor: Palette.deepPlum,
         shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.16,
+        shadowOpacity: 0.18,
         shadowRadius: 20,
         elevation: 6,
     },
-};
+} as const;
 
-export const TypographyTokens = {
+export const Typography = {
+    fontFamily: {
+        heading: 'Montserrat-Bold',
+        headingExtraBold: 'Montserrat-ExtraBold',
+        subheading: 'Montserrat-SemiBold',
+        body: 'Nunito-Regular',
+        bodyBold: 'Nunito-Bold',
+        bodyMedium: 'Nunito-SemiBold',
+    },
     fontSize: {
-        xxs: 10,
         xs: 12,
         sm: 14,
+        md: 16,
         base: 16,
         lg: 18,
         xl: 20,
         xxl: 24,
         title: 28,
-        hero: 34,
+        hero: 32,
     },
     lineHeight: {
-        xxs: 14,
         xs: 16,
         sm: 20,
         base: 24,
@@ -138,14 +213,55 @@ export const TypographyTokens = {
         xl: 28,
         xxl: 32,
         title: 36,
-        hero: 42,
+        hero: 40,
     },
-    fontWeight: {
-        regular: '400' as const,
-        medium: '500' as const,
-        semibold: '600' as const,
-        bold: '700' as const,
-        heavy: '800' as const,
-        black: '900' as const,
+    bodySmall: {
+        fontSize: 14,
+        lineHeight: 20,
+        fontFamily: 'Nunito-Regular',
     },
-};
+    bodyMedium: {
+        fontSize: 16,
+        lineHeight: 24,
+        fontFamily: 'Nunito-SemiBold',
+    },
+    titleSmall: {
+        fontSize: 18,
+        lineHeight: 24,
+        fontFamily: 'Montserrat-SemiBold',
+    },
+    titleMedium: {
+        fontSize: 20,
+        lineHeight: 26,
+        fontFamily: 'Montserrat-Bold',
+    },
+    titleLarge: {
+        fontSize: 24,
+        lineHeight: 32,
+        fontFamily: 'Montserrat-Bold',
+    },
+    labelSmall: {
+        fontSize: 12,
+        lineHeight: 16,
+        fontFamily: 'Nunito-Bold',
+    },
+    labelMedium: {
+        fontSize: 14,
+        lineHeight: 18,
+        fontFamily: 'Nunito-Bold',
+    },
+    labelLarge: {
+        fontSize: 16,
+        lineHeight: 22,
+        fontFamily: 'Nunito-Bold',
+    },
+} as const;
+
+export const Tokens = {
+    Palette,
+    Colors,
+    Spacing,
+    BorderRadius,
+    Shadows,
+    Typography,
+} as const;

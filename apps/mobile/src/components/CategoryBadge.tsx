@@ -134,12 +134,12 @@ const styles = StyleSheet.create({
         marginRight: 4,
     },
     text: {
+        fontFamily: Typography.fontFamily.bodyBold,
         fontSize: Typography.fontSize.xs,
-        fontWeight: '700',
         letterSpacing: 0.2,
     },
     textSm: {
+        fontFamily: Typography.fontFamily.bodyBold,
         fontSize: 10,
-        fontWeight: '700',
     },
 });
