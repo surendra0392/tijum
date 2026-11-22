@@ -188,11 +188,7 @@ class AuditAndRepairRefundJournals
     private function evaluateRefund(ReservationRefund $refund, ?ReservationPayment $payment): array
     {
         $refundInspection = $this->ledger->inspectRefundJournal($refund);
-        if ($refundInspection['status'] === 'complete') {
-            return ['classification' => 'complete'];
-        }
-
-        if ($refundInspection['status'] !== 'missing') {
+        if ($refundInspection['status'] !== 'missing' && $refundInspection['status'] !== 'complete') {
             return [
                 'classification' => 'quarantined',
                 'reason' => $refundInspection['status'].'_refund_journal',
@@ -271,6 +267,10 @@ class AuditAndRepairRefundJournals
                 'reason' => $reason,
                 'details' => $captureInspection['reason'] ?? 'Parent payment capture journal is missing or inconsistent.',
             ];
+        }
+
+        if ($refundInspection['status'] === 'complete') {
+            return ['classification' => 'complete'];
         }
 
         $hasSettledConflict = PartnerSettlementItem::query()

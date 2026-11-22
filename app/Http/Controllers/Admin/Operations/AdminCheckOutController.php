@@ -146,18 +146,23 @@ class AdminCheckOutController extends Controller
 
     public function markCheckOut(Request $request, Reservation $reservation): RedirectResponse
     {
+        $admin = $request->user('admin');
+        abort_unless($admin !== null && ($admin->hasPermission('operations.manage') || $admin->hasPermission('bookings.manage')), 403);
+
         $validated = $request->validate([
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $admin = $request->user('admin');
-        $reservation->markCheckedOut('admin', $admin ? $admin->id : 1, $validated['notes'] ?? null);
+        $reservation->markCheckedOut('admin', $admin->id, $validated['notes'] ?? null);
 
         return back()->with('status', "Guest for {$reservation->booking_reference} marked as checked out.");
     }
 
-    public function undoCheckOut(Reservation $reservation): RedirectResponse
+    public function undoCheckOut(Request $request, Reservation $reservation): RedirectResponse
     {
+        $admin = $request->user('admin');
+        abort_unless($admin !== null && ($admin->hasPermission('operations.manage') || $admin->hasPermission('bookings.manage')), 403);
+
         $reservation->undoCheckOut();
 
         return back()->with('status', "Check-out for {$reservation->booking_reference} reversed.");

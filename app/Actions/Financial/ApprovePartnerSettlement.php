@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace App\Actions\Financial;
 
+use App\Enums\CaseStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\ProviderTransferStatus;
+use App\Enums\RefundStatus;
+use App\Enums\ReservationStatus;
 use App\Enums\SettlementStatus;
 use App\Models\Admin;
 use App\Models\PartnerSettlement;
 use App\Models\PartnerSettlementItem;
 use App\Models\ProviderTransfer;
+use App\Models\Reservation;
 use App\Models\ReservationPayment;
 use App\Services\Financial\FinancialLedgerService;
 use App\Services\Notifications\NotificationDispatcher;
@@ -27,6 +31,8 @@ class ApprovePartnerSettlement
 
     public function execute(PartnerSettlement $settlement, Admin $admin): PartnerSettlement
     {
+        abort_unless($admin->hasPermission('settlements.manage'), 403);
+
         $approved = DB::transaction(function () use ($settlement, $admin): PartnerSettlement {
             /** @var PartnerSettlement $locked */
             $locked = PartnerSettlement::query()->whereKey($settlement->id)->lockForUpdate()->firstOrFail();
@@ -64,7 +70,42 @@ class ApprovePartnerSettlement
                 ]);
             }
 
+            $reservations = Reservation::query()
+                ->whereKey($payableItems->pluck('reservation_id')->filter()->unique()->all())
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
             foreach ($payableItems as $item) {
+                $reservation = $reservations->get($item->reservation_id);
+                if ($reservation === null
+                    || $reservation->status !== ReservationStatus::Confirmed
+                    || $reservation->requires_refund_review
+                    || $reservation->cases()
+                        ->whereNotIn('status', [CaseStatus::Resolved->value, CaseStatus::Closed->value])
+                        ->lockForUpdate()
+                        ->exists()
+                    || $reservation->refunds()
+                        ->where(function ($q): void {
+                            $q->whereIn('status', [
+                                RefundStatus::Requested->value,
+                                RefundStatus::Approved->value,
+                                RefundStatus::Pending->value,
+                                RefundStatus::Uncertain->value,
+                                RefundStatus::Processing->value,
+                            ])->orWhere(function ($legacyFailed): void {
+                                $legacyFailed->where('status', RefundStatus::Failed->value)
+                                    ->whereNull('gateway_refund_id');
+                            });
+                        })
+                        ->lockForUpdate()
+                        ->exists()) {
+                    throw ValidationException::withMessages([
+                        'settlement' => "Reservation {$item->reservation_id} has an unresolved customer protection case, refund review, or non-confirmed status and cannot be approved for payout.",
+                    ]);
+                }
+
                 $payment = ReservationPayment::query()
                     ->whereKey($item->reservation_payment_id)
                     ->lockForUpdate()

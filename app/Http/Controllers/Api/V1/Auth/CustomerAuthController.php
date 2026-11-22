@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
 
 class CustomerAuthController extends ApiController
 {
@@ -42,6 +43,10 @@ class CustomerAuthController extends ApiController
             $request->merge(['phone' => $normalizedPhone]);
         }
 
+        if (! $request->has('terms') && $request->has('terms_accepted')) {
+            $request->merge(['terms' => $request->input('terms_accepted')]);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
@@ -49,7 +54,7 @@ class CustomerAuthController extends ApiController
             'password' => ['required', 'string', Password::min(8)],
             'device_name' => ['nullable', 'string', 'max:100'],
             'referral_code' => ['nullable', 'string', 'max:50'],
-            'terms' => ['sometimes', 'accepted'],
+            'terms' => ['required', 'accepted'],
             'marketing_consent' => ['nullable', 'boolean'],
         ]);
 
@@ -101,6 +106,9 @@ class CustomerAuthController extends ApiController
             'email' => ['required', 'string'],
             'password' => ['required', 'string'],
             'device_name' => ['nullable', 'string', 'max:100'],
+            'code' => ['nullable', 'string'],
+            'two_factor_code' => ['nullable', 'string'],
+            'recovery_code' => ['nullable', 'string'],
         ]);
 
         $login = trim((string) ($request->input('email') ?? $request->input('phone') ?? $request->input('login') ?? ''));
@@ -112,16 +120,74 @@ class CustomerAuthController extends ApiController
             return $this->error("Too many login attempts. Please try again in {$seconds} seconds.", 'RATE_LIMITED', 429);
         }
 
+        $phoneDigits = (string) preg_replace('/[^0-9]/', '', $login);
+        if (strlen($phoneDigits) === 12 && str_starts_with($phoneDigits, '91')) {
+            $phoneDigits = substr($phoneDigits, 2);
+        }
+
         /** @var User|null $user */
         $user = User::query()
             ->where('email', strtolower($login))
-            ->orWhere('phone', $login)
+            ->orWhere(function ($query) use ($login, $phoneDigits): void {
+                $query->where('phone', $login);
+                if ($phoneDigits !== '') {
+                    $query->orWhere('phone', $phoneDigits);
+                }
+            })
             ->first();
 
         if ($user === null || ! Hash::check($validated['password'], $user->password)) {
             RateLimiter::hit($throttleKey, 60);
 
             return $this->error('The provided credentials do not match our customer records.', 'INVALID_CREDENTIALS', 401);
+        }
+
+        if ($user->hasEnabledTwoFactorAuthentication()) {
+            $recoveryCode = trim((string) ($validated['recovery_code'] ?? ''));
+            $totpCode = trim((string) ($validated['code'] ?? $validated['two_factor_code'] ?? ''));
+
+            if ($recoveryCode === '' && $totpCode === '') {
+                return $this->error(
+                    'Two-factor authentication code is required for this account.',
+                    'TWO_FACTOR_REQUIRED',
+                    403,
+                    ['two_factor_required' => true],
+                );
+            }
+
+            if ($recoveryCode !== '') {
+                $validRecoveryCode = collect($user->recoveryCodes())
+                    ->first(static fn (string $code): bool => hash_equals($code, $recoveryCode));
+
+                if (! is_string($validRecoveryCode)) {
+                    RateLimiter::hit($throttleKey, 60);
+
+                    return $this->error(
+                        'The provided two-factor recovery code was invalid.',
+                        'INVALID_TWO_FACTOR_CODE',
+                        422,
+                        ['recovery_code' => ['The provided two-factor recovery code was invalid.']],
+                    );
+                }
+
+                $user->replaceRecoveryCode($validRecoveryCode);
+            } else {
+                $verified = app(TwoFactorAuthenticationProvider::class)->verify(
+                    decrypt((string) $user->two_factor_secret),
+                    $totpCode,
+                );
+
+                if (! $verified) {
+                    RateLimiter::hit($throttleKey, 60);
+
+                    return $this->error(
+                        'The provided two-factor authentication code was invalid.',
+                        'INVALID_TWO_FACTOR_CODE',
+                        422,
+                        ['code' => ['The provided two-factor authentication code was invalid.']],
+                    );
+                }
+            }
         }
 
         RateLimiter::clear($throttleKey);

@@ -74,6 +74,10 @@ class ProcessRelocationDecision
                     'customer_decision_at' => $now,
                 ])->save();
 
+                $source->forceFill([
+                    'requires_refund_review' => true,
+                ])->save();
+
                 if ($lockedRelocation->case !== null) {
                     $lockedRelocation->case->forceFill(['status' => CaseStatus::RefundReview])->save();
                 }

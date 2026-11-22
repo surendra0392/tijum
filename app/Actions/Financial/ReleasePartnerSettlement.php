@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace App\Actions\Financial;
 
+use App\Enums\CaseStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\ProviderTransferStatus;
+use App\Enums\RefundStatus;
+use App\Enums\ReservationStatus;
 use App\Enums\SettlementStatus;
 use App\Models\Admin;
 use App\Models\PartnerSettlement;
 use App\Models\PartnerSettlementItem;
 use App\Models\ProviderTransfer;
+use App\Models\Reservation;
 use App\Models\ReservationPayment;
 use App\Services\Payments\RazorpayRouteService;
 use Carbon\CarbonImmutable;
@@ -176,11 +180,46 @@ class ReleasePartnerSettlement
                 return null;
             }
 
+            $reservations = Reservation::query()
+                ->whereKey($unsent->pluck('reservation_id')->filter()->unique()->all())
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
             $payments = ReservationPayment::query()
                 ->whereKey($unsent->pluck('reservation_payment_id')->all())
                 ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
 
             foreach ($unsent as $item) {
+                $reservation = $reservations->get($item->reservation_id);
+                if ($reservation === null
+                    || $reservation->status !== ReservationStatus::Confirmed
+                    || $reservation->requires_refund_review
+                    || $reservation->cases()
+                        ->whereNotIn('status', [CaseStatus::Resolved->value, CaseStatus::Closed->value])
+                        ->lockForUpdate()
+                        ->exists()
+                    || $reservation->refunds()
+                        ->where(function ($q): void {
+                            $q->whereIn('status', [
+                                RefundStatus::Requested->value,
+                                RefundStatus::Approved->value,
+                                RefundStatus::Pending->value,
+                                RefundStatus::Uncertain->value,
+                                RefundStatus::Processing->value,
+                            ])->orWhere(function ($legacyFailed): void {
+                                $legacyFailed->where('status', RefundStatus::Failed->value)
+                                    ->whereNull('gateway_refund_id');
+                            });
+                        })
+                        ->lockForUpdate()
+                        ->exists()) {
+                    throw ValidationException::withMessages([
+                        'settlement' => "Payout blocked: reservation {$item->reservation_id} has an unresolved customer protection grievance, pending refund review, or non-confirmed status.",
+                    ]);
+                }
+
                 $payment = $payments->get($item->reservation_payment_id);
                 if ($payment === null || $payment->gateway !== 'razorpay' || $payment->currency !== 'INR' || blank($payment->gateway_payment_id)) {
                     throw ValidationException::withMessages(['settlement' => "Payment for reservation {$item->reservation_id} is missing an eligible INR Razorpay payment reference."]);

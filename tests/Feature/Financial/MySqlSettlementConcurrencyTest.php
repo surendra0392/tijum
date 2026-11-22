@@ -6,16 +6,20 @@ namespace Tests\Feature\Financial;
 
 use App\Actions\Financial\CreatePartnerSettlement;
 use App\Actions\Financial\ReleasePartnerSettlement;
+use App\Actions\Protection\CreateProtectionCase;
 use App\Enums\AdminRole;
+use App\Enums\CaseCategory;
 use App\Enums\CommissionSnapshotStatus;
 use App\Enums\FinancialOnboardingStatus;
 use App\Enums\LinkedAccountStatus;
 use App\Enums\PaymentStatus;
+use App\Enums\PointsTransactionType;
 use App\Enums\ReservationStatus;
 use App\Enums\SettlementItemType;
 use App\Enums\SettlementStatus;
 use App\Http\Controllers\Admin\Financial\AdminSettlementController;
 use App\Models\Admin;
+use App\Models\CustomerPointsLedger;
 use App\Models\Owner;
 use App\Models\OwnerFinancialProfile;
 use App\Models\PartnerSettlement;
@@ -23,6 +27,8 @@ use App\Models\PartnerSettlementItem;
 use App\Models\ProviderTransfer;
 use App\Models\Reservation;
 use App\Models\ReservationPayment;
+use App\Models\User;
+use App\Services\Rewards\ReferralService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\Request;
@@ -444,5 +450,195 @@ class MySqlSettlementConcurrencyTest extends TestCase
         $this->assertSame(SettlementStatus::Settled, $retryResult->status);
         $this->assertSame(2, ProviderTransfer::query()->where('partner_settlement_id', $settlement->id)->count());
         Http::assertSentCount(2);
+    }
+
+    public function test_mysql_concurrent_grievance_creation_and_payout_claim_serialize_on_reservation_lock(): void
+    {
+        $this->fakeRouteTransfers();
+        $uniq = uniqid();
+        $admin = $this->createSettlementAdmin();
+        [$owner, $profile, $reservation, $payment] = $this->setupEligibleOwnerAndReservation($uniq.'_griev', 100000);
+
+        $settlement = PartnerSettlement::create([
+            'settlement_reference' => "TPS-2026-GRIEV-{$uniq}",
+            'owner_id' => $owner->id,
+            'owner_financial_profile_id' => $profile->id,
+            'period_start' => now()->subDays(4)->toDateString(),
+            'period_end' => now()->subDays(2)->toDateString(),
+            'currency' => 'INR',
+            'gross_booking_value_minor' => 100000,
+            'commission_amount_minor' => 10000,
+            'commission_tax_amount_minor' => 1800,
+            'statutory_deductions_minor' => 100,
+            'refund_adjustments_minor' => 0,
+            'relocation_adjustments_minor' => 0,
+            'other_adjustments_minor' => 0,
+            'net_settlement_amount_minor' => 88100,
+            'status' => SettlementStatus::Approved,
+            'approved_by_admin_id' => $admin->id,
+            'approved_at' => now(),
+        ]);
+
+        PartnerSettlementItem::create([
+            'partner_settlement_id' => $settlement->id,
+            'reservation_id' => $reservation->id,
+            'reservation_payment_id' => $payment->id,
+            'item_type' => SettlementItemType::BookingPayable,
+            'gross_amount_minor' => 100000,
+            'commission_amount_minor' => 10000,
+            'commission_tax_amount_minor' => 1800,
+            'tax_deduction_minor' => 100,
+            'net_payable_minor' => 88100,
+            'notes' => 'Grievance race test item',
+        ]);
+
+        // Connection A holds an active transaction during CreateProtectionCase (which locks the Reservation row)
+        $defaultConnection = DB::getDefaultConnection();
+        $secondConnection = 'mysql_grievance_race_'.$uniq;
+        $secondConfig = Config::get('database.connections.'.$defaultConnection);
+        $secondConfig['options'] = ($secondConfig['options'] ?? []) + [
+            \PDO::ATTR_TIMEOUT => 2,
+        ];
+        Config::set('database.connections.'.$secondConnection, $secondConfig);
+        DB::connection($secondConnection)->statement('SET innodb_lock_wait_timeout = 1');
+
+        DB::beginTransaction();
+
+        try {
+            app(CreateProtectionCase::class)->execute(
+                $reservation,
+                $reservation->user,
+                [
+                    'category' => CaseCategory::OwnerCancelled->value,
+                    'description' => 'Host refused check-in concurrently with payout attempt.',
+                ],
+            );
+
+            // While Connection A holds the Reservation row lock, Connection B attempts to claim payout.
+            // Because ReleasePartnerSettlement::claimNextTransfer() MUST acquire lockForUpdate() on the Reservation row
+            // in the same transaction as the payout claim, Connection B MUST block on InnoDB row lock!
+            DB::setDefaultConnection($secondConnection);
+            $blockedByRowLock = false;
+
+            try {
+                app(ReleasePartnerSettlement::class)->execute($settlement, $admin);
+            } catch (QueryException $e) {
+                $blockedByRowLock = str_contains($e->getMessage(), '1205')
+                    || str_contains(strtolower($e->getMessage()), 'lock wait timeout');
+            } finally {
+                DB::setDefaultConnection($defaultConnection);
+            }
+
+            $this->assertTrue(
+                $blockedByRowLock,
+                'ReleasePartnerSettlement::claimNextTransfer must lock the Reservation row with lockForUpdate() to serialize against concurrent grievance creation.',
+            );
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+            DB::purge($secondConnection);
+
+            throw $e;
+        }
+
+        DB::purge($secondConnection);
+
+        // Once the grievance transaction commits, any subsequent payout release attempt MUST be rejected
+        // with zero external transfers dispatched!
+        try {
+            app(ReleasePartnerSettlement::class)->execute($settlement->fresh(), $admin);
+            $this->fail('Payout release must fail once the qualifying grievance has committed.');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('settlement', $e->errors());
+        }
+
+        $this->assertSame(0, ProviderTransfer::query()->where('partner_settlement_id', $settlement->id)->count());
+        Http::assertNothingSent();
+    }
+
+    public function test_mysql_concurrent_referral_qualifications_enforce_max_successful_referrals_cap_under_row_lock(): void
+    {
+        $uniq = uniqid();
+        $referrer = User::factory()->create(['email' => "referrer_{$uniq}@example.com"]);
+        $referralService = app(ReferralService::class);
+        $profile = $referralService->getOrCreateProfile($referrer);
+
+        // Referrer already has 4 successful referrals out of max 5
+        $profile->update([
+            'total_referrals_count' => 4,
+            'successful_referrals_count' => 4,
+            'total_points_earned' => 2000,
+        ]);
+
+        // Two referred friends both complete stays concurrently
+        [, , $reservationA] = $this->setupEligibleOwnerAndReservation($uniq.'_refA', 200000);
+        [, , $reservationB] = $this->setupEligibleOwnerAndReservation($uniq.'_refB', 200000);
+
+        $reservationA->forceFill([
+            'checked_in_at' => now()->subDays(5),
+            'checked_out_at' => now()->subDays(2),
+        ])->save();
+        $reservationB->forceFill([
+            'checked_in_at' => now()->subDays(5),
+            'checked_out_at' => now()->subDays(2),
+        ])->save();
+
+        $referralA = $referralService->attributeReferral($reservationA->user, $profile->referral_code);
+        $referralB = $referralService->attributeReferral($reservationB->user, $profile->referral_code);
+        $this->assertNotNull($referralA);
+        $this->assertNotNull($referralB);
+
+        $defaultConnection = DB::getDefaultConnection();
+        $secondConnection = 'mysql_referral_cap_'.$uniq;
+        Config::set('database.connections.'.$secondConnection, Config::get('database.connections.'.$defaultConnection));
+        DB::connection($secondConnection)->statement('SET innodb_lock_wait_timeout = 1');
+
+        // Connection A starts a transaction and qualifies referral A (holding lock on referrer's CustomerReferralProfile)
+        DB::beginTransaction();
+        try {
+            $referralService->qualifyReferralOnCompletedStay($reservationA);
+
+            // While Connection A holds the referrer profile lock, Connection B attempts to qualify referral B
+            DB::setDefaultConnection($secondConnection);
+            $blockedOnProfileLock = false;
+            try {
+                $referralService->qualifyReferralOnCompletedStay($reservationB);
+            } catch (QueryException $e) {
+                $blockedOnProfileLock = str_contains($e->getMessage(), '1205')
+                    || str_contains(strtolower($e->getMessage()), 'lock wait timeout');
+            } finally {
+                DB::setDefaultConnection($defaultConnection);
+            }
+
+            $this->assertTrue(
+                $blockedOnProfileLock,
+                'qualifyReferralOnCompletedStay must lock CustomerReferralProfile with lockForUpdate() to prevent concurrent cap overflow.',
+            );
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+            DB::purge($secondConnection);
+            throw $e;
+        }
+
+        DB::purge($secondConnection);
+
+        // Now qualify referral B after referral A committed (reaching cap of 5)
+        $referralService->qualifyReferralOnCompletedStay($reservationB);
+
+        // Referrer must only receive points for the 5th referral (500 points), NOT the 6th!
+        $referrerBonusEntries = CustomerPointsLedger::query()
+            ->where('user_id', $referrer->id)
+            ->where('transaction_type', PointsTransactionType::ReferralBonusReferrer)
+            ->get();
+        $this->assertCount(1, $referrerBonusEntries);
+        $this->assertSame(500, (int) $referrerBonusEntries->sum('points'));
+        $this->assertSame(2500, (int) $profile->fresh()->total_points_earned);
     }
 }

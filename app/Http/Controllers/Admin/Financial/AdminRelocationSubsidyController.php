@@ -74,6 +74,7 @@ class AdminRelocationSubsidyController extends Controller
     {
         /** @var Admin $admin */
         $admin = $request->user('admin');
+        abort_unless($admin->hasPermission('relocations.subsidies.manage'), 403);
 
         $subsidy->forceFill([
             'status' => RelocationSubsidyStatus::Approved,

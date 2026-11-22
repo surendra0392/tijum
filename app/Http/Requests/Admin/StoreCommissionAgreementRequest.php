@@ -10,7 +10,9 @@ class StoreCommissionAgreementRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user('admin') !== null;
+        $admin = $this->user('admin');
+
+        return $admin !== null && $admin->hasPermission('commissions.manage');
     }
 
     /**

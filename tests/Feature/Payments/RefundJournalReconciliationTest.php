@@ -683,6 +683,37 @@ class RefundJournalReconciliationTest extends TestCase
         $this->assertTrue($payment->reservation->fresh()->requires_refund_review);
     }
 
+    public function test_audit_quarantines_complete_refund_journal_when_parent_capture_journal_is_missing_or_corrupt(): void
+    {
+        $processedAt = CarbonImmutable::parse('2026-11-10 14:30:00');
+        [, $payment, $refund] = $this->seedHistoricalProcessedRefund(
+            gatewayOrderId: 'order_comp_ref_no_cap',
+            gatewayPaymentId: 'pay_comp_ref_no_cap',
+            gatewayRefundId: 'rfnd_comp_ref_no_cap',
+            amountMinor: 20000,
+            processedAt: $processedAt,
+            seedCaptureJournal: false,
+        );
+
+        // Post a complete 2-leg refund journal directly while parent capture journal is missing
+        app(FinancialLedgerService::class)->recordRefundCompleted($refund);
+        $this->assertSame(
+            'complete',
+            app(FinancialLedgerService::class)->inspectRefundJournal($refund)['status'],
+        );
+        $this->assertSame(
+            'missing',
+            app(FinancialLedgerService::class)->inspectPaymentCaptureJournal($payment)['status'],
+        );
+
+        $report = app(AuditAndRepairRefundJournals::class)->execute(apply: false);
+
+        $this->assertSame(0, $report['complete']);
+        $this->assertSame(1, $report['quarantined']);
+        $this->assertSame($refund->id, $report['items'][0]['refund_id']);
+        $this->assertSame('missing_capture_journal', $report['items'][0]['reason']);
+    }
+
     /**
      * @return array{0: Owner, 1: ReservationPayment, 2: ReservationRefund}
      */

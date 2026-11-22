@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace App\Services\Rewards;
 
+use App\Enums\CaseStatus;
+use App\Enums\PaymentStatus;
 use App\Enums\PointsTransactionStatus;
 use App\Enums\PointsTransactionType;
+use App\Enums\RefundStatus;
+use App\Enums\ReservationStatus;
 use App\Models\Admin;
 use App\Models\CustomerPointsLedger;
 use App\Models\CustomerPointsWallet;
 use App\Models\PointsReservationHold;
 use App\Models\Reservation;
+use App\Models\ReservationPayment;
 use App\Models\RewardsSetting;
 use App\Models\User;
 use App\Services\Notifications\NotificationDispatcher;
@@ -212,7 +217,7 @@ class LoyaltyPointsService
             // Burn points from active credit entries via FEFO (First-Expiring-First-Out)
             $consumedFrom = $this->consumeCreditsFefo($lockedHold->user_id, $pointsToBurn);
 
-            $idempKey = 'RED-'.$reservation->id.'-'.Str::random(8);
+            $idempKey = 'RED-'.$reservation->id.'-'.$lockedHold->id;
 
             $ledgerEntry = CustomerPointsLedger::create([
                 'user_id' => $lockedHold->user_id,
@@ -254,15 +259,18 @@ class LoyaltyPointsService
         return DB::transaction(function () use ($user, $points, $type, $referenceType, $referenceId, $idempotencyKey, $notes, $admin, $expiresAt): CustomerPointsLedger {
             $key = $idempotencyKey ?? 'PTS-'.Str::random(16);
 
-            $existing = CustomerPointsLedger::query()->where('idempotency_key', $key)->first();
-            if ($existing !== null) {
-                return $existing;
-            }
-
             /** @var CustomerPointsWallet $wallet */
             $wallet = CustomerPointsWallet::query()
                 ->lockForUpdate()
                 ->firstOrCreate(['user_id' => $user->id]);
+
+            $existing = CustomerPointsLedger::query()
+                ->where('idempotency_key', $key)
+                ->lockForUpdate()
+                ->first();
+            if ($existing !== null) {
+                return $existing;
+            }
 
             $wallet->increment('available_points', $points);
             $wallet->increment('total_points_earned', $points);
@@ -296,15 +304,18 @@ class LoyaltyPointsService
         return DB::transaction(function () use ($user, $reservation, $points): CustomerPointsLedger {
             $key = 'PND-BK-'.$reservation->id;
 
-            $existing = CustomerPointsLedger::query()->where('idempotency_key', $key)->first();
-            if ($existing !== null) {
-                return $existing;
-            }
-
             /** @var CustomerPointsWallet $wallet */
             $wallet = CustomerPointsWallet::query()
                 ->lockForUpdate()
                 ->firstOrCreate(['user_id' => $user->id]);
+
+            $existing = CustomerPointsLedger::query()
+                ->where('idempotency_key', $key)
+                ->lockForUpdate()
+                ->first();
+            if ($existing !== null) {
+                return $existing;
+            }
 
             $wallet->increment('pending_points', $points);
 
@@ -324,20 +335,105 @@ class LoyaltyPointsService
         });
     }
 
+    public function isReservationEligibleForCompletionRewards(Reservation $reservation): bool
+    {
+        if ($reservation->status !== ReservationStatus::Confirmed
+            || $reservation->checked_in_at === null
+            || $reservation->checked_out_at === null
+            || $reservation->checkout_date->startOfDay()->isFuture()
+            || $reservation->requires_refund_review) {
+            return false;
+        }
+
+        $hasUnresolvedCase = $reservation->cases()
+            ->whereNotIn('status', [CaseStatus::Resolved->value, CaseStatus::Closed->value])
+            ->exists();
+        if ($hasUnresolvedCase) {
+            return false;
+        }
+
+        $hasUnresolvedRefund = $reservation->refunds()
+            ->where(function ($q): void {
+                $q->whereIn('status', [
+                    RefundStatus::Requested->value,
+                    RefundStatus::Approved->value,
+                    RefundStatus::Pending->value,
+                    RefundStatus::Uncertain->value,
+                    RefundStatus::Processing->value,
+                ])->orWhere(function ($legacyFailed): void {
+                    $legacyFailed->where('status', RefundStatus::Failed->value)
+                        ->whereNull('gateway_refund_id');
+                });
+            })
+            ->exists();
+        if ($hasUnresolvedRefund) {
+            return false;
+        }
+
+        if ($reservation->total_amount_minor > 0 && $this->netSettledPaidAmountMinor($reservation) <= 0) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function netSettledPaidAmountMinor(Reservation $reservation): int
+    {
+        /** @var ReservationPayment|null $capturedPayment */
+        $capturedPayment = $reservation->payments()
+            ->whereIn('status', [PaymentStatus::Captured->value, PaymentStatus::PartiallyRefunded->value])
+            ->latest('id')
+            ->first();
+
+        if ($capturedPayment === null) {
+            return 0;
+        }
+
+        $refundedMinor = $capturedPayment->totalRefundedAmount();
+        $netPaymentRemaining = $capturedPayment->amount_minor - $refundedMinor;
+        if ($netPaymentRemaining <= 0) {
+            return 0;
+        }
+
+        return max(0, (int) $reservation->total_amount_minor - $refundedMinor);
+    }
+
     /**
      * Activate pending points once reservation stay is completed.
      */
     public function activatePendingPoints(Reservation $reservation): ?CustomerPointsLedger
     {
+        if (! $this->isReservationEligibleForCompletionRewards($reservation)) {
+            return null;
+        }
+
         /** @var int|null $newAvailableBalance */
         $newAvailableBalance = null;
 
         $ledgerEntry = DB::transaction(function () use ($reservation, &$newAvailableBalance): ?CustomerPointsLedger {
+            $lockedReservation = Reservation::query()->whereKey($reservation->id)->lockForUpdate()->first();
+            if ($lockedReservation === null
+                || $lockedReservation->points_awarded_credited > 0
+                || ! $this->isReservationEligibleForCompletionRewards($lockedReservation)) {
+                return null;
+            }
+
+            $alreadyActivated = CustomerPointsLedger::query()
+                ->where('reference_type', Reservation::class)
+                ->where('reference_id', $lockedReservation->id)
+                ->where('transaction_type', PointsTransactionType::BookingEarned)
+                ->where('status', '!=', PointsTransactionStatus::Pending->value)
+                ->lockForUpdate()
+                ->exists();
+            if ($alreadyActivated) {
+                return null;
+            }
+
             /** @var CustomerPointsLedger|null $pendingEntry */
             $pendingEntry = CustomerPointsLedger::query()
                 ->lockForUpdate()
                 ->where('reference_type', Reservation::class)
-                ->where('reference_id', $reservation->id)
+                ->where('reference_id', $lockedReservation->id)
                 ->where('status', PointsTransactionStatus::Pending)
                 ->first();
 
@@ -364,10 +460,10 @@ class LoyaltyPointsService
                 'running_balance_after' => $wallet->available_points,
                 'expires_at' => CarbonImmutable::now()->addDays($expiryDays),
                 'points_remaining' => $points,
-                'notes' => "Credited for completed stay #{$reservation->booking_reference}",
+                'notes' => "Credited for completed stay #{$lockedReservation->booking_reference}",
             ]);
 
-            $reservation->update(['points_awarded_credited' => $points]);
+            $lockedReservation->update(['points_awarded_credited' => $points]);
             $freshWallet = $wallet->fresh();
             $newAvailableBalance = $freshWallet !== null ? $freshWallet->available_points : ($wallet->available_points + $points);
 

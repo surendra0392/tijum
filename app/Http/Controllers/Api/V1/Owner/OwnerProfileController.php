@@ -96,6 +96,11 @@ class OwnerProfileController extends ApiController
             'password' => $validated['password'],
         ]);
 
+        $currentTokenId = optional($owner->currentAccessToken())->getKey();
+        $owner->tokens()
+            ->when($currentTokenId !== null, static fn ($q) => $q->where('id', '!=', $currentTokenId))
+            ->delete();
+
         return $this->success(null, 'Password updated successfully');
     }
 }

@@ -33,6 +33,8 @@ class CreatePartnerSettlement
         ?CarbonImmutable $periodStart = null,
         ?CarbonImmutable $periodEnd = null,
     ): PartnerSettlement {
+        abort_unless($admin->hasPermission('settlements.manage'), 403);
+
         $profile = $owner->financialProfile;
         if ($profile === null || ! $profile->isSettlementEligible()) {
             throw ValidationException::withMessages([

@@ -25,6 +25,9 @@ class QualifyPendingRewardsCommand extends Command
 
         $completedReservations = Reservation::query()
             ->where('status', ReservationStatus::Confirmed)
+            ->where('requires_refund_review', false)
+            ->whereNotNull('checked_in_at')
+            ->whereNotNull('checked_out_at')
             ->whereDate('checkout_date', '<=', $today)
             ->where(function ($sub) {
                 $sub->where(function ($q) {

@@ -7,7 +7,9 @@ namespace Tests\Feature\Financial;
 use App\Actions\Financial\ApprovePartnerSettlement;
 use App\Actions\Financial\ReleasePartnerSettlement;
 use App\Actions\Payments\ProcessWebhookEvent;
+use App\Actions\Protection\CreateProtectionCase;
 use App\Enums\AdminRole;
+use App\Enums\CaseCategory;
 use App\Enums\CommissionSnapshotStatus;
 use App\Enums\FinancialOnboardingStatus;
 use App\Enums\LinkedAccountStatus;
@@ -966,6 +968,108 @@ class RazorpayRouteTransferTest extends TestCase
         $this->assertSame(CommissionSnapshotStatus::Settled, $payment->reservation->fresh()->commission_status);
         $this->assertDatabaseCount('financial_ledger_entries', 2);
         Http::assertSentCount(3);
+    }
+
+    public function test_unresolved_grievance_blocks_settlement_approval(): void
+    {
+        [$admin, $settlement, $payment] = $this->setupApprovedSettlement();
+        $settlement->update([
+            'status' => SettlementStatus::Draft,
+            'approved_by_admin_id' => null,
+            'approved_at' => null,
+        ]);
+
+        app(CreateProtectionCase::class)->execute(
+            $payment->reservation,
+            $payment->reservation->user,
+            [
+                'category' => CaseCategory::PropertyUnavailable->value,
+                'description' => 'Host denied entry at arrival; requesting emergency relocation or refund.',
+            ],
+        );
+
+        try {
+            app(ApprovePartnerSettlement::class)->execute($settlement->fresh(), $admin);
+            $this->fail('Expected ValidationException when approving settlement with an unresolved protection case.');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('settlement', $e->errors());
+        }
+
+        $this->assertSame(SettlementStatus::Draft, $settlement->fresh()->status);
+    }
+
+    public function test_unresolved_grievance_raised_after_approval_blocks_payout_release(): void
+    {
+        [$admin, $settlement, $payment] = $this->setupApprovedSettlement();
+        $this->fakeTransfer('trf_should_not_send');
+
+        // Customer submits a qualifying grievance AFTER the settlement was approved
+        app(CreateProtectionCase::class)->execute(
+            $payment->reservation,
+            $payment->reservation->user,
+            [
+                'category' => CaseCategory::FoodNotProvided->value,
+                'description' => 'Disclosed meals were not provided during stay.',
+            ],
+        );
+
+        try {
+            app(ReleasePartnerSettlement::class)->execute($settlement->fresh(), $admin);
+            $this->fail('Expected ValidationException when releasing payout for reservation with unresolved grievance.');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('settlement', $e->errors());
+        }
+
+        $this->assertNoPayoutRecorded($settlement);
+        Http::assertNothingSent();
+    }
+
+    public function test_grievance_on_second_item_blocks_remaining_payout_while_preserving_already_dispatched_first_transfer(): void
+    {
+        [$admin, $settlement, $payment, $item] = $this->setupApprovedSettlement();
+        $this->addSecondPayableItem($settlement, $payment, $item);
+
+        $secondItem = $settlement->items()->where('id', '!=', $item->id)->firstOrFail();
+        $secondReservation = $secondItem->reservation;
+
+        // When first transfer is dispatched, customer concurrently files a grievance on the second reservation
+        Http::fake([
+            'https://api.razorpay.com/v1/payments/pay_vizag_001/transfers' => function (Request $request) use ($secondReservation): PromiseInterface {
+                app(CreateProtectionCase::class)->execute(
+                    $secondReservation,
+                    $secondReservation->user,
+                    [
+                        'category' => CaseCategory::SafetyConcern->value,
+                        'description' => 'Urgent safety issue raised before second item payout claim.',
+                    ],
+                );
+
+                return $this->routeResponse($request, 'trf_vizag_item1_ok', 'processed');
+            },
+            'https://api.razorpay.com/v1/payments/pay_vizag_002/transfers' => fn (Request $request) => $this->routeResponse($request, 'trf_vizag_item2_blocked', 'processed'),
+        ]);
+
+        try {
+            app(ReleasePartnerSettlement::class)->execute($settlement->fresh(), $admin);
+            $this->fail('Expected ValidationException when second reservation has an unresolved grievance before its payout claim.');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('settlement', $e->errors());
+        }
+
+        // First transfer MUST remain preserved as Processed (never marked unpaid or deleted)
+        $this->assertDatabaseHas('provider_transfers', [
+            'partner_settlement_id' => $settlement->id,
+            'reservation_payment_id' => $payment->id,
+            'gateway_transfer_id' => 'trf_vizag_item1_ok',
+            'status' => ProviderTransferStatus::Processed->value,
+        ]);
+        // Second transfer MUST NOT have been created or dispatched
+        $this->assertDatabaseMissing('provider_transfers', [
+            'partner_settlement_id' => $settlement->id,
+            'reservation_payment_id' => $secondItem->reservation_payment_id,
+        ]);
+        $this->assertSame(1, ProviderTransfer::query()->where('partner_settlement_id', $settlement->id)->count());
+        Http::assertSentCount(1);
     }
 
     private function routeResponse(Request $request, ?string $transferId, string $status = 'processed'): PromiseInterface

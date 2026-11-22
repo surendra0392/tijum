@@ -81,6 +81,14 @@ class OwnerPropertyController extends ApiController
         /** @var Owner $owner */
         $owner = $request->user();
 
+        if (! $owner->canPublishProperties()) {
+            return $this->error(
+                'Your partner account must be verified and active with a confirmed email address to register properties.',
+                'FORBIDDEN',
+                403,
+            );
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'category_id' => ['nullable'],
@@ -128,6 +136,14 @@ class OwnerPropertyController extends ApiController
 
         if ($property === null) {
             return $this->error('Property not found or unauthorized.', 'NOT_FOUND', 404);
+        }
+
+        if (! $owner->canPublishProperties()) {
+            return $this->error(
+                'Your partner account must be verified and active with a confirmed email address to update properties.',
+                'FORBIDDEN',
+                403,
+            );
         }
 
         $validated = $request->validate([
@@ -179,6 +195,14 @@ class OwnerPropertyController extends ApiController
 
         if ($property === null) {
             return $this->error('Property not found or unauthorized.', 'NOT_FOUND', 404);
+        }
+
+        if (! $owner->canPublishProperties()) {
+            return $this->error(
+                'Your partner account must be verified and active with a confirmed email address to update properties.',
+                'FORBIDDEN',
+                403,
+            );
         }
 
         $validated = $request->validate([

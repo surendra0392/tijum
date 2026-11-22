@@ -10,7 +10,9 @@ class CreateSettlementRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user('admin') !== null;
+        $admin = $this->user('admin');
+
+        return $admin !== null && $admin->hasPermission('settlements.manage');
     }
 
     /**

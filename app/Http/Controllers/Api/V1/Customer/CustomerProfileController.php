@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
 class CustomerProfileController extends ApiController
@@ -29,11 +30,37 @@ class CustomerProfileController extends ApiController
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'email' => [
+                'sometimes',
+                'required',
+                'string',
+                'lowercase',
+                'email',
+                'max:255',
+                Rule::unique(User::class, 'email')->ignore($user->id),
+            ],
             'phone' => ['nullable', 'string', 'max:20'],
             'marketing_consent' => ['nullable', 'boolean'],
         ]);
 
-        $user->update($validated);
+        $emailChanged = isset($validated['email']) && strtolower((string) $validated['email']) !== strtolower($user->email);
+        $phoneChanged = array_key_exists('phone', $validated) && $validated['phone'] !== $user->phone;
+
+        $user->fill($validated);
+
+        if ($emailChanged) {
+            $user->email_verified_at = null;
+        }
+
+        if ($phoneChanged) {
+            $user->phone_verified_at = null;
+        }
+
+        $user->save();
+
+        if ($emailChanged) {
+            $user->sendEmailVerificationNotification();
+        }
 
         return $this->success(new CustomerProfileResource($user), 'Profile updated successfully');
     }
@@ -55,6 +82,11 @@ class CustomerProfileController extends ApiController
         $user->update([
             'password' => Hash::make($validated['password']),
         ]);
+
+        $currentTokenId = optional($user->currentAccessToken())->getKey();
+        $user->tokens()
+            ->when($currentTokenId !== null, static fn ($q) => $q->where('id', '!=', $currentTokenId))
+            ->delete();
 
         return $this->success(null, 'Password changed successfully');
     }
