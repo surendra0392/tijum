@@ -633,6 +633,56 @@ class RefundJournalReconciliationTest extends TestCase
         $this->assertSame(PaymentStatus::PartiallyRefunded, $payment->fresh()->status);
     }
 
+    public function test_newly_processed_refund_quarantines_when_parent_capture_journal_is_missing(): void
+    {
+        $processedAt = CarbonImmutable::parse('2026-11-10 14:30:00');
+        [, $payment, $refund] = $this->seedHistoricalProcessedRefund(
+            gatewayOrderId: 'order_new_ref_no_cap',
+            gatewayPaymentId: 'pay_new_ref_no_cap',
+            gatewayRefundId: null,
+            amountMinor: 20000,
+            processedAt: $processedAt,
+            seedCaptureJournal: false,
+        );
+
+        $receipt = ReservationRefund::receiptFor('idemp_new_ref_no_cap');
+        $refund->forceFill([
+            'idempotency_key' => 'idemp_new_ref_no_cap',
+            'status' => RefundStatus::Processing,
+            'gateway_processed_at' => null,
+            'metadata' => [
+                'request_receipt' => $receipt,
+                'request_payment_id' => 'pay_new_ref_no_cap',
+                'request_mode' => 'test',
+            ],
+        ])->save();
+
+        $reconciled = app(ReconcilePaymentRefund::class)->apply($refund, [
+            'id' => 'rfnd_new_no_cap_1',
+            'entity' => 'refund',
+            'payment_id' => 'pay_new_ref_no_cap',
+            'amount' => 20000,
+            'currency' => 'INR',
+            'receipt' => $receipt,
+            'status' => 'processed',
+        ]);
+
+        $this->assertSame(RefundStatus::Processed, $reconciled->status);
+        $this->assertSame(
+            0,
+            FinancialLedgerEntry::query()
+                ->where('entity_type', ReservationRefund::class)
+                ->where('entity_id', $refund->id)
+                ->count(),
+        );
+        $this->assertDatabaseCount('financial_ledger_entries', 0);
+        $this->assertSame(
+            'missing_capture_journal',
+            $refund->fresh()->metadata['accounting_quarantine']['reason'] ?? null,
+        );
+        $this->assertTrue($payment->reservation->fresh()->requires_refund_review);
+    }
+
     /**
      * @return array{0: Owner, 1: ReservationPayment, 2: ReservationRefund}
      */

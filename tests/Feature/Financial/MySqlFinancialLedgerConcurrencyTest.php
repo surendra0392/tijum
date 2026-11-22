@@ -279,6 +279,101 @@ class MySqlFinancialLedgerConcurrencyTest extends TestCase
         $this->assertSame($firstPostedAt, $firstEntry->fresh()->posted_at->toIso8601String());
     }
 
+    public function test_concurrent_duplicate_journal_attempt_rejects_mismatched_leg_direction_or_entity_under_mysql(): void
+    {
+        $uniq = bin2hex(random_bytes(5));
+        [, $owner, , $reservation, $payment] = $this->seedMysqlFixture($uniq);
+        $otherPayment = ReservationPayment::create([
+            'reservation_id' => $reservation->id,
+            'user_id' => $reservation->user_id,
+            'gateway' => 'razorpay',
+            'gateway_order_id' => 'order_mysql_other_'.$uniq,
+            'gateway_payment_id' => 'pay_mysql_other_'.$uniq,
+            'idempotency_key' => 'idemp_mysql_other_'.$uniq,
+            'amount_minor' => 100000,
+            'currency' => 'INR',
+            'status' => PaymentStatus::Captured,
+            'captured_at' => now()->subDays(5),
+        ]);
+
+        $ledger = app(FinancialLedgerService::class);
+        $defaultConnection = DB::getDefaultConnection();
+        $workerConnName = 'mysql_ledger_mismatch_worker_'.$uniq;
+        Config::set('database.connections.'.$workerConnName, Config::get('database.connections.'.$defaultConnection));
+
+        DB::beginTransaction();
+        try {
+            // Take an InnoDB consistent read snapshot BEFORE worker connection commits its journal
+            FinancialLedgerEntry::query()->where('idempotency_key', 'payment_captured:'.$payment->id)->count();
+
+            DB::setDefaultConnection($workerConnName);
+            $ledger->recordPaymentCaptured($payment);
+            DB::setDefaultConnection($defaultConnection);
+
+            // 1. Concurrent attempt with reversed debit/credit directions hits 23000 unique constraint and must fail validation
+            $reversedRejected = false;
+            try {
+                $ledger->postJournal(
+                    $payment,
+                    $owner,
+                    [
+                        ['category' => LedgerEntryCategory::PaymentCaptured, 'debit_minor' => 0, 'credit_minor' => $payment->amount_minor],
+                        ['category' => LedgerEntryCategory::PartnerPayable, 'debit_minor' => $payment->amount_minor, 'credit_minor' => 0],
+                    ],
+                    idempotencyKey: 'payment_captured:'.$payment->id,
+                );
+            } catch (\RuntimeException) {
+                $reversedRejected = true;
+            }
+            $this->assertTrue($reversedRejected, 'Concurrent collision with reversed debit/credit legs must be rejected.');
+
+            // 2. Concurrent attempt binding same idempotency_key to a different entity must fail validation
+            $wrongEntityRejected = false;
+            try {
+                $ledger->postJournal(
+                    $otherPayment,
+                    $owner,
+                    [
+                        ['category' => LedgerEntryCategory::PaymentCaptured, 'debit_minor' => $payment->amount_minor, 'credit_minor' => 0],
+                        ['category' => LedgerEntryCategory::PartnerPayable, 'debit_minor' => 0, 'credit_minor' => $payment->amount_minor],
+                    ],
+                    idempotencyKey: 'payment_captured:'.$payment->id,
+                );
+            } catch (\RuntimeException) {
+                $wrongEntityRejected = true;
+            }
+            $this->assertTrue($wrongEntityRejected, 'Concurrent collision with a different entity must be rejected.');
+
+            // 3. Concurrent identical attempt recovers cleanly
+            $recovered = $ledger->postJournal(
+                $payment,
+                $owner,
+                [
+                    ['category' => LedgerEntryCategory::PaymentCaptured, 'debit_minor' => $payment->amount_minor, 'credit_minor' => 0],
+                    ['category' => LedgerEntryCategory::PartnerPayable, 'debit_minor' => 0, 'credit_minor' => $payment->amount_minor],
+                ],
+                idempotencyKey: 'payment_captured:'.$payment->id,
+            );
+            $this->assertCount(2, $recovered);
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::setDefaultConnection($defaultConnection);
+            DB::rollBack();
+            throw $e;
+        } finally {
+            DB::setDefaultConnection($defaultConnection);
+            DB::purge($workerConnName);
+        }
+
+        $this->assertSame(
+            2,
+            FinancialLedgerEntry::query()
+                ->where('entity_type', ReservationPayment::class)
+                ->where('entity_id', $payment->id)
+                ->count(),
+        );
+    }
+
     /**
      * @return array{0: Admin, 1: Owner, 2: OwnerFinancialProfile, 3: Reservation, 4: ReservationPayment}
      */

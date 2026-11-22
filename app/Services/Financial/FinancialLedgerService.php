@@ -86,7 +86,15 @@ class FinancialLedgerService
                 ->get();
 
             if ($existing->isNotEmpty()) {
-                return $this->validateExistingIdempotentJournal($existing, count($entries), $totalDebit, $normalizedCurrency, $normalizedIdempotency);
+                return $this->validateExistingIdempotentJournal(
+                    $existing,
+                    $entity,
+                    $owner,
+                    $entries,
+                    $totalDebit,
+                    $normalizedCurrency,
+                    $normalizedIdempotency,
+                );
             }
         }
 
@@ -147,7 +155,15 @@ class FinancialLedgerService
                     ->get();
 
                 if ($existing->isNotEmpty()) {
-                    return $this->validateExistingIdempotentJournal($existing, count($entries), $totalDebit, $normalizedCurrency, $normalizedIdempotency);
+                    return $this->validateExistingIdempotentJournal(
+                        $existing,
+                        $entity,
+                        $owner,
+                        $entries,
+                        $totalDebit,
+                        $normalizedCurrency,
+                        $normalizedIdempotency,
+                    );
                 }
             }
 
@@ -160,11 +176,54 @@ class FinancialLedgerService
      */
     public function inspectPaymentCaptureJournal(ReservationPayment $payment): array
     {
+        $amount = $payment->amount_minor;
+
         return $this->inspectEntityJournal(
-            $payment,
-            [LedgerEntryCategory::PaymentCaptured, LedgerEntryCategory::PartnerPayable],
-            $payment->amount_minor,
-            $payment->currency,
+            entity: $payment,
+            expectedLegs: [
+                [
+                    'category' => LedgerEntryCategory::PaymentCaptured,
+                    'debit_minor' => $amount,
+                    'credit_minor' => 0,
+                ],
+                [
+                    'category' => LedgerEntryCategory::PartnerPayable,
+                    'debit_minor' => 0,
+                    'credit_minor' => $amount,
+                ],
+            ],
+            expectedTotalMinor: $amount,
+            expectedCurrency: $payment->currency,
+            expectedOwnerIdResolver: function () use ($payment): ?int {
+                $payment->loadMissing('reservation.property');
+
+                return $payment->reservation->property?->owner_id;
+            },
+            expectedIdempotencyKey: 'payment_captured:'.$payment->id,
+        );
+    }
+
+    /**
+     * @return array{status: 'missing'|'complete'|'incomplete'|'duplicate'|'inconsistent', entries: list<FinancialLedgerEntry>, reason: ?string}
+     */
+    public function inspectSettlementApprovedJournal(PartnerSettlement $settlement): array
+    {
+        [$entries, $clearedPayable] = $this->settlementApprovedLegs($settlement);
+        if ($clearedPayable <= 0) {
+            return [
+                'status' => 'complete',
+                'entries' => [],
+                'reason' => null,
+            ];
+        }
+
+        return $this->inspectEntityJournal(
+            entity: $settlement,
+            expectedLegs: $entries,
+            expectedTotalMinor: $clearedPayable,
+            expectedCurrency: $settlement->currency,
+            expectedOwnerIdResolver: static fn (): int => $settlement->owner_id,
+            expectedIdempotencyKey: 'settlement_approved:'.$settlement->id,
         );
     }
 
@@ -173,11 +232,30 @@ class FinancialLedgerService
      */
     public function inspectRefundJournal(ReservationRefund $refund): array
     {
+        $amount = $refund->amount_minor;
+
         return $this->inspectEntityJournal(
-            $refund,
-            [LedgerEntryCategory::PartnerPayable, LedgerEntryCategory::RefundCompleted],
-            $refund->amount_minor,
-            $refund->currency,
+            entity: $refund,
+            expectedLegs: [
+                [
+                    'category' => LedgerEntryCategory::PartnerPayable,
+                    'debit_minor' => $amount,
+                    'credit_minor' => 0,
+                ],
+                [
+                    'category' => LedgerEntryCategory::RefundCompleted,
+                    'debit_minor' => 0,
+                    'credit_minor' => $amount,
+                ],
+            ],
+            expectedTotalMinor: $amount,
+            expectedCurrency: $refund->currency,
+            expectedOwnerIdResolver: function () use ($refund): ?int {
+                $refund->loadMissing('reservation.property');
+
+                return $refund->reservation->property?->owner_id;
+            },
+            expectedIdempotencyKey: 'refund_completed:'.$refund->id,
         );
     }
 
@@ -186,11 +264,30 @@ class FinancialLedgerService
      */
     public function inspectTransferJournal(ProviderTransfer $transfer): array
     {
+        $amount = $transfer->amount_minor;
+
         return $this->inspectEntityJournal(
-            $transfer,
-            [LedgerEntryCategory::TransferPending, LedgerEntryCategory::TransferCompleted],
-            $transfer->amount_minor,
-            $transfer->currency,
+            entity: $transfer,
+            expectedLegs: [
+                [
+                    'category' => LedgerEntryCategory::TransferPending,
+                    'debit_minor' => $amount,
+                    'credit_minor' => 0,
+                ],
+                [
+                    'category' => LedgerEntryCategory::TransferCompleted,
+                    'debit_minor' => 0,
+                    'credit_minor' => $amount,
+                ],
+            ],
+            expectedTotalMinor: $amount,
+            expectedCurrency: $transfer->currency,
+            expectedOwnerIdResolver: function () use ($transfer): ?int {
+                $transfer->loadMissing('settlement');
+
+                return $transfer->settlement?->owner_id;
+            },
+            expectedIdempotencyKey: 'transfer_completed:'.$transfer->id,
         );
     }
 
@@ -199,23 +296,73 @@ class FinancialLedgerService
      */
     public function inspectTransferReversalJournal(ProviderTransferReversal $reversal): array
     {
+        $amount = $reversal->amount_minor;
+
         return $this->inspectEntityJournal(
-            $reversal,
-            [LedgerEntryCategory::TransferCompleted, LedgerEntryCategory::TransferReversal],
-            $reversal->amount_minor,
-            $reversal->currency,
+            entity: $reversal,
+            expectedLegs: [
+                [
+                    'category' => LedgerEntryCategory::TransferCompleted,
+                    'debit_minor' => $amount,
+                    'credit_minor' => 0,
+                ],
+                [
+                    'category' => LedgerEntryCategory::TransferReversal,
+                    'debit_minor' => 0,
+                    'credit_minor' => $amount,
+                ],
+            ],
+            expectedTotalMinor: $amount,
+            expectedCurrency: $reversal->currency,
+            expectedOwnerIdResolver: function () use ($reversal): ?int {
+                $reversal->loadMissing('transfer.settlement');
+
+                return $reversal->transfer?->settlement?->owner_id;
+            },
+            expectedIdempotencyKey: 'transfer_reversal:'.$reversal->id,
         );
     }
 
     /**
-     * @param  list<LedgerEntryCategory>  $expectedCategories
+     * @return array{status: 'missing'|'complete'|'incomplete'|'duplicate'|'inconsistent', entries: list<FinancialLedgerEntry>, reason: ?string}
+     */
+    public function inspectRelocationSubsidyJournal(PlatformRelocationSubsidy $subsidy): array
+    {
+        $amount = $subsidy->subsidy_amount_minor;
+
+        return $this->inspectEntityJournal(
+            entity: $subsidy,
+            expectedLegs: [
+                [
+                    'category' => LedgerEntryCategory::RelocationSubsidy,
+                    'debit_minor' => $amount,
+                    'credit_minor' => 0,
+                ],
+                [
+                    'category' => LedgerEntryCategory::PartnerPayable,
+                    'debit_minor' => 0,
+                    'credit_minor' => $amount,
+                ],
+            ],
+            expectedTotalMinor: $amount,
+            expectedCurrency: $subsidy->currency,
+            expectedOwnerIdResolver: static fn (): ?int => null,
+            expectedIdempotencyKey: 'relocation_subsidy:'.$subsidy->id,
+        );
+    }
+
+    /**
+     * @param  list<array{category: LedgerEntryCategory, debit_minor: int, credit_minor: int, notes?: string|null}>  $expectedLegs
+     * @param  (\Closure(): ?int)|null  $expectedOwnerIdResolver
      * @return array{status: 'missing'|'complete'|'incomplete'|'duplicate'|'inconsistent', entries: list<FinancialLedgerEntry>, reason: ?string}
      */
     public function inspectEntityJournal(
         Model $entity,
-        array $expectedCategories,
+        array $expectedLegs,
         int $expectedTotalMinor,
         ?string $expectedCurrency = null,
+        ?\Closure $expectedOwnerIdResolver = null,
+        ?string $expectedIdempotencyKey = null,
     ): array {
         $entries = FinancialLedgerEntry::query()
             ->where('entity_type', $entity::class)
@@ -236,7 +383,7 @@ class FinancialLedgerService
         $list = $entries->values()->all();
 
         $distinctJournals = $entries->pluck('journal_reference')->unique()->count();
-        if ($distinctJournals > 1 || $entries->count() > count($expectedCategories)) {
+        if ($distinctJournals > 1 || $entries->count() > count($expectedLegs)) {
             return [
                 'status' => 'duplicate',
                 'entries' => $list,
@@ -255,8 +402,8 @@ class FinancialLedgerService
             }
         }
 
-        $expectedValues = array_map(static fn (LedgerEntryCategory $cat): string => $cat->value, $expectedCategories);
-        foreach ($expectedValues as $expectedValue) {
+        foreach ($expectedLegs as $expectedLeg) {
+            $expectedValue = $expectedLeg['category']->value;
             if (($actualCategoryCounts[$expectedValue] ?? 0) !== 1) {
                 return [
                     'status' => 'incomplete',
@@ -266,7 +413,7 @@ class FinancialLedgerService
             }
         }
 
-        if ($entries->count() < count($expectedCategories)) {
+        if ($entries->count() < count($expectedLegs)) {
             return [
                 'status' => 'incomplete',
                 'entries' => $list,
@@ -284,6 +431,40 @@ class FinancialLedgerService
             ];
         }
 
+        foreach ($expectedLegs as $expectedLeg) {
+            $category = $expectedLeg['category'];
+            /** @var FinancialLedgerEntry|null $actualEntry */
+            $actualEntry = $entries->first(
+                fn (FinancialLedgerEntry $entry): bool => $entry->entry_category === $category,
+            );
+
+            if ($actualEntry === null) {
+                return [
+                    'status' => 'incomplete',
+                    'entries' => $list,
+                    'reason' => "Missing expected ledger leg [{$category->value}] for ".$entity::class.'#'.$entity->getKey().'.',
+                ];
+            }
+
+            $actualDebit = (int) $actualEntry->debit_minor;
+            $actualCredit = (int) $actualEntry->credit_minor;
+            if (($actualDebit > 0 && $actualCredit > 0) || ($actualDebit === 0 && $actualCredit === 0)) {
+                return [
+                    'status' => 'inconsistent',
+                    'entries' => $list,
+                    'reason' => "Invalid single-sided amount on leg [{$category->value}] for ".$entity::class.'#'.$entity->getKey().'.',
+                ];
+            }
+
+            if ($actualDebit !== (int) $expectedLeg['debit_minor'] || $actualCredit !== (int) $expectedLeg['credit_minor']) {
+                return [
+                    'status' => 'inconsistent',
+                    'entries' => $list,
+                    'reason' => "Ledger leg [{$category->value}] amount or direction mismatch for ".$entity::class.'#'.$entity->getKey()." (actual debit={$actualDebit}/credit={$actualCredit}, expected debit={$expectedLeg['debit_minor']}/credit={$expectedLeg['credit_minor']}).",
+                ];
+            }
+        }
+
         if ($expectedCurrency !== null) {
             $normalizedExpectedCurrency = strtoupper(trim($expectedCurrency));
             $hasCurrencyMismatch = $entries->contains(
@@ -295,6 +476,36 @@ class FinancialLedgerService
                     'status' => 'inconsistent',
                     'entries' => $list,
                     'reason' => 'Ledger journal currency mismatch for '.$entity::class.'#'.$entity->getKey()." (expected {$normalizedExpectedCurrency}).",
+                ];
+            }
+        }
+
+        if ($expectedOwnerIdResolver !== null) {
+            $expectedOwnerId = $expectedOwnerIdResolver();
+            $hasOwnerMismatch = $entries->contains(
+                fn (FinancialLedgerEntry $entry): bool => $entry->owner_id !== $expectedOwnerId,
+            );
+
+            if ($hasOwnerMismatch) {
+                return [
+                    'status' => 'inconsistent',
+                    'entries' => $list,
+                    'reason' => 'Ledger journal owner mismatch for '.$entity::class.'#'.$entity->getKey().'.',
+                ];
+            }
+        }
+
+        $nonNullKeys = $entries
+            ->pluck('idempotency_key')
+            ->filter(static fn (mixed $key): bool => $key !== null && $key !== '');
+
+        if ($nonNullKeys->isNotEmpty()) {
+            if ($nonNullKeys->count() !== $entries->count()
+                || ($expectedIdempotencyKey !== null && $nonNullKeys->contains(static fn (mixed $key): bool => $key !== $expectedIdempotencyKey))) {
+                return [
+                    'status' => 'inconsistent',
+                    'entries' => $list,
+                    'reason' => 'Ledger journal idempotency key mismatch for '.$entity::class.'#'.$entity->getKey().'.',
                 ];
             }
         }
@@ -316,6 +527,7 @@ class FinancialLedgerService
             throw new RuntimeException($inspection['reason'] ?? 'Existing payment capture journal is inconsistent.');
         }
 
+        $payment->loadMissing('reservation.property.owner');
         $reservation = $payment->reservation;
         $owner = $reservation?->property?->owner;
         $amount = $payment->amount_minor;
@@ -346,7 +558,196 @@ class FinancialLedgerService
 
     public function recordSettlementApproved(PartnerSettlement $settlement): void
     {
-        $owner = $settlement->owner;
+        [$entries, $clearedPayable] = $this->settlementApprovedLegs($settlement);
+        if ($clearedPayable <= 0) {
+            return;
+        }
+
+        $inspection = $this->inspectSettlementApprovedJournal($settlement);
+        if ($inspection['status'] === 'complete') {
+            return;
+        }
+        if ($inspection['status'] !== 'missing') {
+            throw new RuntimeException($inspection['reason'] ?? 'Existing settlement approval journal is inconsistent.');
+        }
+
+        $settlement->loadMissing('owner');
+
+        $this->postJournal(
+            entity: $settlement,
+            owner: $settlement->owner,
+            entries: $entries,
+            currency: $settlement->currency,
+            effectiveAt: $this->toImmutable($settlement->approved_at),
+            idempotencyKey: 'settlement_approved:'.$settlement->id,
+        );
+    }
+
+    public function recordTransferCompleted(ProviderTransfer $transfer): void
+    {
+        $inspection = $this->inspectTransferJournal($transfer);
+        if ($inspection['status'] === 'complete') {
+            return;
+        }
+        if ($inspection['status'] !== 'missing') {
+            throw new RuntimeException($inspection['reason'] ?? 'Existing transfer completion journal is inconsistent.');
+        }
+
+        $transfer->loadMissing('settlement.owner');
+        $settlement = $transfer->settlement;
+        $owner = $settlement?->owner;
+        $amount = $transfer->amount_minor;
+
+        $this->postJournal(
+            entity: $transfer,
+            owner: $owner,
+            entries: [
+                [
+                    'category' => LedgerEntryCategory::TransferPending,
+                    'debit_minor' => $amount,
+                    'credit_minor' => 0,
+                    'notes' => "Discharged transfer pending for {$transfer->transfer_reference}",
+                ],
+                [
+                    'category' => LedgerEntryCategory::TransferCompleted,
+                    'debit_minor' => 0,
+                    'credit_minor' => $amount,
+                    'notes' => "Settlement transferred to linked account {$transfer->destination_account_id}",
+                ],
+            ],
+            currency: $transfer->currency,
+            effectiveAt: $this->toImmutable($transfer->processed_at),
+            idempotencyKey: 'transfer_completed:'.$transfer->id,
+        );
+    }
+
+    /**
+     * @return list<FinancialLedgerEntry>
+     */
+    public function recordRefundCompleted(
+        ReservationRefund $refund,
+        ?CarbonImmutable $postedAt = null,
+        ?CarbonImmutable $effectiveAt = null,
+        bool $isCorrective = false,
+    ): array {
+        $inspection = $this->inspectRefundJournal($refund);
+        if ($inspection['status'] === 'complete') {
+            return $inspection['entries'];
+        }
+        if ($inspection['status'] !== 'missing') {
+            throw new RuntimeException($inspection['reason'] ?? 'Existing refund completion journal is inconsistent.');
+        }
+
+        $refund->loadMissing('reservation.property.owner');
+        $reservation = $refund->reservation;
+        $owner = $reservation?->property?->owner;
+        $amount = $refund->amount_minor;
+        $resolvedEffectiveAt = $effectiveAt ?? $this->toImmutable($refund->gateway_processed_at);
+
+        return $this->postJournal(
+            entity: $refund,
+            owner: $owner,
+            entries: [
+                [
+                    'category' => LedgerEntryCategory::PartnerPayable,
+                    'debit_minor' => $amount,
+                    'credit_minor' => 0,
+                    'notes' => "Customer refund reduction on payable for {$reservation?->booking_reference}",
+                ],
+                [
+                    'category' => LedgerEntryCategory::RefundCompleted,
+                    'debit_minor' => 0,
+                    'credit_minor' => $amount,
+                    'notes' => "Completed Razorpay customer refund for {$reservation?->booking_reference}",
+                ],
+            ],
+            postedAt: $postedAt,
+            currency: $refund->currency,
+            effectiveAt: $resolvedEffectiveAt,
+            idempotencyKey: 'refund_completed:'.$refund->id,
+            isCorrective: $isCorrective,
+        );
+    }
+
+    public function recordRelocationSubsidy(PlatformRelocationSubsidy $subsidy): void
+    {
+        $inspection = $this->inspectRelocationSubsidyJournal($subsidy);
+        if ($inspection['status'] === 'complete') {
+            return;
+        }
+        if ($inspection['status'] !== 'missing') {
+            throw new RuntimeException($inspection['reason'] ?? 'Existing relocation subsidy journal is inconsistent.');
+        }
+
+        $amount = $subsidy->subsidy_amount_minor;
+
+        $this->postJournal(
+            entity: $subsidy,
+            owner: null,
+            entries: [
+                [
+                    'category' => LedgerEntryCategory::RelocationSubsidy,
+                    'debit_minor' => $amount,
+                    'credit_minor' => 0,
+                    'notes' => "Platform relocation difference subsidy for {$subsidy->subsidy_reference}",
+                ],
+                [
+                    'category' => LedgerEntryCategory::PartnerPayable,
+                    'debit_minor' => 0,
+                    'credit_minor' => $amount,
+                    'notes' => "Payable credit to destination partner for {$subsidy->subsidy_reference}",
+                ],
+            ],
+            currency: $subsidy->currency,
+            effectiveAt: $this->toImmutable($subsidy->approved_at),
+            idempotencyKey: 'relocation_subsidy:'.$subsidy->id,
+        );
+    }
+
+    public function recordTransferReversal(ProviderTransferReversal $reversal): void
+    {
+        $inspection = $this->inspectTransferReversalJournal($reversal);
+        if ($inspection['status'] === 'complete') {
+            return;
+        }
+        if ($inspection['status'] !== 'missing') {
+            throw new RuntimeException($inspection['reason'] ?? 'Existing transfer reversal journal is inconsistent.');
+        }
+
+        $reversal->loadMissing('transfer.settlement.owner');
+        $transfer = $reversal->transfer;
+        $settlement = $transfer?->settlement;
+        $owner = $settlement?->owner;
+        $amount = $reversal->amount_minor;
+
+        $this->postJournal(
+            entity: $reversal,
+            owner: $owner,
+            entries: [
+                [
+                    'category' => LedgerEntryCategory::TransferCompleted,
+                    'debit_minor' => $amount,
+                    'credit_minor' => 0,
+                    'notes' => "Reversed provider transfer for {$reversal->reversal_reference}",
+                ],
+                [
+                    'category' => LedgerEntryCategory::TransferReversal,
+                    'debit_minor' => 0,
+                    'credit_minor' => $amount,
+                    'notes' => "Transfer reversal credit for {$reversal->reversal_reference}",
+                ],
+            ],
+            currency: $reversal->currency,
+            effectiveAt: $this->toImmutable($reversal->processed_at),
+            idempotencyKey: 'transfer_reversal:'.$reversal->id,
+        );
+    }
+
+    /**
+     * @return array{0: list<array{category: LedgerEntryCategory, debit_minor: int, credit_minor: int, notes: string}>, 1: int}
+     */
+    private function settlementApprovedLegs(PartnerSettlement $settlement): array
+    {
         $commission = $settlement->commission_amount_minor;
         $commTax = $settlement->commission_tax_amount_minor;
         $netPayable = $settlement->net_settlement_amount_minor;
@@ -358,7 +759,7 @@ class FinancialLedgerService
         // leave the journal unbalanced.
         $clearedPayable = $commission + $commTax + $statutory + $netPayable;
         if ($clearedPayable <= 0) {
-            return;
+            return [[], 0];
         }
 
         $entries = [
@@ -406,213 +807,63 @@ class FinancialLedgerService
             ];
         }
 
-        $expectedCategories = array_map(static fn (array $e): LedgerEntryCategory => $e['category'], $entries);
-        $inspection = $this->inspectEntityJournal($settlement, $expectedCategories, $clearedPayable, $settlement->currency);
-        if ($inspection['status'] === 'complete') {
-            return;
-        }
-        if ($inspection['status'] !== 'missing') {
-            throw new RuntimeException($inspection['reason'] ?? 'Existing settlement approval journal is inconsistent.');
-        }
-
-        $this->postJournal(
-            entity: $settlement,
-            owner: $owner,
-            entries: $entries,
-            currency: $settlement->currency,
-            effectiveAt: $this->toImmutable($settlement->approved_at),
-            idempotencyKey: 'settlement_approved:'.$settlement->id,
-        );
-    }
-
-    public function recordTransferCompleted(ProviderTransfer $transfer): void
-    {
-        $inspection = $this->inspectTransferJournal($transfer);
-        if ($inspection['status'] === 'complete') {
-            return;
-        }
-        if ($inspection['status'] !== 'missing') {
-            throw new RuntimeException($inspection['reason'] ?? 'Existing transfer completion journal is inconsistent.');
-        }
-
-        $settlement = $transfer->settlement;
-        $owner = $settlement?->owner;
-        $amount = $transfer->amount_minor;
-
-        $this->postJournal(
-            entity: $transfer,
-            owner: $owner,
-            entries: [
-                [
-                    'category' => LedgerEntryCategory::TransferPending,
-                    'debit_minor' => $amount,
-                    'credit_minor' => 0,
-                    'notes' => "Discharged transfer pending for {$transfer->transfer_reference}",
-                ],
-                [
-                    'category' => LedgerEntryCategory::TransferCompleted,
-                    'debit_minor' => 0,
-                    'credit_minor' => $amount,
-                    'notes' => "Settlement transferred to linked account {$transfer->destination_account_id}",
-                ],
-            ],
-            currency: $transfer->currency,
-            effectiveAt: $this->toImmutable($transfer->processed_at),
-            idempotencyKey: 'transfer_completed:'.$transfer->id,
-        );
-    }
-
-    /**
-     * @return list<FinancialLedgerEntry>
-     */
-    public function recordRefundCompleted(
-        ReservationRefund $refund,
-        ?CarbonImmutable $postedAt = null,
-        ?CarbonImmutable $effectiveAt = null,
-        bool $isCorrective = false,
-    ): array {
-        $inspection = $this->inspectRefundJournal($refund);
-        if ($inspection['status'] === 'complete') {
-            return $inspection['entries'];
-        }
-        if ($inspection['status'] !== 'missing') {
-            throw new RuntimeException($inspection['reason'] ?? 'Existing refund completion journal is inconsistent.');
-        }
-
-        $reservation = $refund->reservation;
-        $owner = $reservation?->property?->owner;
-        $amount = $refund->amount_minor;
-        $resolvedEffectiveAt = $effectiveAt ?? $this->toImmutable($refund->gateway_processed_at);
-
-        return $this->postJournal(
-            entity: $refund,
-            owner: $owner,
-            entries: [
-                [
-                    'category' => LedgerEntryCategory::PartnerPayable,
-                    'debit_minor' => $amount,
-                    'credit_minor' => 0,
-                    'notes' => "Customer refund reduction on payable for {$reservation?->booking_reference}",
-                ],
-                [
-                    'category' => LedgerEntryCategory::RefundCompleted,
-                    'debit_minor' => 0,
-                    'credit_minor' => $amount,
-                    'notes' => "Completed Razorpay customer refund for {$reservation?->booking_reference}",
-                ],
-            ],
-            postedAt: $postedAt,
-            currency: $refund->currency,
-            effectiveAt: $resolvedEffectiveAt,
-            idempotencyKey: 'refund_completed:'.$refund->id,
-            isCorrective: $isCorrective,
-        );
-    }
-
-    public function recordRelocationSubsidy(PlatformRelocationSubsidy $subsidy): void
-    {
-        $inspection = $this->inspectEntityJournal(
-            $subsidy,
-            [LedgerEntryCategory::RelocationSubsidy, LedgerEntryCategory::PartnerPayable],
-            $subsidy->subsidy_amount_minor,
-            $subsidy->currency,
-        );
-        if ($inspection['status'] === 'complete') {
-            return;
-        }
-        if ($inspection['status'] !== 'missing') {
-            throw new RuntimeException($inspection['reason'] ?? 'Existing relocation subsidy journal is inconsistent.');
-        }
-
-        $amount = $subsidy->subsidy_amount_minor;
-
-        $this->postJournal(
-            entity: $subsidy,
-            owner: null,
-            entries: [
-                [
-                    'category' => LedgerEntryCategory::RelocationSubsidy,
-                    'debit_minor' => $amount,
-                    'credit_minor' => 0,
-                    'notes' => "Platform relocation difference subsidy for {$subsidy->subsidy_reference}",
-                ],
-                [
-                    'category' => LedgerEntryCategory::PartnerPayable,
-                    'debit_minor' => 0,
-                    'credit_minor' => $amount,
-                    'notes' => "Payable credit to destination partner for {$subsidy->subsidy_reference}",
-                ],
-            ],
-            currency: $subsidy->currency,
-            effectiveAt: $this->toImmutable($subsidy->approved_at),
-            idempotencyKey: 'relocation_subsidy:'.$subsidy->id,
-        );
-    }
-
-    public function recordTransferReversal(ProviderTransferReversal $reversal): void
-    {
-        $inspection = $this->inspectTransferReversalJournal($reversal);
-        if ($inspection['status'] === 'complete') {
-            return;
-        }
-        if ($inspection['status'] !== 'missing') {
-            throw new RuntimeException($inspection['reason'] ?? 'Existing transfer reversal journal is inconsistent.');
-        }
-
-        $transfer = $reversal->transfer;
-        $settlement = $transfer?->settlement;
-        $owner = $settlement?->owner;
-        $amount = $reversal->amount_minor;
-
-        $this->postJournal(
-            entity: $reversal,
-            owner: $owner,
-            entries: [
-                [
-                    'category' => LedgerEntryCategory::TransferCompleted,
-                    'debit_minor' => $amount,
-                    'credit_minor' => 0,
-                    'notes' => "Reversed provider transfer for {$reversal->reversal_reference}",
-                ],
-                [
-                    'category' => LedgerEntryCategory::TransferReversal,
-                    'debit_minor' => 0,
-                    'credit_minor' => $amount,
-                    'notes' => "Transfer reversal credit for {$reversal->reversal_reference}",
-                ],
-            ],
-            currency: $reversal->currency,
-            effectiveAt: $this->toImmutable($reversal->processed_at),
-            idempotencyKey: 'transfer_reversal:'.$reversal->id,
-        );
+        return [$entries, $clearedPayable];
     }
 
     /**
      * @param  Collection<int, FinancialLedgerEntry>  $existing
+     * @param  list<array{
+     *     category: LedgerEntryCategory,
+     *     debit_minor: int,
+     *     credit_minor: int,
+     *     notes?: string|null,
+     * }>  $expectedEntries
      * @return list<FinancialLedgerEntry>
      */
     private function validateExistingIdempotentJournal(
         Collection $existing,
-        int $expectedLines,
+        Model $entity,
+        ?Owner $owner,
+        array $expectedEntries,
         int $expectedTotalMinor,
         string $expectedCurrency,
         string $idempotencyKey,
     ): array {
         $existingDebits = (int) $existing->sum('debit_minor');
         $existingCredits = (int) $existing->sum('credit_minor');
-        $currencyMismatch = $existing->contains(
-            fn (FinancialLedgerEntry $entry): bool => strtoupper((string) $entry->currency) !== $expectedCurrency,
-        );
+        $distinctJournals = $existing->pluck('journal_reference')->unique()->count();
 
-        if ($existing->count() !== $expectedLines
+        if ($existing->count() !== count($expectedEntries)
+            || $distinctJournals !== 1
             || $existingDebits !== $existingCredits
-            || $existingDebits !== $expectedTotalMinor
-            || $currencyMismatch) {
+            || $existingDebits !== $expectedTotalMinor) {
             throw new RuntimeException("Existing ledger journal for key [{$idempotencyKey}] is incomplete or inconsistent.");
         }
 
+        $expectedEntityType = $entity::class;
+        $expectedEntityId = (int) $entity->getKey();
+        $expectedOwnerId = $owner?->id;
+        $orderedExisting = $existing->values();
+
+        foreach ($expectedEntries as $index => $expectedLeg) {
+            /** @var FinancialLedgerEntry|null $actual */
+            $actual = $orderedExisting->get($index);
+
+            if ($actual === null
+                || $actual->entity_type !== $expectedEntityType
+                || (int) $actual->entity_id !== $expectedEntityId
+                || $actual->owner_id !== $expectedOwnerId
+                || strtoupper((string) $actual->currency) !== $expectedCurrency
+                || $actual->entry_category !== $expectedLeg['category']
+                || (int) $actual->debit_minor !== (int) $expectedLeg['debit_minor']
+                || (int) $actual->credit_minor !== (int) $expectedLeg['credit_minor']
+                || ($actual->line_number !== null && (int) $actual->line_number !== $index + 1)) {
+                throw new RuntimeException("Existing ledger journal for key [{$idempotencyKey}] is incomplete or inconsistent.");
+            }
+        }
+
         /** @var list<FinancialLedgerEntry> $list */
-        $list = $existing->values()->all();
+        $list = $orderedExisting->all();
 
         return $list;
     }

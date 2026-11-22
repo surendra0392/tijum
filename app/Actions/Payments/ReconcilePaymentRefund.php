@@ -202,7 +202,7 @@ class ReconcilePaymentRefund
         }
 
         $captureInspection = $this->ledger->inspectPaymentCaptureJournal($payment);
-        if ($captureInspection['status'] !== 'complete' && ($isCorrective || $captureInspection['status'] !== 'missing')) {
+        if ($captureInspection['status'] !== 'complete') {
             $code = $captureInspection['status'] === 'missing'
                 ? 'missing_capture_journal'
                 : $captureInspection['status'].'_capture_journal';

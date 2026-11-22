@@ -453,6 +453,352 @@ class FinancialLedgerIntegrityTest extends TestCase
         );
     }
 
+    public function test_ledger_enforces_exact_leg_directions_amounts_entity_and_owner_and_preserves_valid_legacy_journals(): void
+    {
+        [$admin, $owner, $profile, $reservation, $payment] = $this->seedBookingAndPayment();
+        $otherOwner = $this->createActiveOwner(['email' => 'other_ledger_owner@example.com']);
+        $ledger = app(FinancialLedgerService::class);
+
+        // 1. PaymentCaptured debit/credit sides reversed
+        FinancialLedgerEntry::create([
+            'entry_reference' => 'TLE-REV-CAP-1',
+            'journal_reference' => 'JRN-REV-CAP-1',
+            'entry_category' => LedgerEntryCategory::PaymentCaptured,
+            'debit_minor' => 0,
+            'credit_minor' => $payment->amount_minor,
+            'currency' => 'INR',
+            'entity_type' => ReservationPayment::class,
+            'entity_id' => $payment->id,
+            'owner_id' => $owner->id,
+            'posted_at' => now()->subDay(),
+        ]);
+        FinancialLedgerEntry::create([
+            'entry_reference' => 'TLE-REV-CAP-2',
+            'journal_reference' => 'JRN-REV-CAP-1',
+            'entry_category' => LedgerEntryCategory::PartnerPayable,
+            'debit_minor' => $payment->amount_minor,
+            'credit_minor' => 0,
+            'currency' => 'INR',
+            'entity_type' => ReservationPayment::class,
+            'entity_id' => $payment->id,
+            'owner_id' => $owner->id,
+            'posted_at' => now()->subDay(),
+        ]);
+
+        $this->assertSame('inconsistent', $ledger->inspectPaymentCaptureJournal($payment)['status']);
+        $reversedCaptureRejected = false;
+        try {
+            $ledger->recordPaymentCaptured($payment);
+        } catch (RuntimeException) {
+            $reversedCaptureRejected = true;
+        }
+        $this->assertTrue($reversedCaptureRejected, 'Expected reversed PaymentCaptured debit/credit directions to be rejected.');
+
+        // 2. RefundCompleted debit/credit sides reversed
+        $refund = ReservationRefund::create([
+            'reservation_payment_id' => $payment->id,
+            'reservation_id' => $reservation->id,
+            'initiated_by_admin_id' => $admin->id,
+            'gateway_refund_id' => 'rfnd_rev_dir_1',
+            'idempotency_key' => 'idemp_rev_dir_1',
+            'amount_minor' => 20000,
+            'currency' => 'INR',
+            'status' => RefundStatus::Processed,
+            'reason' => 'Reversed refund leg test',
+            'gateway_processed_at' => now()->subDay(),
+        ]);
+        FinancialLedgerEntry::create([
+            'entry_reference' => 'TLE-REV-REF-1',
+            'journal_reference' => 'JRN-REV-REF-1',
+            'entry_category' => LedgerEntryCategory::PartnerPayable,
+            'debit_minor' => 0,
+            'credit_minor' => 20000,
+            'currency' => 'INR',
+            'entity_type' => ReservationRefund::class,
+            'entity_id' => $refund->id,
+            'owner_id' => $owner->id,
+            'posted_at' => now()->subDay(),
+        ]);
+        FinancialLedgerEntry::create([
+            'entry_reference' => 'TLE-REV-REF-2',
+            'journal_reference' => 'JRN-REV-REF-1',
+            'entry_category' => LedgerEntryCategory::RefundCompleted,
+            'debit_minor' => 20000,
+            'credit_minor' => 0,
+            'currency' => 'INR',
+            'entity_type' => ReservationRefund::class,
+            'entity_id' => $refund->id,
+            'owner_id' => $owner->id,
+            'posted_at' => now()->subDay(),
+        ]);
+
+        $this->assertSame('inconsistent', $ledger->inspectRefundJournal($refund)['status']);
+        $reversedRefundRejected = false;
+        try {
+            $ledger->recordRefundCompleted($refund);
+        } catch (RuntimeException) {
+            $reversedRefundRejected = true;
+        }
+        $this->assertTrue($reversedRefundRejected, 'Expected reversed RefundCompleted debit/credit directions to be rejected.');
+
+        // 3. Correct categories and balanced totals (100000 == 100000) but wrong individual leg amounts on settlement
+        $settlement = PartnerSettlement::create([
+            'settlement_reference' => 'TPS-2026-BAD-LEGS-01',
+            'owner_id' => $owner->id,
+            'owner_financial_profile_id' => $profile->id,
+            'period_start' => now()->subDays(5)->toDateString(),
+            'period_end' => now()->subDays(2)->toDateString(),
+            'currency' => 'INR',
+            'gross_booking_value_minor' => 100000,
+            'commission_amount_minor' => 10000,
+            'commission_tax_amount_minor' => 1800,
+            'statutory_deductions_minor' => 100,
+            'refund_adjustments_minor' => 0,
+            'relocation_adjustments_minor' => 0,
+            'other_adjustments_minor' => 0,
+            'net_settlement_amount_minor' => 88100,
+            'status' => SettlementStatus::Approved,
+            'approved_by_admin_id' => $admin->id,
+            'approved_at' => now()->subDay(),
+        ]);
+        $badSettlementLegs = [
+            [LedgerEntryCategory::PartnerPayable, 100000, 0],
+            [LedgerEntryCategory::CommissionRevenue, 0, 5000], // wrong: expected 10000
+            [LedgerEntryCategory::CommissionGst, 0, 1800],
+            [LedgerEntryCategory::TdsWithheld, 0, 100],
+            [LedgerEntryCategory::TransferPending, 0, 93100], // wrong: expected 88100
+        ];
+        foreach ($badSettlementLegs as $idx => [$cat, $dr, $cr]) {
+            FinancialLedgerEntry::create([
+                'entry_reference' => 'TLE-BAD-SETL-'.$idx,
+                'journal_reference' => 'JRN-BAD-SETL-1',
+                'entry_category' => $cat,
+                'debit_minor' => $dr,
+                'credit_minor' => $cr,
+                'currency' => 'INR',
+                'entity_type' => PartnerSettlement::class,
+                'entity_id' => $settlement->id,
+                'owner_id' => $owner->id,
+                'posted_at' => now()->subDay(),
+            ]);
+        }
+
+        $badSettlementRejected = false;
+        try {
+            $ledger->recordSettlementApproved($settlement);
+        } catch (RuntimeException) {
+            $badSettlementRejected = true;
+        }
+        $this->assertTrue($badSettlementRejected, 'Expected wrong per-leg amounts on balanced settlement journal to be rejected.');
+
+        // 4. Existing idempotency key associated with an incorrect entity
+        $otherPayment = ReservationPayment::create([
+            'reservation_id' => $reservation->id,
+            'user_id' => $reservation->user_id,
+            'gateway' => 'razorpay',
+            'gateway_order_id' => 'order_other_ent',
+            'gateway_payment_id' => 'pay_other_ent',
+            'idempotency_key' => 'idemp_other_ent',
+            'amount_minor' => 50000,
+            'currency' => 'INR',
+            'status' => PaymentStatus::Captured,
+            'captured_at' => now()->subDay(),
+        ]);
+        $ledger->postJournal(
+            $otherPayment,
+            $owner,
+            [
+                ['category' => LedgerEntryCategory::PaymentCaptured, 'debit_minor' => 50000, 'credit_minor' => 0],
+                ['category' => LedgerEntryCategory::PartnerPayable, 'debit_minor' => 0, 'credit_minor' => 50000],
+            ],
+            idempotencyKey: 'shared_entity_collision_key',
+        );
+
+        $wrongEntityKeyRejected = false;
+        try {
+            $ledger->postJournal(
+                $payment,
+                $owner,
+                [
+                    ['category' => LedgerEntryCategory::PaymentCaptured, 'debit_minor' => 50000, 'credit_minor' => 0],
+                    ['category' => LedgerEntryCategory::PartnerPayable, 'debit_minor' => 0, 'credit_minor' => 50000],
+                ],
+                idempotencyKey: 'shared_entity_collision_key',
+            );
+        } catch (RuntimeException) {
+            $wrongEntityKeyRejected = true;
+        }
+        $this->assertTrue($wrongEntityKeyRejected, 'Expected existing idempotency key bound to a different entity to be rejected.');
+
+        // 5. Existing idempotency key with incorrect categories or owner
+        $wrongCategoryKeyRejected = false;
+        try {
+            $ledger->postJournal(
+                $otherPayment,
+                $owner,
+                [
+                    ['category' => LedgerEntryCategory::TransferPending, 'debit_minor' => 50000, 'credit_minor' => 0],
+                    ['category' => LedgerEntryCategory::TransferCompleted, 'debit_minor' => 0, 'credit_minor' => 50000],
+                ],
+                idempotencyKey: 'shared_entity_collision_key',
+            );
+        } catch (RuntimeException) {
+            $wrongCategoryKeyRejected = true;
+        }
+        $this->assertTrue($wrongCategoryKeyRejected, 'Expected existing idempotency key with different categories to be rejected.');
+
+        $wrongOwnerKeyRejected = false;
+        try {
+            $ledger->postJournal(
+                $otherPayment,
+                $otherOwner,
+                [
+                    ['category' => LedgerEntryCategory::PaymentCaptured, 'debit_minor' => 50000, 'credit_minor' => 0],
+                    ['category' => LedgerEntryCategory::PartnerPayable, 'debit_minor' => 0, 'credit_minor' => 50000],
+                ],
+                idempotencyKey: 'shared_entity_collision_key',
+            );
+        } catch (RuntimeException) {
+            $wrongOwnerKeyRejected = true;
+        }
+        $this->assertTrue($wrongOwnerKeyRejected, 'Expected existing idempotency key with mismatched owner to be rejected.');
+
+        $wrongOwnerPayment = ReservationPayment::create([
+            'reservation_id' => $reservation->id,
+            'user_id' => $reservation->user_id,
+            'gateway' => 'razorpay',
+            'gateway_order_id' => 'order_wrong_owner',
+            'gateway_payment_id' => 'pay_wrong_owner',
+            'idempotency_key' => 'idemp_wrong_owner',
+            'amount_minor' => 40000,
+            'currency' => 'INR',
+            'status' => PaymentStatus::Captured,
+            'captured_at' => now()->subDay(),
+        ]);
+        FinancialLedgerEntry::create([
+            'entry_reference' => 'TLE-WRONG-OWN-1',
+            'journal_reference' => 'JRN-WRONG-OWN-1',
+            'entry_category' => LedgerEntryCategory::PaymentCaptured,
+            'debit_minor' => 40000,
+            'credit_minor' => 0,
+            'currency' => 'INR',
+            'entity_type' => ReservationPayment::class,
+            'entity_id' => $wrongOwnerPayment->id,
+            'owner_id' => $otherOwner->id,
+            'posted_at' => now()->subDay(),
+        ]);
+        FinancialLedgerEntry::create([
+            'entry_reference' => 'TLE-WRONG-OWN-2',
+            'journal_reference' => 'JRN-WRONG-OWN-1',
+            'entry_category' => LedgerEntryCategory::PartnerPayable,
+            'debit_minor' => 0,
+            'credit_minor' => 40000,
+            'currency' => 'INR',
+            'entity_type' => ReservationPayment::class,
+            'entity_id' => $wrongOwnerPayment->id,
+            'owner_id' => $otherOwner->id,
+            'posted_at' => now()->subDay(),
+        ]);
+        $this->assertSame('inconsistent', $ledger->inspectPaymentCaptureJournal($wrongOwnerPayment)['status']);
+
+        // 6. Valid legacy journals (null idempotency_key & line_number) remain compatible & idempotent,
+        // including variable-leg settlement journals
+        $legacyPayment = ReservationPayment::create([
+            'reservation_id' => $reservation->id,
+            'user_id' => $reservation->user_id,
+            'gateway' => 'razorpay',
+            'gateway_order_id' => 'order_legacy_ok',
+            'gateway_payment_id' => 'pay_legacy_ok',
+            'idempotency_key' => 'idemp_legacy_ok',
+            'amount_minor' => 60000,
+            'currency' => 'INR',
+            'status' => PaymentStatus::Captured,
+            'captured_at' => now()->subDays(3),
+        ]);
+        FinancialLedgerEntry::create([
+            'entry_reference' => 'TLE-LEG-OK-1',
+            'journal_reference' => 'JRN-LEG-OK-1',
+            'entry_category' => LedgerEntryCategory::PaymentCaptured,
+            'debit_minor' => 60000,
+            'credit_minor' => 0,
+            'currency' => 'INR',
+            'entity_type' => ReservationPayment::class,
+            'entity_id' => $legacyPayment->id,
+            'owner_id' => $owner->id,
+            'posted_at' => now()->subDays(3),
+        ]);
+        FinancialLedgerEntry::create([
+            'entry_reference' => 'TLE-LEG-OK-2',
+            'journal_reference' => 'JRN-LEG-OK-1',
+            'entry_category' => LedgerEntryCategory::PartnerPayable,
+            'debit_minor' => 0,
+            'credit_minor' => 60000,
+            'currency' => 'INR',
+            'entity_type' => ReservationPayment::class,
+            'entity_id' => $legacyPayment->id,
+            'owner_id' => $owner->id,
+            'posted_at' => now()->subDays(3),
+        ]);
+
+        $this->assertSame('complete', $ledger->inspectPaymentCaptureJournal($legacyPayment)['status']);
+        $ledger->recordPaymentCaptured($legacyPayment);
+        $this->assertSame(
+            2,
+            FinancialLedgerEntry::query()
+                ->where('entity_type', ReservationPayment::class)
+                ->where('entity_id', $legacyPayment->id)
+                ->count(),
+        );
+
+        // Variable 3-leg legacy settlement journal (commission + transfer only, 0 GST and 0 TDS)
+        $legacySettlement = PartnerSettlement::create([
+            'settlement_reference' => 'TPS-2026-LEG-VAR-01',
+            'owner_id' => $owner->id,
+            'owner_financial_profile_id' => $profile->id,
+            'period_start' => now()->subDays(5)->toDateString(),
+            'period_end' => now()->subDays(2)->toDateString(),
+            'currency' => 'INR',
+            'gross_booking_value_minor' => 60000,
+            'commission_amount_minor' => 6000,
+            'commission_tax_amount_minor' => 0,
+            'statutory_deductions_minor' => 0,
+            'refund_adjustments_minor' => 0,
+            'relocation_adjustments_minor' => 0,
+            'other_adjustments_minor' => 0,
+            'net_settlement_amount_minor' => 54000,
+            'status' => SettlementStatus::Approved,
+            'approved_by_admin_id' => $admin->id,
+            'approved_at' => now()->subDays(2),
+        ]);
+        foreach ([
+            [LedgerEntryCategory::PartnerPayable, 60000, 0],
+            [LedgerEntryCategory::CommissionRevenue, 0, 6000],
+            [LedgerEntryCategory::TransferPending, 0, 54000],
+        ] as $idx => [$cat, $dr, $cr]) {
+            FinancialLedgerEntry::create([
+                'entry_reference' => 'TLE-LEG-SETL-'.$idx,
+                'journal_reference' => 'JRN-LEG-SETL-1',
+                'entry_category' => $cat,
+                'debit_minor' => $dr,
+                'credit_minor' => $cr,
+                'currency' => 'INR',
+                'entity_type' => PartnerSettlement::class,
+                'entity_id' => $legacySettlement->id,
+                'owner_id' => $owner->id,
+                'posted_at' => now()->subDays(2),
+            ]);
+        }
+
+        $ledger->recordSettlementApproved($legacySettlement);
+        $this->assertSame(
+            3,
+            FinancialLedgerEntry::query()
+                ->where('entity_type', PartnerSettlement::class)
+                ->where('entity_id', $legacySettlement->id)
+                ->count(),
+        );
+    }
+
     /**
      * @return array{0: Admin, 1: Owner, 2: OwnerFinancialProfile, 3: Reservation, 4: ReservationPayment}
      */

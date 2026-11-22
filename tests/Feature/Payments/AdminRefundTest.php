@@ -16,10 +16,12 @@ use App\Enums\RefundStatus;
 use App\Enums\ReservationStatus;
 use App\Models\Admin;
 use App\Models\CustomerProtectionCase;
+use App\Models\FinancialLedgerEntry;
 use App\Models\ProviderTransfer;
 use App\Models\Reservation;
 use App\Models\ReservationPayment;
 use App\Models\ReservationRefund;
+use App\Services\Financial\FinancialLedgerService;
 use App\Services\Financial\SettlementCalculationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
@@ -93,6 +95,8 @@ class AdminRefundTest extends TestCase
             'status' => PaymentStatus::Captured,
             'captured_at' => CarbonImmutable::now(),
         ])->save();
+
+        app(FinancialLedgerService::class)->recordPaymentCaptured($payment);
 
         Http::fake([
             'https://api.razorpay.com/v1/payments/pay_refund_101/refund' => fn (Request $request) => Http::response([
@@ -244,7 +248,8 @@ class AdminRefundTest extends TestCase
         $this->artisan('tijum:reconcile-refunds')->assertSuccessful();
         $this->assertSame(RefundStatus::Processed, $attempt->fresh()->status);
         $this->assertSame(1, $dispatches);
-        $this->assertDatabaseCount('financial_ledger_entries', 2);
+        $this->assertSame(2, FinancialLedgerEntry::query()->where('entity_type', ReservationRefund::class)->count());
+        $this->assertDatabaseCount('financial_ledger_entries', 4);
     }
 
     public function test_refund_webhook_replays_unmatched_event_and_does_not_double_post(): void
@@ -273,7 +278,8 @@ class AdminRefundTest extends TestCase
         $this->assertSame('success', $webhook->execute($raw, $signature, eventId: 'evt_refund_late')['status']);
         $webhook->execute($raw, $signature, eventId: 'evt_refund_second');
         $this->assertSame(PaymentStatus::PartiallyRefunded, $payment->fresh()->status);
-        $this->assertDatabaseCount('financial_ledger_entries', 2);
+        $this->assertSame(2, FinancialLedgerEntry::query()->where('entity_type', ReservationRefund::class)->count());
+        $this->assertDatabaseCount('financial_ledger_entries', 4);
     }
 
     public function test_refund_called_in_a_transaction_dispatches_only_after_commit(): void
@@ -327,7 +333,8 @@ class AdminRefundTest extends TestCase
         $this->assertSame(RefundStatus::Uncertain, $refund->status);
         $this->assertNull($refund->gateway_refund_id);
         $this->assertSame(30000, $payment->fresh()->remainingRefundableAmount());
-        $this->assertDatabaseCount('financial_ledger_entries', 0);
+        $this->assertSame(0, FinancialLedgerEntry::query()->where('entity_type', ReservationRefund::class)->count());
+        $this->assertDatabaseCount('financial_ledger_entries', 2);
     }
 
     public function test_definitive_provider_failure_releases_balance_for_an_explicit_new_intent(): void
@@ -350,7 +357,8 @@ class AdminRefundTest extends TestCase
         $this->assertSame(RefundStatus::Failed, $failed->status);
         $this->assertSame(50000, $payment->fresh()->remainingRefundableAmount());
         $this->assertSame(PaymentStatus::Captured, $payment->fresh()->status);
-        $this->assertDatabaseCount('financial_ledger_entries', 0);
+        $this->assertSame(0, FinancialLedgerEntry::query()->where('entity_type', ReservationRefund::class)->count());
+        $this->assertDatabaseCount('financial_ledger_entries', 2);
 
         $this->assertSame($failed->id, $action->execute($payment, $admin, 20000, 'Verified partial cancellation', 'refund-first-fixture')->id);
         $this->assertSame(1, $dispatches);
@@ -358,7 +366,8 @@ class AdminRefundTest extends TestCase
         $second = $action->execute($payment, $admin, 20000, 'Verified partial cancellation', 'refund-second-fixture');
         $this->assertSame(RefundStatus::Processed, $second->status);
         $this->assertSame(2, $dispatches);
-        $this->assertDatabaseCount('financial_ledger_entries', 2);
+        $this->assertSame(2, FinancialLedgerEntry::query()->where('entity_type', ReservationRefund::class)->count());
+        $this->assertDatabaseCount('financial_ledger_entries', 4);
     }
 
     public function test_legacy_failed_refund_without_gateway_id_reconciles_through_processing_to_processed(): void
@@ -407,7 +416,8 @@ class AdminRefundTest extends TestCase
 
         $this->assertSame(RefundStatus::Processed, $refund->fresh()->status);
         $this->assertSame(PaymentStatus::PartiallyRefunded, $payment->fresh()->status);
-        $this->assertDatabaseCount('financial_ledger_entries', 2);
+        $this->assertSame(2, FinancialLedgerEntry::query()->where('entity_type', ReservationRefund::class)->count());
+        $this->assertDatabaseCount('financial_ledger_entries', 4);
     }
 
     public function test_definitive_failed_refund_rejects_contradictory_processed_response(): void
@@ -436,7 +446,8 @@ class AdminRefundTest extends TestCase
         $this->assertTrue($rejected, 'Expected definitively failed refund to reject processed transition.');
         $this->assertSame(RefundStatus::Failed, $refund->fresh()->status);
         $this->assertSame(PaymentStatus::Captured, $payment->fresh()->status);
-        $this->assertDatabaseCount('financial_ledger_entries', 0);
+        $this->assertSame(0, FinancialLedgerEntry::query()->where('entity_type', ReservationRefund::class)->count());
+        $this->assertDatabaseCount('financial_ledger_entries', 2);
     }
 
     public function test_uncertain_refund_excludes_reservation_from_settlement_and_disables_admin_refund_form(): void
@@ -628,7 +639,8 @@ class AdminRefundTest extends TestCase
         Http::assertSentCount(2);
         $this->assertSame(2, $dispatches);
         $this->assertDatabaseCount('reservation_refunds', 2);
-        $this->assertDatabaseCount('financial_ledger_entries', 4);
+        $this->assertSame(4, FinancialLedgerEntry::query()->where('entity_type', ReservationRefund::class)->count());
+        $this->assertDatabaseCount('financial_ledger_entries', 6);
 
         $freshPayment = $payment->fresh();
         $this->assertSame(40000, $freshPayment->totalRefundedAmount());
@@ -648,7 +660,7 @@ class AdminRefundTest extends TestCase
         $this->submitReservation($user, $payload)->assertRedirect();
         $reservation = Reservation::query()->where('submission_token', $payload['submission_token'])->firstOrFail();
 
-        return ReservationPayment::create([
+        $payment = ReservationPayment::create([
             'reservation_id' => $reservation->id,
             'user_id' => $user->id,
             'gateway' => 'razorpay',
@@ -660,6 +672,10 @@ class AdminRefundTest extends TestCase
             'status' => PaymentStatus::Captured,
             'captured_at' => CarbonImmutable::now(),
         ]);
+
+        app(FinancialLedgerService::class)->recordPaymentCaptured($payment);
+
+        return $payment;
     }
 
     /** @return array<string, int|string|null> */
