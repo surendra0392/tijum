@@ -38,6 +38,8 @@ class RecordRelocationSubsidy
             $now = CarbonImmutable::now();
             $ref = 'PRS-'.$now->format('Y').'-'.strtoupper(Str::ulid()->toBase32());
 
+            $currency = strtoupper(trim((string) ($replacementReservation->currency_code ?: $sourceReservation->currency_code ?: 'INR')));
+
             /** @var PlatformRelocationSubsidy $subsidy */
             $subsidy = PlatformRelocationSubsidy::create([
                 'subsidy_reference' => $ref,
@@ -47,7 +49,7 @@ class RecordRelocationSubsidy
                 'source_amount_minor' => $sourceAmountMinor,
                 'destination_amount_minor' => $destinationAmountMinor,
                 'subsidy_amount_minor' => $subsidyDifference,
-                'currency' => 'INR',
+                'currency' => $currency,
                 'status' => RelocationSubsidyStatus::Approved,
                 'approved_by_admin_id' => $admin?->id,
                 'approved_at' => $now,

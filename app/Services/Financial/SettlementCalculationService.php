@@ -109,6 +109,7 @@ class SettlementCalculationService
     /**
      * @param  Collection<int, Reservation>  $reservations
      * @return array{
+     *     currency: string,
      *     gross_booking_value_minor: int,
      *     commission_amount_minor: int,
      *     commission_tax_amount_minor: int,
@@ -117,9 +118,15 @@ class SettlementCalculationService
      *     relocation_adjustments_minor: int,
      *     other_adjustments_minor: int,
      *     net_settlement_amount_minor: int,
+     *     payable_items_total_minor: int,
+     *     negative_items_deficit_minor: int,
+     *     platform_discount_total_minor: int,
+     *     payment_funding_shortfall_minor: int,
      *     items: list<array<string, mixed>>,
      *     tax_review_required: bool,
      *     tax_review_reasons: list<string>,
+     *     funding_review_required: bool,
+     *     funding_review_reasons: list<string>,
      * }
      */
     public function calculateSettlementSummary(
@@ -130,13 +137,19 @@ class SettlementCalculationService
         $profile = $owner->financialProfile;
         $date = $periodEnd ?? CarbonImmutable::now($this->timingPolicy->timezone());
 
+        $currency = 'INR';
         $grossTotal = 0;
         $commissionTotal = 0;
         $commissionTaxTotal = 0;
         $statutoryTotal = 0;
         $refundTotal = 0;
+        $payableItemsTotal = 0;
+        $negativeItemsDeficitTotal = 0;
+        $platformDiscountTotal = 0;
+        $paymentFundingShortfallTotal = 0;
         $items = [];
         $taxReasons = [];
+        $fundingReasons = [];
 
         $taxEval = $this->taxService->evaluateTaxes($owner, $profile, 0, $date);
         $taxReviewRequired = $taxEval['is_tax_review_required'];
@@ -145,6 +158,11 @@ class SettlementCalculationService
         }
 
         foreach ($reservations as $reservation) {
+            $resCurrency = strtoupper(trim((string) ($reservation->currency_code ?: 'INR')));
+            if ($resCurrency !== '') {
+                $currency = $resCurrency;
+            }
+
             // Snapshot commission if not yet snapshotted
             if ($reservation->commission_amount_minor === null) {
                 $reservation = $this->commissionService->snapshotCommissionOnReservation($reservation);
@@ -157,7 +175,7 @@ class SettlementCalculationService
             $commTax = $reservation->commission_tax_amount_minor ?? 0;
 
             // Calculate completed customer refunds on this reservation
-            $completedRefunds = $reservation->refunds
+            $completedRefunds = (int) $reservation->refunds
                 ->where('status', RefundStatus::Processed)
                 ->sum('amount_minor');
 
@@ -165,7 +183,8 @@ class SettlementCalculationService
             $resTax = $this->taxService->evaluateTaxes($owner, $profile, $bookingGross, $date);
             $tdsAmount = $resTax['tds_amount_minor'];
 
-            $lineNet = max(0, $bookingGross - $commAmount - $commTax - $tdsAmount - $completedRefunds);
+            // Preserve signed net payable so refund/commission deficits are never silently hidden
+            $lineNet = $bookingGross - $commAmount - $commTax - $tdsAmount - $completedRefunds;
 
             $grossTotal += $bookingGross;
             $commissionTotal += $commAmount;
@@ -180,6 +199,24 @@ class SettlementCalculationService
                     PaymentStatus::PartiallyRefunded,
                 ], true);
             });
+
+            $platformDiscountMinor = max(0, $bookingGross - $reservation->total_amount_minor);
+            $platformDiscountTotal += $platformDiscountMinor;
+
+            $availablePaymentFunds = max(0, ($payment !== null ? $payment->amount_minor : 0) - $completedRefunds);
+            $lineShortfall = $lineNet > 0 ? max(0, $lineNet - $availablePaymentFunds) : 0;
+            $paymentFundingShortfallTotal += $lineShortfall;
+
+            if ($lineNet > 0) {
+                $payableItemsTotal += $lineNet;
+            } elseif ($lineNet < 0) {
+                $negativeItemsDeficitTotal += abs($lineNet);
+                $fundingReasons[] = "Booking {$reservation->booking_reference} has a negative line balance ({$lineNet} minor) requiring clawback or credit adjustment.";
+            }
+
+            if ($lineShortfall > 0) {
+                $fundingReasons[] = "Booking {$reservation->booking_reference} requires {$lineShortfall} minor in platform discount or subsidy funding beyond captured payment balance.";
+            }
 
             $items[] = [
                 'reservation_id' => $reservation->id,
@@ -197,8 +234,16 @@ class SettlementCalculationService
         }
 
         $netTotal = max(0, $grossTotal - $commissionTotal - $commissionTaxTotal - $statutoryTotal - $refundTotal);
+        if ($payableItemsTotal !== $netTotal) {
+            $fundingReasons[] = "Sum of positive payable items ({$payableItemsTotal} minor) differs from net settlement total ({$netTotal} minor).";
+        }
+
+        $fundingReviewRequired = $paymentFundingShortfallTotal > 0
+            || $negativeItemsDeficitTotal > 0
+            || $payableItemsTotal !== $netTotal;
 
         return [
+            'currency' => $currency,
             'gross_booking_value_minor' => $grossTotal,
             'commission_amount_minor' => $commissionTotal,
             'commission_tax_amount_minor' => $commissionTaxTotal,
@@ -207,9 +252,15 @@ class SettlementCalculationService
             'relocation_adjustments_minor' => 0,
             'other_adjustments_minor' => 0,
             'net_settlement_amount_minor' => $netTotal,
+            'payable_items_total_minor' => $payableItemsTotal,
+            'negative_items_deficit_minor' => $negativeItemsDeficitTotal,
+            'platform_discount_total_minor' => $platformDiscountTotal,
+            'payment_funding_shortfall_minor' => $paymentFundingShortfallTotal,
             'items' => $items,
             'tax_review_required' => $taxReviewRequired,
-            'tax_review_reasons' => array_unique($taxReasons),
+            'tax_review_reasons' => array_values(array_unique($taxReasons)),
+            'funding_review_required' => $fundingReviewRequired,
+            'funding_review_reasons' => array_values(array_unique($fundingReasons)),
         ];
     }
 }

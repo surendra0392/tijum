@@ -13,6 +13,7 @@ use App\Models\PaymentWebhookEvent;
 use App\Models\ProviderTransfer;
 use App\Models\ProviderTransferReversal;
 use App\Models\ReservationPayment;
+use App\Services\Financial\FinancialLedgerService;
 use App\Services\Notifications\NotificationDispatcher;
 use Carbon\CarbonImmutable;
 use Closure;
@@ -390,14 +391,18 @@ class ProcessWebhookEvent
         }
 
         $now = CarbonImmutable::now();
-        $reversal->forceFill([
-            'status' => 'processed',
-            'processed_at' => $now,
-            'gateway_reversal_id' => $reversalId ?: $reversal->gateway_reversal_id,
-        ])->save();
+        if ($reversal->status !== 'processed') {
+            $reversal->forceFill([
+                'status' => 'processed',
+                'processed_at' => $reversal->processed_at ?? $now,
+                'gateway_reversal_id' => $reversalId ?: $reversal->gateway_reversal_id,
+            ])->save();
+        }
 
-        if ($reversal->transfer !== null) {
+        if ($reversal->transfer !== null && $reversal->transfer->status !== ProviderTransferStatus::Reversed) {
             $reversal->transfer->forceFill(['status' => ProviderTransferStatus::Reversed->value])->save();
         }
+
+        app(FinancialLedgerService::class)->recordTransferReversal($reversal);
     }
 }

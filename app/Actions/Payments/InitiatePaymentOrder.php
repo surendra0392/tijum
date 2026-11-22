@@ -44,6 +44,10 @@ class InitiatePaymentOrder
     {
         $this->assertOwner($reservation, $user);
 
+        if ($reservation->total_amount_minor < 100) {
+            throw new InvalidArgumentException('Minimum Razorpay order amount is 100 paise.');
+        }
+
         if (DB::transactionLevel() !== 0) {
             throw new RuntimeException('Payment initiation requires its own transaction so the order attempt can be committed before dispatch.');
         }

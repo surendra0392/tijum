@@ -17,6 +17,8 @@ class FinancialLedgerEntry extends Model
     protected $fillable = [
         'entry_reference',
         'journal_reference',
+        'idempotency_key',
+        'line_number',
         'entry_category',
         'debit_minor',
         'credit_minor',
@@ -26,23 +28,31 @@ class FinancialLedgerEntry extends Model
         'owner_id',
         'notes',
         'posted_at',
+        'effective_at',
+        'is_corrective',
     ];
 
     /**
      * @return array{
      *     entry_category: 'App\\Enums\\LedgerEntryCategory',
+     *     line_number: 'integer',
      *     debit_minor: 'integer',
      *     credit_minor: 'integer',
      *     posted_at: 'datetime',
+     *     effective_at: 'datetime',
+     *     is_corrective: 'boolean',
      * }
      */
     protected function casts(): array
     {
         return [
             'entry_category' => LedgerEntryCategory::class,
+            'line_number' => 'integer',
             'debit_minor' => 'integer',
             'credit_minor' => 'integer',
             'posted_at' => 'datetime',
+            'effective_at' => 'datetime',
+            'is_corrective' => 'boolean',
         ];
     }
 

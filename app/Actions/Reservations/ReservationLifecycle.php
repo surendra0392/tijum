@@ -7,14 +7,12 @@ namespace App\Actions\Reservations;
 use App\Enums\CaseCategory;
 use App\Enums\CasePriority;
 use App\Enums\CaseStatus;
-use App\Enums\LedgerEntryCategory;
 use App\Enums\PaymentStatus;
 use App\Enums\ReservationStatus;
 use App\Models\CouponHold;
 use App\Models\CouponRedemption;
 use App\Models\CustomerProtectionCase;
 use App\Models\CustomerProtectionCaseMessage;
-use App\Models\FinancialLedgerEntry;
 use App\Models\Owner;
 use App\Models\PointsReservationHold;
 use App\Models\Property;
@@ -59,14 +57,7 @@ class ReservationLifecycle
                 throw ValidationException::withMessages(['payment' => 'A matching captured payment is required to confirm this reservation.']);
             }
 
-            $recorded = FinancialLedgerEntry::query()
-                ->where('entity_type', ReservationPayment::class)
-                ->where('entity_id', $resolvedPayment->id)
-                ->where('entry_category', LedgerEntryCategory::PaymentCaptured)
-                ->exists();
-            if (! $recorded) {
-                app(FinancialLedgerService::class)->recordPaymentCaptured($resolvedPayment);
-            }
+            app(FinancialLedgerService::class)->recordPaymentCaptured($resolvedPayment);
 
             if ($locked->status === ReservationStatus::Confirmed) {
                 if ($locked->payments()->whereKeyNot($resolvedPayment->id)
@@ -104,37 +95,7 @@ class ReservationLifecycle
                 'confirmed_at' => $now,
             ])->save();
 
-            $pointsHold = null;
-            $pointsCommitted = false;
-
-            try {
-                // Commit promotional holds and register pending points
-                /** @var CouponHold|null $couponHold */
-                $couponHold = CouponHold::query()->where('reservation_id', $locked->id)->where('status', 'active')->first();
-                if ($couponHold !== null) {
-                    app(CouponRedemptionService::class)->commitHold($couponHold, $locked);
-                }
-
-                /** @var PointsReservationHold|null $pointsHold */
-                $pointsHold = PointsReservationHold::query()->where('reservation_id', $locked->id)->where('status', 'active')->first();
-                if ($pointsHold !== null) {
-                    app(LoyaltyPointsService::class)->commitHold($pointsHold, $locked);
-                    $pointsCommitted = true;
-                }
-
-                if ($locked->user !== null && $locked->points_awarded_potential > 0) {
-                    app(LoyaltyPointsService::class)->recordPendingBookingPoints(
-                        $locked->user,
-                        $locked,
-                        $locked->points_awarded_potential,
-                    );
-                }
-            } catch (\Throwable $e) {
-                Log::error('Reservation confirmation post-processing failed: '.$e->getMessage(), [
-                    'exception' => $e,
-                    'reservation_id' => $locked->id,
-                ]);
-            }
+            [$pointsHold, $pointsCommitted] = $this->commitPromotionalHolds($locked);
 
             $saved = $locked->fresh() ?? $locked;
             $savedId = $saved->id;
@@ -142,134 +103,256 @@ class ReservationLifecycle
             $pointsHeldAmount = $pointsCommitted && $pointsHold !== null ? (int) $pointsHold->points_held : 0;
             $pointsDiscountAmount = $pointsCommitted && $pointsHold !== null ? (int) $pointsHold->inr_discount_minor : 0;
 
-            DB::afterCommit(function () use ($savedId, $paymentId, $pointsCommitted, $pointsHeldAmount, $pointsDiscountAmount): void {
-                try {
-                    $confirmed = Reservation::query()->with(['user', 'property.owner', 'roomType', 'payments'])->find($savedId);
-                    if ($confirmed === null || $confirmed->user === null || $confirmed->property === null) {
-                        return;
-                    }
+            DB::afterCommit(fn () => $this->dispatchConfirmationNotifications(
+                $savedId,
+                $paymentId,
+                $pointsCommitted,
+                $pointsHeldAmount,
+                $pointsDiscountAmount,
+            ));
 
-                    $dispatcher = app(NotificationDispatcher::class);
-                    $timezone = $this->timing->timezone();
-                    $roomTypeName = $confirmed->snapshot_room_type_name ?: $confirmed->roomType->name;
-                    $amountFormatted = '₹'.number_format($confirmed->total_amount_minor / 100, 2);
-                    $checkInDateFormatted = $confirmed->check_in_date->format('d M Y');
-                    $checkoutDateFormatted = $confirmed->checkout_date->format('d M Y');
-                    $checkInTime = $this->timing->getStandardCheckInTime().' IST';
-                    $checkoutTime = $this->timing->getStandardCheckOutTime().' IST';
-                    $capturedPayment = ReservationPayment::query()->find($paymentId)
-                        ?? $confirmed->payments->where('status', PaymentStatus::Captured)->sortByDesc('id')->first();
-                    $paymentReference = $capturedPayment !== null
-                        ? ($capturedPayment->gateway_payment_id ?: $capturedPayment->gateway_order_id)
-                        : 'PAY-'.$confirmed->booking_reference;
-                    $paymentMethod = Str::headline((string) data_get($capturedPayment?->metadata, 'method', 'Razorpay'));
-                    $capturedAtFormatted = ($capturedPayment !== null && $capturedPayment->captured_at !== null ? $capturedPayment->captured_at : ($confirmed->confirmed_at ?? now()))
-                        ->setTimezone($timezone)
-                        ->format('d M Y, H:i T');
+            return $saved;
+        }, 3);
+    }
 
+    public function confirmZeroPayable(Reservation $reservation): Reservation
+    {
+        return DB::transaction(function () use ($reservation): Reservation {
+            Property::query()->whereKey($reservation->property_id)->lockForUpdate()->firstOrFail();
+
+            $locked = Reservation::query()->whereKey($reservation->id)->lockForUpdate()->firstOrFail();
+            if ($locked->total_amount_minor !== 0) {
+                throw ValidationException::withMessages([
+                    'payment' => 'Zero-payable confirmation is only permitted when total_amount_minor is zero.',
+                ]);
+            }
+
+            if ($locked->status === ReservationStatus::Confirmed) {
+                return $locked;
+            }
+
+            if ($locked->status !== ReservationStatus::AwaitingPayment) {
+                throw ValidationException::withMessages([
+                    'reservation' => 'Only awaiting-payment reservations can be confirmed without a payment.',
+                ]);
+            }
+
+            $roomType = PropertyRoomType::query()->whereKey($locked->property_room_type_id)
+                ->where('property_id', $locked->property_id)->lockForUpdate()->first();
+            if ($roomType === null || ! $roomType->is_active || ! app(ReservationAvailabilityService::class)->stayCapacity(
+                $roomType,
+                $locked->check_in_date->toDateString(),
+                $locked->checkout_date->toDateString(),
+                $locked->quantity,
+                excludingReservationId: $locked->id,
+            )['available']) {
+                throw ValidationException::withMessages([
+                    'room_type_id' => 'The selected rooms are no longer available for the chosen dates.',
+                ]);
+            }
+
+            $now = CarbonImmutable::now($this->timing->timezone());
+
+            $locked->forceFill([
+                'status' => ReservationStatus::Confirmed->value,
+                'confirmed_at' => $now,
+                'payment_deadline_at' => null,
+            ])->save();
+
+            [$pointsHold, $pointsCommitted] = $this->commitPromotionalHolds($locked);
+
+            $saved = $locked->fresh() ?? $locked;
+            $savedId = $saved->id;
+            $pointsHeldAmount = $pointsCommitted && $pointsHold !== null ? (int) $pointsHold->points_held : 0;
+            $pointsDiscountAmount = $pointsCommitted && $pointsHold !== null ? (int) $pointsHold->inr_discount_minor : 0;
+
+            DB::afterCommit(fn () => $this->dispatchConfirmationNotifications(
+                $savedId,
+                null,
+                $pointsCommitted,
+                $pointsHeldAmount,
+                $pointsDiscountAmount,
+            ));
+
+            return $saved;
+        }, 3);
+    }
+
+    /**
+     * @return array{0: ?PointsReservationHold, 1: bool}
+     */
+    private function commitPromotionalHolds(Reservation $locked): array
+    {
+        $pointsHold = null;
+        $pointsCommitted = false;
+
+        try {
+            /** @var CouponHold|null $couponHold */
+            $couponHold = CouponHold::query()->where('reservation_id', $locked->id)->where('status', 'active')->first();
+            if ($couponHold !== null) {
+                app(CouponRedemptionService::class)->commitHold($couponHold, $locked);
+            }
+
+            /** @var PointsReservationHold|null $pointsHold */
+            $pointsHold = PointsReservationHold::query()->where('reservation_id', $locked->id)->where('status', 'active')->first();
+            if ($pointsHold !== null) {
+                app(LoyaltyPointsService::class)->commitHold($pointsHold, $locked);
+                $pointsCommitted = true;
+            }
+
+            if ($locked->user !== null && $locked->points_awarded_potential > 0) {
+                app(LoyaltyPointsService::class)->recordPendingBookingPoints(
+                    $locked->user,
+                    $locked,
+                    $locked->points_awarded_potential,
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::error('Reservation confirmation post-processing failed: '.$e->getMessage(), [
+                'exception' => $e,
+                'reservation_id' => $locked->id,
+            ]);
+        }
+
+        return [$pointsHold, $pointsCommitted];
+    }
+
+    private function dispatchConfirmationNotifications(
+        int $savedId,
+        ?int $paymentId,
+        bool $pointsCommitted,
+        int $pointsHeldAmount,
+        int $pointsDiscountAmount,
+    ): void {
+        try {
+            $confirmed = Reservation::query()->with(['user', 'property.owner', 'roomType', 'payments'])->find($savedId);
+            if ($confirmed === null || $confirmed->user === null || $confirmed->property === null) {
+                return;
+            }
+
+            $dispatcher = app(NotificationDispatcher::class);
+            $timezone = $this->timing->timezone();
+            $roomTypeName = $confirmed->snapshot_room_type_name ?: $confirmed->roomType->name;
+            $amountFormatted = '₹'.number_format($confirmed->total_amount_minor / 100, 2);
+            $checkInDateFormatted = $confirmed->check_in_date->format('d M Y');
+            $checkoutDateFormatted = $confirmed->checkout_date->format('d M Y');
+            $checkInTime = $this->timing->getStandardCheckInTime().' IST';
+            $checkoutTime = $this->timing->getStandardCheckOutTime().' IST';
+            $capturedPayment = $paymentId !== null
+                ? (ReservationPayment::query()->find($paymentId)
+                    ?? $confirmed->payments->where('status', PaymentStatus::Captured)->sortByDesc('id')->first())
+                : null;
+            $paymentReference = $capturedPayment !== null
+                ? ($capturedPayment->gateway_payment_id ?: $capturedPayment->gateway_order_id)
+                : 'PAY-'.$confirmed->booking_reference;
+            $paymentMethod = Str::headline((string) data_get($capturedPayment?->metadata, 'method', 'Razorpay'));
+            $capturedAtFormatted = ($capturedPayment !== null && $capturedPayment->captured_at !== null ? $capturedPayment->captured_at : ($confirmed->confirmed_at ?? now()))
+                ->setTimezone($timezone)
+                ->format('d M Y, H:i T');
+
+            $dispatcher->dispatch(
+                eventType: 'reservation.confirmed',
+                recipients: $confirmed->user,
+                variables: [
+                    'customer_name' => $confirmed->user->name,
+                    'booking_reference' => $confirmed->booking_reference,
+                    'property_name' => $confirmed->property->name,
+                    'room_type' => $roomTypeName,
+                    'check_in_date' => $checkInDateFormatted,
+                    'checkout_date' => $checkoutDateFormatted,
+                    'check_in_time' => $checkInTime,
+                    'checkout_time' => $checkoutTime,
+                    'amount' => $amountFormatted,
+                    'action_url' => url("/reservations/{$confirmed->id}"),
+                ],
+                related: $confirmed,
+                relatedReference: $confirmed->booking_reference
+            );
+
+            if ($capturedPayment !== null) {
+                $dispatcher->dispatch(
+                    eventType: 'payment.captured',
+                    recipients: $confirmed->user,
+                    variables: [
+                        'customer_name' => $confirmed->user->name,
+                        'booking_reference' => $confirmed->booking_reference,
+                        'property_name' => $confirmed->property->name,
+                        'amount' => $amountFormatted,
+                        'payment_reference' => $paymentReference,
+                        'payment_method' => $paymentMethod,
+                        'captured_at' => $capturedAtFormatted,
+                        'action_url' => url("/reservations/{$confirmed->id}"),
+                    ],
+                    related: $confirmed,
+                    relatedReference: $confirmed->booking_reference,
+                    idempotencySeed: 'payment_captured_'.$confirmed->id.'_'.$capturedPayment->id
+                );
+            }
+
+            if ($pointsCommitted && $pointsHeldAmount > 0) {
+                $wallet = app(LoyaltyPointsService::class)->getOrCreateWallet($confirmed->user);
+                $dispatcher->dispatch(
+                    eventType: 'rewards.points_redeemed',
+                    recipients: $confirmed->user,
+                    variables: [
+                        'customer_name' => $confirmed->user->name,
+                        'booking_reference' => $confirmed->booking_reference,
+                        'property_name' => $confirmed->property->name,
+                        'points_redeemed' => number_format($pointsHeldAmount),
+                        'points_balance' => number_format($wallet->available_points),
+                        'monetary_value' => '₹'.number_format($pointsDiscountAmount / 100, 2),
+                        'action_url' => url('/rewards'),
+                    ],
+                    related: $confirmed,
+                    relatedReference: $confirmed->booking_reference,
+                    idempotencySeed: 'points_redeemed_'.$confirmed->id
+                );
+            }
+
+            if ($confirmed->property->owner !== null) {
+                $dispatcher->dispatch(
+                    eventType: 'partner.reservation_confirmed',
+                    recipients: $confirmed->property->owner,
+                    variables: [
+                        'owner_name' => $confirmed->property->owner->name,
+                        'booking_reference' => $confirmed->booking_reference,
+                        'property_name' => $confirmed->property->name,
+                        'room_type' => $roomTypeName,
+                        'check_in_date' => $checkInDateFormatted,
+                        'checkout_date' => $checkoutDateFormatted,
+                        'guest_count' => (string) $confirmed->guest_count,
+                        'amount' => $amountFormatted,
+                        'action_url' => url("/owner/reservations/{$confirmed->id}"),
+                    ],
+                    related: $confirmed,
+                    relatedReference: $confirmed->booking_reference
+                );
+
+                if ($capturedPayment !== null) {
                     $dispatcher->dispatch(
-                        eventType: 'reservation.confirmed',
-                        recipients: $confirmed->user,
+                        eventType: 'partner.payment_confirmed',
+                        recipients: $confirmed->property->owner,
                         variables: [
-                            'customer_name' => $confirmed->user->name,
-                            'booking_reference' => $confirmed->booking_reference,
-                            'property_name' => $confirmed->property->name,
-                            'room_type' => $roomTypeName,
-                            'check_in_date' => $checkInDateFormatted,
-                            'checkout_date' => $checkoutDateFormatted,
-                            'check_in_time' => $checkInTime,
-                            'checkout_time' => $checkoutTime,
-                            'amount' => $amountFormatted,
-                            'action_url' => url("/reservations/{$confirmed->id}"),
-                        ],
-                        related: $confirmed,
-                        relatedReference: $confirmed->booking_reference
-                    );
-
-                    $dispatcher->dispatch(
-                        eventType: 'payment.captured',
-                        recipients: $confirmed->user,
-                        variables: [
-                            'customer_name' => $confirmed->user->name,
+                            'owner_name' => $confirmed->property->owner->name,
                             'booking_reference' => $confirmed->booking_reference,
                             'property_name' => $confirmed->property->name,
                             'amount' => $amountFormatted,
                             'payment_reference' => $paymentReference,
-                            'payment_method' => $paymentMethod,
                             'captured_at' => $capturedAtFormatted,
-                            'action_url' => url("/reservations/{$confirmed->id}"),
+                            'action_url' => url("/owner/reservations/{$confirmed->id}"),
                         ],
                         related: $confirmed,
                         relatedReference: $confirmed->booking_reference,
-                        idempotencySeed: 'payment_captured_'.$confirmed->id.'_'.($capturedPayment !== null ? $capturedPayment->id : 'confirmed')
+                        idempotencySeed: 'partner_payment_confirmed_'.$confirmed->id
                     );
-
-                    if ($pointsCommitted && $pointsHeldAmount > 0) {
-                        $wallet = app(LoyaltyPointsService::class)->getOrCreateWallet($confirmed->user);
-                        $dispatcher->dispatch(
-                            eventType: 'rewards.points_redeemed',
-                            recipients: $confirmed->user,
-                            variables: [
-                                'customer_name' => $confirmed->user->name,
-                                'booking_reference' => $confirmed->booking_reference,
-                                'property_name' => $confirmed->property->name,
-                                'points_redeemed' => number_format($pointsHeldAmount),
-                                'points_balance' => number_format($wallet->available_points),
-                                'monetary_value' => '₹'.number_format($pointsDiscountAmount / 100, 2),
-                                'action_url' => url('/rewards'),
-                            ],
-                            related: $confirmed,
-                            relatedReference: $confirmed->booking_reference,
-                            idempotencySeed: 'points_redeemed_'.$confirmed->id
-                        );
-                    }
-
-                    if ($confirmed->property->owner !== null) {
-                        $dispatcher->dispatch(
-                            eventType: 'partner.reservation_confirmed',
-                            recipients: $confirmed->property->owner,
-                            variables: [
-                                'owner_name' => $confirmed->property->owner->name,
-                                'booking_reference' => $confirmed->booking_reference,
-                                'property_name' => $confirmed->property->name,
-                                'room_type' => $roomTypeName,
-                                'check_in_date' => $checkInDateFormatted,
-                                'checkout_date' => $checkoutDateFormatted,
-                                'guest_count' => (string) $confirmed->guest_count,
-                                'amount' => $amountFormatted,
-                                'action_url' => url("/owner/reservations/{$confirmed->id}"),
-                            ],
-                            related: $confirmed,
-                            relatedReference: $confirmed->booking_reference
-                        );
-
-                        $dispatcher->dispatch(
-                            eventType: 'partner.payment_confirmed',
-                            recipients: $confirmed->property->owner,
-                            variables: [
-                                'owner_name' => $confirmed->property->owner->name,
-                                'booking_reference' => $confirmed->booking_reference,
-                                'property_name' => $confirmed->property->name,
-                                'amount' => $amountFormatted,
-                                'payment_reference' => $paymentReference,
-                                'captured_at' => $capturedAtFormatted,
-                                'action_url' => url("/owner/reservations/{$confirmed->id}"),
-                            ],
-                            related: $confirmed,
-                            relatedReference: $confirmed->booking_reference,
-                            idempotencySeed: 'partner_payment_confirmed_'.$confirmed->id
-                        );
-                    }
-                } catch (\Throwable $e) {
-                    Log::warning('Reservation confirmation notification dispatch failed: '.$e->getMessage(), [
-                        'exception' => $e,
-                        'reservation_id' => $savedId,
-                    ]);
                 }
-            });
-
-            return $saved;
-        }, 3);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Reservation confirmation notification dispatch failed: '.$e->getMessage(), [
+                'exception' => $e,
+                'reservation_id' => $savedId,
+            ]);
+        }
     }
 
     private function flagPaymentForReview(Reservation $reservation, ReservationPayment $payment, string $reason): Reservation

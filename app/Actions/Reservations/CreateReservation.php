@@ -131,6 +131,12 @@ class CreateReservation
                 $originalAmountMinor = (int) $quote['total_amount_minor'];
                 $finalPayableMinor = (int) $promo['total_payable_minor'];
 
+                if ($finalPayableMinor > 0 && $finalPayableMinor < 100) {
+                    throw ValidationException::withMessages([
+                        'coupon_code' => 'Discounted payable amount must be either ₹0 or at least ₹1.00 to create a valid payment order.',
+                    ]);
+                }
+
                 $couponModel = null;
                 if ($promo['coupon_applied'] && $promo['coupon_code']) {
                     $couponModel = CouponCode::query()->where('code', $promo['coupon_code'])->first();
@@ -164,7 +170,7 @@ class CreateReservation
                     'points_awarded_potential' => $promo['points_potential_earned'],
                     'status' => ReservationStatus::AwaitingPayment->value,
                     'submitted_at' => $now,
-                    'payment_deadline_at' => $now->addMinutes($expiryMinutes),
+                    'payment_deadline_at' => $finalPayableMinor === 0 ? null : $now->addMinutes($expiryMinutes),
                 ]));
 
                 $reservation->save();
@@ -189,6 +195,10 @@ class CreateReservation
 
                 app(CommissionCalculationService::class)
                     ->snapshotCommissionOnReservation($reservation);
+
+                if ($finalPayableMinor === 0) {
+                    return app(ReservationLifecycle::class)->confirmZeroPayable($reservation);
+                }
 
                 $saved = $reservation->fresh() ?? $reservation;
 

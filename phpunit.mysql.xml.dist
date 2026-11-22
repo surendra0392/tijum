@@ -8,6 +8,7 @@
         <testsuite name="MySQL concurrency">
             <file>tests/Feature/Payments/MySqlPaymentConcurrencyTest.php</file>
             <file>tests/Feature/Financial/MySqlSettlementConcurrencyTest.php</file>
+            <file>tests/Feature/Financial/MySqlFinancialLedgerConcurrencyTest.php</file>
         </testsuite>
     </testsuites>
     <php>

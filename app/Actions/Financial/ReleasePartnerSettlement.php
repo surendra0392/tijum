@@ -85,9 +85,21 @@ class ReleasePartnerSettlement
                 throw ValidationException::withMessages(['settlement' => 'Only approved, pending or retriable failed settlements can be released.']);
             }
 
-            $items = $lockedSettlement->items()->where('net_payable_minor', '>', 0)->orderBy('reservation_payment_id')->get();
+            $allItems = $lockedSettlement->items()->orderBy('reservation_payment_id')->lockForUpdate()->get();
 
-            if ($lockedSettlement->currency !== 'INR' || $items->sum('net_payable_minor') !== $lockedSettlement->net_settlement_amount_minor) {
+            if ($allItems->isEmpty()) {
+                throw ValidationException::withMessages(['settlement' => 'Settlement contains no items to settle.']);
+            }
+
+            if ($allItems->contains(fn (PartnerSettlementItem $item): bool => $item->net_payable_minor < 0)) {
+                throw ValidationException::withMessages([
+                    'settlement' => 'Settlement contains negative item balances and cannot be released until adjusted by Finance.',
+                ]);
+            }
+
+            $items = $allItems->filter(fn (PartnerSettlementItem $item): bool => $item->net_payable_minor > 0)->values();
+
+            if ($lockedSettlement->currency !== 'INR' || (int) $items->sum('net_payable_minor') !== $lockedSettlement->net_settlement_amount_minor) {
                 throw ValidationException::withMessages([
                     'settlement' => 'The transfer total differs from the approved INR settlement amount. Finance must review the batch before release.',
                 ]);
@@ -105,6 +117,16 @@ class ReleasePartnerSettlement
 
             if ($attempts->keys()->diff($paymentIds)->isNotEmpty()) {
                 throw ValidationException::withMessages(['settlement' => 'Existing transfers no longer match the approved settlement items.']);
+            }
+
+            if ($lockedSettlement->net_settlement_amount_minor === 0 && $items->isEmpty() && $attempts->isEmpty()) {
+                $this->updateTransferStatus->execute(
+                    $lockedSettlement,
+                    CarbonImmutable::now(),
+                    $mode ?? (string) config('tijum.payments.razorpay.mode', 'test'),
+                );
+
+                return null;
             }
 
             $unsent = $items->filter(function (PartnerSettlementItem $item) use ($attempts, $mode, $accountId, $retryableIds): bool {

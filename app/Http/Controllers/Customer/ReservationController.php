@@ -168,8 +168,12 @@ class ReservationController extends Controller
             $request->validated(),
         );
 
+        $message = $reservation->status === ReservationStatus::Confirmed
+            ? 'Reservation confirmed.'
+            : 'Reservation created. Complete payment within 15 minutes to confirm your booking.';
+
         return to_route('reservations.show', $reservation)
-            ->with('status', 'Reservation created. Complete payment within 15 minutes to confirm your booking.');
+            ->with('status', $message);
     }
 
     public function show(mixed $reservation): Response

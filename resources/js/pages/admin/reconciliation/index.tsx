@@ -60,6 +60,17 @@ interface UnreconciledException {
     reversals_count: number;
 }
 
+interface LedgerAuditSummary {
+    unbalanced_journals_count: number;
+    duplicate_entity_journals_count: number;
+    processed_refunds_missing_journal_count: number;
+    quarantined_refunds_count: number;
+    completed_transfers_missing_journal_count: number;
+    processed_reversals_missing_journal_count: number;
+    transfers_with_provenance_issues_count: number;
+    zero_payable_platform_discount_bookings_count: number;
+}
+
 interface Props {
     exceptions: UnreconciledException[];
     summary: {
@@ -68,6 +79,7 @@ interface Props {
         total_tax_deductions_minor: number;
         unreconciled_count: number;
     };
+    ledger_audit?: LedgerAuditSummary;
 }
 
 function formatInr(minor: number): string {
@@ -101,6 +113,7 @@ function getInternalStatusSemantic(status: string): SemanticStatus {
 export default function FinancialReconciliationIndex({
     exceptions,
     summary,
+    ledger_audit,
 }: Props) {
     const [resolvingId, setResolvingId] = useState<number | null>(null);
     const [resolveTarget, setResolveTarget] =
@@ -153,7 +166,9 @@ export default function FinancialReconciliationIndex({
                 description="Continuous matching between internal reservation bookings, gateway captured funds, and Razorpay Route linked-account transfers."
                 badges={
                     <>
-                        <Badge variant="plum">Accounting &amp; Governance</Badge>
+                        <Badge variant="plum">
+                            Accounting &amp; Governance
+                        </Badge>
                         <Badge variant="outline" className="gap-1.5">
                             <ShieldCheck
                                 className="size-3.5 text-tijum-coral"
@@ -239,6 +254,68 @@ export default function FinancialReconciliationIndex({
                     }
                 />
             </section>
+
+            {ledger_audit && (
+                <Card className="gap-0 overflow-hidden py-0">
+                    <CardHeader className="border-b border-tijum-surface/80 py-4 dark:border-border">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="space-y-0.5">
+                                <CardTitle className="text-base">
+                                    Ledger &amp; Subledger Integrity Audit
+                                </CardTitle>
+                                <CardDescription>
+                                    Read-only verification of balanced journal
+                                    legs, duplicate entity postings, refund
+                                    quarantines, and Route transfer provenance.
+                                </CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="rounded-lg border p-3 text-sm">
+                            <p className="text-xs text-muted-foreground">
+                                Unbalanced Journals
+                            </p>
+                            <p className="mt-1 font-semibold tabular-nums">
+                                {ledger_audit.unbalanced_journals_count}
+                            </p>
+                        </div>
+                        <div className="rounded-lg border p-3 text-sm">
+                            <p className="text-xs text-muted-foreground">
+                                Duplicate Entity Postings
+                            </p>
+                            <p className="mt-1 font-semibold tabular-nums">
+                                {ledger_audit.duplicate_entity_journals_count}
+                            </p>
+                        </div>
+                        <div className="rounded-lg border p-3 text-sm">
+                            <p className="text-xs text-muted-foreground">
+                                Quarantined / Unjournalled Refunds
+                            </p>
+                            <p className="mt-1 font-semibold tabular-nums">
+                                {ledger_audit.quarantined_refunds_count} /{' '}
+                                {
+                                    ledger_audit.processed_refunds_missing_journal_count
+                                }
+                            </p>
+                        </div>
+                        <div className="rounded-lg border p-3 text-sm">
+                            <p className="text-xs text-muted-foreground">
+                                Transfer Journal / Provenance Issues
+                            </p>
+                            <p className="mt-1 font-semibold tabular-nums">
+                                {
+                                    ledger_audit.completed_transfers_missing_journal_count
+                                }{' '}
+                                /{' '}
+                                {
+                                    ledger_audit.transfers_with_provenance_issues_count
+                                }
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Unreconciled Exceptions Table */}
             <Card className="gap-0 overflow-hidden py-0">

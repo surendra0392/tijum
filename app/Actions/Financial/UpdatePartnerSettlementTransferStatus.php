@@ -25,7 +25,9 @@ class UpdatePartnerSettlementTransferStatus
 
         $previousStatus = $settlement->status;
         $held = $previousStatus === SettlementStatus::OnHold;
-        $items = $settlement->items()->where('net_payable_minor', '>', 0)->get();
+        $allItems = $settlement->items()->get();
+        $hasNegativeItems = $allItems->contains(fn (PartnerSettlementItem $item): bool => $item->net_payable_minor < 0);
+        $items = $allItems->filter(fn (PartnerSettlementItem $item): bool => $item->net_payable_minor > 0)->values();
         $transfers = $settlement->providerTransfers()->latest('id')->lockForUpdate()->get();
         $latestByPayment = $transfers->unique('reservation_payment_id');
         $failed = $latestByPayment->first(fn (ProviderTransfer $transfer): bool => $transfer->status === ProviderTransferStatus::Failed);
@@ -36,10 +38,21 @@ class UpdatePartnerSettlementTransferStatus
             && ProviderTransfer::isRazorpayTransferId($transfer->gateway_transfer_id));
         $processedByPayment = $processed->keyBy('reservation_payment_id');
 
-        $paidInFull = (! $held || ($settlement->approved_at !== null && $items->isNotEmpty()))
+        $isCleanZeroSettlement = ! $held
+            && ! $hasNegativeItems
+            && $settlement->net_settlement_amount_minor === 0
+            && $allItems->isNotEmpty()
+            && $items->isEmpty()
+            && $transfers->isEmpty();
+
+        $paidInFull = $isCleanZeroSettlement || (
+            ! $hasNegativeItems
+            && $items->isNotEmpty()
+            && (! $held || $settlement->approved_at !== null)
             && $processed->count() === $items->count()
-            && $processed->sum('amount_minor') === $settlement->net_settlement_amount_minor
-            && $items->every(fn (PartnerSettlementItem $item): bool => $processedByPayment->get($item->reservation_payment_id)?->amount_minor === $item->net_payable_minor);
+            && (int) $processed->sum('amount_minor') === $settlement->net_settlement_amount_minor
+            && $items->every(fn (PartnerSettlementItem $item): bool => $processedByPayment->get($item->reservation_payment_id)?->amount_minor === $item->net_payable_minor)
+        );
 
         $status = match (true) {
             $held && (! $paidInFull || $uncertain || $failed !== null) => SettlementStatus::OnHold,

@@ -811,18 +811,6 @@ parameters:
 			path: app/Services/Financial/FinancialLedgerService.php
 
 		-
-			message: '#^Method App\\Services\\Financial\\FinancialReconciliationService\:\:getUnreconciledExceptions\(\) should return Illuminate\\Support\\Collection\<int, array\<string, mixed\>\> but returns Illuminate\\Support\\Collection\<int, array\{settlement_id\: int, settlement_reference\: string, owner_name\: string\|null, amount_minor\: int, status\: string, status_label\: string, reconciliation_status\: string, reconciliation_label\: string, \.\.\.\}\>\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Services/Financial/FinancialReconciliationService.php
-
-		-
-			message: '#^Method App\\Services\\Financial\\SettlementCalculationService\:\:calculateSettlementSummary\(\) should return array\{gross_booking_value_minor\: int, commission_amount_minor\: int, commission_tax_amount_minor\: int, statutory_deductions_minor\: int, refund_adjustments_minor\: int, relocation_adjustments_minor\: int, other_adjustments_minor\: int, net_settlement_amount_minor\: int, \.\.\.\} but returns array\{gross_booking_value_minor\: int, commission_amount_minor\: int\<0, max\>, commission_tax_amount_minor\: int\<0, max\>, statutory_deductions_minor\: int, refund_adjustments_minor\: \(float\|int\), relocation_adjustments_minor\: 0, other_adjustments_minor\: 0, net_settlement_amount_minor\: float\|int\<0, max\>, \.\.\.\}\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Services/Financial/SettlementCalculationService.php
-
-		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.expr
 			count: 1

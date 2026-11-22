@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace App\Actions\Payments;
 
 use App\Contracts\PaymentGateway;
-use App\Enums\LedgerEntryCategory;
 use App\Enums\PaymentStatus;
 use App\Enums\RefundStatus;
-use App\Models\FinancialLedgerEntry;
+use App\Enums\SettlementStatus;
+use App\Models\PartnerSettlementItem;
+use App\Models\Reservation;
 use App\Models\ReservationPayment;
 use App\Models\ReservationRefund;
 use App\Services\Financial\FinancialLedgerService;
 use App\Services\Notifications\NotificationDispatcher;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -42,9 +45,14 @@ class ReconcilePaymentRefund
         return is_string($id) && preg_match('/^pay_[a-zA-Z0-9_]{1,95}$/D', $id) === 1;
     }
 
+    public static function isRefundId(mixed $id): bool
+    {
+        return is_string($id) && preg_match('/^rfnd_[a-zA-Z0-9_]{1,96}$/D', $id) === 1;
+    }
+
     public function byProviderId(string $providerId): ?ReservationRefund
     {
-        if (! $this->isRefundId($providerId) || $this->gatewayMode() === null) {
+        if (! self::isRefundId($providerId) || $this->gatewayMode() === null) {
             return null;
         }
 
@@ -54,7 +62,7 @@ class ReconcilePaymentRefund
         }
 
         $refund = ReservationRefund::query()->where('gateway_refund_id', $providerId)->first();
-        if ($refund === null && is_string($response['receipt'] ?? null) && $this->isPaymentId($response['payment_id'] ?? null)) {
+        if ($refund === null && is_string($response['receipt'] ?? null) && self::isPaymentId($response['payment_id'] ?? null)) {
             $payment = ReservationPayment::query()->where('gateway', 'razorpay')
                 ->where('gateway_payment_id', $response['payment_id'])->first();
 
@@ -110,12 +118,17 @@ class ReconcilePaymentRefund
 
             if ($locked->status === RefundStatus::Processed) {
                 if ($status === RefundStatus::Processed) {
-                    $this->recordCompletedJournalIfMissing($locked);
+                    $this->recordCompletedJournalIfMissing(
+                        $locked,
+                        $payment,
+                        isCorrective: true,
+                        effectiveAt: $this->resolveEffectiveAt($locked, $response),
+                    );
                 } elseif ($status === RefundStatus::Failed) {
                     throw new RuntimeException('Processed refund received a contradictory failed status from Razorpay.');
                 }
 
-                return $locked;
+                return $locked->fresh() ?? $locked;
             }
 
             if ($locked->status === RefundStatus::Failed && ! $isLegacyFailed) {
@@ -151,26 +164,133 @@ class ReconcilePaymentRefund
             }]);
 
             if ($status === RefundStatus::Processed) {
-                $this->recordCompletedJournalIfMissing($locked);
+                $this->recordCompletedJournalIfMissing(
+                    $locked,
+                    $payment,
+                    isCorrective: false,
+                    effectiveAt: $locked->gateway_processed_at !== null
+                        ? CarbonImmutable::instance($locked->gateway_processed_at)
+                        : CarbonImmutable::now(),
+                );
             }
 
             DB::afterCommit(fn () => $this->notify($locked));
 
-            return $locked;
+            return $locked->fresh() ?? $locked;
         }, 3);
     }
 
-    private function recordCompletedJournalIfMissing(ReservationRefund $refund): void
-    {
-        $alreadyRecorded = FinancialLedgerEntry::query()
-            ->where('entity_type', ReservationRefund::class)
-            ->where('entity_id', $refund->id)
-            ->where('entry_category', LedgerEntryCategory::RefundCompleted)
-            ->exists();
-
-        if (! $alreadyRecorded) {
-            $this->ledger->recordRefundCompleted($refund);
+    private function recordCompletedJournalIfMissing(
+        ReservationRefund $refund,
+        ReservationPayment $payment,
+        bool $isCorrective = false,
+        ?CarbonImmutable $effectiveAt = null,
+    ): void {
+        $refundInspection = $this->ledger->inspectRefundJournal($refund);
+        if ($refundInspection['status'] === 'complete') {
+            return;
         }
+
+        if ($refundInspection['status'] !== 'missing') {
+            $this->quarantineRefund(
+                $refund,
+                $refundInspection['status'].'_refund_journal',
+                $refundInspection['reason'] ?? 'Existing refund journal is incomplete or inconsistent.',
+            );
+
+            return;
+        }
+
+        $captureInspection = $this->ledger->inspectPaymentCaptureJournal($payment);
+        if ($captureInspection['status'] !== 'complete' && ($isCorrective || $captureInspection['status'] !== 'missing')) {
+            $code = $captureInspection['status'] === 'missing'
+                ? 'missing_capture_journal'
+                : $captureInspection['status'].'_capture_journal';
+
+            $this->quarantineRefund(
+                $refund,
+                $code,
+                $captureInspection['reason'] ?? 'Parent payment capture journal is missing or incomplete; cannot post refund journal.',
+            );
+
+            return;
+        }
+
+        if ($this->hasPostSettlementConflict($payment)) {
+            $this->quarantineRefund(
+                $refund,
+                'post_settlement_refund',
+                'Refund completed after partner settlement approval/payout; requires clawback or manual credit-note adjustment instead of silent payable debit.',
+            );
+
+            return;
+        }
+
+        $this->ledger->recordRefundCompleted(
+            $refund,
+            postedAt: CarbonImmutable::now(),
+            effectiveAt: $effectiveAt ?? ($refund->gateway_processed_at !== null
+                ? CarbonImmutable::instance($refund->gateway_processed_at)
+                : CarbonImmutable::now()),
+            isCorrective: $isCorrective,
+        );
+    }
+
+    private function hasPostSettlementConflict(ReservationPayment $payment): bool
+    {
+        return PartnerSettlementItem::query()
+            ->where(function (Builder $query) use ($payment): void {
+                $query->where('reservation_id', $payment->reservation_id)
+                    ->orWhere('reservation_payment_id', $payment->id);
+            })
+            ->whereHas('settlement', function (Builder $query): void {
+                $query->whereIn('status', [
+                    SettlementStatus::Approved->value,
+                    SettlementStatus::TransferPending->value,
+                    SettlementStatus::Settled->value,
+                    SettlementStatus::Failed->value,
+                    SettlementStatus::OnHold->value,
+                ]);
+            })
+            ->exists();
+    }
+
+    private function quarantineRefund(ReservationRefund $refund, string $reasonCode, string $details): void
+    {
+        $metadata = $refund->metadata ?? [];
+        $metadata['accounting_quarantine'] = [
+            'reason' => $reasonCode,
+            'details' => $details,
+            'quarantined_at' => CarbonImmutable::now()->toIso8601String(),
+        ];
+
+        $refund->forceFill(['metadata' => $metadata])->save();
+
+        Reservation::query()
+            ->whereKey($refund->reservation_id)
+            ->update(['requires_refund_review' => true]);
+
+        Log::warning('Refund accounting quarantined during reconciliation.', [
+            'refund_id' => $refund->id,
+            'payment_id' => $refund->reservation_payment_id,
+            'reservation_id' => $refund->reservation_id,
+            'reason' => $reasonCode,
+            'details' => $details,
+        ]);
+    }
+
+    /** @param array<string, mixed> $response */
+    private function resolveEffectiveAt(ReservationRefund $refund, array $response): CarbonImmutable
+    {
+        if ($refund->gateway_processed_at !== null) {
+            return CarbonImmutable::instance($refund->gateway_processed_at);
+        }
+
+        if (isset($response['created_at']) && is_numeric($response['created_at'])) {
+            return CarbonImmutable::createFromTimestampUTC((int) $response['created_at']);
+        }
+
+        return CarbonImmutable::now();
     }
 
     /** @param array<string, mixed> $response */
@@ -184,7 +304,7 @@ class ReconcilePaymentRefund
 
         if ($mode === null || $payment->gateway !== 'razorpay' || ! $payment->isCaptured()
             || $refund->reservation_id !== $payment->reservation_id
-            || ! $this->isRefundId($providerId) || ! self::isPaymentId($providerPaymentId)
+            || ! self::isRefundId($providerId) || ! self::isPaymentId($providerPaymentId)
             || $providerPaymentId !== $payment->gateway_payment_id
             || ($response['currency'] ?? null) !== $refund->currency || $refund->currency !== $payment->currency
             || ($response['amount'] ?? null) !== $refund->amount_minor
@@ -195,11 +315,6 @@ class ReconcilePaymentRefund
                 || ($metadata['request_mode'] ?? null) !== $mode))) {
             throw new RuntimeException('Razorpay refund does not match the local refund request.');
         }
-    }
-
-    private function isRefundId(mixed $id): bool
-    {
-        return is_string($id) && preg_match('/^rfnd_[a-zA-Z0-9_]{1,96}$/D', $id) === 1;
     }
 
     private function notify(ReservationRefund $refund): void
