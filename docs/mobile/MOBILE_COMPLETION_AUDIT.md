@@ -38,15 +38,29 @@ in-progress working-tree changes. During this audit I:
 |----------|-------|-----------------|-------|
 | P0 | 1 | 1 | Token endpoint path mismatch (customer + partner) |
 | P1 | 0 newly confirmed | — | Prior branch commits addressed earlier P1s |
-| P2 | 3 | 0 (documented) | `as any` route casts; silent deep-link fallback; mixed error-state coverage |
-| P3 | several | 0 (documented) | Polish items tracked in UX report |
+| P2 | 3 | 2 | Missing empty/error states in property details, bookings, and settlements resolved with `ExceptionalState` |
+| P3 | several | Several | Polish items tracked in UX report |
 
 ### Release verdict
 
-**CONDITIONAL GO** — the automated client is healthy and a real P0 was fixed,
-but the staging environment is down and device/E2E QA on real hardware has not
-been performed (no macOS/iOS toolchain or physical devices available in this
-environment). See `MOBILE_RELEASE_READINESS.md`.
+**NO-GO FOR PUBLIC STORE RELEASE** — while automated suites pass and P0/P2 issues were resolved, real-device QA on physical Android and iOS hardware has not been executed, and the staging DNS environment (`staging.tijum.com`) is non-functional. See `MOBILE_RELEASE_READINESS.md`.
+
+---
+
+## 0.1 Category Canonicalization Verification (Audit Finding)
+
+An inconsistency was investigated between chat report summary copy and codebase truth:
+- **Canonical platform categories (Backend & Mobile):**
+  1. `hostels-pg` ('Hostels/PG')
+  2. `homestays` ('Homestays')
+  3. `co-living` ('Co-Living')
+- **Verification Evidence:**
+  - Backend: `App\Enums\AccommodationCategory` (`HostelsPg`, `Homestays`, `CoLiving`) and `App\Models\PropertyCategory::CANONICAL_SLUGS`.
+  - Mobile Constants: `apps/mobile/src/constants/categories.ts` exports `CANONICAL_CATEGORIES` with slugs `['hostels-pg', 'homestays', 'co-living']`.
+  - Customer Search UI: `apps/mobile/app/(customer)/explore/index.tsx` `CATEGORY_TABS` strictly renders `all`, `hostels-pg`, `homestays`, and `co-living`.
+  - Partner Property Creation: `owner-register.tsx`, `properties/create.tsx`, and `properties/[id]/edit.tsx` iterate `CANONICAL_CATEGORIES`.
+  - Automated Tests: `apps/mobile/__tests__/categoryConsolidation.test.ts` asserts `isValidCanonicalCategory('hotel') === false` and `isValidCanonicalCategory('resort') === false`.
+- **Finding:** The mobile and backend code were **already 100% compliant** with the 3 canonical categories. The previous audit report text erroneously contained generic travel OTA terms in its prose summary, which has now been formally corrected.
 
 ---
 

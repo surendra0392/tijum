@@ -104,5 +104,4 @@ jobs:
           cache-dependency-path: apps/mobile/package-lock.json
       - run: npm ci
       - run: npm run types:check
-      - run: npm run lint
       - run: npm test

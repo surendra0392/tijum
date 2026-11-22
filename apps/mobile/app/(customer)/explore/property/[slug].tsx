@@ -45,11 +45,13 @@ import { AppHeader } from '../../../../src/components/AppHeader';
 import { Badge } from '../../../../src/components/Badge';
 import { Button } from '../../../../src/components/Button';
 import { CategoryBadge } from '../../../../src/components/CategoryBadge';
+import { ExceptionalState } from '../../../../src/components/ExceptionalState';
 import { MealBadge } from '../../../../src/components/MealBadge';
+import { Skeleton } from '../../../../src/components/Skeleton';
 import { StayTimingBadge } from '../../../../src/components/StayTimingBadge';
 import { getCanonicalCategory } from '../../../../src/constants/categories';
 import { Colors } from '../../../../src/theme/colors';
-import { Spacing } from '../../../../src/theme/spacing';
+import { BorderRadius, Spacing } from '../../../../src/theme/spacing';
 import { Typography } from '../../../../src/theme/typography';
 
 export default function PropertyDetailScreen() {
@@ -166,12 +168,32 @@ export default function PropertyDetailScreen() {
                     showBack
                     fallbackRoute="/(customer)/explore"
                 />
-                <View style={styles.center}>
-                    <ActivityIndicator size="large" color={Colors.deepPlum} />
-                    <Text style={styles.loadingText}>
-                        Loading stay details...
-                    </Text>
-                </View>
+                <ScrollView contentContainerStyle={{ padding: Spacing.md }}>
+                    <Skeleton
+                        height={240}
+                        borderRadius={BorderRadius.lg}
+                        style={{ marginBottom: Spacing.md }}
+                    />
+                    <Skeleton
+                        width="60%"
+                        height={24}
+                        style={{ marginBottom: Spacing.sm }}
+                    />
+                    <Skeleton
+                        width="40%"
+                        height={16}
+                        style={{ marginBottom: Spacing.md }}
+                    />
+                    <Skeleton
+                        height={80}
+                        borderRadius={BorderRadius.md}
+                        style={{ marginBottom: Spacing.md }}
+                    />
+                    <Skeleton
+                        height={120}
+                        borderRadius={BorderRadius.md}
+                    />
+                </ScrollView>
             </View>
         );
     }
@@ -184,16 +206,18 @@ export default function PropertyDetailScreen() {
                     showBack
                     fallbackRoute="/(customer)/explore"
                 />
-                <View style={styles.center}>
-                    <Text style={styles.errorText}>
-                        {error || 'Property not found.'}
-                    </Text>
-                    <Button
-                        title="Retry"
-                        onPress={() => void loadProperty()}
-                        style={{ marginTop: Spacing.md }}
-                    />
-                </View>
+                <ExceptionalState
+                    type="no-results"
+                    title="Stay Unavailable"
+                    description={
+                        error ||
+                        "We couldn't find the requested accommodation or it has been unpublished."
+                    }
+                    primaryActionLabel="Retry"
+                    onPrimaryAction={() => void loadProperty()}
+                    secondaryActionLabel="Back to Explore"
+                    onSecondaryAction={() => router.push('/(customer)/explore')}
+                />
             </View>
         );
     }

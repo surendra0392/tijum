@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { OwnerApi } from '../../../src/api/owner';
 import { Badge } from '../../../src/components/Badge';
+import { Button } from '../../../src/components/Button';
 import { AppHeader } from '../../../src/components/AppHeader';
 import { RequireAuth } from '../../../src/components/RequireAuth';
 import { Colors } from '../../../src/theme/colors';
@@ -110,8 +111,19 @@ export default function SettlementDetailScreen() {
                     <Info size={40} color={Colors.textTertiary} />
                     <Text style={styles.emptyTitle}>Statement Not Found</Text>
                     <Text style={styles.emptySubtitle}>
-                        Could not retrieve details for {reference}.
+                        Could not retrieve settlement statement details for {reference}.
                     </Text>
+                    <Button
+                        title="Retry"
+                        onPress={() => void fetchStatement()}
+                        style={{ marginTop: Spacing.md }}
+                    />
+                    <Button
+                        title="Back to Settlements"
+                        variant="outline"
+                        onPress={() => router.push('/(partner)/settlements')}
+                        style={{ marginTop: Spacing.sm }}
+                    />
                 </View>
             ) : (
                 <ScrollView

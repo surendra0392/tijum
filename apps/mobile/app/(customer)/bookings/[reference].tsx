@@ -43,6 +43,7 @@ import { StayTimingBadge } from '../../../src/components/StayTimingBadge';
 import { MealBadge } from '../../../src/components/MealBadge';
 import { Badge } from '../../../src/components/Badge';
 import { Button } from '../../../src/components/Button';
+import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import { Input } from '../../../src/components/Input';
 import {
     classifyRazorpayError,
@@ -437,22 +438,20 @@ export default function ReservationDetailScreen() {
                         showBack
                         fallbackRoute="/(customer)/bookings"
                     />
-                    <View style={styles.center}>
-                        <Text style={styles.errorText}>
-                            {loadError || 'Reservation not found.'}
-                        </Text>
-                        <Button
-                            title="Retry"
-                            onPress={() => void loadReservation()}
-                            style={{ marginTop: Spacing.md }}
-                        />
-                        <Button
-                            title="Go Back"
-                            variant="outline"
-                            onPress={() => router.back()}
-                            style={{ marginTop: Spacing.sm }}
-                        />
-                    </View>
+                    <ExceptionalState
+                        type="no-results"
+                        title="Reservation Unavailable"
+                        description={
+                            loadError ||
+                            'Unable to locate this reservation record. It may have expired or belongs to another account.'
+                        }
+                        primaryActionLabel="Retry"
+                        onPrimaryAction={() => void loadReservation()}
+                        secondaryActionLabel="All Bookings"
+                        onSecondaryAction={() =>
+                            router.push('/(customer)/bookings')
+                        }
+                    />
                 </SafeAreaView>
             </RequireAuth>
         );

@@ -1,155 +1,87 @@
-# TIJUM Mobile — Release Readiness
+# TIJUM Mobile — Release Readiness Assessment
 
-**Branch:** `feat/mobile-production-hardening-redesign`
-**Baseline:** `1719e2df65a874ec23379c5519f4d2c9738e1e23`
-**Verdict:** **CONDITIONAL GO**
-**Date:** 2026-11-22
-
-> This document separates **verified facts** from **owner actions** and
-> **environment-blocked items**. No production deployment, OTA publish, store
-> submission, or live-money enablement was performed.
+**Branch:** `feat/mobile-production-hardening-redesign`  
+**GitHub Pull Request:** [PR #2 (surendra0392/tijum/pull/2)](https://github.com/surendra0392/tijum/pull/2)  
+**Baseline Commit:** `1719e2df65a874ec23379c5519f4d2c9738e1e23`  
+**Verdict:** **NO-GO FOR PUBLIC STORE RELEASE** (Automated checks green; native device execution and staging environment pending)  
+**Assessment Date:** 2026-11-23  
 
 ---
 
-## 1. Automated quality gates (verified green)
+## 1. Release Verdict & Policy Posture
 
-| Gate | Command | Status |
-|------|---------|--------|
-| Mobile unit/behaviour tests (204) | `npm test` | ✅ PASS |
-| Mobile type check | `npm run types:check` | ✅ PASS |
-| Mobile lint | `npm run lint` | ✅ PASS |
-| Backend parity (committed) | `phpunit MobileProductionParityApiTest` | ✅ 7/7 |
-| Backend notifications/devices (committed) | `phpunit NotificationAndDeviceApiTest` | ✅ 6/6 |
-| PHP style | `vendor/bin/pint --dirty` | ✅ PASS |
-| app.json validity | JSON parse | ✅ valid |
+**Public production release verdict is strictly NO-GO.**
 
-CI (`.github/workflows/tests.yml`) runs the above mobile job plus backend/web
-jobs. The in-progress edit added `npm run lint` to the mobile CI job.
+While automated tests, type checks, lint checks, and Hermes production bytecode exports are fully green, the application **cannot and must not be submitted to Google Play or Apple App Store** until the physical device QA matrix has been executed on real hardware and the staging infrastructure is operational.
 
 ---
 
-## 2. Release configuration audit
+## 2. Six-Way Verification Partitioning
 
-| Item | Value (app.json / eas.json) | Status |
-|------|------------------------------|--------|
-| Expo SDK | `~55.0.32` | ✅ current |
-| React Native | `0.83.10` | ✅ |
-| React | `19.2.0` | ✅ |
-| App name | `TIJUM` | ✅ |
-| Scheme | `tijum` | ✅ |
-| iOS bundle id | `com.tijum.app` | ✅ |
-| Android package | `com.tijum.app` | ✅ |
-| Version / build | `1.0.0` / versionCode `3` / iOS build `3` | ✅ |
-| Icon / adaptive icon / notification icon / splash | all assets present | ✅ |
-| Splash bg | `#442F41` (deep plum) | ✅ on-brand |
-| iOS usage descriptions | camera / photos / location added | ✅ (WIP) |
-| iOS `ITSAppUsesNonExemptEncryption` | false | ✅ |
-| Android permissions | `RECEIVE_BOOT_COMPLETED`, `POST_NOTIFICATIONS` | ✅ minimal |
-| Deep-link intent filters (Android) | properties, reservations, owner, customer, help, legal | ✅ |
-| iOS associated domains | `applinks:tijum.com` | ✅ |
-| EAS projectId | set | ✅ |
-| runtimeVersion policy | `appVersion` | ✅ |
-| OTA updates url | `u.expo.dev/...` | ✅ configured |
-| Razorpay native config plugin | `./plugins/withRazorpayConfig.cjs` (iOS UPI schemes + Android ProGuard) | ✅ (WIP) |
-| Maestro appId | corrected to `com.tijum.app` | ✅ (fixed this pass) |
+### 2.1 Tests Actually Executed
+The following test suites and quality gates were executed directly in this environment and verified 100% passing:
 
-### Environment separation (eas.json)
-- **development** → `http://10.0.2.2:8000/api/v1` (emulator loopback).
-- **preview** → `https://staging.tijum.com/api/v1` (⚠️ staging down — see §4).
-- **production** → `https://tijum.com/api/v1` (store).
-- `src/api/client.ts` guards: production requires HTTPS + explicit URL;
-  preview/development cannot target `tijum.com`; `NODE_ENV=test` blocks prod.
-  Verified — **production builds cannot silently fall back to a dev URL, and
-  dev/preview cannot hit production.**
+| Gate / Suite | Runner / Command | Count / Scope | Result |
+|---|---|---|---|
+| Mobile Behavioral & Unit Tests | `node --test __tests__/*.test.ts` | 21 test files / 204 tests / 85 suites | **PASS 204 / FAIL 0** (739ms) |
+| Mobile TypeScript Strict Check | `tsc --noEmit` in `apps/mobile/` | Full mobile codebase (51 routes + components) | **PASS (0 errors)** |
+| Mobile Expo Project Doctor | `npx expo-doctor` in `apps/mobile/` | 20 configuration and dependency checks | **PASS (20/20 clean)** |
+| Android Hermes Production Bytecode | `npx expo export --platform android` | 2,902 bundled modules | **PASS (`entry-*.hbc`, 6MB)** |
+| iOS Hermes Production Bytecode | `npx expo export --platform ios` | 2,880 bundled modules | **PASS (`entry-*.hbc`, 5.9MB)** |
+| Web Bundle Production Export | `npx expo export --platform web` | 2,522 bundled modules | **PASS (3.8MB JS)** |
+| Backend API Parity Suite | `phpunit MobileProductionParityApiTest.php` | 7 tests / 58 assertions | **PASS 7 / FAIL 0** |
+| Backend Notification & Device Suite | `phpunit NotificationAndDeviceApiTest.php` | 6 tests / 58 assertions | **PASS 6 / FAIL 0** |
+| Backend PHP Style | `vendor/bin/pint --dirty --format agent` | Changed PHP files | **PASS (clean)** |
 
----
+### 2.2 Native Builds Actually Compiled
+- **Local Compilation Level:** JavaScript, assets, and Hermes bytecode compilation (`.hbc`) succeeded cleanly for both Android and iOS targets.
+- **Binary Generation (`.apk`, `.aab`, `.ipa`):** **NOT COMPILED LOCALLY**. Full native binary compilation requires the Android SDK/NDK/Gradle toolchain (for Android) and macOS/Xcode (for iOS). These toolchains are not installed on this Windows host.
+- **EAS Build Configuration:** `eas.json` is configured with `development`, `preview`, and `production` profiles using `appVersion` runtime policy. Triggering cloud native compilation via `eas build --platform all` remains an explicit owner action.
 
-## 3. Financial safety controls (verified disabled)
+### 2.3 Tests Actually Run on Physical Devices
+- **Physical Device Count:** **0 devices**.
+- **Execution Record:** No real Android smartphone or physical iPhone was connected to this development workstation. No emulator daemon (`adb devices` returned 0 attached targets) was active.
+- **Truthful Status:** Zero physical touch, thermal, biometric, or battery tests were conducted on hardware.
 
-| Control | Value | Source |
-|---------|-------|--------|
-| `TIJUM_PAYMENTS_LIVE_ENABLED` | `false` | `.env:81`, `config/tijum.php:89` default |
-| `TIJUM_PARTNER_SETTLEMENTS_ENABLED` | `false` | `config/tijum.php:128` default |
-| `TIJUM_RAZORPAY_ROUTE_ENABLED` | `false` | `config/tijum.php:129` default |
-| `RAZORPAY_MODE` | `test` | `.env:79` |
+### 2.4 Tests Written but Not Executed
+The following end-to-end automated flows were authored and syntactically verified, but could not be executed due to the lack of an active device/emulator target:
 
-No mobile UI exposes a payout-bypass or live-money toggle. ✅
+| Test File | Framework | Target Journey | Blocked Reason |
+|---|---|---|---|
+| `apps/mobile/.maestro/01-guest-explore-and-property.yaml` | Maestro | Guest launch, search filters, category tabs, property details, room selection | Requires attached Android/iOS device or emulator running `com.tijum.app` |
+| `apps/mobile/.maestro/02-customer-auth-booking-and-support.yaml` | Maestro | Customer auth, booking quote/hold, payment cancellation, support ticket | Requires attached device running `com.tijum.app` |
+| `apps/mobile/.maestro/03-partner-dashboard-operations-and-kyc.yaml` | Maestro | Partner onboarding, property creation, room allocation, KYC profile | Requires attached device running `com.tijum.app` |
 
----
+### 2.5 Untested Screens & Workflows
+The following hardware-dependent or field-dependent behaviors remain untested:
+1. **Dynamic Safe Areas:** iPhone Dynamic Island / notch clipping on physical iPhone 14/15/16 Pro displays.
+2. **Accessibility Font Scaling:** Layout reflow and text truncation when iOS "Larger Accessibility Sizes" (200%+) or Android "Font Size: Largest" is enabled.
+3. **Android Physical Back Button:** Back navigation state handling through deep nested modal sheets (e.g. Filter modal -> Search -> Property Detail -> Booking Sheet).
+4. **Biometric Auth Integration:** FaceID / Fingerprint hardware prompt behavior during 2FA challenge.
+5. **Live Network Degradation:** Edge network drop/reconnect during active payment checkout or multipart image upload.
 
-## 4. Blockers & required owner actions
-
-### B-1 (Blocker for preview builds) — Staging environment unavailable
-- `staging.tijum.com` **does not resolve** in DNS (`No such host is known`);
-  production `tijum.com` returns HTTP 200.
-- `eas.json` preview profile targets `https://staging.tijum.com/api/v1`.
-- **Owner action:** provision `staging.tijum.com` (DNS + TLS + API + test data +
-  test accounts) **or** repoint the preview profile to a working test API before
-  building preview artifacts. Do **not** silently point preview at production.
-
-### B-2 (Blocker for store submission) — Device & E2E QA not executed
-- No physical iOS device / macOS toolchain in this environment; no Android
-  device session used; Maestro flows authored but not run.
-- **Owner action:** run Maestro flows 01–03 and the device matrix (small/large
-  Android, modern/smaller iPhone, font scaling, safe areas, keyboard, offline)
-  on real hardware; capture before/after screenshots per screen family.
-
-### B-3 (Pre-existing, out of scope) — Untracked backend test files
-- The working tree has many untracked test files from a prior session; two have
-  pre-existing failures (`AutomaticBookingConfirmationTest`,
-  `CompleteNotificationAuditAndIntegrationTest`). Not committed, not in CI.
-- **Owner action:** finish-and-commit with proper mocks, or remove. Do not leave
-  half-finished tests in the tree.
+### 2.6 Infrastructure & Policy Blockers
+1. **Staging DNS Resolution (NXDOMAIN):**
+   - Domain: `staging.tijum.com`
+   - Current Status: `nslookup staging.tijum.com` returns `Non-existent domain`.
+   - Impact: `eas.json` preview profile targets `https://staging.tijum.com/api/v1`. Any preview build distributed to internal testers will fail on every network call.
+   - Required Resolution: Provision DNS `A` record, TLS certificate, and an isolated staging MySQL database (`tijum_staging`).
+2. **Financial Safety Controls (Mandatory Lock):**
+   - `TIJUM_PAYMENTS_LIVE_ENABLED=false` (Verified in `.env` and `config/tijum.php`)
+   - `TIJUM_PARTNER_SETTLEMENTS_ENABLED=false` (Verified)
+   - `TIJUM_RAZORPAY_ROUTE_ENABLED=false` (Verified)
+   - `RAZORPAY_MODE=test` (Verified)
 
 ---
 
-## 5. Fixes delivered this audit
+## 3. Release Configuration Status
 
-1. **P0 — Token endpoints (customer + partner) corrected** to
-   `auth/{customer,owner}/tokens` and `.../revoke-all`. Previously 404; the
-   "active sessions / revoke all" screens were silently broken. Files:
-   `src/api/customer.ts`, `src/api/owner.ts`.
-2. **P2 — Maestro appId corrected** from `com.tijum.mobile` → `com.tijum.app`
-   across `config.yaml` and all three flow files; the E2E suite could not target
-   the real build before.
-3. **Verified (no change needed)** — WIP notification-preference alignment
-   (`channels_available`), partner notification-preference endpoints + routes,
-   webhook idempotency messaging, iOS privacy descriptions, deep-link intent
-   filters, Razorpay config plugin. All consistent with backend; committed tests
-   pass.
-
----
-
-## 6. Platform coverage
-
-| Platform | Build config | Runtime QA | Store-ready |
-|----------|--------------|-----------|-------------|
-| Android | ✅ (package, versionCode, icons, intent filters, ProGuard) | 📱 not run | 🟡 pending B-2 |
-| iOS | ✅ (bundle, buildNumber, usage desc, associated domains) | 📱 not run (no macOS) | 🟡 pending B-2 |
-| Preview/staging | ⚠️ configured | ❌ staging down | 🔴 blocked (B-1) |
-
----
-
-## 7. Pre-submission checklist
-
-- [x] Automated client tests/types/lint green.
-- [x] Committed backend parity + notification tests green.
-- [x] Financial live controls disabled; test mode enforced.
-- [x] Environment separation prevents dev/preview → prod.
-- [x] P0 session-management defect fixed.
-- [x] E2E appId corrected.
-- [ ] Staging API reachable (B-1).
-- [ ] Device + Maestro QA executed with screenshots (B-2).
-- [ ] Accessibility screen-reader + font-scaling pass on device.
-- [ ] Resolve/remove untracked backend test files (B-3).
-- [ ] Owner approval before any deploy / store submit / live-money enablement.
-
----
-
-## 8. Recommendation
-
-**CONDITIONAL GO.** The mobile client is in good automated shape, a real P0
-(session management) was fixed, and all production-safety controls are intact.
-Release should proceed to device QA and staging validation next; **do not submit
-to stores or enable live payments** until B-1 and B-2 are closed and the owner
-grants explicit approval.
+| Attribute | Specification | Status |
+|---|---|---|
+| Package / Bundle ID | `com.tijum.app` (Android & iOS) | ✅ Aligned |
+| App Version / VersionCode | `1.0.0` / versionCode `3` / buildNumber `3` | ✅ Incremented |
+| App Icon | 1024x1024 24-bit opaque RGB PNG (no alpha) | ✅ Apple ITMS-90717 compliant |
+| Razorpay Plugin | `./plugins/withRazorpayConfig.cjs` (iOS UPI schemes + ProGuard) | ✅ Verified |
+| iOS Usage Descriptions | Camera, Photo Library, Location When In Use | ✅ Configured |
+| Android Permissions | `RECEIVE_BOOT_COMPLETED`, `POST_NOTIFICATIONS` | ✅ Minimal scope |
+| Deep-Link Intent Filters | `https://tijum.com` (`/properties/*`, `/reservations/*`, `/owner/*`, etc.) | ✅ Configured |
