@@ -109,6 +109,12 @@ class ReconcilePaymentRefund
             $isLegacyFailed = $locked->status === RefundStatus::Failed && $locked->gateway_refund_id === null;
 
             if ($locked->status === RefundStatus::Processed) {
+                if ($status === RefundStatus::Processed) {
+                    $this->recordCompletedJournalIfMissing($locked);
+                } elseif ($status === RefundStatus::Failed) {
+                    throw new RuntimeException('Processed refund received a contradictory failed status from Razorpay.');
+                }
+
                 return $locked;
             }
 
@@ -145,20 +151,26 @@ class ReconcilePaymentRefund
             }]);
 
             if ($status === RefundStatus::Processed) {
-                $alreadyRecorded = FinancialLedgerEntry::query()
-                    ->where('entity_type', ReservationRefund::class)
-                    ->where('entity_id', $locked->id)
-                    ->where('entry_category', LedgerEntryCategory::RefundCompleted)
-                    ->exists();
-                if (! $alreadyRecorded) {
-                    $this->ledger->recordRefundCompleted($locked);
-                }
+                $this->recordCompletedJournalIfMissing($locked);
             }
 
             DB::afterCommit(fn () => $this->notify($locked));
 
             return $locked;
         }, 3);
+    }
+
+    private function recordCompletedJournalIfMissing(ReservationRefund $refund): void
+    {
+        $alreadyRecorded = FinancialLedgerEntry::query()
+            ->where('entity_type', ReservationRefund::class)
+            ->where('entity_id', $refund->id)
+            ->where('entry_category', LedgerEntryCategory::RefundCompleted)
+            ->exists();
+
+        if (! $alreadyRecorded) {
+            $this->ledger->recordRefundCompleted($refund);
+        }
     }
 
     /** @param array<string, mixed> $response */

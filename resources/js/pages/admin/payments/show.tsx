@@ -462,15 +462,18 @@ export default function AdminPaymentShow({
                                     className="space-y-4"
                                     resetOnSuccess={['reason']}
                                     onSuccess={(page) => {
-                                        const key =
-                                            page.props.refund_request_key;
-                                        if (typeof key === 'string') {
-                                            setRefundRequestKey(key);
-                                        }
                                         const updatedPayment = page.props
                                             .payment as
                                             | PaymentDetailProps['payment']
                                             | undefined;
+                                        const key =
+                                            page.props.refund_request_key;
+                                        if (
+                                            typeof key === 'string' &&
+                                            !updatedPayment?.has_unresolved_refund
+                                        ) {
+                                            setRefundRequestKey(key);
+                                        }
                                         if (
                                             updatedPayment &&
                                             typeof updatedPayment.refundable_balance_minor ===

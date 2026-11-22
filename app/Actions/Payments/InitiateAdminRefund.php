@@ -42,12 +42,15 @@ class InitiateAdminRefund
             throw ValidationException::withMessages(['amount' => 'A positive refund amount and reason are required.']);
         }
 
-        $normalizedKey = $idempotencyKey !== null && trim($idempotencyKey) !== ''
-            ? trim($idempotencyKey)
-            : null;
+        $normalizedKey = $idempotencyKey !== null ? trim($idempotencyKey) : '';
+        if ($normalizedKey === '' || mb_strlen($normalizedKey, 'UTF-8') > 64) {
+            throw ValidationException::withMessages([
+                'idempotency_key' => 'An explicit refund idempotency key is required.',
+            ]);
+        }
 
         $idempotency = hash('sha256', json_encode(
-            ['refund', $payment->id, $normalizedKey ?? [$amountMinor, $reason, $caseId]],
+            ['refund', $payment->id, $normalizedKey],
             JSON_THROW_ON_ERROR,
         ));
 

@@ -7,11 +7,15 @@ namespace Tests\Feature\Payments;
 use App\Actions\Payments\InitiateAdminRefund;
 use App\Actions\Payments\ProcessWebhookEvent;
 use App\Actions\Payments\ReconcilePaymentRefund;
+use App\Enums\CaseCategory;
+use App\Enums\CasePriority;
+use App\Enums\CaseStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\ProviderTransferStatus;
 use App\Enums\RefundStatus;
 use App\Enums\ReservationStatus;
 use App\Models\Admin;
+use App\Models\CustomerProtectionCase;
 use App\Models\ProviderTransfer;
 use App\Models\Reservation;
 use App\Models\ReservationPayment;
@@ -107,6 +111,7 @@ class AdminRefundTest extends TestCase
             ->post(route('admin.payments.refund', $payment->id), [
                 'amount_minor' => 40000,
                 'reason' => 'Customer requested partial cancellation allowance',
+                'idempotency_key' => 'refund-partial-101',
             ]);
 
         $response1->assertRedirect();
@@ -129,6 +134,7 @@ class AdminRefundTest extends TestCase
             ->post(route('admin.payments.refund', $payment->id), [
                 'amount_minor' => 60000,
                 'reason' => 'Remaining balance refund',
+                'idempotency_key' => 'refund-full-102',
             ]);
 
         $response2->assertRedirect();
@@ -170,6 +176,7 @@ class AdminRefundTest extends TestCase
             ->post(route('admin.payments.refund', $payment->id), [
                 'amount_minor' => 999999, // Exceeds 50000
                 'reason' => 'Excess refund attempt',
+                'idempotency_key' => 'refund-exceed-001',
             ])
             ->assertSessionHasErrors('amount');
     }
@@ -182,9 +189,18 @@ class AdminRefundTest extends TestCase
             'https://api.razorpay.com/v1/payments/pay_refund_fixture/refund' => fn (Request $request) => Http::response($this->refundEntity($request['receipt'], 'processed')),
         ]);
 
-        $requestData = ['amount_minor' => 20000, 'reason' => 'Verified partial cancellation'];
-        $this->actingAs($admin, 'admin')->post(route('admin.payments.refund', $payment), $requestData)->assertRedirect();
-        $this->post(route('admin.payments.refund', $payment), $requestData)->assertRedirect();
+        $requestData = [
+            'amount_minor' => 20000,
+            'reason' => 'Verified partial cancellation',
+            'idempotency_key' => 'refund-repeat-001',
+        ];
+        $this->actingAs($admin, 'admin')
+            ->post(route('admin.payments.refund', $payment), $requestData)
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+        $this->post(route('admin.payments.refund', $payment), $requestData)
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
 
         Http::assertSentCount(1);
         Http::assertSent(fn (Request $request): bool => $request->hasHeader('X-Refund-Idempotency'));
@@ -300,7 +316,13 @@ class AdminRefundTest extends TestCase
             },
         ]);
 
-        $refund = app(InitiateAdminRefund::class)->execute($payment, $admin, 20000, 'Verified partial cancellation');
+        $refund = app(InitiateAdminRefund::class)->execute(
+            $payment,
+            $admin,
+            20000,
+            'Verified partial cancellation',
+            'refund-mismatched-001',
+        );
 
         $this->assertSame(RefundStatus::Uncertain, $refund->status);
         $this->assertNull($refund->gateway_refund_id);
@@ -488,6 +510,130 @@ class AdminRefundTest extends TestCase
         $freshPayment = $payment->fresh();
         $this->assertSame(15000, $freshPayment->remainingRefundableAmount());
         $this->assertSame(15000, $freshPayment->refundableBalanceMinor());
+    }
+
+    public function test_refund_requires_a_non_blank_explicit_idempotency_key(): void
+    {
+        $payment = $this->createCapturedPayment();
+        $admin = $this->createSuperAdmin();
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.razorpay.com/v1/payments/pay_refund_fixture/refund' => fn (Request $request) => Http::response($this->refundEntity($request['receipt'], 'processed')),
+        ]);
+
+        $invalidHttpPayloads = [
+            ['amount_minor' => 20000, 'reason' => 'Verified partial cancellation'],
+            ['amount_minor' => 20000, 'reason' => 'Verified partial cancellation', 'idempotency_key' => ''],
+            ['amount_minor' => 20000, 'reason' => 'Verified partial cancellation', 'idempotency_key' => '   '],
+        ];
+
+        foreach ($invalidHttpPayloads as $payload) {
+            $this->actingAs($admin, 'admin')
+                ->post(route('admin.payments.refund', $payment), $payload)
+                ->assertSessionHasErrors('idempotency_key');
+        }
+
+        $this->actingAs($admin, 'admin')
+            ->post(
+                route('admin.payments.refund', $payment),
+                ['amount_minor' => 20000, 'reason' => 'Verified partial cancellation'],
+                ['Idempotency-Key' => '   '],
+            )
+            ->assertSessionHasErrors('idempotency_key');
+
+        $action = app(InitiateAdminRefund::class);
+        foreach ([null, '', '   ', str_repeat('a', 65)] as $invalidKey) {
+            $rejected = false;
+
+            try {
+                $action->execute($payment, $admin, 20000, 'Verified partial cancellation', $invalidKey);
+            } catch (ValidationException $exception) {
+                $rejected = array_key_exists('idempotency_key', $exception->errors());
+            }
+
+            $this->assertTrue($rejected, 'Expected direct refund execution to reject invalid idempotency_key.');
+        }
+
+        Http::assertNothingSent();
+        $this->assertDatabaseCount('reservation_refunds', 0);
+
+        $this->actingAs($admin, 'admin')
+            ->post(
+                route('admin.payments.refund', $payment),
+                ['amount_minor' => 20000, 'reason' => 'Refund using Idempotency-Key header'],
+                ['Idempotency-Key' => 'refund-header-fallback-001'],
+            )
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($admin, 'admin')
+            ->post(
+                route('admin.payments.refund', $payment),
+                ['amount_minor' => 20000, 'reason' => 'Refund using Idempotency-Key header'],
+                ['Idempotency-Key' => 'refund-header-fallback-001'],
+            )
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        Http::assertSentCount(1);
+        $this->assertDatabaseCount('reservation_refunds', 1);
+        $this->assertSame(20000, $payment->fresh()->totalRefundedAmount());
+    }
+
+    public function test_two_independent_refunds_with_same_amount_and_reason_succeed_with_distinct_keys(): void
+    {
+        $payment = $this->createCapturedPayment();
+        $admin = $this->createSuperAdmin();
+        $reservation = $payment->reservation->fresh();
+        $case = CustomerProtectionCase::create([
+            'case_reference' => 'TPC-2026-REFUNDCASE01',
+            'reservation_id' => $reservation->id,
+            'user_id' => $reservation->user_id,
+            'property_id' => $reservation->property_id,
+            'owner_id' => $reservation->property->owner_id,
+            'category' => CaseCategory::RefundRequest,
+            'status' => CaseStatus::RefundReview,
+            'priority' => CasePriority::Standard,
+            'description' => 'Two separate partial refunds approved on the same case.',
+            'sla_due_at' => now()->addDays(2),
+        ]);
+
+        $dispatches = 0;
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.razorpay.com/v1/payments/pay_refund_fixture/refund' => function (Request $request) use (&$dispatches) {
+                $dispatches++;
+                $entity = $this->refundEntity($request['receipt'], 'processed');
+                $entity['id'] = 'rfnd_case_'.$dispatches;
+
+                return Http::response($entity);
+            },
+        ]);
+
+        $action = app(InitiateAdminRefund::class);
+        $reason = 'Partial goodwill refund for same protection case';
+
+        $first = $action->execute($payment, $admin, 20000, $reason, 'refund-case-first-001', $case->id);
+        $second = $action->execute($payment->fresh(), $admin, 20000, $reason, 'refund-case-second-001', $case->id);
+        $replayed = $action->execute($payment->fresh(), $admin, 20000, $reason, 'refund-case-second-001', $case->id);
+
+        $this->assertSame(RefundStatus::Processed, $first->status);
+        $this->assertSame(RefundStatus::Processed, $second->status);
+        $this->assertNotSame($first->id, $second->id);
+        $this->assertSame($case->id, $first->customer_protection_case_id);
+        $this->assertSame($case->id, $second->customer_protection_case_id);
+        $this->assertSame($second->id, $replayed->id);
+
+        Http::assertSentCount(2);
+        $this->assertSame(2, $dispatches);
+        $this->assertDatabaseCount('reservation_refunds', 2);
+        $this->assertDatabaseCount('financial_ledger_entries', 4);
+
+        $freshPayment = $payment->fresh();
+        $this->assertSame(40000, $freshPayment->totalRefundedAmount());
+        $this->assertSame(10000, $freshPayment->remainingRefundableAmount());
+        $this->assertSame(PaymentStatus::PartiallyRefunded, $freshPayment->status);
     }
 
     private function createCapturedPayment(): ReservationPayment
