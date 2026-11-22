@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Reviews;
 
 use App\Enums\PaymentStatus;
+use App\Enums\RefundStatus;
 use App\Enums\RelocationStatus;
 use App\Enums\ReservationStatus;
 use App\Models\Reservation;
@@ -36,13 +37,34 @@ class ReviewEligibilityService
             return ReviewEligibilityResult::ineligible("Reservation is {$reservation->status->label()} and cannot be reviewed.");
         }
 
-        // 4. Payment verification: captured payment is mandatory
-        $hasCapturedPayment = $reservation->payments()
-            ->where('status', PaymentStatus::Captured)
+        // 4. Payment verification: verified non-fully-refunded captured payment is mandatory
+        $hasActiveCapturedPayment = $reservation->payments()
+            ->whereIn('status', [PaymentStatus::Captured, PaymentStatus::PartiallyRefunded])
             ->exists();
 
-        if (! $hasCapturedPayment) {
+        $totalCapturedMinor = (int) $reservation->payments()
+            ->whereIn('status', [
+                PaymentStatus::Captured,
+                PaymentStatus::RefundPending,
+                PaymentStatus::PartiallyRefunded,
+                PaymentStatus::Refunded,
+            ])
+            ->sum('amount_minor');
+
+        if ($totalCapturedMinor <= 0 && ! $hasActiveCapturedPayment) {
             return ReviewEligibilityResult::ineligible('A verified captured payment is required to submit a review.');
+        }
+
+        $processedRefundMinor = (int) $reservation->refunds()
+            ->where('status', RefundStatus::Processed)
+            ->sum('amount_minor');
+
+        if ($processedRefundMinor >= max($totalCapturedMinor, (int) $reservation->total_amount_minor) || ! $hasActiveCapturedPayment) {
+            return ReviewEligibilityResult::ineligible('Fully refunded or refunded reservations are not eligible for stay reviews.');
+        }
+
+        if ($reservation->status !== ReservationStatus::Confirmed) {
+            return ReviewEligibilityResult::ineligible('Only confirmed reservations are eligible for a stay review.');
         }
 
         // 5. Relocation source check: original reservation cancelled via accepted relocation is ineligible

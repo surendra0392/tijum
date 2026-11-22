@@ -260,6 +260,14 @@ export default function PartnerReservationDetailScreen() {
         );
     }
 
+    const isConfirmed = reservation.status === 'confirmed';
+    const isCheckedIn = Boolean(
+        reservation.is_checked_in || reservation.checked_in_at,
+    );
+    const isCheckedOut = Boolean(
+        reservation.is_checked_out || reservation.checked_out_at,
+    );
+
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -269,7 +277,10 @@ export default function PartnerReservationDetailScreen() {
                         <Text style={styles.refText}>
                             {reservation.reference}
                         </Text>
-                        <ReservationStatusBadge status={reservation.status} />
+                        <ReservationStatusBadge
+                            status={reservation.status}
+                            label={reservation.status_label}
+                        />
                     </View>
 
                     <Text style={styles.guestTitle}>
@@ -535,12 +546,7 @@ export default function PartnerReservationDetailScreen() {
                     ) : null}
 
                     {/* Physical Room Allocation Section */}
-                    {[
-                        'confirmed',
-                        'checked_in',
-                        'checked_out',
-                        'completed',
-                    ].includes(reservation.status) ? (
+                    {isConfirmed ? (
                         <View style={styles.section}>
                             <View style={styles.sectionTitleRow}>
                                 <DoorClosed
@@ -572,9 +578,7 @@ export default function PartnerReservationDetailScreen() {
                                                 Allocated
                                             </Text>
                                         </View>
-                                        {['confirmed', 'checked_in'].includes(
-                                            reservation.status,
-                                        ) ? (
+                                        {isConfirmed && !isCheckedOut ? (
                                             <TouchableOpacity
                                                 onPress={openAllocateModal}
                                                 activeOpacity={0.7}
@@ -648,9 +652,7 @@ export default function PartnerReservationDetailScreen() {
                                             </Text>
                                         </View>
                                     </View>
-                                    {['confirmed', 'checked_in'].includes(
-                                        reservation.status,
-                                    ) ? (
+                                    {isConfirmed && !isCheckedOut ? (
                                         <Button
                                             title="Assign Physical Room"
                                             variant="primary"
@@ -677,7 +679,7 @@ export default function PartnerReservationDetailScreen() {
                             </Text>
                         </View>
 
-                        {reservation.status === 'confirmed' ? (
+                        {isConfirmed && !isCheckedIn && !isCheckedOut ? (
                             <View style={styles.frontDeskCard}>
                                 <Text style={styles.frontDeskHeading}>
                                     Guest Arrival & Key Handover
@@ -699,7 +701,7 @@ export default function PartnerReservationDetailScreen() {
                                     style={styles.checkInBtn}
                                 />
                             </View>
-                        ) : reservation.status === 'checked_in' ? (
+                        ) : isConfirmed && isCheckedIn && !isCheckedOut ? (
                             <View style={styles.frontDeskCard}>
                                 <Text style={styles.frontDeskHeading}>
                                     Guest Departure & Room Turnover
@@ -722,8 +724,7 @@ export default function PartnerReservationDetailScreen() {
                                     style={styles.checkOutBtn}
                                 />
                             </View>
-                        ) : reservation.status === 'checked_out' ||
-                          reservation.status === 'completed' ? (
+                        ) : isCheckedOut ? (
                             <View style={styles.completedNoticeCard}>
                                 <CheckCircle2
                                     size={18}

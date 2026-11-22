@@ -94,6 +94,8 @@ class CustomerAuthController extends ApiController
             $this->recordMarketingOptIn($user, $request->ip(), (string) $request->userAgent());
         }
 
+        $user->sendEmailVerificationNotification();
+
         return $this->success([
             'token' => $token->plainTextToken,
             'token_type' => 'Bearer',
@@ -119,7 +121,12 @@ class CustomerAuthController extends ApiController
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
 
-            return $this->error("Too many login attempts. Please try again in {$seconds} seconds.", 'RATE_LIMITED', 429);
+            return $this->error(
+                "Too many login attempts. Please try again in {$seconds} seconds.",
+                'RATE_LIMITED',
+                429,
+                ['retry_after' => $seconds],
+            )->header('Retry-After', (string) $seconds);
         }
 
         $phoneDigits = (string) preg_replace('/[^0-9]/', '', $login);

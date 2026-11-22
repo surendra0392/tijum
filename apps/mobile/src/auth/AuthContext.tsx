@@ -7,7 +7,11 @@ import {
     reconcilePendingRevocationQueue,
 } from './SecureTokenStorage';
 import { PushNotificationService } from '../notifications/PushNotificationService';
-import { buildLoginPayload, withPasswordConfirmation } from './payloads';
+import {
+    buildLoginPayload,
+    TwoFactorCredentials,
+    withPasswordConfirmation,
+} from './payloads';
 
 export type AuthState =
     | 'idle'
@@ -27,7 +31,11 @@ interface AuthContextType {
     user?: CustomerProfile | null;
     owner?: OwnerProfile | null;
     isLoading: boolean;
-    loginCustomer: (email: string, password: string) => Promise<void>;
+    loginCustomer: (
+        email: string,
+        password: string,
+        twoFactor?: TwoFactorCredentials,
+    ) => Promise<void>;
     registerCustomer: (data: {
         name: string;
         email: string;
@@ -198,7 +206,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
      * Authenticate Customer: Establishes single Customer principal.
      * Supports login with Email OR Phone number.
      */
-    const loginCustomer = async (emailOrPhone: string, password: string) => {
+    const loginCustomer = async (
+        emailOrPhone: string,
+        password: string,
+        twoFactor?: TwoFactorCredentials,
+    ) => {
         setIsLoading(true);
         try {
             // If another session was active, clear it first
@@ -208,7 +220,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             const res = await ApiClient.post<
                 ApiResponse<{ token: string; user: CustomerProfile }>
-            >('auth/customer/login', buildLoginPayload(emailOrPhone, password));
+            >(
+                'auth/customer/login',
+                buildLoginPayload(
+                    emailOrPhone,
+                    password,
+                    'TIJUM Mobile App',
+                    twoFactor,
+                ),
+            );
 
             if (!res.success || !res.data) {
                 throw new Error(

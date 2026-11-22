@@ -42,6 +42,8 @@ export interface PropertyCard {
     address_line: string | null;
     latitude?: number | null;
     longitude?: number | null;
+    has_coordinates?: boolean;
+    location_precision?: 'exact' | 'area_only';
     distance_km?: number | null;
     distance_label?: string | null;
     is_locality_match?: boolean | null;
@@ -201,26 +203,54 @@ export interface OwnerReview {
     } | null;
 }
 
+export interface ReservationPaymentSummary {
+    id: number;
+    gateway: string;
+    gateway_order_id?: string | null;
+    gateway_payment_id?: string | null;
+    status: string;
+    status_label?: string;
+    amount_minor: number;
+    refunded_amount_minor?: number;
+    refundable_balance_minor?: number;
+    currency_code?: string;
+    payment_method?: string | null;
+    captured_at?: string | null;
+    failed_at?: string | null;
+    failure_reason?: string | null;
+    created_at?: string | null;
+}
+
+export interface ReviewEligibility {
+    is_eligible: boolean;
+    reason: string;
+    days_remaining?: number | null;
+    window_deadline?: string | null;
+}
+
 export interface Reservation {
     id: number;
     booking_reference: string;
     reference?: string;
-    status:
-        | 'awaiting_payment'
-        | 'confirmed'
-        | 'cancelled'
-        | 'expired'
-        | 'completed'
-        | 'payment_pending'
-        | 'checked_in'
-        | 'checked_out';
+    status: 'awaiting_payment' | 'confirmed' | 'cancelled' | 'expired';
     status_label: string;
     status_semantic?: string;
     is_cancellable: boolean;
+    can_cancel?: boolean;
+    can_pay?: boolean;
     is_awaiting_payment: boolean;
+    is_payment_deadline_expired?: boolean;
     is_confirmed?: boolean;
     is_cancelled?: boolean;
     is_expired?: boolean;
+    expired_at?: string | null;
+    requires_refund_review?: boolean;
+    has_captured_payment?: boolean;
+    payment_status?: string | null;
+    payment_status_label?: string | null;
+    payment_summary?: ReservationPaymentSummary | null;
+    is_checked_in?: boolean;
+    is_checked_out?: boolean;
     checked_in_at?: string | null;
     checked_out_at?: string | null;
     check_in_date: string;
@@ -273,10 +303,15 @@ export interface Reservation {
         id?: number;
         overall_rating?: number;
         rating?: number;
-        title?: string;
-        content?: string;
+        title?: string | null;
+        content?: string | null;
+        status?: string;
+        status_label?: string;
+        submitted_at?: string | null;
+        published_at?: string | null;
         created_at?: string;
     } | null;
+    review_eligibility?: ReviewEligibility | null;
     check_in_time?: string;
     check_out_time?: string;
     food_inclusions?: {
@@ -297,6 +332,8 @@ export interface Reservation {
         address?: string;
         latitude?: number | null;
         longitude?: number | null;
+        has_coordinates?: boolean;
+        location_precision?: 'exact' | 'area_only';
         cover_image_url?: string;
         food_provided?: boolean;
         breakfast_included?: boolean;
@@ -346,11 +383,12 @@ export interface ReverseGeocodeResult {
     display: string;
     locality: string;
     city: string;
-    city_slug: string;
+    city_slug: string | null;
     formatted_address: string;
     lat: number;
     lng: number;
     provider: string;
+    location_available?: boolean;
 }
 
 export interface ContactFieldValidation {
@@ -434,6 +472,8 @@ export interface CustomerProfile {
     phone?: string;
     email_verified: boolean;
     phone_verified: boolean;
+    two_factor_enabled?: boolean;
+    terms_accepted?: boolean;
     marketing_consent: boolean;
     account_type: 'customer';
     created_at: string;

@@ -79,6 +79,7 @@ class PropertySearchCustomerData
 
         $eligibleGender = $this->eligibleGenderLabel($qualifying);
         $roomSummaries = $this->roomSummaries($qualifying);
+        $coords = $property->resolvedCoordinates();
 
         return [
             'id' => $property->id,
@@ -93,8 +94,10 @@ class PropertySearchCustomerData
                 'slug' => $property->city?->slug,
             ],
             'locality' => $property->locality,
-            'latitude' => $property->latitude !== null ? (float) $property->latitude : null,
-            'longitude' => $property->longitude !== null ? (float) $property->longitude : null,
+            'latitude' => $coords['latitude'] ?? null,
+            'longitude' => $coords['longitude'] ?? null,
+            'has_coordinates' => $coords !== null,
+            'location_precision' => $coords !== null ? 'exact' : 'area_only',
             'gender_eligibility' => $eligibleGender,
             'cover_image' => $cover,
             'property_amenities' => $shownAmenities,

@@ -470,6 +470,32 @@ export default function PropertyDetailPage({
                                                     {property.landmark}
                                                 </p>
                                             )}
+                                            {property.has_coordinates &&
+                                            property.google_maps_url ? (
+                                                <a
+                                                    href={
+                                                        property.google_maps_url
+                                                    }
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="inline-flex items-center gap-1.5 pt-1 text-xs font-semibold text-tijum-coral underline underline-offset-4 hover:text-tijum-plum"
+                                                >
+                                                    <MapPin
+                                                        className="size-3.5"
+                                                        aria-hidden="true"
+                                                    />
+                                                    <span>
+                                                        View exact pin on Google
+                                                        Maps
+                                                    </span>
+                                                </a>
+                                            ) : (
+                                                <p className="pt-1 text-xs text-tijum-lavender">
+                                                    Exact map pin unavailable —
+                                                    locality and street address
+                                                    shown above.
+                                                </p>
+                                            )}
                                         </dd>
                                     </div>
 

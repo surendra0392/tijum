@@ -12,7 +12,6 @@ export function ReservationStatusBadge({ status, label }: Props) {
             case 'confirmed':
                 return 'emerald';
             case 'awaiting_payment':
-            case 'payment_pending':
                 return 'amber';
             case 'cancelled':
             case 'expired':
@@ -28,14 +27,11 @@ export function ReservationStatusBadge({ status, label }: Props) {
             case 'confirmed':
                 return 'Confirmed';
             case 'awaiting_payment':
-            case 'payment_pending':
                 return 'Payment Required';
             case 'cancelled':
                 return 'Cancelled';
             case 'expired':
                 return 'Expired';
-            case 'completed':
-                return 'Completed';
             default:
                 return status;
         }

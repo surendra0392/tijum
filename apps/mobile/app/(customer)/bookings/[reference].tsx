@@ -35,6 +35,14 @@ import { Badge } from '../../../src/components/Badge';
 import { Button } from '../../../src/components/Button';
 import { Input } from '../../../src/components/Input';
 import { RazorpayService } from '../../../src/payments/RazorpayService';
+import {
+    canCancelReservation,
+    canPayReservation,
+    canSubmitReview,
+    resolvePaymentVerifyAlert,
+    resolveRefundNotice,
+    shouldShowRefundSection,
+} from '../../../src/utils/reservationState';
 
 export default function ReservationDetailScreen() {
     const { reference } = useLocalSearchParams<{ reference: string }>();
@@ -68,9 +76,7 @@ export default function ReservationDetailScreen() {
     useEffect(() => {
         if (!reservation) return;
 
-        const isPayable =
-            reservation.status === 'awaiting_payment' ||
-            reservation.status === 'payment_pending';
+        const isPayable = canPayReservation(reservation);
 
         const deadlineStr =
             reservation.payment_deadline_at ||
@@ -152,10 +158,11 @@ export default function ReservationDetailScreen() {
 
             if (verifyRes.data) {
                 setReservation(verifyRes.data);
-                Alert.alert(
-                    'Payment Successful',
-                    'Your reservation is now fully confirmed. Enjoy your stay!',
+                const alertCopy = resolvePaymentVerifyAlert(
+                    verifyRes.data,
+                    verifyRes.message,
                 );
+                Alert.alert(alertCopy.title, alertCopy.message);
             }
         } catch (e: any) {
             // Dismissal / cancellation by user does not warrant an alarming error alert
@@ -247,18 +254,8 @@ export default function ReservationDetailScreen() {
                 },
             );
 
-            setReservation({
-                ...reservation,
-                is_reviewed: true,
-                review: {
-                    overall_rating: overallRating,
-                    rating: overallRating,
-                    title: reviewTitle.trim(),
-                    content: reviewContent.trim(),
-                    created_at: 'Just now',
-                },
-            });
             setShowReviewModal(false);
+            await loadReservation();
             Alert.alert(
                 'Review Submitted',
                 'Thank you for rating your stay! Your verified review helps future travelers.',
@@ -325,12 +322,24 @@ export default function ReservationDetailScreen() {
         );
     }
 
-    const isPayable =
-        reservation.status === 'awaiting_payment' ||
-        reservation.status === 'payment_pending';
-    const isCompletedStay =
-        reservation.status === 'completed' ||
-        reservation.status === 'checked_out';
+    const isPayable = canPayReservation(reservation);
+    const hasReviewRecord = Boolean(
+        reservation.is_reviewed || reservation.review,
+    );
+    const isReviewEligible = canSubmitReview(reservation);
+    const showReviewSection =
+        hasReviewRecord ||
+        isReviewEligible ||
+        Boolean(reservation.review_eligibility?.reason);
+    const formatDateTime = (isoString?: string | null) => {
+        if (!isoString) {
+            return null;
+        }
+        const parsed = new Date(isoString);
+        return Number.isNaN(parsed.getTime())
+            ? isoString
+            : parsed.toLocaleString();
+    };
     const formatTimer = (secs: number) => {
         const mins = Math.floor(secs / 60);
         const remainder = secs % 60;
@@ -378,7 +387,10 @@ export default function ReservationDetailScreen() {
                         <Text style={styles.referenceText}>
                             {reservation.reference}
                         </Text>
-                        <ReservationStatusBadge status={reservation.status} />
+                        <ReservationStatusBadge
+                            status={reservation.status}
+                            label={reservation.status_label}
+                        />
                     </View>
 
                     <Text style={styles.propertyTitle}>
@@ -423,6 +435,30 @@ export default function ReservationDetailScreen() {
                                     {reservation.check_out_date} at 08:00 AM
                                 </Text>
                             </View>
+                            {reservation.checked_in_at ? (
+                                <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>
+                                        Verified Check-In:
+                                    </Text>
+                                    <Text style={styles.infoValue}>
+                                        {formatDateTime(
+                                            reservation.checked_in_at,
+                                        )}
+                                    </Text>
+                                </View>
+                            ) : null}
+                            {reservation.checked_out_at ? (
+                                <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>
+                                        Verified Check-Out:
+                                    </Text>
+                                    <Text style={styles.infoValue}>
+                                        {formatDateTime(
+                                            reservation.checked_out_at,
+                                        )}
+                                    </Text>
+                                </View>
+                            ) : null}
                             <View style={styles.infoRow}>
                                 <Text style={styles.infoLabel}>Duration:</Text>
                                 <Text style={styles.infoValue}>
@@ -579,9 +615,95 @@ export default function ReservationDetailScreen() {
                         </View>
                     </View>
 
+                    {/* Authoritative Payment Status */}
+                    {reservation.payment_status_label ||
+                    reservation.payment_summary ||
+                    reservation.requires_refund_review ? (
+                        <View style={styles.section}>
+                            <View style={styles.sectionHeaderRow}>
+                                <Receipt
+                                    size={18}
+                                    color={Colors.deepPlum}
+                                    style={{ marginRight: 6 }}
+                                />
+                                <Text style={styles.sectionTitle}>
+                                    Payment Status
+                                </Text>
+                            </View>
+                            <View style={styles.infoCard}>
+                                <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>
+                                        Status:
+                                    </Text>
+                                    <Text style={styles.infoValue}>
+                                        {reservation.payment_status_label ||
+                                            reservation.payment_summary
+                                                ?.status_label ||
+                                            reservation.payment_status ||
+                                            'Pending'}
+                                    </Text>
+                                </View>
+                                {reservation.payment_summary
+                                    ?.gateway_payment_id ? (
+                                    <View style={styles.infoRow}>
+                                        <Text style={styles.infoLabel}>
+                                            Payment Ref:
+                                        </Text>
+                                        <Text style={styles.infoValue}>
+                                            {
+                                                reservation.payment_summary
+                                                    .gateway_payment_id
+                                            }
+                                        </Text>
+                                    </View>
+                                ) : null}
+                                {reservation.payment_summary?.captured_at ? (
+                                    <View style={styles.infoRow}>
+                                        <Text style={styles.infoLabel}>
+                                            Captured At:
+                                        </Text>
+                                        <Text style={styles.infoValue}>
+                                            {formatDateTime(
+                                                reservation.payment_summary
+                                                    .captured_at,
+                                            )}
+                                        </Text>
+                                    </View>
+                                ) : null}
+                                {reservation.payment_summary
+                                    ?.refunded_amount_minor ? (
+                                    <View style={styles.infoRow}>
+                                        <Text style={styles.infoLabel}>
+                                            Refunded Amount:
+                                        </Text>
+                                        <Text style={styles.infoValue}>
+                                            ₹
+                                            {(
+                                                reservation.payment_summary
+                                                    .refunded_amount_minor / 100
+                                            ).toLocaleString('en-IN')}
+                                        </Text>
+                                    </View>
+                                ) : null}
+                                {reservation.payment_summary?.failure_reason ? (
+                                    <View style={styles.infoRow}>
+                                        <Text style={styles.infoLabel}>
+                                            Gateway Note:
+                                        </Text>
+                                        <Text style={styles.infoValue}>
+                                            {
+                                                reservation.payment_summary
+                                                    .failure_reason
+                                            }
+                                        </Text>
+                                    </View>
+                                ) : null}
+                            </View>
+                        </View>
+                    ) : null}
+
                     {/* Cancellation & Refund Tracking */}
-                    {reservation.status === 'cancelled' ||
-                    (reservation.refunds?.length ?? 0) > 0 ? (
+                    {shouldShowRefundSection(reservation) ? (
                         <View style={styles.section}>
                             <View style={styles.sectionHeaderRow}>
                                 <RotateCcw
@@ -598,9 +720,9 @@ export default function ReservationDetailScreen() {
                                     <Text style={styles.infoLabel}>
                                         Booking Status:
                                     </Text>
-                                    <Badge
-                                        label="CANCELLED"
-                                        variant="secondary"
+                                    <ReservationStatusBadge
+                                        status={reservation.status}
+                                        label={reservation.status_label}
                                     />
                                 </View>
                                 {reservation.cancelled_at ? (
@@ -612,6 +734,18 @@ export default function ReservationDetailScreen() {
                                             {new Date(
                                                 reservation.cancelled_at,
                                             ).toLocaleDateString()}
+                                        </Text>
+                                    </View>
+                                ) : null}
+                                {reservation.expired_at ? (
+                                    <View style={styles.infoRow}>
+                                        <Text style={styles.infoLabel}>
+                                            Expired On:
+                                        </Text>
+                                        <Text style={styles.infoValue}>
+                                            {new Date(
+                                                reservation.expired_at,
+                                            ).toLocaleString()}
                                         </Text>
                                     </View>
                                 ) : null}
@@ -692,14 +826,23 @@ export default function ReservationDetailScreen() {
                                 ) : (
                                     <View style={styles.refundNoticeBox}>
                                         <Text style={styles.refundNoticeText}>
-                                                {(reservation.original_amount_paise ??
-                                                    0) >
-                                                0
-                                                ? 'Refund review initiated. Eligible amounts are processed to your original payment method in 5–7 banking days pursuant to our Cancellation Policy.'
-                                                : 'Reservation was cancelled prior to payment completion. No charges deducted.'}
+                                            {resolveRefundNotice(reservation)}
                                         </Text>
                                     </View>
                                 )}
+                                {(reservation.refunds?.length ?? 0) > 0 &&
+                                reservation.requires_refund_review ? (
+                                    <View
+                                        style={[
+                                            styles.refundNoticeBox,
+                                            { marginTop: Spacing.xs },
+                                        ]}
+                                    >
+                                        <Text style={styles.refundNoticeText}>
+                                            {resolveRefundNotice(reservation)}
+                                        </Text>
+                                    </View>
+                                ) : null}
                             </View>
                         </View>
                     ) : null}
@@ -738,8 +881,8 @@ export default function ReservationDetailScreen() {
                         />
                     </View>
 
-                    {/* Customer Review Section for Completed Stays */}
-                    {isCompletedStay ? (
+                    {/* Customer Review Section */}
+                    {showReviewSection ? (
                         <View style={styles.section}>
                             <View style={styles.sectionHeaderRow}>
                                 <Star
@@ -753,7 +896,7 @@ export default function ReservationDetailScreen() {
                                 </Text>
                             </View>
 
-                            {reservation.is_reviewed || reservation.review ? (
+                            {hasReviewRecord ? (
                                 <View style={styles.reviewedCard}>
                                     <View style={styles.reviewedHeader}>
                                         <View style={styles.verifiedBadge}>
@@ -765,7 +908,9 @@ export default function ReservationDetailScreen() {
                                             <Text
                                                 style={styles.verifiedBadgeText}
                                             >
-                                                Verified Review
+                                                {reservation.review
+                                                    ?.status_label ||
+                                                    'Verified Review'}
                                             </Text>
                                         </View>
                                         <View style={styles.ratingBadge}>
@@ -801,11 +946,16 @@ export default function ReservationDetailScreen() {
                                     ) : null}
                                     <Text style={styles.reviewedDate}>
                                         Submitted{' '}
-                                        {reservation.review?.created_at ||
-                                            'for this stay'}
+                                        {reservation.review?.submitted_at
+                                            ? formatDateTime(
+                                                  reservation.review
+                                                      .submitted_at,
+                                              )
+                                            : reservation.review?.created_at ||
+                                              'for this stay'}
                                     </Text>
                                 </View>
-                            ) : (
+                            ) : isReviewEligible ? (
                                 <View style={styles.reviewPromptCard}>
                                     <Text style={styles.reviewPromptTitle}>
                                         How was your stay?
@@ -826,16 +976,20 @@ export default function ReservationDetailScreen() {
                                         style={{ marginTop: Spacing.sm }}
                                     />
                                 </View>
+                            ) : (
+                                <View style={styles.refundNoticeBox}>
+                                    <Text style={styles.refundNoticeText}>
+                                        {reservation.review_eligibility
+                                            ?.reason ||
+                                            'Verified reviews open after check-in for confirmed active stays.'}
+                                    </Text>
+                                </View>
                             )}
                         </View>
                     ) : null}
 
                     {/* Cancellation Option */}
-                    {[
-                        'awaiting_payment',
-                        'payment_pending',
-                        'confirmed',
-                    ].includes(reservation.status) ? (
+                    {canCancelReservation(reservation) ? (
                         <View style={styles.section}>
                             <Button
                                 title="Cancel Reservation"

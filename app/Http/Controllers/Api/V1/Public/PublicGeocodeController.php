@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\V1\Public;
 use App\Http\Controllers\Api\V1\ApiController;
 use App\Models\City;
 use App\Models\PlatformSetting;
+use App\Models\Property;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -38,8 +39,12 @@ class PublicGeocodeController extends ApiController
         $lat = (float) $validated['lat'];
         $lng = (float) $validated['lng'];
 
+        if (! Property::areValidCoordinates($lat, $lng)) {
+            return $this->success($this->unavailableResponse($lat, $lng));
+        }
+
         // Cache 4 decimal places (~11 meters) for 24 hours to reduce external API requests
-        $cacheKey = sprintf('geocode:reverse:%.4f:%.4f', $lat, $lng);
+        $cacheKey = sprintf('geocode:reverse:v2:%.4f:%.4f', $lat, $lng);
 
         $result = Cache::remember($cacheKey, 86400, fn (): array => $this->performReverseGeocode($lat, $lng));
 
@@ -129,12 +134,19 @@ class PublicGeocodeController extends ApiController
                     }
 
                     $resolvedLocality = $neighborhood !== '' ? $neighborhood : ($sublocality !== '' ? $sublocality : $locality);
-                    $resolvedCityName = $locality !== '' ? $locality : ($city !== '' ? $city : 'Hyderabad');
+                    $resolvedCityName = $city !== '' ? $city : $locality;
                     $citySlug = $this->matchCitySlug($resolvedCityName, $lat, $lng);
+                    if ($resolvedCityName === '' && $citySlug !== null) {
+                        $resolvedCityName = ucfirst($citySlug);
+                    }
 
-                    $display = $resolvedLocality !== '' && strtolower($resolvedLocality) !== strtolower($resolvedCityName)
+                    $display = $resolvedLocality !== '' && $resolvedCityName !== '' && strtolower($resolvedLocality) !== strtolower($resolvedCityName)
                         ? "{$resolvedLocality}, {$resolvedCityName}"
-                        : $resolvedCityName;
+                        : ($resolvedCityName !== '' ? $resolvedCityName : $resolvedLocality);
+
+                    if ($display === '') {
+                        return null;
+                    }
 
                     return [
                         'display' => $display,
@@ -145,6 +157,7 @@ class PublicGeocodeController extends ApiController
                         'lat' => $lat,
                         'lng' => $lng,
                         'provider' => 'google',
+                        'location_available' => true,
                     ];
                 }
             }
@@ -186,9 +199,9 @@ class PublicGeocodeController extends ApiController
 
                 if ($cityName !== '' || $locality !== '') {
                     $citySlug = $this->matchCitySlug($cityName !== '' ? $cityName : $locality, $lat, $lng);
-                    $displayCity = $cityName !== '' ? $cityName : ucfirst($citySlug);
+                    $displayCity = $cityName !== '' ? $cityName : ($citySlug !== null ? ucfirst($citySlug) : '');
 
-                    $display = $locality !== '' && strtolower($locality) !== strtolower($displayCity)
+                    $display = $locality !== '' && $displayCity !== '' && strtolower($locality) !== strtolower($displayCity)
                         ? "{$locality}, {$displayCity}"
                         : ($locality !== '' ? $locality : $displayCity);
 
@@ -201,6 +214,7 @@ class PublicGeocodeController extends ApiController
                         'lat' => $lat,
                         'lng' => $lng,
                         'provider' => 'nominatim',
+                        'location_available' => true,
                     ];
                 }
             }
@@ -248,11 +262,15 @@ class PublicGeocodeController extends ApiController
                 }
 
                 $citySlug = $this->matchCitySlug($cityName, $lat, $lng);
-                $displayCity = $cityName !== '' ? $cityName : ucfirst($citySlug);
+                $displayCity = $cityName !== '' ? $cityName : ($citySlug !== null ? ucfirst($citySlug) : '');
 
-                $display = $locality !== '' && strtolower($locality) !== strtolower($displayCity)
+                $display = $locality !== '' && $displayCity !== '' && strtolower($locality) !== strtolower($displayCity)
                     ? "{$locality}, {$displayCity}"
                     : ($locality !== '' ? $locality : $displayCity);
+
+                if ($display === '') {
+                    return null;
+                }
 
                 return [
                     'display' => $display,
@@ -263,6 +281,7 @@ class PublicGeocodeController extends ApiController
                     'lat' => $lat,
                     'lng' => $lng,
                     'provider' => 'bigdatacloud',
+                    'location_available' => true,
                 ];
             }
         } catch (\Throwable $e) {
@@ -273,21 +292,26 @@ class PublicGeocodeController extends ApiController
     }
 
     /**
-     * Fallback to closest launch city when no provider succeeds.
+     * Match closest launch city within 80 km when external providers fail,
+     * otherwise return an explicit unavailable location state without inventing coordinates/cities.
      *
      * @return array<string, mixed>
      */
     private function fallbackClosestCity(float $lat, float $lng): array
     {
-        $closest = self::LAUNCH_CITIES['hyderabad'];
-        $minDist = INF;
+        $closest = null;
+        $minDistKm = INF;
 
         foreach (self::LAUNCH_CITIES as $city) {
-            $dist = hypot($city['lat'] - $lat, $city['lng'] - $lng);
-            if ($dist < $minDist) {
-                $minDist = $dist;
+            $distKm = $this->haversineDistanceKm($city['lat'], $city['lng'], $lat, $lng);
+            if ($distKm < $minDistKm) {
+                $minDistKm = $distKm;
                 $closest = $city;
             }
+        }
+
+        if ($closest === null || $minDistKm > 80.0) {
+            return $this->unavailableResponse($lat, $lng);
         }
 
         return [
@@ -299,46 +323,80 @@ class PublicGeocodeController extends ApiController
             'lat' => $lat,
             'lng' => $lng,
             'provider' => 'fallback',
+            'location_available' => true,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function unavailableResponse(float $lat, float $lng): array
+    {
+        return [
+            'display' => 'Location unavailable',
+            'locality' => '',
+            'city' => '',
+            'city_slug' => null,
+            'formatted_address' => '',
+            'lat' => $lat,
+            'lng' => $lng,
+            'provider' => 'unavailable',
+            'location_available' => false,
+        ];
+    }
+
+    private function haversineDistanceKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $earthRadius = 6371.0;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a = sin($dLat / 2) ** 2
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+
+        return $earthRadius * 2 * atan2(sqrt($a), sqrt(max(0.0, 1 - $a)));
     }
 
     /**
      * Map a location/city name or coordinate to an active TIJUM city slug.
      */
-    private function matchCitySlug(string $name, float $lat, float $lng): string
+    private function matchCitySlug(string $name, float $lat, float $lng): ?string
     {
         $lower = strtolower(trim($name));
 
-        if (str_contains($lower, 'hyderabad') || str_contains($lower, 'secunderabad') || str_contains($lower, 'cyberabad') || str_contains($lower, 'ranga reddy')) {
-            return 'hyderabad';
+        if ($lower !== '') {
+            if (str_contains($lower, 'hyderabad') || str_contains($lower, 'secunderabad') || str_contains($lower, 'cyberabad') || str_contains($lower, 'ranga reddy')) {
+                return 'hyderabad';
+            }
+
+            if (str_contains($lower, 'visakhapatnam') || str_contains($lower, 'vizag') || str_contains($lower, 'vishakhapatnam')) {
+                return 'visakhapatnam';
+            }
+
+            if (str_contains($lower, 'vijayawada') || str_contains($lower, 'ntr')) {
+                return 'vijayawada';
+            }
+
+            if (str_contains($lower, 'guntur')) {
+                return 'guntur';
+            }
+
+            // Try database slug
+            $matchedCity = City::query()
+                ->where('is_active', true)
+                ->where(static function ($q) use ($lower): void {
+                    $q->where('slug', $lower)
+                        ->orWhereRaw('LOWER(name) = ?', [$lower]);
+                })
+                ->value('slug');
+
+            if ($matchedCity !== null) {
+                return (string) $matchedCity;
+            }
         }
 
-        if (str_contains($lower, 'visakhapatnam') || str_contains($lower, 'vizag') || str_contains($lower, 'vishakhapatnam')) {
-            return 'visakhapatnam';
-        }
+        // Fallback by distance only when within range of a launch city
+        $fallbackSlug = $this->fallbackClosestCity($lat, $lng)['city_slug'];
 
-        if (str_contains($lower, 'vijayawada') || str_contains($lower, 'ntr')) {
-            return 'vijayawada';
-        }
-
-        if (str_contains($lower, 'guntur')) {
-            return 'guntur';
-        }
-
-        // Try database slug
-        $matchedCity = City::query()
-            ->where('is_active', true)
-            ->where(static function ($q) use ($lower): void {
-                $q->where('slug', $lower)
-                    ->orWhereRaw('LOWER(name) = ?', [$lower]);
-            })
-            ->value('slug');
-
-        if ($matchedCity !== null) {
-            return (string) $matchedCity;
-        }
-
-        // Fallback by distance to closest launch city
-        return $this->fallbackClosestCity($lat, $lng)['city_slug'];
+        return is_string($fallbackSlug) ? $fallbackSlug : null;
     }
 }

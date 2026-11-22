@@ -24,5 +24,12 @@
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
+        <env name="RAZORPAY_KEY_ID" value="" force="true"/>
+        <env name="RAZORPAY_KEY_SECRET" value="" force="true"/>
+        <env name="RAZORPAY_WEBHOOK_SECRET" value="" force="true"/>
+        <env name="RAZORPAY_MODE" value="test" force="true"/>
+        <env name="TIJUM_PAYMENTS_LIVE_ENABLED" value="false" force="true"/>
+        <env name="TIJUM_PARTNER_SETTLEMENTS_ENABLED" value="false" force="true"/>
+        <env name="TIJUM_RAZORPAY_ROUTE_ENABLED" value="false" force="true"/>
     </php>
 </phpunit>

@@ -182,6 +182,7 @@ class PropertyPublicData
 
         $gallery = $this->buildGallery($property);
         $eligibleGender = $this->propertyGenderLabel($roomTypes);
+        $coords = $property->resolvedCoordinates();
 
         return [
             'id' => $property->id,
@@ -193,6 +194,13 @@ class PropertyPublicData
             'locality' => $property->locality,
             'address_line_1' => $property->address_line_1,
             'landmark' => $property->landmark,
+            'latitude' => $coords['latitude'] ?? null,
+            'longitude' => $coords['longitude'] ?? null,
+            'has_coordinates' => $coords !== null,
+            'location_precision' => $coords !== null ? 'exact' : 'area_only',
+            'google_maps_url' => $coords !== null
+                ? "https://www.google.com/maps/search/?api=1&query={$coords['latitude']},{$coords['longitude']}"
+                : null,
             'gender_eligibility' => $eligibleGender,
             'food' => $property->foodSummary(),
             'timing' => [

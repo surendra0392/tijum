@@ -102,6 +102,8 @@ class CityLandingPageController extends Controller
                     ? (float) $p->ratingSummary->average_rating
                     : null;
 
+                $coords = $p->resolvedCoordinates();
+
                 return [
                     'id' => $p->id,
                     'name' => $p->name,
@@ -124,8 +126,10 @@ class CityLandingPageController extends Controller
                     'dinner_included' => (bool) $p->dinner_included,
                     'included_meals' => $meals,
                     'included_meals_label' => ! empty($meals) ? implode(' • ', $meals) : 'Food Included',
-                    'latitude' => $p->latitude !== null ? (float) $p->latitude : null,
-                    'longitude' => $p->longitude !== null ? (float) $p->longitude : null,
+                    'latitude' => $coords['latitude'] ?? null,
+                    'longitude' => $coords['longitude'] ?? null,
+                    'has_coordinates' => $coords !== null,
+                    'location_precision' => $coords !== null ? 'exact' : 'area_only',
                 ];
             })
             ->values();

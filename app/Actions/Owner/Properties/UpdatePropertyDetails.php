@@ -85,6 +85,18 @@ class UpdatePropertyDetails
                         : PropertyOwnershipArrangement::OwnerOperator->value)),
             ) ?? PropertyOwnershipArrangement::OwnerOperator;
 
+            $hasCoordinateInput = array_key_exists('latitude', $attributes) || array_key_exists('longitude', $attributes);
+            if ($hasCoordinateInput) {
+                [$resolvedLat, $resolvedLng] = $this->resolveCoordinatePair(
+                    $attributes['latitude'] ?? null,
+                    $attributes['longitude'] ?? null,
+                );
+            } else {
+                $existingCoords = $lockedProperty->resolvedCoordinates();
+                $resolvedLat = $existingCoords['latitude'] ?? null;
+                $resolvedLng = $existingCoords['longitude'] ?? null;
+            }
+
             $name = trim((string) $attributes['name']);
             $fieldsPayload = [
                 'property_category_id' => $category->id,
@@ -103,8 +115,8 @@ class UpdatePropertyDetails
                 'postal_code' => trim((string) $attributes['postal_code']),
                 'state' => $city->state,
                 'country_code' => $city->country_code,
-                'latitude' => $attributes['latitude'] ?? null,
-                'longitude' => $attributes['longitude'] ?? null,
+                'latitude' => $resolvedLat,
+                'longitude' => $resolvedLng,
             ];
 
             if (! $lockedProperty->hasApprovedBaseline()) {
@@ -177,6 +189,27 @@ class UpdatePropertyDetails
 
             return $lockedProperty->fresh(['category', 'city', 'activeVerificationApplication']) ?? $lockedProperty;
         });
+    }
+
+    /**
+     * @return array{0: float|null, 1: float|null}
+     */
+    private function resolveCoordinatePair(mixed $rawLatitude, mixed $rawLongitude): array
+    {
+        $latEmpty = $rawLatitude === null || (is_string($rawLatitude) && trim($rawLatitude) === '');
+        $lngEmpty = $rawLongitude === null || (is_string($rawLongitude) && trim($rawLongitude) === '');
+
+        if ($latEmpty && $lngEmpty) {
+            return [null, null];
+        }
+
+        if ($latEmpty || $lngEmpty || ! Property::areValidCoordinates($rawLatitude, $rawLongitude)) {
+            throw ValidationException::withMessages([
+                'latitude' => 'Provide valid paired latitude and longitude coordinates, or leave both blank.',
+            ]);
+        }
+
+        return [(float) $rawLatitude, (float) $rawLongitude];
     }
 
     private function nullableTrimmed(mixed $value): ?string

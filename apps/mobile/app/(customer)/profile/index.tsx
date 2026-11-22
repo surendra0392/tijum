@@ -42,6 +42,7 @@ export default function CustomerProfileScreen() {
     const [profile, setProfile] = useState<CustomerProfile | null>(null);
     const [wishlistCount, setWishlistCount] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [resendingVerification, setResendingVerification] = useState(false);
 
     const isGuest =
         !token || authState === 'guest' || authState === 'session_expired';
@@ -102,6 +103,31 @@ export default function CustomerProfileScreen() {
         );
     };
 
+    const handleResendVerification = async () => {
+        try {
+            setResendingVerification(true);
+            const res = await CustomerApi.resendEmailVerification();
+            Alert.alert(
+                res.data?.email_verified
+                    ? 'Email Already Verified'
+                    : 'Verification Email Sent',
+                res.message ||
+                    'Please check your inbox for the email verification link.',
+            );
+            if (res.data?.email_verified) {
+                await loadProfile();
+            }
+        } catch (err: any) {
+            Alert.alert(
+                'Verification Failed',
+                err?.message ||
+                    'Could not send the verification email right now. Please try again later.',
+            );
+        } finally {
+            setResendingVerification(false);
+        }
+    };
+
     const handleSwitchToPartner = () => {
         Alert.alert(
             'Switch to Partner',
@@ -139,6 +165,7 @@ export default function CustomerProfileScreen() {
     const displayName = profile?.name || user?.name || 'TIJUM Guest';
     const displayEmail = profile?.email || user?.email || 'Email not available';
     const displayPhone = profile?.phone || user?.phone || '';
+    const isEmailVerified = profile?.email_verified ?? user?.email_verified;
     const initial = displayName.trim().charAt(0).toUpperCase() || 'T';
 
     return (
@@ -184,6 +211,13 @@ export default function CustomerProfileScreen() {
                         {displayPhone ? (
                             <Text style={styles.userPhone}>{displayPhone}</Text>
                         ) : null}
+                        {isEmailVerified === true ? (
+                            <View style={styles.verifiedPill}>
+                                <Text style={styles.verifiedPillText}>
+                                    Email Verified
+                                </Text>
+                            </View>
+                        ) : null}
 
                         {loading ? (
                             <ActivityIndicator
@@ -194,6 +228,32 @@ export default function CustomerProfileScreen() {
                         ) : null}
                     </View>
                 </View>
+
+                {isEmailVerified === false ? (
+                    <View style={styles.verificationBanner}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.verificationBannerTitle}>
+                                Verify your email address
+                            </Text>
+                            <Text style={styles.verificationBannerDesc}>
+                                Confirm your email so you receive booking
+                                receipts and security alerts.
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.verificationActionBtn}
+                            onPress={handleResendVerification}
+                            disabled={resendingVerification}
+                            activeOpacity={0.85}
+                        >
+                            <Text style={styles.verificationActionText}>
+                                {resendingVerification
+                                    ? 'Sending...'
+                                    : 'Resend Verification Email'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : null}
 
                 <View style={styles.menuCard}>
                     <MenuRow
@@ -415,6 +475,53 @@ const styles = StyleSheet.create({
         color: Colors.warmCream,
         marginTop: 2,
         opacity: 0.75,
+    },
+    verifiedPill: {
+        marginTop: Spacing.xs,
+        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+        borderColor: 'rgba(16, 185, 129, 0.5)',
+        borderWidth: 1,
+        borderRadius: BorderRadius.full,
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+    },
+    verifiedPillText: {
+        color: '#D1FAE5',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    verificationBanner: {
+        backgroundColor: '#FFF7ED',
+        marginHorizontal: Spacing.base,
+        marginTop: Spacing.base,
+        padding: Spacing.md,
+        borderRadius: BorderRadius.lg,
+        borderWidth: 1,
+        borderColor: '#FED7AA',
+        gap: Spacing.sm,
+    },
+    verificationBannerTitle: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: Colors.deepPlum,
+    },
+    verificationBannerDesc: {
+        fontSize: 12,
+        color: Colors.inkSecondary,
+        marginTop: 2,
+        lineHeight: 17,
+    },
+    verificationActionBtn: {
+        alignSelf: 'flex-start',
+        backgroundColor: Colors.deepPlum,
+        borderRadius: BorderRadius.pill,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+    },
+    verificationActionText: {
+        color: Colors.white,
+        fontSize: 12,
+        fontWeight: '700',
     },
     menuCard: {
         backgroundColor: Colors.white,

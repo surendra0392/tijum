@@ -1544,10 +1544,11 @@ export default function ReservationShow({
                                     </div>
                                 </CardHeader>
                                 <CardContent className="pt-0 text-xs leading-relaxed text-tijum-plum-muted dark:text-muted-foreground">
-                                    This reservation was cancelled after
-                                    payment. TIJUM support is reviewing the
-                                    transaction for gateway refund processing
-                                    and will notify you once completed.
+                                    {reservation.status === 'expired'
+                                        ? 'Payment was received after this reservation expired or could not be fulfilled. TIJUM support is reviewing the transaction for refund processing and will notify you once completed.'
+                                        : reservation.status === 'cancelled'
+                                          ? 'This reservation was cancelled after payment. TIJUM support is reviewing the transaction for gateway refund processing and will notify you once completed.'
+                                          : 'A payment or protection review is underway for this reservation. TIJUM support will update you once completed.'}
                                 </CardContent>
                             </Card>
                         )}

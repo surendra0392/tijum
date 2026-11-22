@@ -122,12 +122,13 @@ class PropertySearchService
             }
 
             $distKm = null;
-            if ($refCoords && $property->latitude !== null && $property->longitude !== null) {
+            $coords = $property->resolvedCoordinates();
+            if ($refCoords && $coords !== null) {
                 $distKm = $this->calculateDistanceKm(
                     $refCoords['lat'],
                     $refCoords['lng'],
-                    (float) $property->latitude,
-                    (float) $property->longitude,
+                    $coords['latitude'],
+                    $coords['longitude'],
                 );
             }
 
@@ -318,7 +319,7 @@ class PropertySearchService
         $cityModel = $this->resolveCityModel($filters['city'] ?? null);
         $cityCenter = $cityModel !== null ? $this->cityCenterForSlug($cityModel->slug) : null;
 
-        if (isset($filters['lat'], $filters['lng']) && is_numeric($filters['lat']) && is_numeric($filters['lng'])) {
+        if (isset($filters['lat'], $filters['lng']) && Property::areValidCoordinates($filters['lat'], $filters['lng'])) {
             $lat = (float) $filters['lat'];
             $lng = (float) $filters['lng'];
 

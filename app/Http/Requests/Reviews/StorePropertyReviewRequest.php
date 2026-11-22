@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Reviews;
 
+use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StorePropertyReviewRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user('web') !== null;
+        return $this->user() instanceof User;
     }
 
     /**

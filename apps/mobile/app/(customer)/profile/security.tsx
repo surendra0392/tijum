@@ -46,7 +46,7 @@ export default function CustomerSecurityScreen() {
             setConfirmPassword('');
             Alert.alert(
                 'Password Updated',
-                'Your password has been changed successfully.',
+                'Your password has been changed successfully. Other active sessions and devices have been signed out for your security.',
                 [{ text: 'OK', onPress: () => router.back() }],
             );
         } catch (err: any) {

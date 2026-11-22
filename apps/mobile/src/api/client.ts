@@ -1,6 +1,7 @@
 import { SecureTokenStorage } from '../auth/SecureTokenStorage.ts';
 
-const DEFAULT_BASE_URL = 'https://tijum.com/api/v1';
+const PRODUCTION_HOSTS = new Set(['tijum.com', 'www.tijum.com']);
+const LOCAL_FALLBACK_BASE_URL = 'http://127.0.0.1:8000/api/v1';
 
 type UnauthorizedHandler = () => void;
 
@@ -13,29 +14,111 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
 export class ApiError extends Error {
     readonly status: number;
     readonly errorCode?: string;
-    readonly errors?: Record<string, string[]>;
+    readonly errors?: Record<string, any>;
+    readonly retryAfter?: number;
 
     constructor(
         message: string,
         status: number,
         errorCode?: string,
-        errors?: Record<string, string[]>,
+        errors?: Record<string, any>,
+        retryAfter?: number,
     ) {
         super(message);
         this.name = 'ApiError';
         this.status = status;
         this.errorCode = errorCode;
         this.errors = errors;
+        this.retryAfter = retryAfter;
     }
+}
+
+export function resolveApiBaseUrl(
+    env: Record<string, string | undefined> = typeof process !== 'undefined'
+        ? (process.env as Record<string, string | undefined>)
+        : {},
+): string {
+    const rawUrl = env.EXPO_PUBLIC_API_URL?.trim();
+    const environment = (env.EXPO_PUBLIC_ENVIRONMENT ?? 'development')
+        .trim()
+        .toLowerCase();
+    const nodeEnv = (env.NODE_ENV ?? '').trim().toLowerCase();
+
+    if (rawUrl) {
+        const normalized = rawUrl.replace(/\/+$/, '');
+        let hostname = '';
+        try {
+            hostname = new URL(normalized).hostname.toLowerCase();
+        } catch {
+            hostname = '';
+        }
+
+        if (
+            PRODUCTION_HOSTS.has(hostname) &&
+            (nodeEnv === 'test' || environment !== 'production')
+        ) {
+            throw new ApiError(
+                "Refusing to send requests to production API while EXPO_PUBLIC_ENVIRONMENT is not 'production'.",
+                0,
+                'UNSAFE_PRODUCTION_TARGET',
+            );
+        }
+
+        return normalized;
+    }
+
+    if (environment === 'production') {
+        throw new ApiError(
+            'EXPO_PUBLIC_API_URL must be explicitly configured for production builds.',
+            0,
+            'MISSING_PRODUCTION_API_URL',
+        );
+    }
+
+    return LOCAL_FALLBACK_BASE_URL;
+}
+
+export function resolveApiOrigin(
+    env: Record<string, string | undefined> = typeof process !== 'undefined'
+        ? (process.env as Record<string, string | undefined>)
+        : {},
+): string {
+    return resolveApiBaseUrl(env).replace(/\/api\/v1\/?$/, '');
+}
+
+function parseRetryAfterSeconds(
+    response: Response,
+    json: any,
+): number | undefined {
+    const rawHeader = response.headers?.get?.('Retry-After');
+    if (rawHeader) {
+        const parsedHeader = Number(rawHeader);
+        if (Number.isFinite(parsedHeader) && parsedHeader > 0) {
+            return Math.ceil(parsedHeader);
+        }
+    }
+
+    const bodyRetry = json?.errors?.retry_after;
+    if (typeof bodyRetry === 'number' && Number.isFinite(bodyRetry) && bodyRetry > 0) {
+        return Math.ceil(bodyRetry);
+    }
+
+    if (response.status === 429 && typeof json?.message === 'string') {
+        const match = json.message.match(/(\d+)\s+seconds?/i);
+        if (match) {
+            const parsedMessage = Number(match[1]);
+            if (Number.isFinite(parsedMessage) && parsedMessage > 0) {
+                return parsedMessage;
+            }
+        }
+    }
+
+    return undefined;
 }
 
 export class ApiClient {
     private static getBaseUrl(): string {
-        const envUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
-        if (envUrl) {
-            return envUrl.replace(/\/+$/, '');
-        }
-        return DEFAULT_BASE_URL;
+        return resolveApiBaseUrl();
     }
 
     static async request<T>(
@@ -103,6 +186,7 @@ export class ApiClient {
                     response.status >= 500
                         ? `Server error (${response.status}). Please try again later.`
                         : `Request failed with status ${response.status}.`;
+                const retryAfter = parseRetryAfterSeconds(response, json);
 
                 throw new ApiError(
                     json?.message || fallbackMessage,
@@ -113,6 +197,7 @@ export class ApiClient {
                             ? 'SERVER_ERROR'
                             : 'HTTP_ERROR'),
                     json?.errors,
+                    retryAfter,
                 );
             }
 

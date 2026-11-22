@@ -25,6 +25,8 @@ class CustomerProfileResource extends JsonResource
             'phone' => $this->phone,
             'email_verified' => $this->email_verified_at !== null,
             'phone_verified' => $this->phone_verified_at !== null,
+            'two_factor_enabled' => $this->hasEnabledTwoFactorAuthentication(),
+            'terms_accepted' => $this->terms_accepted_at !== null,
             'marketing_consent' => (bool) ($this->marketing_consent ?? false),
             'account_type' => 'customer',
             'created_at' => $this->created_at?->toIso8601String(),

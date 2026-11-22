@@ -90,4 +90,18 @@ class CustomerProfileController extends ApiController
 
         return $this->success(null, 'Password changed successfully');
     }
+
+    public function resendVerification(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($user->hasVerifiedEmail()) {
+            return $this->success(['email_verified' => true], 'Your email address is already verified.');
+        }
+
+        $user->sendEmailVerificationNotification();
+
+        return $this->success(['email_verified' => false], 'Verification link sent to your email address.');
+    }
 }

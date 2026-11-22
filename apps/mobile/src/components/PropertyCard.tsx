@@ -8,6 +8,7 @@ import {
     Building2,
 } from 'lucide-react-native';
 import { PropertyCard as PropertyCardType } from '../api/types';
+import { resolveApiOrigin } from '../api/client';
 import { Colors } from '../theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../theme/spacing';
 import { CategoryBadge } from './CategoryBadge';
@@ -37,9 +38,7 @@ export function PropertyCard({
               ).toLocaleString('en-IN')}`
             : null;
 
-    const baseUrl = process.env.EXPO_PUBLIC_API_URL
-        ? process.env.EXPO_PUBLIC_API_URL.replace(/\/api\/v1\/?$/, '')
-        : 'https://tijum.com';
+    const baseUrl = resolveApiOrigin();
 
     const rawImage = property.cover_image_url || '';
 

@@ -41,17 +41,25 @@ const CITY_CENTERS: Record<string, { lat: number; lng: number; zoom: number }> =
         visakhapatnam: { lat: 17.7312, lng: 83.3156, zoom: 13 },
     };
 
-// Fallback offsets when coordinates are identical or null
-const DEMO_OFFSETS: Array<{ lat: number; lng: number }> = [
-    { lat: 0, lng: 0 },
-    { lat: 0.008, lng: 0.01 },
-    { lat: -0.007, lng: 0.009 },
-    { lat: 0.006, lng: -0.011 },
-    { lat: -0.009, lng: -0.008 },
-    { lat: 0.012, lng: 0.005 },
-    { lat: -0.011, lng: 0.012 },
-    { lat: 0.005, lng: 0.015 },
-];
+function hasValidCoordinates(
+    lat?: number | null,
+    lng?: number | null,
+): boolean {
+    if (
+        typeof lat !== 'number' ||
+        typeof lng !== 'number' ||
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lng)
+    ) {
+        return false;
+    }
+
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return false;
+    }
+
+    return Math.abs(lat) >= 1e-9 || Math.abs(lng) >= 1e-9;
+}
 
 function project(
     lat: number,
@@ -101,8 +109,10 @@ export function SearchMap({
             return CITY_CENTERS[slug];
         }
 
-        // Compute average center from properties with coordinates
-        const withCoords = properties.filter((p) => p.latitude && p.longitude);
+        // Compute average center from properties with verified coordinates
+        const withCoords = properties.filter((p) =>
+            hasValidCoordinates(p.latitude, p.longitude),
+        );
         if (withCoords.length > 0) {
             const avgLat =
                 withCoords.reduce((sum, p) => sum + (p.latitude ?? 0), 0) /
@@ -151,8 +161,14 @@ export function SearchMap({
             setActiveSlug(selectedSlug);
             if (selectedSlug) {
                 const target = properties.find((p) => p.slug === selectedSlug);
-                if (target?.latitude && target?.longitude) {
-                    setCenter({ lat: target.latitude, lng: target.longitude });
+                if (
+                    target &&
+                    hasValidCoordinates(target.latitude, target.longitude)
+                ) {
+                    setCenter({
+                        lat: target.latitude as number,
+                        lng: target.longitude as number,
+                    });
                 }
             }
         }
@@ -170,28 +186,20 @@ export function SearchMap({
         return properties.find((p) => p.slug === target) ?? null;
     }, [activeSlug, selectedSlug, properties]);
 
-    // Markers mapped with real GPS coordinates
+    // Markers mapped strictly from properties with verified coordinates (never fabricate fallback pins)
     const markers = useMemo(() => {
-        return properties.map((item, index) => {
-            let lat = item.latitude;
-            let lng = item.longitude;
-
-            if (!lat || !lng) {
-                const citySlug = (item.city?.slug ?? cityName).toLowerCase();
-                const cityBase =
-                    CITY_CENTERS[citySlug] ?? CITY_CENTERS.hyderabad;
-                const offset = DEMO_OFFSETS[index % DEMO_OFFSETS.length];
-                lat = cityBase.lat + offset.lat;
-                lng = cityBase.lng + offset.lng;
-            }
-
-            return {
+        return properties
+            .filter((item) =>
+                hasValidCoordinates(item.latitude, item.longitude),
+            )
+            .map((item) => ({
                 item,
-                lat,
-                lng,
-            };
-        });
-    }, [properties, cityName]);
+                lat: item.latitude as number,
+                lng: item.longitude as number,
+            }));
+    }, [properties]);
+
+    const unmappedCount = properties.length - markers.length;
 
     // Tile calculations based on center and zoom
     const { tiles, centerPixel, topLeft } = useMemo(() => {
@@ -297,8 +305,11 @@ export function SearchMap({
         setActiveSlug(slug);
         onSelectProperty?.(slug);
         const target = properties.find((p) => p.slug === slug);
-        if (target?.latitude && target?.longitude) {
-            setCenter({ lat: target.latitude, lng: target.longitude });
+        if (target && hasValidCoordinates(target.latitude, target.longitude)) {
+            setCenter({
+                lat: target.latitude as number,
+                lng: target.longitude as number,
+            });
         }
     };
 
@@ -422,6 +433,27 @@ export function SearchMap({
                 })}
             </div>
 
+            {/* Unavailable Map Pins Notice when properties lack coordinates */}
+            {markers.length === 0 && (
+                <div className="pointer-events-auto absolute inset-0 z-30 flex items-center justify-center p-6">
+                    <div className="max-w-xs rounded-[20px] border border-tijum-surface bg-tijum-cream/95 p-5 text-center shadow-xl backdrop-blur-md">
+                        <MapPin
+                            className="mx-auto mb-2 size-6 text-tijum-coral"
+                            aria-hidden="true"
+                        />
+                        <p className="font-heading text-sm font-bold text-tijum-plum">
+                            Exact map pins unavailable
+                        </p>
+                        <p className="mt-1 text-xs leading-relaxed text-tijum-lavender">
+                            Verified GPS coordinates are not yet available for
+                            {properties.length === 0
+                                ? ' stays in this view.'
+                                : ' these properties. Review locality and street address on each card.'}
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* Selected Property Popup Card */}
             {activeItem && (
                 <div className="pointer-events-auto absolute right-4 bottom-4 left-4 z-40 max-w-sm rounded-[20px] border border-tijum-surface bg-tijum-cream p-3.5 shadow-2xl transition-all sm:right-auto sm:left-4 sm:w-80">
@@ -466,6 +498,14 @@ export function SearchMap({
                                 <MapPin className="size-3 shrink-0 text-tijum-coral" />
                                 {activeItem.locality || activeItem.city?.name}
                             </p>
+                            {!hasValidCoordinates(
+                                activeItem.latitude,
+                                activeItem.longitude,
+                            ) && (
+                                <p className="mt-0.5 text-[11px] font-medium text-tijum-lavender">
+                                    Exact map pin unavailable
+                                </p>
+                            )}
                             <div className="mt-1 flex items-center justify-between">
                                 <span className="font-heading text-xs font-bold text-tijum-coral">
                                     {formatPriceShort(
@@ -496,8 +536,9 @@ export function SearchMap({
                     <Navigation className="size-3.5 shrink-0 text-tijum-coral" />
                     <span>{cityName}</span>
                     <span className="font-normal text-tijum-lavender">
-                        ({properties.length}{' '}
-                        {properties.length === 1 ? 'stay' : 'stays'})
+                        {unmappedCount > 0 && markers.length > 0
+                            ? `(${markers.length} on map · ${unmappedCount} exact pin unavailable)`
+                            : `(${markers.length} ${markers.length === 1 ? 'stay' : 'stays'})`}
                     </span>
                 </div>
             </div>

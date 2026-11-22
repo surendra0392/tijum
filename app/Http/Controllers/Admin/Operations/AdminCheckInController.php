@@ -138,6 +138,7 @@ class AdminCheckInController extends Controller
     {
         $admin = $request->user('admin');
         abort_unless($admin !== null && ($admin->hasPermission('operations.manage') || $admin->hasPermission('bookings.manage')), 403);
+        abort_unless($reservation->status === ReservationStatus::Confirmed, 422, 'Only confirmed reservations can be checked in.');
 
         $validated = $request->validate([
             'notes' => ['nullable', 'string', 'max:1000'],

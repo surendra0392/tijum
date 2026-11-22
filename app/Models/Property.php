@@ -394,6 +394,46 @@ class Property extends Model
             ?? ($this->accommodationCategory() === AccommodationCategory::CoLiving);
     }
 
+    public static function areValidCoordinates(mixed $latitude, mixed $longitude): bool
+    {
+        if (! is_numeric($latitude) || ! is_numeric($longitude)) {
+            return false;
+        }
+
+        $lat = (float) $latitude;
+        $lng = (float) $longitude;
+
+        if (! is_finite($lat) || ! is_finite($lng)) {
+            return false;
+        }
+
+        if ($lat < -90.0 || $lat > 90.0 || $lng < -180.0 || $lng > 180.0) {
+            return false;
+        }
+
+        return abs($lat) >= 1e-9 || abs($lng) >= 1e-9;
+    }
+
+    public function hasValidCoordinates(): bool
+    {
+        return self::areValidCoordinates($this->latitude, $this->longitude);
+    }
+
+    /**
+     * @return array{latitude: float, longitude: float}|null
+     */
+    public function resolvedCoordinates(): ?array
+    {
+        if (! $this->hasValidCoordinates()) {
+            return null;
+        }
+
+        return [
+            'latitude' => (float) $this->latitude,
+            'longitude' => (float) $this->longitude,
+        ];
+    }
+
     /**
      * @param  Builder<self>  $query
      * @return Builder<self>
