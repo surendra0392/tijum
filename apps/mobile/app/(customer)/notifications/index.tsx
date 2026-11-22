@@ -58,8 +58,6 @@ interface PreferenceState {
     push: boolean;
     sms: boolean;
     whatsapp: boolean;
-    emailMarketing: boolean;
-    pushMarketing: boolean;
 }
 
 export default function CustomerNotificationsScreen() {
@@ -83,8 +81,6 @@ export default function CustomerNotificationsScreen() {
     const [pushActive, setPushActive] = useState(true);
     const [smsActive, setSmsActive] = useState(false);
     const [whatsappActive, setWhatsappActive] = useState(false);
-    const [emailMarketingActive, setEmailMarketingActive] = useState(false);
-    const [pushMarketingActive, setPushMarketingActive] = useState(false);
 
     const isGuest =
         !token ||
@@ -110,24 +106,24 @@ export default function CustomerNotificationsScreen() {
             const d = res?.data;
             if (d) {
                 setInAppActive(
-                    d.in_app_operational ?? d.channels?.in_app?.enabled ?? true,
+                    d.in_app_operational ??
+                        d.channels_available?.in_app ??
+                        true,
                 );
                 setEmailActive(
-                    d.email_operational ?? d.channels?.email?.enabled ?? true,
+                    d.email_operational ?? d.channels_available?.email ?? true,
                 );
                 setPushActive(
-                    d.push_operational ?? d.channels?.push?.enabled ?? true,
+                    d.push_operational ?? d.channels_available?.push ?? true,
                 );
                 setSmsActive(
-                    d.sms_operational ?? d.channels?.sms?.enabled ?? false,
+                    d.sms_operational ?? d.channels_available?.sms ?? false,
                 );
                 setWhatsappActive(
                     d.whatsapp_opted_in ??
-                        d.channels?.whatsapp?.enabled ??
+                        d.channels_available?.whatsapp ??
                         false,
                 );
-                setEmailMarketingActive(d.email_marketing ?? false);
-                setPushMarketingActive(d.push_marketing ?? false);
             }
         } catch (loadPreferencesError: unknown) {
             setPreferencesError(
@@ -147,8 +143,6 @@ export default function CustomerNotificationsScreen() {
             push: pushActive,
             sms: smsActive,
             whatsapp: whatsappActive,
-            emailMarketing: emailMarketingActive,
-            pushMarketing: pushMarketingActive,
         };
         const next = { ...previous, ...updates };
 
@@ -157,8 +151,6 @@ export default function CustomerNotificationsScreen() {
         setPushActive(next.push);
         setSmsActive(next.sms);
         setWhatsappActive(next.whatsapp);
-        setEmailMarketingActive(next.emailMarketing);
-        setPushMarketingActive(next.pushMarketing);
 
         try {
             await CustomerApi.updateNotificationPreferences({
@@ -167,8 +159,6 @@ export default function CustomerNotificationsScreen() {
                 push_operational: next.push,
                 sms_operational: next.sms,
                 whatsapp_opted_in: next.whatsapp,
-                email_marketing: next.emailMarketing,
-                push_marketing: next.pushMarketing,
             });
             return true;
         } catch {
@@ -177,8 +167,6 @@ export default function CustomerNotificationsScreen() {
             setPushActive(previous.push);
             setSmsActive(previous.sms);
             setWhatsappActive(previous.whatsapp);
-            setEmailMarketingActive(previous.emailMarketing);
-            setPushMarketingActive(previous.pushMarketing);
             Alert.alert(
                 'Preferences Not Saved',
                 'Please check your connection and try again.',
@@ -662,48 +650,6 @@ export default function CustomerNotificationsScreen() {
                                     value={pushActive}
                                     onValueChange={(value: boolean) => {
                                         void handleTogglePush(value);
-                                    }}
-                                />
-                            </View>
-
-                            {/* Marketing Email */}
-                            <View style={styles.channelRow}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.channelName}>
-                                        Promotional Offers (Email)
-                                    </Text>
-                                    <Text style={styles.channelDesc}>
-                                        Receive verified stay deals and seasonal
-                                        coupon campaigns via email.
-                                    </Text>
-                                </View>
-                                <Switch
-                                    value={emailMarketingActive}
-                                    onValueChange={(value: boolean) => {
-                                        void handleSavePreferences({
-                                            emailMarketing: value,
-                                        });
-                                    }}
-                                />
-                            </View>
-
-                            {/* Marketing Push */}
-                            <View style={styles.channelRow}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.channelName}>
-                                        Promotional Alerts (Push)
-                                    </Text>
-                                    <Text style={styles.channelDesc}>
-                                        Receive flash stay discounts and reward
-                                        reminders via push alerts.
-                                    </Text>
-                                </View>
-                                <Switch
-                                    value={pushMarketingActive}
-                                    onValueChange={(value: boolean) => {
-                                        void handleSavePreferences({
-                                            pushMarketing: value,
-                                        });
                                     }}
                                 />
                             </View>

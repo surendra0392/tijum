@@ -1,0 +1,16 @@
+appId: com.tijum.app
+name: "01 - Guest Onboarding, Explore, Filters & Property Details"
+---
+- launchApp:
+    clearState: true
+- assertVisible: "SKIP"
+- tapOn: "SKIP"
+- assertVisible: "Explore"
+- assertVisible: "Hostels / PG"
+- assertVisible: "Homestays"
+- assertVisible: "Co-Living"
+- tapOn: "Hostels / PG"
+- tapOn: "All"
+- tapOn:
+    text: "Help & Support"
+    optional: true

@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\ApiController;
 use App\Http\Resources\Api\V1\NotificationDeliveryResource;
 use App\Models\NotificationDelivery;
 use App\Models\Owner;
+use App\Services\Notifications\NotificationPreferenceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -108,5 +109,46 @@ class OwnerNotificationController extends ApiController
         }, 3);
 
         return $this->success(null, 'All partner notifications marked as read.');
+    }
+
+    public function preferences(
+        Request $request,
+        NotificationPreferenceService $preferenceService,
+    ): JsonResponse {
+        /** @var Owner $owner */
+        $owner = $request->user();
+
+        return $this->success(
+            $preferenceService->getPreferences($owner),
+            'Partner notification preferences retrieved successfully.'
+        );
+    }
+
+    public function updatePreferences(
+        Request $request,
+        NotificationPreferenceService $preferenceService,
+    ): JsonResponse {
+        /** @var Owner $owner */
+        $owner = $request->user();
+
+        $validated = $request->validate([
+            'in_app_operational' => ['nullable', 'boolean'],
+            'email_operational' => ['nullable', 'boolean'],
+            'push_operational' => ['nullable', 'boolean'],
+            'sms_operational' => ['nullable', 'boolean'],
+            'whatsapp_opted_in' => ['nullable', 'boolean'],
+        ]);
+
+        $preferenceService->updatePreferences(
+            $owner,
+            $validated,
+            $request->ip(),
+            $request->userAgent()
+        );
+
+        return $this->success(
+            $preferenceService->getPreferences($owner),
+            'Partner notification preferences updated successfully.'
+        );
     }
 }

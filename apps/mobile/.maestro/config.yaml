@@ -1,0 +1,8 @@
+appId: com.tijum.app
+tags:
+  - e2e
+  - production-readiness
+flows:
+  - 01-guest-explore-and-property.yaml
+  - 02-customer-auth-booking-and-support.yaml
+  - 03-partner-dashboard-operations-and-kyc.yaml

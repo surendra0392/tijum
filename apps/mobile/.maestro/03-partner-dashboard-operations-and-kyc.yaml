@@ -1,0 +1,9 @@
+appId: com.tijum.app
+name: "03 - Partner Authentication, Dashboard, Properties, KYC & Settlements"
+---
+- launchApp
+- openLink: "tijum://(auth)/owner-login"
+- assertVisible: "Partner Sign In"
+- tapOn: "Apply as Accommodation Partner"
+- assertVisible: "Become a TIJUM Partner"
+- navigateBack

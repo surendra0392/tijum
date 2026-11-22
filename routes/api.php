@@ -253,6 +253,8 @@ Route::prefix('v1')->group(function (): void {
         // In-App Notifications
         Route::get('notifications', [OwnerNotificationController::class, 'index'])->name('api.v1.owner.notifications.index');
         Route::get('notifications/unread-count', [OwnerNotificationController::class, 'unreadCount'])->name('api.v1.owner.notifications.unread-count');
+        Route::get('notifications/preferences', [OwnerNotificationController::class, 'preferences'])->name('api.v1.owner.notifications.preferences');
+        Route::put('notifications/preferences', [OwnerNotificationController::class, 'updatePreferences'])->name('api.v1.owner.notifications.preferences.update');
         Route::post('notifications/{id}/read', [OwnerNotificationController::class, 'markRead'])->name('api.v1.owner.notifications.read');
         Route::post('notifications/mark-all-read', [OwnerNotificationController::class, 'markAllRead'])->name('api.v1.owner.notifications.mark-all-read');
 

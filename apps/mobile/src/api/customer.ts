@@ -1,5 +1,5 @@
-import { ApiClient } from './client';
-import {
+import { ApiClient } from './client.ts';
+import type {
     ApiResponse,
     CustomerProfile,
     MobileSessionToken,
@@ -14,7 +14,7 @@ import {
     PropertyCard,
     Reservation,
     StayQuoteResponse,
-} from './types';
+} from './types.ts';
 
 export const CustomerApi = {
     // Profile
@@ -36,10 +36,10 @@ export const CustomerApi = {
         ),
     getTokens: () =>
         ApiClient.get<ApiResponse<MobileSessionToken[]>>(
-            'customer/auth/tokens',
+            'auth/customer/tokens',
         ),
     revokeAllTokens: () =>
-        ApiClient.post<ApiResponse<null>>('customer/auth/tokens/revoke-all'),
+        ApiClient.post<ApiResponse<null>>('auth/customer/revoke-all'),
 
     // Reservations
     getReservations: (
@@ -238,9 +238,6 @@ export const CustomerApi = {
         push_operational?: boolean;
         sms_operational?: boolean;
         whatsapp_opted_in?: boolean;
-        email_marketing?: boolean;
-        sms_marketing?: boolean;
-        push_marketing?: boolean;
     }) =>
         ApiClient.put<ApiResponse<NotificationPreferences>>(
             'customer/notifications/preferences',

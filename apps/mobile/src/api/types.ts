@@ -1,6 +1,6 @@
-import { CanonicalCategorySlug } from '../constants/categories';
+import type { CanonicalCategorySlug } from '../constants/categories.ts';
 
-export * from '../constants/categories';
+export * from '../constants/categories.ts';
 
 export interface ApiResponse<T> {
     success: boolean;
@@ -607,15 +607,12 @@ export interface NotificationPreferences {
     push_operational?: boolean;
     sms_operational?: boolean;
     whatsapp_opted_in?: boolean;
-    email_marketing?: boolean;
-    sms_marketing?: boolean;
-    push_marketing?: boolean;
-    channels?: {
-        in_app?: { enabled: boolean };
-        email?: { enabled: boolean };
-        push?: { enabled: boolean };
-        sms?: { enabled: boolean };
-        whatsapp?: { enabled: boolean };
+    channels_available?: {
+        in_app: boolean;
+        email: boolean;
+        push: boolean;
+        sms: boolean;
+        whatsapp: boolean;
     };
 }
 

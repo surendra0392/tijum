@@ -1,5 +1,5 @@
 import { CustomerApi } from '../api/customer.ts';
-import { PaymentOrderPayload, Reservation } from '../api/types.ts';
+import type { PaymentOrderPayload, Reservation } from '../api/types.ts';
 
 export interface NativeRazorpayModule {
     open(options: Record<string, unknown>): Promise<RazorpaySignatureResponse>;

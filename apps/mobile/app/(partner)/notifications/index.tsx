@@ -69,7 +69,7 @@ export default function PartnerNotificationsScreen() {
             const d = res?.data;
             if (d) {
                 setPushActive(
-                    d.push_operational ?? d.channels?.push?.enabled ?? true,
+                    d.push_operational ?? d.channels_available?.push ?? true,
                 );
             }
         } catch {

@@ -16,7 +16,14 @@
         "ios": {
             "supportsTablet": false,
             "bundleIdentifier": "com.tijum.app",
-            "associatedDomains": ["applinks:tijum.com"]
+            "buildNumber": "3",
+            "associatedDomains": ["applinks:tijum.com"],
+            "infoPlist": {
+                "ITSAppUsesNonExemptEncryption": false,
+                "NSCameraUsageDescription": "TIJUM requires camera access so accommodation partners and guests can capture property photographs, verification documents, and support case evidence.",
+                "NSPhotoLibraryUsageDescription": "TIJUM requires photo library access so you can upload property gallery photographs, verification documents, and support case attachments.",
+                "NSLocationWhenInUseUsageDescription": "TIJUM uses your location while using the app to show nearby verified hostels, PGs, homestays, and co-living spaces."
+            }
         },
         "android": {
             "adaptiveIcon": {
@@ -39,6 +46,26 @@
                             "scheme": "https",
                             "host": "tijum.com",
                             "pathPrefix": "/reservations"
+                        },
+                        {
+                            "scheme": "https",
+                            "host": "tijum.com",
+                            "pathPrefix": "/owner"
+                        },
+                        {
+                            "scheme": "https",
+                            "host": "tijum.com",
+                            "pathPrefix": "/customer"
+                        },
+                        {
+                            "scheme": "https",
+                            "host": "tijum.com",
+                            "pathPrefix": "/help"
+                        },
+                        {
+                            "scheme": "https",
+                            "host": "tijum.com",
+                            "pathPrefix": "/legal"
                         }
                     ],
                     "category": ["BROWSABLE", "DEFAULT"]
@@ -58,7 +85,15 @@
                     "icon": "./assets/notification-icon.png",
                     "color": "#FF7A67"
                 }
-            ]
+            ],
+            [
+                "expo-image-picker",
+                {
+                    "photosPermission": "TIJUM requires photo library access so you can upload property gallery photographs, verification documents, and support case attachments.",
+                    "cameraPermission": "TIJUM requires camera access so accommodation partners and guests can capture property photographs, verification documents, and support case evidence."
+                }
+            ],
+            "./plugins/withRazorpayConfig.cjs"
         ],
         "extra": {
             "eas": {

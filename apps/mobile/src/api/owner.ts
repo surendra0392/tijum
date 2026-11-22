@@ -6,6 +6,7 @@ import {
     FinancialSummaryData,
     MobileSessionToken,
     NotificationItem,
+    NotificationPreferences,
     OwnerCase,
     OwnerCommissionAgreement,
     OwnerFinancialProfile,
@@ -38,9 +39,9 @@ export const OwnerApi = {
         password_confirmation: string;
     }) => ApiClient.put<ApiResponse<null>>('owner/password', data),
     getTokens: () =>
-        ApiClient.get<ApiResponse<MobileSessionToken[]>>('owner/auth/tokens'),
+        ApiClient.get<ApiResponse<MobileSessionToken[]>>('auth/owner/tokens'),
     revokeAllTokens: () =>
-        ApiClient.post<ApiResponse<null>>('owner/auth/tokens/revoke-all'),
+        ApiClient.post<ApiResponse<null>>('auth/owner/revoke-all'),
 
     // Dashboard
     getDashboard: () =>
@@ -468,12 +469,12 @@ export const OwnerApi = {
     markAllRead: () =>
         ApiClient.post<ApiResponse<null>>('owner/notifications/mark-all-read'),
     getNotificationPreferences: () =>
-        ApiClient.get<ApiResponse<any>>(
-            'owner/notification-preferences',
+        ApiClient.get<ApiResponse<NotificationPreferences>>(
+            'owner/notifications/preferences',
         ),
     updateNotificationPreferences: (prefs: Record<string, boolean>) =>
-        ApiClient.put<ApiResponse<any>>(
-            'owner/notification-preferences',
+        ApiClient.put<ApiResponse<NotificationPreferences>>(
+            'owner/notifications/preferences',
             prefs,
         ),
 

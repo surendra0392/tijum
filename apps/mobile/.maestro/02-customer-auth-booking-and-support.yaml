@@ -1,0 +1,16 @@
+appId: com.tijum.app
+name: "02 - Customer Authentication, Bookings, Rewards, Profile & Support"
+---
+- launchApp
+- tapOn:
+    text: "Profile"
+    optional: true
+- tapOn:
+    text: "Sign In"
+    optional: true
+- assertVisible: "Welcome Back"
+- tapOn: "Create Customer Account"
+- assertVisible: "Create Customer Account"
+- navigateBack
+- tapOn: "Partner Portal →"
+- assertVisible: "Partner Sign In"

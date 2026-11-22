@@ -60,13 +60,15 @@ class ProcessWebhookEvent
 
         if (in_array($eventType, [...self::ROUTE_TRANSFER_EVENTS, ...self::REFUND_EVENTS, ...self::PAYMENT_EVENTS], true)) {
             $event = $this->storeRecoverableEvent($payload, $eventId, $eventType);
+            $status = match (true) {
+                in_array($eventType, self::REFUND_EVENTS, true) => $this->replayRefund($event),
+                in_array($eventType, self::PAYMENT_EVENTS, true) => $this->replayPayment($event),
+                default => $this->replayTransfer($event),
+            };
 
             return [
-                'status' => match (true) {
-                    in_array($eventType, self::REFUND_EVENTS, true) => $this->replayRefund($event),
-                    in_array($eventType, self::PAYMENT_EVENTS, true) => $this->replayPayment($event),
-                    default => $this->replayTransfer($event),
-                },
+                'status' => $status,
+                ...($status === 'ignored' ? ['message' => 'Event already processed.'] : []),
                 'event_id' => $eventId,
                 'event_type' => $eventType,
             ];
