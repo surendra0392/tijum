@@ -5,12 +5,37 @@
 
 const MAX_DEEP_LINK_LENGTH = 2048;
 const ALLOWED_SCHEMES = ['tijum:', 'https:'];
-const ALLOWED_HOSTS = ['tijum.com', 'staging.tijum.com'];
+const ALLOWED_HOSTS = ['tijum.com', 'www.tijum.com', 'staging.tijum.com'];
 
 export interface SanitizedLinkResult {
     isValid: boolean;
     sanitizedUrl: string | null;
     rejectionReason?: string;
+}
+
+export function hasTraversalOrControlChars(input: string): boolean {
+    let candidate = input;
+    for (let pass = 0; pass < 3; pass += 1) {
+        for (let index = 0; index < candidate.length; index += 1) {
+            const code = candidate.charCodeAt(index);
+            if (code < 32 || code === 127) {
+                return true;
+            }
+        }
+        if (candidate.includes('..') || candidate.includes('\\')) {
+            return true;
+        }
+        try {
+            const decoded = decodeURIComponent(candidate);
+            if (decoded === candidate) {
+                break;
+            }
+            candidate = decoded;
+        } catch {
+            return true;
+        }
+    }
+    return candidate.includes('..') || candidate.includes('\\');
 }
 
 /**
@@ -40,9 +65,9 @@ export function sanitizeDeepLink(
 
     // 2. Enforce scheme validation
     try {
-        // Check custom scheme tijum://
-        if (trimmed.startsWith('tijum://')) {
-            // Validate path and params
+        const lower = trimmed.toLowerCase();
+        // Check custom scheme tijum:// (case-insensitive)
+        if (lower.startsWith('tijum://')) {
             const afterScheme = trimmed.slice(8);
             // Check for excessive repetitive percent-encoded sequences (e.g. %25%25%25 or malformed runs)
             if (/(?:%[0-9a-fA-F]{2}){100,}/.test(afterScheme)) {
@@ -53,12 +78,20 @@ export function sanitizeDeepLink(
                         'Excessive percent-encoded sequence detected (ReDoS prevention)',
                 };
             }
-            return { isValid: true, sanitizedUrl: trimmed };
+            const parsedCustom = new URL(`tijum://${afterScheme}`);
+            if (hasTraversalOrControlChars(parsedCustom.pathname)) {
+                return {
+                    isValid: false,
+                    sanitizedUrl: null,
+                    rejectionReason: 'Path traversal or control character blocked',
+                };
+            }
+            return { isValid: true, sanitizedUrl: `tijum://${afterScheme}` };
         }
 
         // Check https:// scheme
         const parsed = new URL(trimmed);
-        if (!ALLOWED_SCHEMES.includes(parsed.protocol)) {
+        if (!ALLOWED_SCHEMES.includes(parsed.protocol.toLowerCase())) {
             return {
                 isValid: false,
                 sanitizedUrl: null,
@@ -67,7 +100,7 @@ export function sanitizeDeepLink(
         }
 
         if (
-            parsed.protocol === 'https:' &&
+            parsed.protocol.toLowerCase() === 'https:' &&
             !ALLOWED_HOSTS.includes(parsed.hostname.toLowerCase())
         ) {
             return {
@@ -84,6 +117,14 @@ export function sanitizeDeepLink(
                 sanitizedUrl: null,
                 rejectionReason:
                     'Excessive percent-encoded parameter sequence (ReDoS prevention)',
+            };
+        }
+
+        if (hasTraversalOrControlChars(parsed.pathname)) {
+            return {
+                isValid: false,
+                sanitizedUrl: null,
+                rejectionReason: 'Path traversal or control character blocked',
             };
         }
 

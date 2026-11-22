@@ -3,6 +3,8 @@ import {
     AmenityCatalogCategory,
     ApiResponse,
     CaseMessage,
+    FinancialSummaryData,
+    MobileSessionToken,
     NotificationItem,
     OwnerCase,
     OwnerCommissionAgreement,
@@ -17,6 +19,8 @@ import {
     PropertyDetail,
     PropertyMediaItem,
     PropertyPricingData,
+    PropertyVerificationDocumentItem,
+    PropertyVerificationDocumentsResponse,
     PropertyVerificationEvaluation,
     Reservation,
     RoomType,
@@ -33,6 +37,10 @@ export const OwnerApi = {
         password: string;
         password_confirmation: string;
     }) => ApiClient.put<ApiResponse<null>>('owner/password', data),
+    getTokens: () =>
+        ApiClient.get<ApiResponse<MobileSessionToken[]>>('owner/auth/tokens'),
+    revokeAllTokens: () =>
+        ApiClient.post<ApiResponse<null>>('owner/auth/tokens/revoke-all'),
 
     // Dashboard
     getDashboard: () =>
@@ -92,6 +100,19 @@ export const OwnerApi = {
     getVerificationStatus: (id: number) =>
         ApiClient.get<ApiResponse<PropertyVerificationEvaluation>>(
             `owner/properties/${id}/verification-status`,
+        ),
+    getPropertyDocuments: (propertyId: number) =>
+        ApiClient.get<ApiResponse<PropertyVerificationDocumentsResponse>>(
+            `owner/properties/${propertyId}/documents`,
+        ),
+    uploadPropertyDocument: (propertyId: number, formData: FormData) =>
+        ApiClient.postFormData<ApiResponse<PropertyVerificationDocumentItem>>(
+            `owner/properties/${propertyId}/documents`,
+            formData,
+        ),
+    deletePropertyDocument: (propertyId: number, docId: number) =>
+        ApiClient.delete<ApiResponse<null>>(
+            `owner/properties/${propertyId}/documents/${docId}`,
         ),
 
     // Room Types
@@ -186,13 +207,13 @@ export const OwnerApi = {
         propertyId: number,
         roomId: number,
         operationalStatus: string,
-        description?: string,
+        internalDescription?: string,
     ) =>
         ApiClient.patch<ApiResponse<any>>(
             `owner/properties/${propertyId}/rooms/${roomId}/status`,
             {
                 operational_status: operationalStatus,
-                description,
+                internal_description: internalDescription,
             },
         ),
 
@@ -258,7 +279,7 @@ export const OwnerApi = {
             `owner/properties/${propertyId}/media`,
         ),
     uploadMedia: (propertyId: number, formData: FormData) =>
-        ApiClient.post<ApiResponse<PropertyMediaItem>>(
+        ApiClient.postFormData<ApiResponse<PropertyMediaItem>>(
             `owner/properties/${propertyId}/media`,
             formData,
         ),
@@ -353,11 +374,16 @@ export const OwnerApi = {
 
     // Financial & Settlements
     getFinancialSummary: () =>
-        ApiClient.get<ApiResponse<any>>('owner/financial/summary'),
+        ApiClient.get<ApiResponse<FinancialSummaryData>>(
+            'owner/financial/summary',
+        ),
     getSettlements: (page: number = 1) =>
-        ApiClient.get<ApiResponse<any[]>>('owner/financial/settlements', {
-            page,
-        }),
+        ApiClient.get<ApiResponse<SettlementDetail[]>>(
+            'owner/financial/settlements',
+            {
+                page,
+            },
+        ),
     getSettlement: (reference: string) =>
         ApiClient.get<ApiResponse<SettlementDetail>>(
             `owner/settlements/${reference}`,
@@ -369,13 +395,21 @@ export const OwnerApi = {
     updateFinancialProfile: (data: {
         legal_business_name?: string;
         business_constitution?: string;
+        pan_number?: string;
         pan?: string;
-        gstin?: string;
+        gst_registered?: boolean;
+        gstin?: string | null;
+        supplier_legal_classification?: string;
+        bank_beneficiary_name?: string;
+        bank_account_holder_name?: string;
         bank_account_number?: string;
         bank_ifsc?: string;
         bank_name?: string;
-        bank_account_holder_name?: string;
-    }) => ApiClient.put<ApiResponse<any>>('owner/financial-profile', data),
+    }) =>
+        ApiClient.put<ApiResponse<OwnerFinancialProfile>>(
+            'owner/financial-profile',
+            data,
+        ),
     getCommissionAgreements: () =>
         ApiClient.get<ApiResponse<OwnerCommissionAgreement[]>>(
             'owner/commission-agreements',
@@ -390,11 +424,16 @@ export const OwnerApi = {
         ApiClient.get<ApiResponse<OwnerCase[]>>('owner/cases', params),
     getCase: (reference: string) =>
         ApiClient.get<ApiResponse<OwnerCase>>(`owner/cases/${reference}`),
-    addCaseMessage: (reference: string, message: string) =>
-        ApiClient.post<ApiResponse<CaseMessage>>(
-            `owner/cases/${reference}/messages`,
-            { message },
-        ),
+    addCaseMessage: (reference: string, payload: string | FormData) =>
+        typeof FormData !== 'undefined' && payload instanceof FormData
+            ? ApiClient.postFormData<ApiResponse<CaseMessage>>(
+                  `owner/cases/${reference}/messages`,
+                  payload,
+              )
+            : ApiClient.post<ApiResponse<CaseMessage>>(
+                  `owner/cases/${reference}/messages`,
+                  { message: payload },
+              ),
 
     // Notifications
     getNotifications: (page: number = 1) =>

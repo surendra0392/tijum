@@ -2,6 +2,7 @@ import { ApiClient } from './client';
 import {
     ApiResponse,
     CustomerProfile,
+    MobileSessionToken,
     NotificationItem,
     NotificationPreferences,
     CustomerCaseSummary,
@@ -33,6 +34,12 @@ export const CustomerApi = {
         ApiClient.post<ApiResponse<{ email_verified: boolean }>>(
             'customer/email/verification-notification',
         ),
+    getTokens: () =>
+        ApiClient.get<ApiResponse<MobileSessionToken[]>>(
+            'customer/auth/tokens',
+        ),
+    revokeAllTokens: () =>
+        ApiClient.post<ApiResponse<null>>('customer/auth/tokens/revoke-all'),
 
     // Reservations
     getReservations: (
@@ -83,12 +90,16 @@ export const CustomerApi = {
         coupon_code?: string;
         points_to_redeem?: number;
     }) =>
-        ApiClient.post<ApiResponse<Reservation>>('customer/reservations', {
-            ...data,
-            submission_token: data.submission_token,
-            guest_count: data.guest_count ?? data.quantity,
-            guest_composition: data.guest_composition ?? 'individuals',
-        }),
+        ApiClient.post<ApiResponse<Reservation>>(
+            'customer/reservations',
+            {
+                ...data,
+                submission_token: data.submission_token,
+                guest_count: data.guest_count ?? data.quantity,
+                guest_composition: data.guest_composition ?? 'individuals',
+            },
+            { idempotencyKey: data.submission_token },
+        ),
 
     getReservation: (reference: string) =>
         ApiClient.get<ApiResponse<Reservation>>(
@@ -118,6 +129,9 @@ export const CustomerApi = {
         ApiClient.post<ApiResponse<Reservation>>(
             `customer/reservations/${reference}/payment/verify`,
             data,
+            {
+                idempotencyKey: `pay_${reference}_${data.razorpay_payment_id}`,
+            },
         ),
 
     getPaymentStatus: (reference: string) =>
@@ -224,8 +238,11 @@ export const CustomerApi = {
         push_operational?: boolean;
         sms_operational?: boolean;
         whatsapp_opted_in?: boolean;
+        email_marketing?: boolean;
+        sms_marketing?: boolean;
+        push_marketing?: boolean;
     }) =>
-        ApiClient.put<ApiResponse<any>>(
+        ApiClient.put<ApiResponse<NotificationPreferences>>(
             'customer/notifications/preferences',
             data,
         ),
@@ -237,9 +254,16 @@ export const CustomerApi = {
         ApiClient.post<ApiResponse<any>>(`customer/wishlist/${propertyId}`),
     removeFromWishlist: (propertyId: number) =>
         ApiClient.delete<ApiResponse<any>>(`customer/wishlist/${propertyId}`),
-    toggleWishlist: (propertyId: number) =>
-        ApiClient.post<ApiResponse<any>>(
-            `customer/wishlist/${propertyId}/toggle`,
+    toggleWishlist: (
+        propertyId: number,
+    ): Promise<{ wishlisted: boolean; data?: any }> =>
+        ApiClient.post<any>(`customer/wishlist/${propertyId}/toggle`).then(
+            (res) => ({
+                wishlisted: Boolean(
+                    res?.data?.wishlisted ?? res?.wishlisted ?? false,
+                ),
+                data: res?.data,
+            }),
         ),
 
     // Push Device Registration

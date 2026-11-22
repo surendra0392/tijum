@@ -45,8 +45,13 @@ export function NotificationNavigationHandler() {
                 principalType,
             );
 
-            if (validation.targetRoute) {
+            if (validation.allowed && validation.targetRoute) {
                 router.push(validation.targetRoute as never);
+            } else {
+                console.warn(
+                    '[NotificationNavigationHandler] Blocked notification deep link:',
+                    validation.reason,
+                );
             }
         };
 

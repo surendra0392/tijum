@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { ApiClient, setUnauthorizedHandler } from '../api/client';
 import { ApiResponse, CustomerProfile, OwnerProfile } from '../api/types';
 import {
@@ -31,6 +31,12 @@ interface AuthContextType {
     user?: CustomerProfile | null;
     owner?: OwnerProfile | null;
     isLoading: boolean;
+    sessionEpoch: number;
+    authNotice: string | null;
+    clearAuthNotice: () => void;
+    pendingRedirect: string | null;
+    setPendingRedirect: (route: string | null) => void;
+    consumePendingRedirect: () => string | null;
     loginCustomer: (
         email: string,
         password: string,
@@ -44,6 +50,7 @@ interface AuthContextType {
         terms_accepted: boolean;
         consent_version?: string;
         marketing_consent?: boolean;
+        referral_code?: string;
     }) => Promise<void>;
     loginPartner: (email: string, password: string) => Promise<void>;
     registerPartner: (data: {
@@ -78,6 +85,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
     const [partnerUser, setPartnerUser] = useState<OwnerProfile | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [sessionEpoch, setSessionEpoch] = useState<number>(0);
+    const [authNotice, setAuthNotice] = useState<string | null>(null);
+    const [pendingRedirectState, setPendingRedirectState] = useState<
+        string | null
+    >(null);
+    const pendingRedirectRef = useRef<string | null>(null);
+
+    const setPendingRedirect = (route: string | null) => {
+        pendingRedirectRef.current = route;
+        setPendingRedirectState(route);
+    };
+
+    const consumePendingRedirect = (): string | null => {
+        const nextRoute = pendingRedirectRef.current;
+        pendingRedirectRef.current = null;
+        setPendingRedirectState(null);
+        return nextRoute;
+    };
+
+    const clearAuthNotice = () => setAuthNotice(null);
 
     useEffect(() => {
         void restoreAndVerifySession();
@@ -89,6 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setPrincipalType(null);
             setCustomerUser(null);
             setPartnerUser(null);
+            setSessionEpoch((prev) => prev + 1);
             setAuthState('session_expired');
         });
 
@@ -157,9 +185,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
             }
         } catch (err: any) {
-            // Only clear session if server explicitly rejects token with 401 Unauthenticated
+            // Clear session if server explicitly rejects token with 401 or suspended/invalid 403
             if (
                 err?.status === 401 ||
+                err?.status === 403 ||
                 err?.errorCode === 'UNAUTHENTICATED' ||
                 err?.message?.includes('Unauthenticated')
             ) {
@@ -168,7 +197,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setPrincipalType(null);
                 setCustomerUser(null);
                 setPartnerUser(null);
-                setAuthState('session_expired');
+                setSessionEpoch((prev) => prev + 1);
+                if (err?.status === 403) {
+                    setAuthNotice(
+                        err?.message ||
+                            'Account access restricted or session invalidated. Please sign in again.',
+                    );
+                    setAuthState('guest');
+                } else {
+                    setAuthState('session_expired');
+                }
             } else if (currentSession) {
                 // Network failure or temporary server timeout: keep the token and
                 // principal so requests can resume, but do not invent an identity.
@@ -195,7 +233,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const reconcilePendingRevocations = async () => {
         try {
             await reconcilePendingRevocationQueue((endpoint, options) =>
-                ApiClient.request(endpoint, options),
+                ApiClient.request(endpoint, {
+                    ...options,
+                    skipAuthInterceptor: true,
+                }),
             );
         } catch {
             // Ignored
@@ -252,12 +293,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setPrincipalType('customer');
             setCustomerUser(res.data.user);
             setPartnerUser(null);
+            setAuthNotice(null);
+            setSessionEpoch((prev) => prev + 1);
             setAuthState('customer_authenticated');
 
             // Register device for push alerts under this customer principal
             PushNotificationService.registerForPushNotifications(
                 'customer',
             ).catch(() => {});
+        } catch (err) {
+            setAuthState((prev) => (prev === 'logging_out' ? 'guest' : prev));
+            throw err;
         } finally {
             setIsLoading(false);
         }
@@ -274,6 +320,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         terms_accepted: boolean;
         consent_version?: string;
         marketing_consent?: boolean;
+        referral_code?: string;
     }) => {
         setIsLoading(true);
         try {
@@ -292,6 +339,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 terms_accepted: data.terms_accepted,
                 consent_version: data.consent_version ?? 'mobile-1.0',
                 marketing_consent: data.marketing_consent ?? false,
+                ...(data.referral_code?.trim()
+                    ? { referral_code: data.referral_code.trim() }
+                    : {}),
                 device_name: 'TIJUM Mobile App',
             });
 
@@ -317,11 +367,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setPrincipalType('customer');
             setCustomerUser(res.data.user);
             setPartnerUser(null);
+            setAuthNotice(null);
+            setSessionEpoch((prev) => prev + 1);
             setAuthState('customer_authenticated');
 
             PushNotificationService.registerForPushNotifications(
                 'customer',
             ).catch(() => {});
+        } catch (err) {
+            setAuthState((prev) => (prev === 'logging_out' ? 'guest' : prev));
+            throw err;
         } finally {
             setIsLoading(false);
         }
@@ -371,11 +426,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setPrincipalType('owner');
             setPartnerUser(res.data.owner);
             setCustomerUser(null);
+            setAuthNotice(null);
+            setSessionEpoch((prev) => prev + 1);
             setAuthState('owner_authenticated');
 
             PushNotificationService.registerForPushNotifications(
                 'partner',
             ).catch(() => {});
+        } catch (err) {
+            setAuthState((prev) => (prev === 'logging_out' ? 'guest' : prev));
+            throw err;
         } finally {
             setIsLoading(false);
         }
@@ -405,6 +465,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 await logoutInternal(false);
             }
 
+            const acceptedTerms = Boolean(data.terms ?? data.terms_accepted);
             const res = await ApiClient.post<
                 ApiResponse<{ token: string; owner: OwnerProfile }>
             >(
@@ -421,8 +482,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     location: data.location,
                     locality: data.locality,
                     description: data.description,
-                    terms: true,
-                    terms_accepted: true,
+                    terms: acceptedTerms,
+                    terms_accepted: acceptedTerms,
                     device_name: 'TIJUM Partner Mobile',
                 }),
             );
@@ -449,11 +510,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setPrincipalType('owner');
             setPartnerUser(res.data.owner);
             setCustomerUser(null);
+            setAuthNotice(null);
+            setSessionEpoch((prev) => prev + 1);
             setAuthState('owner_authenticated');
 
             PushNotificationService.registerForPushNotifications(
                 'partner',
             ).catch(() => {});
+        } catch (err) {
+            setAuthState((prev) => (prev === 'logging_out' ? 'guest' : prev));
+            throw err;
         } finally {
             setIsLoading(false);
         }
@@ -506,6 +572,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPrincipalType(null);
         setCustomerUser(null);
         setPartnerUser(null);
+        setSessionEpoch((prev) => prev + 1);
 
         if (transitionToGuest) {
             setAuthState('guest');
@@ -547,6 +614,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 user: customerUser,
                 owner: partnerUser,
                 isLoading,
+                sessionEpoch,
+                authNotice,
+                clearAuthNotice,
+                pendingRedirect: pendingRedirectState,
+                setPendingRedirect,
+                consumePendingRedirect,
                 loginCustomer,
                 registerCustomer,
                 loginPartner,

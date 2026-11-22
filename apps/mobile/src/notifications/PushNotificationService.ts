@@ -9,7 +9,6 @@ import { resolveDeepLinkPath } from '../utils/deepLinkRouting';
 // Configure notification presentation for foreground alerts
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
-        shouldShowAlert: true,
         shouldShowBanner: true,
         shouldShowList: true,
         shouldPlaySound: true,
@@ -18,6 +17,29 @@ Notifications.setNotificationHandler({
 });
 
 const PUSH_PROMPT_RECORD_KEY = 'tijum_push_prompt_history';
+const PUSH_REGISTRATION_STATE_KEY = 'tijum_push_registered_state';
+
+function getExpoConfigMetadata(): {
+    projectId?: string;
+    version: string;
+} {
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const constantsMod = require('expo-constants');
+        const constants = constantsMod?.default ?? constantsMod;
+        const expoConfig = constants?.expoConfig;
+        return {
+            projectId: expoConfig?.extra?.eas?.projectId,
+            version:
+                typeof expoConfig?.version === 'string' &&
+                expoConfig.version.trim() !== ''
+                    ? expoConfig.version
+                    : '1.0.0',
+        };
+    } catch {
+        return { version: '1.0.0' };
+    }
+}
 
 export interface DeepLinkValidationResult {
     allowed: boolean;
@@ -171,9 +193,10 @@ export class PushNotificationService {
                 return null;
             }
 
-            const tokenData = await Notifications.getExpoPushTokenAsync().catch(
-                () => null,
-            );
+            const { projectId, version } = getExpoConfigMetadata();
+            const tokenData = await Notifications.getExpoPushTokenAsync(
+                projectId ? { projectId } : undefined,
+            ).catch(() => null);
             if (!tokenData || !tokenData.data) {
                 return null;
             }
@@ -188,7 +211,7 @@ export class PushNotificationService {
                     Platform.OS === 'ios'
                         ? ('ios' as const)
                         : ('android' as const),
-                app_version: '1.0.0',
+                app_version: version,
                 device_name: `${Platform.OS.toUpperCase()} Mobile Device`,
             };
 
@@ -197,6 +220,11 @@ export class PushNotificationService {
             } else {
                 await OwnerApi.registerDevice(payload);
             }
+
+            await SecureStore.setItemAsync(
+                PUSH_REGISTRATION_STATE_KEY,
+                JSON.stringify({ accountType, installationId }),
+            ).catch(() => {});
 
             return pushToken;
         } catch {
@@ -219,6 +247,10 @@ export class PushNotificationService {
             }
         } catch {
             // Ignore unregistration errors on logout
+        } finally {
+            await SecureStore.deleteItemAsync(
+                PUSH_REGISTRATION_STATE_KEY,
+            ).catch(() => {});
         }
     }
 
@@ -234,6 +266,7 @@ export class PushNotificationService {
                   action_url?: string;
                   booking_reference?: string;
                   case_reference?: string;
+                  ticket_reference?: string;
                   settlement_reference?: string;
                   data?: Record<string, unknown>;
               }
@@ -249,7 +282,15 @@ export class PushNotificationService {
                 ? `/(partner)/reservations/${rawPayload.booking_reference}`
                 : `/(customer)/bookings/${rawPayload.booking_reference}`;
         } else if (rawPayload?.case_reference) {
-            route = `/(customer)/support/${rawPayload.case_reference}`;
+            const isOwnerCase =
+                Boolean(rawPayload.action_url?.includes('/owner/')) ||
+                (currentPrincipalType === 'owner' &&
+                    !rawPayload.action_url?.includes('/my-support/'));
+            route = isOwnerCase
+                ? `/(partner)/cases/${rawPayload.case_reference}`
+                : `/(customer)/support/${rawPayload.case_reference}`;
+        } else if (rawPayload?.ticket_reference) {
+            route = `/(customer)/support/ticket/${rawPayload.ticket_reference}`;
         } else if (rawPayload?.settlement_reference) {
             route = `/(partner)/settlements/${rawPayload.settlement_reference}`;
         } else if (rawPayload?.route) {
@@ -268,6 +309,19 @@ export class PushNotificationService {
         }
 
         route = resolveDeepLinkPath(route);
+
+        // Public explore/property routes remain accessible to guests, customers, and partners
+        const isPublic =
+            route === '/' ||
+            route === '/help' ||
+            route.startsWith('/legal/') ||
+            route.startsWith('/(auth)/') ||
+            route === '/(customer)/explore' ||
+            route.startsWith('/(customer)/explore/property/');
+
+        if (isPublic) {
+            return { allowed: true, targetRoute: route };
+        }
 
         // Customer route verification
         if (route.startsWith('/(customer)')) {
@@ -290,17 +344,6 @@ export class PushNotificationService {
                     reason: 'Partner authentication required for this destination',
                 };
             }
-            return { allowed: true, targetRoute: route };
-        }
-
-        // Public / generic routes (e.g., search, property details, home)
-        const isPublic =
-            route === '/' ||
-            route === '/help' ||
-            route.startsWith('/legal/') ||
-            route.startsWith('/(auth)/');
-
-        if (isPublic) {
             return { allowed: true, targetRoute: route };
         }
 

@@ -39,8 +39,8 @@ declare module 'react-native-razorpay' {
     export default class RazorpayCheckout {
         static open(
             options: RazorpayCheckoutOptions,
-            successCallback: (data: RazorpaySuccessResponse) => void,
-            errorCallback: (error: RazorpayErrorResponse) => void,
-        ): void;
+            successCallback?: (data: RazorpaySuccessResponse) => void,
+            errorCallback?: (error: RazorpayErrorResponse) => void,
+        ): Promise<RazorpaySuccessResponse>;
     }
 }

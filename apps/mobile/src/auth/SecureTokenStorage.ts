@@ -20,19 +20,24 @@ export class StorageWriteError extends Error {
 
 const inMemoryStore: Record<string, string> = {};
 
-const webStorage: StorageEngine = {
+const isWebBrowserRuntime = (): boolean =>
+    typeof window !== 'undefined' &&
+    typeof document !== 'undefined' &&
+    typeof window.sessionStorage !== 'undefined';
+
+const ephemeralWebStorage: StorageEngine = {
     getItemAsync: async (key: string) => {
         try {
-            if (typeof window !== 'undefined' && window.localStorage) {
-                return window.localStorage.getItem(key);
+            if (isWebBrowserRuntime()) {
+                return window.sessionStorage.getItem(key);
             }
         } catch {}
         return inMemoryStore[key] ?? null;
     },
     setItemAsync: async (key: string, value: string) => {
         try {
-            if (typeof window !== 'undefined' && window.localStorage) {
-                window.localStorage.setItem(key, value);
+            if (isWebBrowserRuntime()) {
+                window.sessionStorage.setItem(key, value);
                 return;
             }
         } catch {}
@@ -40,54 +45,73 @@ const webStorage: StorageEngine = {
     },
     deleteItemAsync: async (key: string) => {
         try {
-            if (typeof window !== 'undefined' && window.localStorage) {
-                window.localStorage.removeItem(key);
-                return;
+            if (isWebBrowserRuntime()) {
+                window.sessionStorage.removeItem(key);
+                window.localStorage?.removeItem?.(key);
             }
         } catch {}
         delete inMemoryStore[key];
     },
 };
 
+const nodeFallbackStorage: StorageEngine = {
+    getItemAsync: async (key: string) => inMemoryStore[key] ?? null,
+    setItemAsync: async (key: string, value: string) => {
+        inMemoryStore[key] = value;
+    },
+    deleteItemAsync: async (key: string) => {
+        delete inMemoryStore[key];
+    },
+};
+
+const failClosedStorage: StorageEngine = {
+    getItemAsync: async () => null,
+    setItemAsync: async () => {
+        throw new StorageWriteError(
+            'Secure native storage is unavailable on this device.',
+        );
+    },
+    deleteItemAsync: async () => {},
+};
+
 let nativeSecureStore: StorageEngine;
-try {
-    if (
-        typeof window !== 'undefined' &&
-        typeof window.localStorage !== 'undefined'
-    ) {
-        nativeSecureStore = webStorage;
-    } else {
+if (isWebBrowserRuntime()) {
+    nativeSecureStore = ephemeralWebStorage;
+} else {
+    try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const secureStore = require('expo-secure-store');
-        nativeSecureStore = {
-            getItemAsync: async (key: string) => {
-                try {
-                    return await secureStore.getItemAsync(key);
-                } catch {
-                    return webStorage.getItemAsync(key);
-                }
-            },
-            setItemAsync: async (key: string, value: string) => {
-                try {
-                    await secureStore.setItemAsync(key, value);
-                } catch {
-                    await webStorage.setItemAsync(key, value);
-                }
-            },
-            deleteItemAsync: async (key: string) => {
-                try {
-                    await secureStore.deleteItemAsync(key);
-                } catch {
-                    await webStorage.deleteItemAsync(key);
-                }
-            },
-        };
+        if (
+            secureStore &&
+            typeof secureStore.getItemAsync === 'function' &&
+            typeof secureStore.setItemAsync === 'function' &&
+            typeof secureStore.deleteItemAsync === 'function'
+        ) {
+            nativeSecureStore = {
+                getItemAsync: (key: string) => secureStore.getItemAsync(key),
+                setItemAsync: (key: string, value: string) =>
+                    secureStore.setItemAsync(key, value),
+                deleteItemAsync: (key: string) =>
+                    secureStore.deleteItemAsync(key),
+            };
+        } else {
+            nativeSecureStore =
+                typeof process !== 'undefined' && process.env?.NODE_ENV === 'test'
+                    ? nodeFallbackStorage
+                    : failClosedStorage;
+        }
+    } catch {
+        nativeSecureStore =
+            typeof process !== 'undefined' && process.env?.NODE_ENV === 'test'
+                ? nodeFallbackStorage
+                : failClosedStorage;
     }
-} catch {
-    nativeSecureStore = webStorage;
 }
 
 let activeStorage: StorageEngine = nativeSecureStore;
+
+export const MAX_REVOCATION_QUEUE_ITEMS = 16;
+export const MAX_REVOCATION_QUEUE_BYTES = 1900;
 
 /**
  * Single Active Session Keys
@@ -202,60 +226,38 @@ export class SecureTokenStorage {
             ]);
         } catch (err) {
             console.warn(
-                '[SecureTokenStorage] SecureStore write failure in setActiveSession, saving to fallback:',
+                '[SecureTokenStorage] SecureStore write failure in setActiveSession.',
+            );
+            throw new StorageWriteError(
+                'Failed to persist active session securely in SecureStore',
                 err,
             );
-            try {
-                await Promise.all([
-                    webStorage.setItemAsync(ACTIVE_SESSION_TOKEN_KEY, token),
-                    webStorage.setItemAsync(
-                        ACTIVE_PRINCIPAL_TYPE_KEY,
-                        principalType,
-                    ),
-                    webStorage.setItemAsync(
-                        ACTIVE_DEVICE_SESSION_ID_KEY,
-                        deviceSessionId,
-                    ),
-                ]);
-            } catch {
-                inMemoryStore[ACTIVE_SESSION_TOKEN_KEY] = token;
-                inMemoryStore[ACTIVE_PRINCIPAL_TYPE_KEY] = principalType;
-                inMemoryStore[ACTIVE_DEVICE_SESSION_ID_KEY] = deviceSessionId;
-            }
         }
     }
 
     /**
      * Clear active session upon logout or session expiration.
-     * Resilient to delete failures: warns but guarantees local completion.
+     * Resilient to delete failures: warns and purges all storage tiers unconditionally.
      */
     static async clearActiveSession(): Promise<void> {
+        const sessionKeys = [
+            ACTIVE_SESSION_TOKEN_KEY,
+            ACTIVE_PRINCIPAL_TYPE_KEY,
+            ACTIVE_DEVICE_SESSION_ID_KEY,
+        ];
         try {
             await Promise.all([
-                activeStorage
-                    .deleteItemAsync(ACTIVE_SESSION_TOKEN_KEY)
-                    .catch((e) => {
+                ...sessionKeys.map((key) =>
+                    activeStorage.deleteItemAsync(key).catch((e) => {
                         console.warn(
-                            '[SecureTokenStorage] Delete failure for active session token:',
+                            `[SecureTokenStorage] Delete failure for ${key}:`,
                             e,
                         );
                     }),
-                activeStorage
-                    .deleteItemAsync(ACTIVE_PRINCIPAL_TYPE_KEY)
-                    .catch((e) => {
-                        console.warn(
-                            '[SecureTokenStorage] Delete failure for principal type:',
-                            e,
-                        );
-                    }),
-                activeStorage
-                    .deleteItemAsync(ACTIVE_DEVICE_SESSION_ID_KEY)
-                    .catch((e) => {
-                        console.warn(
-                            '[SecureTokenStorage] Delete failure for device session ID:',
-                            e,
-                        );
-                    }),
+                ),
+                ...sessionKeys.map((key) =>
+                    ephemeralWebStorage.deleteItemAsync(key).catch(() => {}),
+                ),
                 this.cleanupLegacySlots(),
             ]);
         } catch (err) {
@@ -263,6 +265,10 @@ export class SecureTokenStorage {
                 '[SecureTokenStorage] Error during clearActiveSession:',
                 err,
             );
+        } finally {
+            sessionKeys.forEach((key) => {
+                delete inMemoryStore[key];
+            });
         }
     }
 
@@ -306,8 +312,7 @@ export class SecureTokenStorage {
                             } else {
                                 healed = true;
                                 console.warn(
-                                    '[SecureTokenStorage] Self-healing: dropping corrupted queue entry:',
-                                    item,
+                                    '[SecureTokenStorage] Self-healing: dropping corrupted queue entry.',
                                 );
                             }
                         }
@@ -409,6 +414,14 @@ export class SecureTokenStorage {
                         recordedAt: Date.now(),
                         retryCount: 0,
                     });
+                    while (
+                        filtered.length > MAX_REVOCATION_QUEUE_ITEMS ||
+                        (filtered.length > 1 &&
+                            JSON.stringify(filtered).length >
+                                MAX_REVOCATION_QUEUE_BYTES)
+                    ) {
+                        filtered.shift();
+                    }
                     await activeStorage.setItemAsync(
                         PENDING_REVOCATIONS_QUEUE_KEY,
                         JSON.stringify(filtered),
@@ -555,12 +568,28 @@ export class SecureTokenStorage {
      * Remove old legacy multi-slot token keys to prevent dormant token attacks.
      */
     private static async cleanupLegacySlots(): Promise<void> {
+        const legacyKeys = [
+            LEGACY_TOKEN_KEY,
+            LEGACY_ACCOUNT_TYPE_KEY,
+            ACTIVE_SESSION_TOKEN_KEY,
+            ACTIVE_PRINCIPAL_TYPE_KEY,
+            ACTIVE_DEVICE_SESSION_ID_KEY,
+        ];
         try {
             await Promise.all([
                 activeStorage.deleteItemAsync(LEGACY_TOKEN_KEY).catch(() => {}),
                 activeStorage
                     .deleteItemAsync(LEGACY_ACCOUNT_TYPE_KEY)
                     .catch(() => {}),
+                ...(isWebBrowserRuntime()
+                    ? legacyKeys.map((key) =>
+                          Promise.resolve().then(() => {
+                              try {
+                                  window.localStorage?.removeItem?.(key);
+                              } catch {}
+                          }),
+                      )
+                    : []),
             ]);
         } catch {
             // Ignored

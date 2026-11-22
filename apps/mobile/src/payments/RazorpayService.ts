@@ -1,15 +1,34 @@
-import { CustomerApi } from '../api/customer';
-import { PaymentOrderPayload, Reservation } from '../api/types';
+import { CustomerApi } from '../api/customer.ts';
+import { PaymentOrderPayload, Reservation } from '../api/types.ts';
 
-// Safe dynamic loader for native Razorpay SDK supporting New Architecture TurboModule
-let NativeRazorpay: any = null;
-try {
-    const RZ = require('react-native-razorpay');
-    NativeRazorpay = RZ.default || RZ;
-} catch {
-    // Graceful fallback when running in non-native or test environments
-    NativeRazorpay = null;
+export interface NativeRazorpayModule {
+    open(options: Record<string, unknown>): Promise<RazorpaySignatureResponse>;
 }
+
+function resolveNativeRazorpayModule(): NativeRazorpayModule | null {
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const RN = require('react-native');
+        if (RN?.Platform?.OS === 'web') {
+            return null;
+        }
+        const hasNativeBridge = Boolean(
+            RN?.NativeModules?.RNRazorpayCheckout ||
+                RN?.TurboModuleRegistry?.get?.('RNRazorpayCheckout'),
+        );
+        if (!hasNativeBridge) {
+            return null;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const RZ = require('react-native-razorpay');
+        const mod = RZ?.default || RZ;
+        return mod && typeof mod.open === 'function' ? mod : null;
+    } catch {
+        return null;
+    }
+}
+
+let testNativeModuleOverride: NativeRazorpayModule | null | undefined;
 
 export interface PaymentCheckoutResult {
     success: boolean;
@@ -25,21 +44,65 @@ export interface RazorpaySignatureResponse {
     razorpay_signature: string;
 }
 
+export function classifyRazorpayError(
+    err: any,
+    platformOs?: string,
+): { cancelled: boolean; message: string } {
+    const code = typeof err?.code === 'number' ? err.code : undefined;
+    const rawDescription =
+        typeof err?.description === 'string' && err.description.trim() !== ''
+            ? err.description.trim()
+            : typeof err?.message === 'string' && err.message.trim() !== ''
+              ? err.message.trim()
+              : '';
+    const lowerDesc = rawDescription.toLowerCase();
+    const isCancelKeyword =
+        lowerDesc.includes('cancel') || lowerDesc.includes('dismissed');
+
+    // Android Razorpay SDK: code 2 = PAYMENT_CANCELLED; code 0 = NETWORK_ERROR.
+    // iOS Razorpay SDK may report code 0 with cancel description or code 2.
+    const isCancelled =
+        code === 2 ||
+        isCancelKeyword ||
+        (platformOs === 'ios' && code === 0 && !lowerDesc.includes('network'));
+
+    if (isCancelled) {
+        return {
+            cancelled: true,
+            message: 'Payment was cancelled by the user.',
+        };
+    }
+
+    return {
+        cancelled: false,
+        message:
+            rawDescription || 'Payment processing could not be completed.',
+    };
+}
+
 /**
- * Razorpay Payment Service (Phase 20A - Stabilized Native Module Integration).
- *
- * NOTE: Live payment verification is explicitly DEFERRED pending production merchant credentials.
- * This service provides compile-time verification, native TurboModule linking, and safe error boundaries
- * without invoking live monetary transactions.
+ * Razorpay native payment checkout wrapper and server-verified reconciliation service.
  */
 export class RazorpayPaymentService {
+    static setNativeModuleForTesting(
+        module: NativeRazorpayModule | null | undefined,
+    ): void {
+        testNativeModuleOverride = module;
+    }
+
+    private static getNativeModule(): NativeRazorpayModule | null {
+        if (testNativeModuleOverride !== undefined) {
+            return testNativeModuleOverride;
+        }
+        return resolveNativeRazorpayModule();
+    }
+
     /**
-     * Check whether native Razorpay module is linked and available at runtime.
+     * Check whether the native Razorpay module is linked and available at runtime.
      */
     static isAvailable(): boolean {
-        return Boolean(
-            NativeRazorpay && typeof NativeRazorpay.open === 'function',
-        );
+        const mod = this.getNativeModule();
+        return Boolean(mod && typeof mod.open === 'function');
     }
 
     /**
@@ -49,9 +112,10 @@ export class RazorpayPaymentService {
         payload: PaymentOrderPayload,
         customerDetails?: { name?: string; email?: string; phone?: string },
     ): Promise<RazorpaySignatureResponse> {
-        if (!this.isAvailable()) {
+        const nativeModule = this.getNativeModule();
+        if (!nativeModule || typeof nativeModule.open !== 'function') {
             throw new Error(
-                'Razorpay Native Checkout module is not available in this environment. Live payment confirmation is DEFERRED.',
+                'Native payment checkout is unavailable in this build. Use a native Android or iOS build to complete payment.',
             );
         }
 
@@ -77,19 +141,22 @@ export class RazorpayPaymentService {
             };
         }
 
-        return new Promise<RazorpaySignatureResponse>((resolve, reject) => {
-            NativeRazorpay.open(options)
-                .then((data: any) => {
-                    resolve({
-                        razorpay_order_id: data.razorpay_order_id,
-                        razorpay_payment_id: data.razorpay_payment_id,
-                        razorpay_signature: data.razorpay_signature,
-                    });
-                })
-                .catch((err: any) => {
-                    reject(err);
-                });
-        });
+        const data = await nativeModule.open(options);
+        if (
+            !data?.razorpay_order_id ||
+            !data?.razorpay_payment_id ||
+            !data?.razorpay_signature
+        ) {
+            throw new Error(
+                'Incomplete payment confirmation payload returned by checkout.',
+            );
+        }
+
+        return {
+            razorpay_order_id: data.razorpay_order_id,
+            razorpay_payment_id: data.razorpay_payment_id,
+            razorpay_signature: data.razorpay_signature,
+        };
     }
 
     /**
@@ -102,8 +169,25 @@ export class RazorpayPaymentService {
         bookingReference: string,
         customerDetails: { name: string; email: string; phone?: string },
     ): Promise<PaymentCheckoutResult> {
+        let platformOs: string | undefined;
         try {
-            // Step 1: Initiate payment order on backend
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            platformOs = require('react-native')?.Platform?.OS;
+        } catch {
+            platformOs = undefined;
+        }
+
+        try {
+            // Step 1: Check native availability before initiating order when on web/Expo Go
+            if (!this.isAvailable()) {
+                return {
+                    success: false,
+                    deferred: true,
+                    error: 'Native Razorpay checkout requires an Android or iOS development/release build (not Expo Go or Web).',
+                };
+            }
+
+            // Step 2: Initiate payment order on backend
             const initRes = await CustomerApi.initiatePayment(bookingReference);
             const payload = initRes.data;
 
@@ -114,22 +198,13 @@ export class RazorpayPaymentService {
                 };
             }
 
-            // Handle deferred / simulated gateway
-            if (!this.isAvailable()) {
-                return {
-                    success: false,
-                    deferred: true,
-                    error: 'Razorpay native payment is deferred. No live transactions are executed in Phase 20A.',
-                };
-            }
-
-            // Step 2: Open native checkout
+            // Step 3: Open native checkout
             const signatureData = await this.openCheckout(
                 payload,
                 customerDetails,
             );
 
-            // Step 3: Authoritative signature verification on backend
+            // Step 4: Authoritative signature verification on backend
             const verifyRes = await CustomerApi.verifyPayment(
                 bookingReference,
                 signatureData,
@@ -140,19 +215,18 @@ export class RazorpayPaymentService {
                 reservation: verifyRes.data,
             };
         } catch (err: any) {
-            if (err?.code === 0 || err?.description?.includes('cancelled')) {
+            const classified = classifyRazorpayError(err, platformOs);
+            if (classified.cancelled) {
                 return {
                     success: false,
                     cancelled: true,
-                    error: 'Payment was cancelled by the user.',
+                    error: classified.message,
                 };
             }
 
             return {
                 success: false,
-                error:
-                    err?.message ||
-                    'Payment processing could not be completed.',
+                error: classified.message,
             };
         }
     }

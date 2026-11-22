@@ -1,19 +1,26 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Home, Calendar, Headset, User } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../src/theme/colors';
 
+const HIDDEN_TAB_STYLE = { display: 'none' } as const;
+
 export default function CustomerTabsLayout() {
+    const insets = useSafeAreaInsets();
+    const bottomInset = Math.max(insets.bottom, 8);
+
     return (
         <Tabs
+            backBehavior="history"
             screenOptions={{
                 tabBarActiveTintColor: Colors.coral,
                 tabBarInactiveTintColor: Colors.gray400,
                 tabBarStyle: {
                     backgroundColor: Colors.white,
                     borderTopColor: Colors.gray200,
-                    height: 64,
-                    paddingBottom: 10,
+                    height: 54 + bottomInset,
+                    paddingBottom: bottomInset,
                     paddingTop: 6,
                 },
                 tabBarLabelStyle: {
@@ -75,6 +82,7 @@ export default function CustomerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -82,6 +90,7 @@ export default function CustomerTabsLayout() {
                 options={{
                     href: null,
                     headerTitle: 'Stay Details',
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -89,6 +98,7 @@ export default function CustomerTabsLayout() {
                 options={{
                     href: null,
                     headerTitle: 'Reservation Details',
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -96,13 +106,15 @@ export default function CustomerTabsLayout() {
                 options={{
                     href: null,
                     headerTitle: 'Confirm Booking',
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
                 name="support/[reference]"
                 options={{
                     href: null,
-                    headerTitle: 'Case Details & Timeline',
+                    headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -110,6 +122,7 @@ export default function CustomerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -117,6 +130,7 @@ export default function CustomerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -124,6 +138,7 @@ export default function CustomerTabsLayout() {
                 options={{
                     href: null,
                     headerTitle: 'Rewards & Points',
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -131,6 +146,7 @@ export default function CustomerTabsLayout() {
                 options={{
                     href: null,
                     headerTitle: 'Points Wallet',
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -138,6 +154,7 @@ export default function CustomerTabsLayout() {
                 options={{
                     href: null,
                     headerTitle: 'Refer & Earn',
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -145,6 +162,7 @@ export default function CustomerTabsLayout() {
                 options={{
                     href: null,
                     headerTitle: 'Available Coupons',
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -152,6 +170,7 @@ export default function CustomerTabsLayout() {
                 options={{
                     href: null,
                     headerTitle: 'Edit Profile',
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -159,6 +178,7 @@ export default function CustomerTabsLayout() {
                 options={{
                     href: null,
                     headerTitle: 'Account Security',
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -166,6 +186,7 @@ export default function CustomerTabsLayout() {
                 options={{
                     href: null,
                     headerTitle: 'My Reviews',
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -173,6 +194,7 @@ export default function CustomerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
         </Tabs>

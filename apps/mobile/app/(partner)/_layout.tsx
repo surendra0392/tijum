@@ -1,25 +1,33 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Home, Building2, ClipboardList, User } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../src/theme/colors';
 
+const HIDDEN_TAB_STYLE = { display: 'none' } as const;
+
 export default function PartnerTabsLayout() {
+    const insets = useSafeAreaInsets();
+    const bottomInset = Math.max(insets.bottom, 8);
+
     return (
         <Tabs
+            backBehavior="history"
             screenOptions={{
                 tabBarActiveTintColor: Colors.deepPlum,
                 tabBarInactiveTintColor: Colors.gray400,
                 tabBarStyle: {
                     backgroundColor: Colors.white,
                     borderTopColor: Colors.gray200,
-                    height: 64,
-                    paddingBottom: 10,
+                    height: 54 + bottomInset,
+                    paddingBottom: bottomInset,
                     paddingTop: 6,
                 },
                 tabBarLabelStyle: {
                     fontSize: 11,
                     fontWeight: '700',
                 },
+                tabBarHideOnKeyboard: true,
                 headerStyle: {
                     backgroundColor: Colors.white,
                 },
@@ -74,6 +82,7 @@ export default function PartnerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -81,6 +90,7 @@ export default function PartnerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -88,6 +98,7 @@ export default function PartnerTabsLayout() {
                 options={{
                     href: null,
                     headerTitle: 'Booking Review',
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -95,6 +106,7 @@ export default function PartnerTabsLayout() {
                 options={{
                     href: null,
                     headerTitle: 'Guest Reviews',
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -102,6 +114,7 @@ export default function PartnerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -109,6 +122,7 @@ export default function PartnerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -116,6 +130,7 @@ export default function PartnerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -123,6 +138,7 @@ export default function PartnerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -130,6 +146,7 @@ export default function PartnerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -137,6 +154,7 @@ export default function PartnerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -144,6 +162,7 @@ export default function PartnerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -151,6 +170,7 @@ export default function PartnerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -158,6 +178,7 @@ export default function PartnerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -165,6 +186,7 @@ export default function PartnerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -172,6 +194,7 @@ export default function PartnerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -179,6 +202,7 @@ export default function PartnerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
             <Tabs.Screen
@@ -186,6 +210,7 @@ export default function PartnerTabsLayout() {
                 options={{
                     href: null,
                     headerShown: false,
+                    tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
         </Tabs>

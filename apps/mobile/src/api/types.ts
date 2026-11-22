@@ -118,11 +118,24 @@ export interface RoomType {
 
 export interface PropertyDetail extends PropertyCard {
     description: string;
+    city_id?: number;
+    property_category_id?: number;
+    contact_person_name?: string;
+    contact_phone?: string;
+    contact_email?: string | null;
     landmark?: string | null;
     pincode?: string;
+    postal_code?: string;
     address_line1?: string;
+    address_line_1?: string;
+    address_line_2?: string | null;
     google_maps_url?: string | null;
     status?: string;
+    verification_status?: string;
+    is_amendment_pending?: boolean;
+    missing_requirements?: string[];
+    decision_reason?: string | null;
+    requested_changes?: string | null;
     check_in_time?: string;
     check_out_time?: string;
     breakfast_timing?: string;
@@ -130,7 +143,23 @@ export interface PropertyDetail extends PropertyCard {
     dinner_timing?: string;
     meals_description?: string;
     rating?: number;
-    reviews?: any[];
+    reviews?: Array<{
+        id: number;
+        overall_rating: number;
+        cleanliness_rating?: number | null;
+        food_quality_rating?: number | null;
+        communication_rating?: number | null;
+        value_rating?: number | null;
+        customer_display_name?: string;
+        customer_name?: string;
+        title?: string | null;
+        content?: string | null;
+        verified_booking?: boolean;
+        published_at?: string | null;
+        created_at?: string | null;
+        owner_reply?: string | null;
+        owner_reply_at?: string | null;
+    }>;
     gallery: Array<{
         id: number;
         url: string;
@@ -164,6 +193,12 @@ export interface PhysicalRoom {
     property_room_type_id: number;
     room_number: string;
     floor?: string | number | null;
+    floor_number?: string | null;
+    wing_name?: string | null;
+    building_name?: string | null;
+    operational_status?: string;
+    operational_status_label?: string;
+    internal_description?: string | null;
     is_active: boolean;
     is_occupied?: boolean;
     current_allocation?: {
@@ -172,6 +207,7 @@ export interface PhysicalRoom {
         check_out_date?: string;
     } | null;
     room_type_name?: string;
+    room_type?: { id: number; name: string } | null;
 }
 
 export interface OwnerReview {
@@ -291,13 +327,23 @@ export interface Reservation {
     customer_name?: string;
     guest_gender?: string;
     commission_amount_paise?: number;
+    commission_tax_paise?: number;
     owner_payable_paise?: number;
     property_id?: number;
     property_room_type_id?: number;
     physical_room_id?: number | null;
     physical_room?: PhysicalRoom | null;
+    is_allocated?: boolean;
+    primary_room_number?: string | null;
     allocated_room_number?: string | null;
     allocated_floor?: string | number | null;
+    allocations?: Array<{
+        id: number;
+        property_room_id: number;
+        room_number: string;
+        floor_number?: string | number | null;
+        allocated_quantity: number;
+    }>;
     is_reviewed?: boolean;
     review?: {
         id?: number;
@@ -556,7 +602,15 @@ export interface NotificationItem {
 }
 
 export interface NotificationPreferences {
-    channels: {
+    in_app_operational?: boolean;
+    email_operational?: boolean;
+    push_operational?: boolean;
+    sms_operational?: boolean;
+    whatsapp_opted_in?: boolean;
+    email_marketing?: boolean;
+    sms_marketing?: boolean;
+    push_marketing?: boolean;
+    channels?: {
         in_app?: { enabled: boolean };
         email?: { enabled: boolean };
         push?: { enabled: boolean };
@@ -565,13 +619,31 @@ export interface NotificationPreferences {
     };
 }
 
+export interface MobileSessionToken {
+    id: number;
+    name: string;
+    last_used_at?: string | null;
+    created_at: string;
+    is_current?: boolean;
+}
+
 export interface CustomerCaseSummary {
     id: number;
     case_reference: string;
     category: string;
+    category_label?: string;
     status: string;
+    status_label?: string;
     priority: string;
+    property_name?: string | null;
+    booking_reference?: string | null;
     description?: string | null;
+    resolution_summary?: string | null;
+    first_action_due_at?: string | null;
+    first_action_target_hours?: number | null;
+    acknowledgement_due_at?: string | null;
+    resolution_due_at?: string | null;
+    sla_due_at?: string | null;
     created_at: string;
 }
 
@@ -714,7 +786,15 @@ export interface ReferralProfile {
 export interface ReferralItem {
     id: number;
     referred_customer_name: string;
-    status: 'registered' | 'booking_created' | 'stay_completed' | 'rewarded';
+    status:
+        | 'pending_registration'
+        | 'registered'
+        | 'booking_created'
+        | 'stay_completed'
+        | 'qualified'
+        | 'reward_credited'
+        | 'rewarded'
+        | 'cancelled';
     status_label: string;
     points_reward: number;
     created_at: string;
@@ -730,7 +810,9 @@ export interface CouponItem {
     discount_amount_paise?: number;
     discount_percentage?: number;
     points_reward?: number;
+    bonus_points?: number;
     min_subtotal_paise: number;
+    min_booking_amount_paise?: number;
     max_discount_paise?: number;
     funding_source: 'platform' | 'property' | 'split';
     expires_at: string;
@@ -911,18 +993,51 @@ export interface AmenityCatalogCategory {
     amenities: AmenityCatalogItem[];
 }
 
+export interface PropertyVerificationDocumentItem {
+    id: number;
+    document_type: string;
+    document_type_label?: string;
+    original_filename: string;
+    status: string;
+    status_label?: string;
+    rejection_reason?: string | null;
+    uploaded_at?: string | null;
+}
+
+export interface PropertyVerificationChecklistItem {
+    document_type: string;
+    label: string;
+    required: boolean;
+    fulfilled: boolean;
+}
+
+export interface PropertyVerificationDocumentsResponse {
+    documents: PropertyVerificationDocumentItem[];
+    checklist: PropertyVerificationChecklistItem[];
+}
+
 export interface OwnerFinancialProfile {
     legal_business_name: string | null;
     business_constitution: string | null;
-    pan: string | null;
+    pan_number?: string | null;
+    pan?: string | null;
+    gst_registered?: boolean;
     gstin: string | null;
+    supplier_legal_classification?: string | null;
+    bank_beneficiary_name?: string | null;
     bank_account_number?: string | null;
+    bank_account_number_masked?: string | null;
     bank_account_masked: string | null;
     bank_ifsc: string | null;
     bank_name: string | null;
     bank_account_holder_name: string | null;
+    onboarding_status?: string;
     verification_status: string;
+    is_eligible?: boolean;
     settlement_eligible: boolean;
+    linked_account_status?: string | null;
+    razorpay_account_id?: string | null;
+    rejection_reason?: string | null;
     rejection_reasons?: string[] | null;
 }
 
@@ -931,14 +1046,27 @@ export interface OwnerCommissionAgreement {
     agreement_reference?: string;
     commission_rate_percentage: number;
     base_type: string;
+    commission_base_label?: string;
     gst_treatment: string;
+    commission_gst_label?: string;
+    property_name?: string | null;
     terms_version: string;
     effective_from: string;
+    effective_until?: string | null;
     effective_to?: string | null;
     status: string;
+    is_pending_acceptance?: boolean;
     terms_hash?: string | null;
     accepted_by_owner_id?: number | null;
     accepted_at?: string | null;
+}
+
+export interface FinancialSummaryData {
+    total_settled_paise: number;
+    pending_settlement_paise: number;
+    on_hold_paise?: number;
+    settled_count?: number;
+    pending_count?: number;
 }
 
 export interface SettlementLineItem {
@@ -979,7 +1107,12 @@ export interface SettlementDetail {
     gross_booking_value_minor?: number;
     statutory_deductions_minor?: number;
     refund_adjustments_minor?: number;
+    relocation_adjustments_minor?: number;
     other_adjustments_minor?: number;
+    failure_reason?: string | null;
+    hold_reason?: string | null;
+    provider_status?: string | null;
+    provider_transfer_status?: string | null;
     items?: SettlementLineItem[];
     line_items?: SettlementLineItem[];
 }
@@ -987,24 +1120,36 @@ export interface SettlementDetail {
 export interface CaseMessage {
     id: number;
     sender_name: string;
-    sender_role: string;
+    sender_type?: 'customer' | 'owner' | 'admin';
+    sender_role?: string;
     message: string;
+    attachment_url?: string | null;
     created_at: string;
-    is_owner: boolean;
+    is_owner?: boolean;
 }
 
 export interface OwnerCase {
     id: number;
     case_reference: string;
-    title: string;
-    type: string;
+    title?: string;
+    category?: string;
+    category_label?: string;
+    type?: string;
     status: string;
+    status_label?: string;
     priority: string;
+    priority_label?: string;
     booking_reference?: string | null;
+    customer_name?: string | null;
     guest_name?: string | null;
+    property_id?: number | null;
     property_name?: string | null;
+    stay_dates?: string | null;
+    description?: string | null;
+    messages_count?: number;
     created_at: string;
     updated_at: string;
+    resolution_summary?: string | null;
     resolution?: string | null;
     sla_due_at?: string | null;
     first_action_due_at?: string | null;
