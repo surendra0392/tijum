@@ -1,62 +1,97 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
+    Alert,
     FlatList,
     Image,
     RefreshControl,
-    SafeAreaView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { Building2, Heart, Star, ChevronLeft } from 'lucide-react-native';
 import { CustomerApi } from '../../../src/api/customer';
 import { PropertyCard as PropertyCardType } from '../../../src/api/types';
 import { ExceptionalState } from '../../../src/components/ExceptionalState';
+import { SkeletonCard } from '../../../src/components/Skeleton';
 import { useAuth } from '../../../src/auth/AuthContext';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
 
 export default function WishlistScreen() {
     const router = useRouter();
-    const { token, authState, isLoading: authLoading } = useAuth();
+    const insets = useSafeAreaInsets();
+    const isFocused = useIsFocused();
+    const { token, authState, isLoading: authLoading, sessionEpoch } = useAuth();
     const [properties, setProperties] = useState<PropertyCardType[]>([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const isGuest =
-        !token || authState === 'guest' || authState === 'session_expired';
+        !token ||
+        authState === 'guest' ||
+        authState === 'session_expired' ||
+        authState === 'owner_authenticated';
 
-    const loadWishlist = async () => {
-        if (isGuest) return;
-        try {
-            setLoading(true);
-            setErrorMessage(null);
-            const res = await CustomerApi.getWishlist();
-            setProperties(res.data ?? []);
-        } catch (loadError: unknown) {
-            setErrorMessage(
-                loadError instanceof Error
-                    ? loadError.message
-                    : 'Unable to load your wishlist. Please try again.',
-            );
-        } finally {
-            setLoading(false);
+    useEffect(() => {
+        setProperties([]);
+    }, [sessionEpoch]);
+
+    const loadWishlist = useCallback(
+        async (options?: { silent?: boolean }) => {
+            if (isGuest) return;
+            try {
+                if (!options?.silent) {
+                    setLoading(true);
+                }
+                setErrorMessage(null);
+                const res = await CustomerApi.getWishlist();
+                setProperties(res.data ?? []);
+            } catch (loadError: unknown) {
+                setErrorMessage(
+                    loadError instanceof Error
+                        ? loadError.message
+                        : 'Unable to load your wishlist. Please try again.',
+                );
+            } finally {
+                setLoading(false);
+            }
+        },
+        [isGuest],
+    );
+
+    useEffect(() => {
+        if (!isGuest && isFocused) {
+            void loadWishlist({ silent: properties.length > 0 });
+        }
+    }, [isGuest, isFocused]);
+
+    const handleRemove = (propertyId: number) => {
+        const previous = properties;
+        setProperties((prev) => prev.filter((p) => p.id !== propertyId));
+        if (!isGuest) {
+            CustomerApi.toggleWishlist(propertyId).catch((err: any) => {
+                setProperties(previous);
+                Alert.alert(
+                    'Wishlist Update Failed',
+                    err?.message ||
+                        'Could not update your saved stays. Please try again.',
+                );
+            });
         }
     };
 
-    useEffect(() => {
-        if (!isGuest) {
-            void loadWishlist();
-        }
-    }, [isGuest]);
-
-    const handleRemove = (propertyId: number) => {
-        setProperties((prev) => prev.filter((p) => p.id !== propertyId));
-        if (!isGuest) {
-            CustomerApi.toggleWishlist(propertyId).catch(() => {});
+    const handleGoBack = () => {
+        if (router.canGoBack()) {
+            router.back();
+        } else {
+            router.replace('/(customer)/profile');
         }
     };
 
@@ -140,24 +175,37 @@ export default function WishlistScreen() {
 
     if (
         !authLoading &&
-        (!token || authState === 'guest' || authState === 'session_expired')
+        (!token ||
+            authState === 'guest' ||
+            authState === 'session_expired' ||
+            authState === 'owner_authenticated')
     ) {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.plumHeader}>
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <View
+                    style={[
+                        styles.plumHeader,
+                        { paddingTop: Math.max(insets.top, Spacing.sm) },
+                    ]}
+                >
                     <View style={styles.headerTopRow}>
                         <TouchableOpacity
-                            onPress={() => router.back()}
+                            style={styles.headerActionBtn}
+                            onPress={handleGoBack}
                             activeOpacity={0.8}
+                            accessibilityRole="button"
+                            accessibilityLabel="Go back"
                         >
                             <ChevronLeft size={24} color={Colors.white} />
                         </TouchableOpacity>
                         <Text style={styles.headerTitle}>Saved Stays</Text>
-                        <Heart
-                            size={20}
-                            color={Colors.white}
-                            fill={Colors.white}
-                        />
+                        <View style={styles.headerActionBtn}>
+                            <Heart
+                                size={20}
+                                color={Colors.white}
+                                fill={Colors.white}
+                            />
+                        </View>
                     </View>
                 </View>
                 <ExceptionalState
@@ -172,18 +220,32 @@ export default function WishlistScreen() {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['bottom']}>
             {/* Curved Plum Header */}
-            <View style={styles.plumHeader}>
+            <View
+                style={[
+                    styles.plumHeader,
+                    { paddingTop: Math.max(insets.top, Spacing.sm) },
+                ]}
+            >
                 <View style={styles.headerTopRow}>
                     <TouchableOpacity
-                        onPress={() => router.back()}
+                        style={styles.headerActionBtn}
+                        onPress={handleGoBack}
                         activeOpacity={0.8}
+                        accessibilityRole="button"
+                        accessibilityLabel="Go back"
                     >
                         <ChevronLeft size={24} color={Colors.white} />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Saved Stays</Text>
-                    <Heart size={20} color={Colors.white} fill={Colors.white} />
+                    <View style={styles.headerActionBtn}>
+                        <Heart
+                            size={20}
+                            color={Colors.white}
+                            fill={Colors.white}
+                        />
+                    </View>
                 </View>
             </View>
 
@@ -193,11 +255,12 @@ export default function WishlistScreen() {
                     title="Wishlist Unavailable"
                     description={errorMessage}
                     actionLabel="Try Again"
-                    onAction={loadWishlist}
+                    onAction={() => void loadWishlist()}
                 />
-            ) : loading ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={Colors.deepPlum} />
+            ) : loading && !refreshing && properties.length === 0 ? (
+                <View style={styles.listContainer}>
+                    <SkeletonCard />
+                    <SkeletonCard />
                 </View>
             ) : (
                 <FlatList
@@ -205,17 +268,33 @@ export default function WishlistScreen() {
                     renderItem={renderGridItem}
                     keyExtractor={(item: PropertyCardType) => String(item.id)}
                     numColumns={2}
-                    contentContainerStyle={styles.listContainer}
-                    columnWrapperStyle={styles.columnWrapper}
+                    contentContainerStyle={[
+                        styles.listContainer,
+                        properties.length === 0 && { flexGrow: 1 },
+                    ]}
+                    columnWrapperStyle={
+                        properties.length > 0 ? styles.columnWrapper : undefined
+                    }
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={() => {
                                 setRefreshing(true);
-                                void loadWishlist().then(() =>
+                                void loadWishlist({ silent: true }).then(() =>
                                     setRefreshing(false),
                                 );
                             }}
+                            colors={[Colors.deepPlum]}
+                            tintColor={Colors.deepPlum}
+                        />
+                    }
+                    ListEmptyComponent={
+                        <ExceptionalState
+                            type="no-results"
+                            title="No Saved Stays Yet"
+                            description="Tap the heart icon on any verified hostel, PG, or co-living property to compare options later."
+                            actionLabel="Explore Verified Stays"
+                            onAction={() => router.push('/(customer)/explore')}
                         />
                     }
                 />
@@ -241,6 +320,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+    },
+    headerActionBtn: {
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     headerTitle: {
         fontSize: 18,

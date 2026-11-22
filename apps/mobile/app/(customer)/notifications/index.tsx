@@ -5,13 +5,18 @@ import {
     FlatList,
     Modal,
     RefreshControl,
-    SafeAreaView,
+    ScrollView,
     StyleSheet,
     Switch,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import {
     Bell,
@@ -53,11 +58,15 @@ interface PreferenceState {
     push: boolean;
     sms: boolean;
     whatsapp: boolean;
+    emailMarketing: boolean;
+    pushMarketing: boolean;
 }
 
 export default function CustomerNotificationsScreen() {
     const router = useRouter();
-    const { token, authState } = useAuth();
+    const insets = useSafeAreaInsets();
+    const isFocused = useIsFocused();
+    const { token, authState, sessionEpoch } = useAuth();
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
     const [activeTab, setActiveTab] = useState('all');
     const [loading, setLoading] = useState(false);
@@ -74,27 +83,51 @@ export default function CustomerNotificationsScreen() {
     const [pushActive, setPushActive] = useState(true);
     const [smsActive, setSmsActive] = useState(false);
     const [whatsappActive, setWhatsappActive] = useState(false);
+    const [emailMarketingActive, setEmailMarketingActive] = useState(false);
+    const [pushMarketingActive, setPushMarketingActive] = useState(false);
 
     const isGuest =
-        !token || authState === 'guest' || authState === 'session_expired';
+        !token ||
+        authState === 'guest' ||
+        authState === 'session_expired' ||
+        authState === 'owner_authenticated';
 
     useEffect(() => {
-        if (!isGuest) {
+        setNotifications([]);
+    }, [sessionEpoch]);
+
+    useEffect(() => {
+        if (!isGuest && isFocused) {
             void loadNotifications();
             void loadPreferences();
         }
-    }, [isGuest]);
+    }, [isGuest, isFocused]);
 
     const loadPreferences = async () => {
         try {
             setPreferencesError(null);
             const res = await CustomerApi.getNotificationPreferences();
-            if (res?.data?.channels) {
-                setInAppActive(res.data.channels.in_app?.enabled ?? true);
-                setEmailActive(res.data.channels.email?.enabled ?? true);
-                setPushActive(res.data.channels.push?.enabled ?? true);
-                setSmsActive(res.data.channels.sms?.enabled ?? false);
-                setWhatsappActive(res.data.channels.whatsapp?.enabled ?? false);
+            const d = res?.data;
+            if (d) {
+                setInAppActive(
+                    d.in_app_operational ?? d.channels?.in_app?.enabled ?? true,
+                );
+                setEmailActive(
+                    d.email_operational ?? d.channels?.email?.enabled ?? true,
+                );
+                setPushActive(
+                    d.push_operational ?? d.channels?.push?.enabled ?? true,
+                );
+                setSmsActive(
+                    d.sms_operational ?? d.channels?.sms?.enabled ?? false,
+                );
+                setWhatsappActive(
+                    d.whatsapp_opted_in ??
+                        d.channels?.whatsapp?.enabled ??
+                        false,
+                );
+                setEmailMarketingActive(d.email_marketing ?? false);
+                setPushMarketingActive(d.push_marketing ?? false);
             }
         } catch (loadPreferencesError: unknown) {
             setPreferencesError(
@@ -114,6 +147,8 @@ export default function CustomerNotificationsScreen() {
             push: pushActive,
             sms: smsActive,
             whatsapp: whatsappActive,
+            emailMarketing: emailMarketingActive,
+            pushMarketing: pushMarketingActive,
         };
         const next = { ...previous, ...updates };
 
@@ -122,6 +157,8 @@ export default function CustomerNotificationsScreen() {
         setPushActive(next.push);
         setSmsActive(next.sms);
         setWhatsappActive(next.whatsapp);
+        setEmailMarketingActive(next.emailMarketing);
+        setPushMarketingActive(next.pushMarketing);
 
         try {
             await CustomerApi.updateNotificationPreferences({
@@ -130,6 +167,8 @@ export default function CustomerNotificationsScreen() {
                 push_operational: next.push,
                 sms_operational: next.sms,
                 whatsapp_opted_in: next.whatsapp,
+                email_marketing: next.emailMarketing,
+                push_marketing: next.pushMarketing,
             });
             return true;
         } catch {
@@ -138,6 +177,8 @@ export default function CustomerNotificationsScreen() {
             setPushActive(previous.push);
             setSmsActive(previous.sms);
             setWhatsappActive(previous.whatsapp);
+            setEmailMarketingActive(previous.emailMarketing);
+            setPushMarketingActive(previous.pushMarketing);
             Alert.alert(
                 'Preferences Not Saved',
                 'Please check your connection and try again.',
@@ -175,6 +216,9 @@ export default function CustomerNotificationsScreen() {
                 );
                 return;
             }
+            await PushNotificationService.registerForPushNotifications(
+                'customer',
+            );
         }
 
         await handleSavePreferences({ push: val });
@@ -198,13 +242,11 @@ export default function CustomerNotificationsScreen() {
         notification: NotificationItem,
     ): string | null => {
         const reference = notification.related_reference;
-        const code = notification.template_code;
+        const code = (notification.template_code || '').toLowerCase();
 
-        if (reference && code.startsWith('owner.reservation.')) {
-            return `/(partner)/reservations/${reference}`;
-        }
-        if (reference && code.startsWith('owner.settlement.')) {
-            return `/(partner)/settlements/${reference}`;
+        // Guard customer inbox against accidentally routing to partner-only screens
+        if (code.startsWith('owner.')) {
+            return null;
         }
         if (
             reference &&
@@ -213,6 +255,9 @@ export default function CustomerNotificationsScreen() {
                 code.includes('refund'))
         ) {
             return `/(customer)/bookings/${reference}`;
+        }
+        if (reference && code.includes('ticket')) {
+            return `/(customer)/support/ticket/${reference}`;
         }
         if (
             reference &&
@@ -228,8 +273,18 @@ export default function CustomerNotificationsScreen() {
             return '/(customer)/rewards';
         }
         if (notification.action_url) {
+            const urlLower = notification.action_url.toLowerCase();
+            if (reference && urlLower.includes('support-tickets')) {
+                return `/(customer)/support/ticket/${reference}`;
+            }
             const target = resolveDeepLinkPath(notification.action_url);
-            return target === '/' ? null : target;
+            if (
+                target.startsWith('/(customer)') ||
+                target.startsWith('/help') ||
+                target.startsWith('/legal')
+            ) {
+                return target;
+            }
         }
 
         return null;
@@ -263,10 +318,19 @@ export default function CustomerNotificationsScreen() {
         }
     };
 
+    const handleGoBack = () => {
+        if (router.canGoBack()) {
+            router.back();
+        } else {
+            router.replace('/(customer)/profile');
+        }
+    };
+
     const getIcon = (type: string) => {
         switch (type) {
+            case 'marketing':
             case 'offer':
-                return <Percent size={18} color={Colors.coral} />;
+                return <Percent size={18} color={Colors.coralDark} />;
             case 'support':
                 return <Info size={18} color="#0284C7" />;
             case 'system':
@@ -278,23 +342,38 @@ export default function CustomerNotificationsScreen() {
 
     const filtered = notifications.filter((n) => {
         if (activeTab === 'unread') return !n.is_read;
-        if (activeTab === 'offers') return n.category === 'offer';
+        if (activeTab === 'offers') {
+            return n.category === 'marketing' || n.category === 'offer';
+        }
         return true;
     });
 
-    if (!token || authState === 'guest' || authState === 'session_expired') {
+    if (
+        !token ||
+        authState === 'guest' ||
+        authState === 'session_expired' ||
+        authState === 'owner_authenticated'
+    ) {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.plumHeader}>
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <View
+                    style={[
+                        styles.plumHeader,
+                        { paddingTop: Math.max(insets.top, Spacing.sm) },
+                    ]}
+                >
                     <View style={styles.headerTopRow}>
                         <TouchableOpacity
-                            onPress={() => router.back()}
+                            style={styles.headerActionButton}
+                            onPress={handleGoBack}
                             activeOpacity={0.8}
+                            accessibilityRole="button"
+                            accessibilityLabel="Go back"
                         >
                             <ChevronLeft size={24} color={Colors.white} />
                         </TouchableOpacity>
                         <Text style={styles.headerTitle}>Notifications</Text>
-                        <View style={{ width: 24 }} />
+                        <View style={{ width: 44 }} />
                     </View>
                 </View>
                 <ExceptionalState
@@ -309,15 +388,20 @@ export default function CustomerNotificationsScreen() {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['bottom']}>
             {/* Curved Plum Header */}
-            <View style={styles.plumHeader}>
+            <View
+                style={[
+                    styles.plumHeader,
+                    { paddingTop: Math.max(insets.top, Spacing.sm) },
+                ]}
+            >
                 <View style={styles.headerTopRow}>
                     <TouchableOpacity
                         accessibilityLabel="Go back"
                         accessibilityRole="button"
                         style={styles.headerActionButton}
-                        onPress={() => router.back()}
+                        onPress={handleGoBack}
                         activeOpacity={0.8}
                     >
                         <ChevronLeft size={24} color={Colors.white} />
@@ -457,7 +541,12 @@ export default function CustomerNotificationsScreen() {
             )}
 
             {/* Bottom Push Notification Switch Bar */}
-            <View style={styles.bottomBar}>
+            <View
+                style={[
+                    styles.bottomBar,
+                    { paddingBottom: Math.max(insets.bottom, 14) },
+                ]}
+            >
                 <Text style={styles.bottomBarText}>
                     Enable Push Notifications
                 </Text>
@@ -480,7 +569,17 @@ export default function CustomerNotificationsScreen() {
                 onRequestClose={() => setPrefModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalCard}>
+                    <View
+                        style={[
+                            styles.modalCard,
+                            {
+                                paddingBottom: Math.max(
+                                    insets.bottom,
+                                    Spacing.lg,
+                                ),
+                            },
+                        ]}
+                    >
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>
                                 Channel Preferences
@@ -494,111 +593,155 @@ export default function CustomerNotificationsScreen() {
                                 <X size={20} color={Colors.inkSecondary} />
                             </TouchableOpacity>
                         </View>
-                        <Text style={styles.modalSubtitle}>
-                            Manage how TIJUM contacts you across delivery
-                            channels.
-                        </Text>
-                        {preferencesError ? (
-                            <Text
-                                accessibilityRole="alert"
-                                style={styles.preferencesError}
-                            >
-                                {preferencesError}
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            <Text style={styles.modalSubtitle}>
+                                Manage how TIJUM contacts you across delivery
+                                channels.
                             </Text>
-                        ) : null}
+                            {preferencesError ? (
+                                <Text
+                                    accessibilityRole="alert"
+                                    style={styles.preferencesError}
+                                >
+                                    {preferencesError}
+                                </Text>
+                            ) : null}
 
-                        {/* In-App */}
-                        <View style={styles.channelRow}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.channelName}>
-                                    In-App Alerts
-                                </Text>
-                                <Text style={styles.channelDesc}>
-                                    Activity feed and reservation notifications
-                                    in the app.
-                                </Text>
+                            {/* In-App */}
+                            <View style={styles.channelRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.channelName}>
+                                        In-App Alerts
+                                    </Text>
+                                    <Text style={styles.channelDesc}>
+                                        Activity feed and reservation
+                                        notifications in the app.
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={inAppActive}
+                                    onValueChange={(value: boolean) => {
+                                        void handleSavePreferences({
+                                            inApp: value,
+                                        });
+                                    }}
+                                />
                             </View>
-                            <Switch
-                                value={inAppActive}
-                                onValueChange={(value: boolean) => {
-                                    void handleSavePreferences({
-                                        inApp: value,
-                                    });
-                                }}
-                            />
-                        </View>
 
-                        {/* Email */}
-                        <View style={styles.channelRow}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.channelName}>
-                                    Email Invoices & Updates
-                                </Text>
-                                <Text style={styles.channelDesc}>
-                                    {EMAIL_CHANNEL_DESCRIPTION}
-                                </Text>
+                            {/* Email */}
+                            <View style={styles.channelRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.channelName}>
+                                        Email Invoices & Updates
+                                    </Text>
+                                    <Text style={styles.channelDesc}>
+                                        {EMAIL_CHANNEL_DESCRIPTION}
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={emailActive}
+                                    onValueChange={(value: boolean) => {
+                                        void handleSavePreferences({
+                                            email: value,
+                                        });
+                                    }}
+                                />
                             </View>
-                            <Switch
-                                value={emailActive}
-                                onValueChange={(value: boolean) => {
-                                    void handleSavePreferences({
-                                        email: value,
-                                    });
-                                }}
-                            />
-                        </View>
 
-                        {/* Push */}
-                        <View style={styles.channelRow}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.channelName}>
-                                    Push Notifications
-                                </Text>
-                                <Text style={styles.channelDesc}>
-                                    {PUSH_CHANNEL_DESCRIPTION}
-                                </Text>
+                            {/* Push */}
+                            <View style={styles.channelRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.channelName}>
+                                        Push Notifications
+                                    </Text>
+                                    <Text style={styles.channelDesc}>
+                                        {PUSH_CHANNEL_DESCRIPTION}
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={pushActive}
+                                    onValueChange={(value: boolean) => {
+                                        void handleTogglePush(value);
+                                    }}
+                                />
                             </View>
-                            <Switch
-                                value={pushActive}
-                                onValueChange={(value: boolean) => {
-                                    void handleTogglePush(value);
-                                }}
-                            />
-                        </View>
 
-                        {/* SMS */}
-                        <View style={styles.channelRow}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.channelName}>
-                                    SMS Alerts
-                                </Text>
-                                <Text style={styles.channelDesc}>
-                                    {SMS_CHANNEL_DESCRIPTION}
-                                </Text>
+                            {/* Marketing Email */}
+                            <View style={styles.channelRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.channelName}>
+                                        Promotional Offers (Email)
+                                    </Text>
+                                    <Text style={styles.channelDesc}>
+                                        Receive verified stay deals and seasonal
+                                        coupon campaigns via email.
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={emailMarketingActive}
+                                    onValueChange={(value: boolean) => {
+                                        void handleSavePreferences({
+                                            emailMarketing: value,
+                                        });
+                                    }}
+                                />
                             </View>
-                            <Switch
-                                value={smsActive}
-                                disabled={true}
-                                onValueChange={setSmsActive}
-                            />
-                        </View>
 
-                        {/* WhatsApp */}
-                        <View style={styles.channelRow}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.channelName}>
-                                    WhatsApp Updates
-                                </Text>
-                                <Text style={styles.channelDesc}>
-                                    {WHATSAPP_CHANNEL_DESCRIPTION}
-                                </Text>
+                            {/* Marketing Push */}
+                            <View style={styles.channelRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.channelName}>
+                                        Promotional Alerts (Push)
+                                    </Text>
+                                    <Text style={styles.channelDesc}>
+                                        Receive flash stay discounts and reward
+                                        reminders via push alerts.
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={pushMarketingActive}
+                                    onValueChange={(value: boolean) => {
+                                        void handleSavePreferences({
+                                            pushMarketing: value,
+                                        });
+                                    }}
+                                />
                             </View>
-                            <Switch
-                                value={whatsappActive}
-                                disabled={true}
-                                onValueChange={setWhatsappActive}
-                            />
-                        </View>
+
+                            {/* SMS */}
+                            <View style={styles.channelRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.channelName}>
+                                        SMS Alerts
+                                    </Text>
+                                    <Text style={styles.channelDesc}>
+                                        {SMS_CHANNEL_DESCRIPTION}
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={smsActive}
+                                    disabled={true}
+                                    onValueChange={setSmsActive}
+                                />
+                            </View>
+
+                            {/* WhatsApp */}
+                            <View style={styles.channelRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.channelName}>
+                                        WhatsApp Updates
+                                    </Text>
+                                    <Text style={styles.channelDesc}>
+                                        {WHATSAPP_CHANNEL_DESCRIPTION}
+                                    </Text>
+                                </View>
+                                <Switch
+                                    value={whatsappActive}
+                                    disabled={true}
+                                    onValueChange={setWhatsappActive}
+                                />
+                            </View>
+                        </ScrollView>
                     </View>
                 </View>
             </Modal>

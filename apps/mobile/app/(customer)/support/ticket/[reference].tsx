@@ -2,13 +2,16 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    SafeAreaView,
+    KeyboardAvoidingView,
+    Platform,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
     View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { CustomerApi } from '../../../../src/api/customer';
 import { useAuth } from '../../../../src/auth/AuthContext';
 import {
@@ -19,27 +22,32 @@ import { AppHeader } from '../../../../src/components/AppHeader';
 import { Button } from '../../../../src/components/Button';
 import { ExceptionalState } from '../../../../src/components/ExceptionalState';
 import { Input } from '../../../../src/components/Input';
+import { RequireAuth } from '../../../../src/components/RequireAuth';
 import { Colors } from '../../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../../src/theme/spacing';
 
 export default function CustomerSupportTicketDetailScreen() {
-    const router = useRouter();
     const { reference } = useLocalSearchParams<{ reference: string }>();
     const { token, authState } = useAuth();
     const [ticket, setTicket] = useState<SupportTicketDetail | null>(null);
     const [messages, setMessages] = useState<SupportTicketMessage[]>([]);
     const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [reply, setReply] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
-    const loadTicket = async () => {
+    const loadTicket = async (isRefresh = false) => {
         if (!reference || !token || authState !== 'customer_authenticated') {
             return;
         }
 
         try {
-            setLoading(true);
+            if (isRefresh) {
+                setRefreshing(true);
+            } else {
+                setLoading(true);
+            }
             setErrorMessage(null);
             const response = await CustomerApi.getSupportTicket(reference);
             setTicket(response.data.ticket);
@@ -52,10 +60,13 @@ export default function CustomerSupportTicketDetailScreen() {
             );
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     };
 
     useEffect(() => {
+        setTicket(null);
+        setMessages([]);
         void loadTicket();
     }, [authState, reference, token]);
 
@@ -114,35 +125,46 @@ export default function CustomerSupportTicketDetailScreen() {
         );
     };
 
-    if (!token || authState !== 'customer_authenticated') {
-        return (
-            <ExceptionalState
-                type="auth-required"
-                title="Customer Sign-In Required"
-                description="Sign in to view this helpdesk ticket."
-                actionLabel="Customer Sign In"
-                onAction={() => router.push('/(auth)/customer-login')}
-            />
-        );
-    }
-
     return (
-        <SafeAreaView style={styles.container}>
-            <AppHeader title="Helpdesk Ticket" />
-            {loading && !ticket ? (
-                <View style={styles.centered}>
-                    <ActivityIndicator size="large" color={Colors.deepPlum} />
-                </View>
-            ) : errorMessage && !ticket ? (
-                <ExceptionalState
-                    type="no-internet"
-                    title="Ticket Unavailable"
-                    description={errorMessage}
-                    actionLabel="Try Again"
-                    onAction={() => loadTicket()}
+        <RequireAuth role="customer">
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <AppHeader
+                    title="Helpdesk Ticket"
+                    showBack
+                    fallbackRoute="/(customer)/support/tickets"
                 />
-            ) : ticket ? (
-                <ScrollView contentContainerStyle={styles.content}>
+                {loading && !ticket ? (
+                    <View style={styles.centered}>
+                        <ActivityIndicator
+                            size="large"
+                            color={Colors.deepPlum}
+                        />
+                    </View>
+                ) : errorMessage && !ticket ? (
+                    <ExceptionalState
+                        type="no-internet"
+                        title="Ticket Unavailable"
+                        description={errorMessage}
+                        actionLabel="Try Again"
+                        onAction={() => loadTicket()}
+                    />
+                ) : ticket ? (
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={{ flex: 1 }}
+                    >
+                        <ScrollView
+                            contentContainerStyle={styles.content}
+                            keyboardShouldPersistTaps="handled"
+                            refreshControl={
+                                <RefreshControl
+                                    refreshing={refreshing}
+                                    onRefresh={() => void loadTicket(true)}
+                                    colors={[Colors.deepPlum]}
+                                    tintColor={Colors.deepPlum}
+                                />
+                            }
+                        >
                     <View style={styles.summaryCard}>
                         <View style={styles.topRow}>
                             <Text style={styles.reference}>
@@ -176,7 +198,8 @@ export default function CustomerSupportTicketDetailScreen() {
                             key={message.id}
                             style={[
                                 styles.messageCard,
-                                message.sender_type === 'customer'
+                                message.sender_type?.toLowerCase() ===
+                                'customer'
                                     ? styles.customerMessage
                                     : styles.supportMessage,
                             ]}
@@ -223,9 +246,11 @@ export default function CustomerSupportTicketDetailScreen() {
                             This ticket is closed.
                         </Text>
                     )}
-                </ScrollView>
-            ) : null}
-        </SafeAreaView>
+                        </ScrollView>
+                    </KeyboardAvoidingView>
+                ) : null}
+            </SafeAreaView>
+        </RequireAuth>
     );
 }
 

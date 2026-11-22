@@ -6,10 +6,12 @@ import {
     StyleSheet,
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
+    Platform,
     TouchableOpacity,
-    SafeAreaView,
     Switch,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { PublicApi } from '../../../src/api/public';
 import { CustomerApi } from '../../../src/api/customer';
@@ -19,6 +21,7 @@ import { PointsWallet, PropertyDetail, RoomType } from '../../../src/api/types';
 import { Colors } from '../../../src/theme/colors';
 import { Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
+import { AppHeader } from '../../../src/components/AppHeader';
 import { Input } from '../../../src/components/Input';
 import { Button } from '../../../src/components/Button';
 import { Badge } from '../../../src/components/Badge';
@@ -34,16 +37,18 @@ import {
 } from 'lucide-react-native';
 
 export default function CreateReservationScreen() {
-    const { property_slug } = useLocalSearchParams<{
+    const { property_slug, property_room_type_id } = useLocalSearchParams<{
         property_id?: string;
         property_slug: string;
+        property_room_type_id?: string;
     }>();
     const router = useRouter();
     const { token, authState } = useAuth();
-    const [submissionToken] = useState(createUuid);
+    const [submissionToken, setSubmissionToken] = useState(createUuid);
 
     const [property, setProperty] = useState<PropertyDetail | null>(null);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
     // Form State
@@ -63,8 +68,7 @@ export default function CreateReservationScreen() {
         'male',
     );
     const [guestComposition, setGuestComposition] =
-        useState<'individuals'>('individuals');
-    const [notes, setNotes] = useState<string>('');
+        useState<string>('individuals');
 
     // Rewards & Promotion State
     const [couponCode, setCouponCode] = useState('');
@@ -82,6 +86,7 @@ export default function CreateReservationScreen() {
     const [pointsToRedeem, setPointsToRedeem] = useState<number>(0);
 
     // Quote State
+    const [quoteLoading, setQuoteLoading] = useState(false);
     const [quote, setQuote] = useState<{
         base_amount_paise: number;
         coupon_discount_paise: number;
@@ -99,6 +104,7 @@ export default function CreateReservationScreen() {
         if (!token || authState !== 'customer_authenticated') {
             setUserWallet(null);
             setPointsToRedeem(0);
+            setRedeemPointsActive(false);
             return;
         }
 
@@ -107,7 +113,7 @@ export default function CreateReservationScreen() {
                 if (res.data?.wallet) {
                     setUserWallet(res.data.wallet);
                     setPointsToRedeem(
-                        Math.min(res.data.wallet.available_points, 400),
+                        Math.max(0, res.data.wallet.available_points),
                     );
                 }
             })
@@ -118,58 +124,123 @@ export default function CreateReservationScreen() {
     }, [authState, token]);
 
     useEffect(() => {
+        setSubmissionToken(createUuid());
         void loadProperty();
-    }, [property_slug]);
+    }, [property_slug, property_room_type_id]);
+
+    // Rotate submission token whenever booking parameters change so a fresh intent is formed
+    useEffect(() => {
+        setSubmissionToken(createUuid());
+    }, [
+        selectedRoomId,
+        checkInDate,
+        durationType,
+        durationQuantity,
+        quantity,
+        guestGender,
+        guestComposition,
+        appliedCoupon?.code,
+        redeemPointsActive,
+    ]);
 
     const loadProperty = async () => {
         try {
             setLoading(true);
+            setLoadError(null);
             const effectiveSlug = property_slug || '';
             const res = await PublicApi.getProperty(effectiveSlug);
             if (res.data) {
                 setProperty(res.data);
-                if (res.data.room_types && res.data.room_types.length > 0) {
-                    setSelectedRoomId(res.data.room_types[0].id);
+                const rooms = res.data.room_types || [];
+                const requestedId = property_room_type_id
+                    ? Number(property_room_type_id)
+                    : NaN;
+                const matchedRoom = Number.isFinite(requestedId)
+                    ? rooms.find((r: RoomType) => r.id === requestedId)
+                    : undefined;
+                if (matchedRoom) {
+                    setSelectedRoomId(matchedRoom.id);
+                } else if (rooms.length > 0) {
+                    setSelectedRoomId(rooms[0].id);
+                } else {
+                    setSelectedRoomId(null);
                 }
             } else {
                 setProperty(null);
                 setSelectedRoomId(null);
+                setLoadError('Property details could not be loaded.');
             }
-        } catch {
+        } catch (err: any) {
             setProperty(null);
             setSelectedRoomId(null);
+            setLoadError(
+                err?.message || 'Unable to load property details right now.',
+            );
         } finally {
             setLoading(false);
         }
     };
 
-    // Authoritative Backend Quote Calculation
+    const selectedRoom: RoomType | null =
+        property?.room_types.find((r: RoomType) => r.id === selectedRoomId) ??
+        null;
+
+    const allowedGenders = selectedRoom?.allowed_guest_genders?.length
+        ? selectedRoom.allowed_guest_genders
+        : [
+              { value: 'male' as const, label: 'Male' },
+              { value: 'female' as const, label: 'Female' },
+              { value: 'mixed' as const, label: 'Mixed' },
+          ];
+
+    const allowedCompositions = selectedRoom?.allowed_guest_compositions?.length
+        ? selectedRoom.allowed_guest_compositions
+        : [{ value: 'individuals', label: 'Individual' }];
+
+    useEffect(() => {
+        if (!selectedRoom) return;
+        if (!allowedGenders.some((g) => g.value === guestGender)) {
+            setGuestGender(allowedGenders[0].value);
+        }
+        if (!allowedCompositions.some((c) => c.value === guestComposition)) {
+            setGuestComposition(
+                selectedRoom.default_guest_composition ||
+                    allowedCompositions[0].value,
+            );
+        }
+    }, [selectedRoomId]);
+
+    // Debounced Authoritative Backend Quote Calculation
     useEffect(() => {
         if (!property || !selectedRoomId) return;
 
         let isCurrent = true;
-        const durCount = parseInt(durationQuantity, 10) || 1;
-        const count = parseInt(quantity, 10) || 1;
+        const durCount = Math.max(1, parseInt(durationQuantity, 10) || 1);
+        const count = Math.max(1, parseInt(quantity, 10) || 1);
 
-        const selectedRoom = property.room_types.find(
+        const roomMatch = property.room_types.find(
             (r: RoomType) => r.id === selectedRoomId,
         );
-        if (!selectedRoom) return;
+        if (!roomMatch) return;
 
         const calculateAuthoritativeQuote = async () => {
             try {
-                setQuote(null);
+                setQuoteLoading(true);
                 setQuoteError(null);
-                const quoteRes = await CustomerApi.quoteReservation(
-                    property.id,
-                    {
-                        property_room_type_id: selectedRoomId,
-                        check_in_date: checkInDate,
-                        duration_type: durationType,
-                        duration_quantity: durCount,
-                        quantity: count,
-                    },
-                );
+                const quotePayload = {
+                    property_room_type_id: selectedRoomId,
+                    check_in_date: checkInDate.trim(),
+                    duration_type: durationType,
+                    duration_quantity: durCount,
+                    quantity: count,
+                };
+                const quoteRes =
+                    authState === 'customer_authenticated' && token
+                        ? await CustomerApi.quoteReservation(
+                              property.id,
+                              quotePayload,
+                          )
+                        : await PublicApi.quoteStay(property.id, quotePayload);
 
                 if (!isCurrent) return;
 
@@ -187,8 +258,10 @@ export default function CreateReservationScreen() {
                     let pointsToEarn = 0;
 
                     if (
-                        appliedCoupon ||
-                        (redeemPointsActive && pointsToRedeem > 0)
+                        authState === 'customer_authenticated' &&
+                        token &&
+                        (appliedCoupon ||
+                            (redeemPointsActive && pointsToRedeem > 0))
                     ) {
                         const promoRes = await RewardsApi.quotePromotions({
                             property_id: property.id,
@@ -200,16 +273,17 @@ export default function CreateReservationScreen() {
                                 ? pointsToRedeem
                                 : 0,
                         });
+                        if (!isCurrent) return;
                         if (promoRes.data) {
                             couponDiscount =
-                                promoRes.data.coupon_discount_paise || 0;
+                                promoRes.data.coupon_discount_paise ?? 0;
                             pointsDiscount =
-                                promoRes.data.points_discount_paise || 0;
-                            pointsRedeemed = promoRes.data.points_redeemed || 0;
+                                promoRes.data.points_discount_paise ?? 0;
+                            pointsRedeemed = promoRes.data.points_redeemed ?? 0;
                             totalPaise =
-                                promoRes.data.final_payable_paise || totalPaise;
+                                promoRes.data.final_payable_paise ?? totalPaise;
                             pointsToEarn =
-                                promoRes.data.points_to_earn_on_completion || 0;
+                                promoRes.data.points_to_earn_on_completion ?? 0;
                         }
                     }
 
@@ -233,13 +307,20 @@ export default function CreateReservationScreen() {
                         ? quoteLoadError.message
                         : 'Unable to calculate an authoritative stay quote.',
                 );
+            } finally {
+                if (isCurrent) {
+                    setQuoteLoading(false);
+                }
             }
         };
 
-        void calculateAuthoritativeQuote();
+        const timer = setTimeout(() => {
+            void calculateAuthoritativeQuote();
+        }, 350);
 
         return () => {
             isCurrent = false;
+            clearTimeout(timer);
         };
     }, [
         property,
@@ -251,6 +332,8 @@ export default function CreateReservationScreen() {
         appliedCoupon,
         redeemPointsActive,
         pointsToRedeem,
+        authState,
+        token,
     ]);
 
     const handleApplyCoupon = async () => {
@@ -353,19 +436,24 @@ export default function CreateReservationScreen() {
 
         try {
             setSubmitting(true);
-            const requestedQuantity = parseInt(quantity, 10) || 1;
+            const requestedQuantity = Math.max(
+                1,
+                parseInt(quantity, 10) || 1,
+            );
             const res = await CustomerApi.createReservation({
                 submission_token: submissionToken,
                 property_id: property.id,
                 property_room_type_id: selectedRoomId,
-                check_in_date: checkInDate,
+                check_in_date: checkInDate.trim(),
                 duration_type: durationType,
-                duration_quantity: parseInt(durationQuantity, 10) || 1,
+                duration_quantity: Math.max(
+                    1,
+                    parseInt(durationQuantity, 10) || 1,
+                ),
                 quantity: requestedQuantity,
                 guest_count: requestedQuantity,
                 guest_gender: guestGender,
                 guest_composition: guestComposition,
-                notes: notes.trim() || undefined,
                 coupon_code: appliedCoupon ? appliedCoupon.code : undefined,
                 points_to_redeem:
                     redeemPointsActive && quote?.points_redeemed
@@ -399,6 +487,7 @@ export default function CreateReservationScreen() {
                 );
             }
         } catch (e: any) {
+            setSubmissionToken(createUuid());
             Alert.alert(
                 'Booking Error',
                 e.message || 'Failed to submit reservation request.',
@@ -410,49 +499,82 @@ export default function CreateReservationScreen() {
 
     if (loading) {
         return (
-            <View style={styles.center}>
-                <ActivityIndicator size="large" color={Colors.coral} />
-                <Text style={styles.loadingText}>
-                    Preparing booking request...
-                </Text>
-            </View>
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <AppHeader title="Confirm Booking" showBack />
+                <View style={styles.center}>
+                    <ActivityIndicator size="large" color={Colors.deepPlum} />
+                    <Text style={styles.loadingText}>
+                        Preparing booking request...
+                    </Text>
+                </View>
+            </SafeAreaView>
         );
     }
 
     if (!property) {
         return (
-            <View style={styles.center}>
-                <Text style={styles.errorText}>
-                    Property details unavailable.
-                </Text>
-                <Button
-                    title="Go Back"
-                    onPress={() => router.back()}
-                    style={{ marginTop: Spacing.md }}
-                />
-            </View>
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <AppHeader title="Confirm Booking" showBack />
+                <View style={styles.center}>
+                    <Text style={styles.errorText}>
+                        {loadError || 'Property details unavailable.'}
+                    </Text>
+                    <Button
+                        title="Retry"
+                        onPress={() => void loadProperty()}
+                        style={{ marginTop: Spacing.md }}
+                    />
+                    <Button
+                        title="Go Back"
+                        variant="outline"
+                        onPress={() => router.back()}
+                        style={{ marginTop: Spacing.sm }}
+                    />
+                </View>
+            </SafeAreaView>
         );
     }
 
+    const addressText = [
+        property.address_line_1 ||
+            property.address_line1 ||
+            property.locality ||
+            '',
+        property.city?.name ?? '',
+    ]
+        .filter(Boolean)
+        .join(', ');
+
     return (
-        <SafeAreaView style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                <View style={styles.contentPadding}>
-                    {/* Property Summary */}
-                    <View style={styles.headerBox}>
-                        <Text style={styles.propertyName}>{property.name}</Text>
-                        <View style={styles.addressRow}>
-                            <MapPin
-                                size={12}
-                                color={Colors.gray600}
-                                style={{ marginRight: 4 }}
-                            />
-                            <Text style={styles.propertyAddress}>
-                                {property.address_line1},{' '}
-                                {property.city?.name ?? ''}
+        <SafeAreaView style={styles.container} edges={['bottom']}>
+            <AppHeader title="Confirm Booking" showBack />
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <View style={styles.contentPadding}>
+                        {/* Property Summary */}
+                        <View style={styles.headerBox}>
+                            <Text style={styles.propertyName}>
+                                {property.name}
                             </Text>
+                            {addressText ? (
+                                <View style={styles.addressRow}>
+                                    <MapPin
+                                        size={12}
+                                        color={Colors.gray600}
+                                        style={{ marginRight: 4 }}
+                                    />
+                                    <Text style={styles.propertyAddress}>
+                                        {addressText}
+                                    </Text>
+                                </View>
+                            ) : null}
                         </View>
-                    </View>
 
                     {/* Stay Timing Policy Notice */}
                     <View style={styles.timingNotice}>
@@ -574,7 +696,11 @@ export default function CreateReservationScreen() {
                     />
 
                     <Input
-                        label="Number of Rooms"
+                        label={
+                            selectedRoom?.pricing_basis === 'per_guest'
+                                ? 'Number of Guests'
+                                : 'Number of Rooms'
+                        }
                         value={quantity}
                         onChangeText={setQuantity}
                         keyboardType="numeric"
@@ -588,30 +714,31 @@ export default function CreateReservationScreen() {
                     </Text>
                     <Text style={styles.fieldLabel}>Guest Gender</Text>
                     <View style={styles.chipRow}>
-                        {(['male', 'female', 'mixed'] as const).map(
-                            (gender) => (
-                                <TouchableOpacity
-                                    key={gender}
+                        {allowedGenders.map((genderOpt) => (
+                            <TouchableOpacity
+                                key={genderOpt.value}
+                                style={[
+                                    styles.chip,
+                                    guestGender === genderOpt.value &&
+                                        styles.chipActive,
+                                ]}
+                                onPress={() => setGuestGender(genderOpt.value)}
+                                accessibilityRole="button"
+                                accessibilityState={{
+                                    selected: guestGender === genderOpt.value,
+                                }}
+                            >
+                                <Text
                                     style={[
-                                        styles.chip,
-                                        guestGender === gender &&
-                                            styles.chipActive,
+                                        styles.chipText,
+                                        guestGender === genderOpt.value &&
+                                            styles.chipTextActive,
                                     ]}
-                                    onPress={() => setGuestGender(gender)}
                                 >
-                                    <Text
-                                        style={[
-                                            styles.chipText,
-                                            guestGender === gender &&
-                                                styles.chipTextActive,
-                                        ]}
-                                    >
-                                        {gender.charAt(0).toUpperCase() +
-                                            gender.slice(1)}
-                                    </Text>
-                                </TouchableOpacity>
-                            ),
-                        )}
+                                    {genderOpt.label}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
                     </View>
 
                     <Text
@@ -620,41 +747,35 @@ export default function CreateReservationScreen() {
                         Guest Composition
                     </Text>
                     <View style={styles.chipRow}>
-                        {([['individuals', 'Individual']] as const).map(
-                            ([composition, label]) => (
-                                <TouchableOpacity
-                                    key={composition}
+                        {allowedCompositions.map((compOpt) => (
+                            <TouchableOpacity
+                                key={compOpt.value}
+                                style={[
+                                    styles.chip,
+                                    guestComposition === compOpt.value &&
+                                        styles.chipActive,
+                                ]}
+                                onPress={() =>
+                                    setGuestComposition(compOpt.value)
+                                }
+                                accessibilityRole="button"
+                                accessibilityState={{
+                                    selected:
+                                        guestComposition === compOpt.value,
+                                }}
+                            >
+                                <Text
                                     style={[
-                                        styles.chip,
-                                        guestComposition === composition &&
-                                            styles.chipActive,
+                                        styles.chipText,
+                                        guestComposition === compOpt.value &&
+                                            styles.chipTextActive,
                                     ]}
-                                    onPress={() =>
-                                        setGuestComposition(composition)
-                                    }
                                 >
-                                    <Text
-                                        style={[
-                                            styles.chipText,
-                                            guestComposition === composition &&
-                                                styles.chipTextActive,
-                                        ]}
-                                    >
-                                        {label}
-                                    </Text>
-                                </TouchableOpacity>
-                            ),
-                        )}
+                                    {compOpt.label}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
                     </View>
-
-                    <Input
-                        label="Special Requests / Notes (Optional)"
-                        value={notes}
-                        onChangeText={setNotes}
-                        placeholder="e.g. Vegetarian meals only, ground floor preferred"
-                        multiline
-                        numberOfLines={3}
-                    />
 
                     {/* Section 4: Coupons & Loyalty Rewards */}
                     <Text
@@ -708,17 +829,27 @@ export default function CreateReservationScreen() {
                         ) : (
                             <View>
                                 <View style={styles.couponInputRow}>
-                                    <Input
-                                        placeholder="e.g. TIJUMWELCOME"
-                                        value={couponCode}
-                                        onChangeText={setCouponCode}
-                                        autoCapitalize="characters"
-                                        style={{ flex: 1, marginBottom: 0 }}
-                                    />
+                                    <View style={{ flex: 1 }}>
+                                        <Input
+                                            placeholder="Enter promo code"
+                                            value={couponCode}
+                                            onChangeText={setCouponCode}
+                                            autoCapitalize="characters"
+                                            editable={
+                                                authState ===
+                                                'customer_authenticated'
+                                            }
+                                            style={{ marginBottom: 0 }}
+                                        />
+                                    </View>
                                     <Button
                                         title="Apply"
                                         variant="primary"
                                         loading={couponLoading}
+                                        disabled={
+                                            authState !==
+                                            'customer_authenticated'
+                                        }
                                         onPress={handleApplyCoupon}
                                         style={styles.applyCouponBtn}
                                     />
@@ -729,8 +860,9 @@ export default function CreateReservationScreen() {
                                     </Text>
                                 )}
                                 <Text style={styles.couponHintText}>
-                                    Try: TIJUMWELCOME (₹500 off) or COLIVING15
-                                    (15% off)
+                                    {authState === 'customer_authenticated'
+                                        ? 'Enter a valid promo code or browse Rewards > Coupons for eligible offers.'
+                                        : 'Sign in as a customer to validate coupon codes and redeem loyalty points.'}
                                 </Text>
                             </View>
                         )}
@@ -766,13 +898,18 @@ export default function CreateReservationScreen() {
                             </View>
                             <Switch
                                 value={redeemPointsActive}
+                                disabled={
+                                    authState !== 'customer_authenticated' ||
+                                    !userWallet ||
+                                    userWallet.available_points <= 0
+                                }
                                 onValueChange={(val: boolean) => {
                                     setRedeemPointsActive(val);
                                     if (val && userWallet) {
                                         setPointsToRedeem(
-                                            Math.min(
+                                            Math.max(
+                                                0,
                                                 userWallet.available_points,
-                                                400,
                                             ),
                                         );
                                     }
@@ -803,7 +940,22 @@ export default function CreateReservationScreen() {
                     </View>
 
                     {/* Summary / Price Quotation */}
-                    {quote ? (
+                    {quoteLoading && !quote ? (
+                        <View style={styles.quoteCard}>
+                            <ActivityIndicator
+                                size="small"
+                                color={Colors.deepPlum}
+                            />
+                            <Text
+                                style={[
+                                    styles.quoteLabel,
+                                    { textAlign: 'center', marginTop: 4 },
+                                ]}
+                            >
+                                Calculating authoritative quote...
+                            </Text>
+                        </View>
+                    ) : quote ? (
                         <View style={styles.quoteCard}>
                             <View style={styles.quoteTitleRow}>
                                 <Receipt
@@ -950,14 +1102,19 @@ export default function CreateReservationScreen() {
                     ) : null}
 
                     <Button
-                        title="Request Reservation"
+                        title={
+                            authState === 'customer_authenticated'
+                                ? 'Request Reservation'
+                                : 'Sign In to Book'
+                        }
                         loading={submitting}
-                        disabled={!quote}
+                        disabled={!quote || quoteLoading}
                         onPress={handleSubmit}
                         style={{ marginTop: Spacing.xl }}
                     />
                 </View>
             </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }
@@ -1049,7 +1206,7 @@ const styles = StyleSheet.create({
         color: Colors.deepPlum,
     },
     textActive: {
-        color: Colors.coral,
+        color: Colors.coralDark,
         fontWeight: '700',
     },
     roomPricing: {
@@ -1064,10 +1221,13 @@ const styles = StyleSheet.create({
     },
     chipRow: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: Spacing.sm,
         marginBottom: Spacing.md,
     },
     chip: {
+        minHeight: 44,
+        justifyContent: 'center',
         paddingVertical: Spacing.xs,
         paddingHorizontal: Spacing.md,
         borderRadius: 20,
@@ -1084,7 +1244,7 @@ const styles = StyleSheet.create({
         color: Colors.gray700,
     },
     chipTextActive: {
-        color: Colors.white,
+        color: Colors.deepPlum,
         fontWeight: '700',
     },
     quoteCard: {
@@ -1143,7 +1303,7 @@ const styles = StyleSheet.create({
     },
     quoteTotalValue: {
         ...Typography.titleSmall,
-        color: Colors.coral,
+        color: Colors.coralDark,
         fontWeight: '800',
     },
     earnBadgeRow: {
@@ -1275,6 +1435,7 @@ const styles = StyleSheet.create({
     },
     errorText: {
         ...Typography.bodyMedium,
-        color: Colors.coral,
+        color: Colors.coralDark,
+        textAlign: 'center',
     },
 });

@@ -1,21 +1,29 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    AppState,
+    KeyboardAvoidingView,
     Modal,
-    SafeAreaView,
+    Platform,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
     Calendar,
     CheckCircle,
     Clock,
     Receipt,
+    RefreshCw,
     ShieldCheck,
     Star,
     UtensilsCrossed,
@@ -28,13 +36,18 @@ import { Reservation } from '../../../src/api/types';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
+import { AppHeader } from '../../../src/components/AppHeader';
+import { RequireAuth } from '../../../src/components/RequireAuth';
 import { ReservationStatusBadge } from '../../../src/components/ReservationStatusBadge';
 import { StayTimingBadge } from '../../../src/components/StayTimingBadge';
 import { MealBadge } from '../../../src/components/MealBadge';
 import { Badge } from '../../../src/components/Badge';
 import { Button } from '../../../src/components/Button';
 import { Input } from '../../../src/components/Input';
-import { RazorpayService } from '../../../src/payments/RazorpayService';
+import {
+    classifyRazorpayError,
+    RazorpayService,
+} from '../../../src/payments/RazorpayService';
 import {
     canCancelReservation,
     canPayReservation,
@@ -47,12 +60,19 @@ import {
 export default function ReservationDetailScreen() {
     const { reference } = useLocalSearchParams<{ reference: string }>();
     const router = useRouter();
+    const insets = useSafeAreaInsets();
 
     const [reservation, setReservation] = useState<Reservation | null>(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [paying, setPaying] = useState(false);
+    const [checkingStatus, setCheckingStatus] = useState(false);
     const [cancelling, setCancelling] = useState(false);
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+    const paymentInFlightRef = useRef(false);
+    const hasTriggeredExpiryRef = useRef<string | null>(null);
 
     // Customer Review State
     const [showReviewModal, setShowReviewModal] = useState(false);
@@ -67,74 +87,170 @@ export default function ReservationDetailScreen() {
     const [reviewError, setReviewError] = useState('');
 
     useEffect(() => {
+        setReservation(null);
+        setLoadError(null);
+        setTimeLeft(null);
+        setShowReviewModal(false);
+        setReviewError('');
+        setReviewTitle('');
+        setReviewContent('');
+        hasTriggeredExpiryRef.current = null;
         if (reference) {
             void loadReservation();
+        } else {
+            setLoading(false);
+            setLoadError('Reservation reference is missing.');
         }
     }, [reference]);
 
     // Payment Countdown Timer (15-minute window)
     useEffect(() => {
-        if (!reservation) return;
+        if (!reservation) {
+            setTimeLeft(null);
+            return;
+        }
 
-        const isPayable = canPayReservation(reservation);
-
+        const isWindowPayable = canPayReservation(reservation);
         const deadlineStr =
             reservation.payment_deadline_at ||
             reservation.payment_window_expires_at;
 
-        if (isPayable && deadlineStr) {
-            const calculateSeconds = () => {
-                const expires = new Date(deadlineStr).getTime();
-                const now = Date.now();
-                const diff = Math.max(0, Math.floor((expires - now) / 1000));
-                return diff;
-            };
-
-            setTimeLeft(calculateSeconds());
-
-            const interval = setInterval(() => {
-                const remaining = calculateSeconds();
-                setTimeLeft(remaining);
-                if (remaining <= 0) {
-                    clearInterval(interval);
-                    void loadReservation(); // refresh status (will be expired)
-                }
-            }, 1000);
-
-            return () => clearInterval(interval);
-        } else {
+        if (!isWindowPayable || !deadlineStr) {
             setTimeLeft(null);
+            return;
         }
-    }, [reservation]);
 
-    const loadReservation = async () => {
+        const calculateSeconds = () => {
+            const expires = new Date(deadlineStr).getTime();
+            const now = Date.now();
+            return Math.max(0, Math.floor((expires - now) / 1000));
+        };
+
+        const initialSeconds = calculateSeconds();
+        setTimeLeft(initialSeconds);
+
+        if (initialSeconds <= 0) {
+            if (reference && hasTriggeredExpiryRef.current !== reference) {
+                hasTriggeredExpiryRef.current = reference;
+                void loadReservation({ silent: true });
+            }
+            return;
+        }
+
+        const interval = setInterval(() => {
+            const remaining = calculateSeconds();
+            setTimeLeft(remaining);
+            if (remaining <= 0) {
+                clearInterval(interval);
+                if (reference && hasTriggeredExpiryRef.current !== reference) {
+                    hasTriggeredExpiryRef.current = reference;
+                    void loadReservation({ silent: true });
+                }
+            }
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [
+        reference,
+        reservation?.status,
+        reservation?.payment_deadline_at,
+        reservation?.payment_window_expires_at,
+    ]);
+
+    const loadReservation = async (options?: { silent?: boolean }) => {
+        if (!reference) {
+            setLoading(false);
+            setLoadError('Reservation reference is missing.');
+            return;
+        }
         try {
-            setLoading(true);
+            if (!options?.silent) {
+                setLoading(true);
+            }
+            setLoadError(null);
             const res = await CustomerApi.getReservation(reference);
             if (res.data) {
                 setReservation(res.data);
                 return;
             }
             setReservation(null);
+            setLoadError('Reservation could not be found.');
         } catch (e: any) {
-            Alert.alert(
-                'Error',
-                e.message || 'Failed to load reservation details.',
-            );
+            const msg = e?.message || 'Failed to load reservation details.';
+            setLoadError(msg);
+            if (options?.silent) {
+                Alert.alert('Error', msg);
+            }
         } finally {
             setLoading(false);
         }
     };
 
-    const handlePayWithRazorpay = async () => {
-        if (!reservation) return;
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await loadReservation({ silent: true });
+        setRefreshing(false);
+    };
+
+    const handleCheckPaymentStatus = async (options?: { silent?: boolean }) => {
+        const targetRef =
+            reservation?.reference ?? reservation?.booking_reference ?? reference;
+        if (!targetRef) {
+            return;
+        }
         try {
+            if (!options?.silent) {
+                setCheckingStatus(true);
+            }
+            await RazorpayService.reconcile(targetRef);
+            await loadReservation({ silent: true });
+            if (!options?.silent) {
+                Alert.alert(
+                    'Payment Status Refreshed',
+                    'Latest payment state synced from the server.',
+                );
+            }
+        } catch (e: any) {
+            if (!options?.silent) {
+                Alert.alert(
+                    'Status Check Failed',
+                    e?.message || 'Unable to verify payment status right now.',
+                );
+            }
+        } finally {
+            if (!options?.silent) {
+                setCheckingStatus(false);
+            }
+        }
+    };
+
+    // Reconcile payment state when returning to foreground during/around payment
+    useEffect(() => {
+        const sub = AppState.addEventListener('change', (nextState) => {
+            if (
+                nextState === 'active' &&
+                reservation &&
+                (paying || canPayReservation(reservation))
+            ) {
+                void handleCheckPaymentStatus({ silent: true });
+            }
+        });
+        return () => sub.remove();
+    }, [paying, reservation?.reference, reservation?.booking_reference, reservation?.status]);
+
+    const handlePayWithRazorpay = async () => {
+        if (!reservation || paymentInFlightRef.current) return;
+        try {
+            paymentInFlightRef.current = true;
             setPaying(true);
+            const bookingRef =
+                reservation.reference ?? reservation.booking_reference;
             // Step 1: Initiate payment on backend to create authoritative Razorpay order
-            const initRes = await CustomerApi.initiatePayment(
-                reservation.reference ?? reservation.booking_reference,
-            );
+            const initRes = await CustomerApi.initiatePayment(bookingRef);
             const payload = initRes.data;
+            if (!payload) {
+                throw new Error('Unable to initialize payment order. Please try again.');
+            }
 
             // Step 2: Open native Razorpay Checkout with prefill
             const checkoutResponse = await RazorpayService.openCheckout(
@@ -147,14 +263,11 @@ export default function ReservationDetailScreen() {
             );
 
             // Step 3: Authoritatively verify signature on backend
-            const verifyRes = await CustomerApi.verifyPayment(
-                reservation.reference ?? reservation.booking_reference,
-                {
-                    razorpay_order_id: checkoutResponse.razorpay_order_id,
-                    razorpay_payment_id: checkoutResponse.razorpay_payment_id,
-                    razorpay_signature: checkoutResponse.razorpay_signature,
-                },
-            );
+            const verifyRes = await CustomerApi.verifyPayment(bookingRef, {
+                razorpay_order_id: checkoutResponse.razorpay_order_id,
+                razorpay_payment_id: checkoutResponse.razorpay_payment_id,
+                razorpay_signature: checkoutResponse.razorpay_signature,
+            });
 
             if (verifyRes.data) {
                 setReservation(verifyRes.data);
@@ -165,21 +278,13 @@ export default function ReservationDetailScreen() {
                 Alert.alert(alertCopy.title, alertCopy.message);
             }
         } catch (e: any) {
-            // Dismissal / cancellation by user does not warrant an alarming error alert
-            if (
-                e?.code === 0 ||
-                e?.description?.toLowerCase().includes('cancel') ||
-                e?.message?.toLowerCase().includes('cancel')
-            ) {
+            const classified = classifyRazorpayError(e, Platform.OS);
+            if (classified.cancelled) {
                 return;
             }
-            Alert.alert(
-                'Payment Incomplete',
-                e?.description ||
-                    e?.message ||
-                    'Payment could not be completed.',
-            );
+            Alert.alert('Payment Incomplete', classified.message);
         } finally {
+            paymentInFlightRef.current = false;
             setPaying(false);
         }
     };
@@ -302,23 +407,54 @@ export default function ReservationDetailScreen() {
 
     if (loading) {
         return (
-            <View style={styles.center}>
-                <ActivityIndicator size="large" color={Colors.coral} />
-                <Text style={styles.loadingText}>Loading reservation...</Text>
-            </View>
+            <RequireAuth role="customer">
+                <SafeAreaView style={styles.container} edges={['bottom']}>
+                    <AppHeader
+                        title="Reservation Details"
+                        showBack
+                        fallbackRoute="/(customer)/bookings"
+                    />
+                    <View style={styles.center}>
+                        <ActivityIndicator
+                            size="large"
+                            color={Colors.deepPlum}
+                        />
+                        <Text style={styles.loadingText}>
+                            Loading reservation...
+                        </Text>
+                    </View>
+                </SafeAreaView>
+            </RequireAuth>
         );
     }
 
     if (!reservation) {
         return (
-            <View style={styles.center}>
-                <Text style={styles.errorText}>Reservation not found.</Text>
-                <Button
-                    title="Go Back"
-                    onPress={() => router.back()}
-                    style={{ marginTop: Spacing.md }}
-                />
-            </View>
+            <RequireAuth role="customer">
+                <SafeAreaView style={styles.container} edges={['bottom']}>
+                    <AppHeader
+                        title="Reservation Details"
+                        showBack
+                        fallbackRoute="/(customer)/bookings"
+                    />
+                    <View style={styles.center}>
+                        <Text style={styles.errorText}>
+                            {loadError || 'Reservation not found.'}
+                        </Text>
+                        <Button
+                            title="Retry"
+                            onPress={() => void loadReservation()}
+                            style={{ marginTop: Spacing.md }}
+                        />
+                        <Button
+                            title="Go Back"
+                            variant="outline"
+                            onPress={() => router.back()}
+                            style={{ marginTop: Spacing.sm }}
+                        />
+                    </View>
+                </SafeAreaView>
+            </RequireAuth>
         );
     }
 
@@ -347,8 +483,27 @@ export default function ReservationDetailScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+        <RequireAuth role="customer">
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <AppHeader
+                    title="Reservation Details"
+                    showBack
+                    fallbackRoute="/(customer)/bookings"
+                />
+                <ScrollView
+                    contentContainerStyle={[
+                        styles.scrollContent,
+                        isPayable && { paddingBottom: 140 + insets.bottom },
+                    ]}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            colors={[Colors.deepPlum]}
+                            tintColor={Colors.deepPlum}
+                        />
+                    }
+                >
                 {/* Urgent Payment Banner */}
                 {isPayable ? (
                     <View style={styles.urgentHeader}>
@@ -596,6 +751,42 @@ export default function ReservationDetailScreen() {
                                         ₹
                                         {(
                                             (reservation.deposit_amount_paise ??
+                                                0) / 100
+                                        ).toLocaleString('en-IN')}
+                                    </Text>
+                                </View>
+                            ) : null}
+                            {(reservation.coupon_discount_paise ?? 0) > 0 ? (
+                                <View style={styles.infoRow}>
+                                    <Text style={styles.discountLabel}>
+                                        Coupon Discount
+                                        {reservation.coupon_code
+                                            ? ` (${reservation.coupon_code})`
+                                            : ''}
+                                        :
+                                    </Text>
+                                    <Text style={styles.discountValue}>
+                                        -₹
+                                        {(
+                                            (reservation.coupon_discount_paise ??
+                                                0) / 100
+                                        ).toLocaleString('en-IN')}
+                                    </Text>
+                                </View>
+                            ) : null}
+                            {(reservation.points_discount_paise ?? 0) > 0 ? (
+                                <View style={styles.infoRow}>
+                                    <Text style={styles.discountLabel}>
+                                        Points Redeemed
+                                        {reservation.points_redeemed
+                                            ? ` (${reservation.points_redeemed} pts)`
+                                            : ''}
+                                        :
+                                    </Text>
+                                    <Text style={styles.discountValue}>
+                                        -₹
+                                        {(
+                                            (reservation.points_discount_paise ??
                                                 0) / 100
                                         ).toLocaleString('en-IN')}
                                     </Text>
@@ -871,10 +1062,11 @@ export default function ReservationDetailScreen() {
                             style={{ marginTop: Spacing.sm }}
                             onPress={() =>
                                 router.push({
-                                    pathname: '/(customer)/support/index',
+                                    pathname: '/(customer)/support',
                                     params: {
                                         booking_reference:
-                                            reservation.reference,
+                                            reservation.reference ??
+                                            reservation.booking_reference,
                                     },
                                 })
                             }
@@ -1005,8 +1197,13 @@ export default function ReservationDetailScreen() {
 
             {/* Floating Bottom Action for Payable State */}
             {isPayable ? (
-                <View style={styles.bottomBar}>
-                    <View>
+                <View
+                    style={[
+                        styles.bottomBar,
+                        { paddingBottom: Math.max(insets.bottom, Spacing.md) },
+                    ]}
+                >
+                    <View style={{ flex: 1, marginRight: Spacing.sm }}>
                         <Text style={styles.bottomLabel}>Amount Due</Text>
                         <Text style={styles.bottomPrice}>
                             ₹
@@ -1015,12 +1212,40 @@ export default function ReservationDetailScreen() {
                             ).toLocaleString('en-IN')}
                         </Text>
                     </View>
-                    <Button
-                        title="Pay with Razorpay"
-                        loading={paying}
-                        onPress={handlePayWithRazorpay}
-                        style={{ paddingHorizontal: Spacing.xl }}
-                    />
+                    <View style={styles.bottomActionsRow}>
+                        <TouchableOpacity
+                            style={styles.checkStatusBtn}
+                            onPress={() =>
+                                void handleCheckPaymentStatus({ silent: false })
+                            }
+                            disabled={checkingStatus || paying}
+                            accessibilityRole="button"
+                            accessibilityLabel="Check payment status"
+                        >
+                            {checkingStatus ? (
+                                <ActivityIndicator
+                                    size="small"
+                                    color={Colors.deepPlum}
+                                />
+                            ) : (
+                                <>
+                                    <RefreshCw
+                                        size={14}
+                                        color={Colors.deepPlum}
+                                    />
+                                    <Text style={styles.checkStatusBtnText}>
+                                        Status
+                                    </Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                        <Button
+                            title="Pay with Razorpay"
+                            loading={paying}
+                            onPress={handlePayWithRazorpay}
+                            style={{ paddingHorizontal: Spacing.lg }}
+                        />
+                    </View>
                 </View>
             ) : null}
 
@@ -1031,8 +1256,21 @@ export default function ReservationDetailScreen() {
                 animationType="slide"
                 onRequestClose={() => setShowReviewModal(false)}
             >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.reviewModalContent}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
+                >
+                    <View
+                        style={[
+                            styles.reviewModalContent,
+                            {
+                                paddingBottom: Math.max(
+                                    insets.bottom,
+                                    Spacing.lg,
+                                ),
+                            },
+                        ]}
+                    >
                         <View style={styles.modalHeader}>
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.modalTitle}>
@@ -1047,12 +1285,9 @@ export default function ReservationDetailScreen() {
                             </View>
                             <TouchableOpacity
                                 onPress={() => setShowReviewModal(false)}
-                                hitSlop={{
-                                    top: 10,
-                                    bottom: 10,
-                                    left: 10,
-                                    right: 10,
-                                }}
+                                style={styles.modalCloseBtn}
+                                accessibilityRole="button"
+                                accessibilityLabel="Close review modal"
                             >
                                 <X size={20} color={Colors.gray600} />
                             </TouchableOpacity>
@@ -1160,9 +1395,10 @@ export default function ReservationDetailScreen() {
                             />
                         </ScrollView>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
-        </SafeAreaView>
+            </SafeAreaView>
+        </RequireAuth>
     );
 }
 
@@ -1188,7 +1424,7 @@ const styles = StyleSheet.create({
     },
     urgentTitle: {
         ...Typography.labelMedium,
-        color: Colors.coral,
+        color: Colors.coralDark,
         fontWeight: '700',
     },
     urgentSubtitle: {
@@ -1198,7 +1434,7 @@ const styles = StyleSheet.create({
     },
     timerCountdown: {
         ...Typography.titleSmall,
-        color: Colors.coral,
+        color: Colors.coralDark,
         fontWeight: '800',
     },
     inlineTimerRow: {
@@ -1283,8 +1519,18 @@ const styles = StyleSheet.create({
     },
     totalValue: {
         ...Typography.titleSmall,
-        color: Colors.coral,
+        color: Colors.coralDark,
         fontWeight: '800',
+    },
+    discountLabel: {
+        ...Typography.bodySmall,
+        color: '#065F46',
+        fontWeight: '600',
+    },
+    discountValue: {
+        ...Typography.bodySmall,
+        color: '#065F46',
+        fontWeight: '700',
     },
     mealBadgesContainer: {
         gap: Spacing.sm,
@@ -1298,7 +1544,8 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: Colors.gray200,
         paddingHorizontal: Spacing.lg,
-        paddingVertical: Spacing.md,
+        paddingTop: Spacing.md,
+        paddingBottom: Spacing.md,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -1308,14 +1555,41 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 8,
     },
+    bottomActionsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+    },
+    checkStatusBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        minHeight: 44,
+        paddingHorizontal: Spacing.md,
+        borderRadius: BorderRadius.md,
+        borderWidth: 1,
+        borderColor: Colors.deepPlum,
+        backgroundColor: Colors.white,
+    },
+    checkStatusBtnText: {
+        ...Typography.labelSmall,
+        color: Colors.deepPlum,
+        fontWeight: '700',
+    },
     bottomLabel: {
         ...Typography.bodySmall,
         color: Colors.gray500,
     },
     bottomPrice: {
         ...Typography.titleSmall,
-        color: Colors.coral,
+        color: Colors.coralDark,
         fontWeight: '800',
+    },
+    modalCloseBtn: {
+        minWidth: 44,
+        minHeight: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     center: {
         flex: 1,
@@ -1331,7 +1605,7 @@ const styles = StyleSheet.create({
     },
     errorText: {
         ...Typography.bodyMedium,
-        color: Colors.coral,
+        color: Colors.coralDark,
         textAlign: 'center',
     },
     starRow: {

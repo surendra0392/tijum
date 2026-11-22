@@ -165,8 +165,8 @@ describe('End-to-End Booking & Payment Lifecycle Specification', () => {
             const source = fs.readFileSync(detailPath, 'utf8');
 
             assert.ok(
-                source.includes('e?.code === 0') && source.includes("includes('cancel')"),
-                'Must gracefully handle user dismissal without false positive failure alerts',
+                source.includes('classifyRazorpayError'),
+                'Must use classifyRazorpayError so user dismissal is handled safely without swallowing network errors',
             );
         });
     });

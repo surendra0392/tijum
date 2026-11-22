@@ -1,25 +1,55 @@
 import React, { useEffect, useState } from 'react';
 import {
-    Dimensions,
+    ActivityIndicator,
+    Alert,
     Image,
-    SafeAreaView,
+    Platform,
+    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
-    Platform,
-    Alert,
+    useWindowDimensions,
 } from 'react-native';
-import { BedDouble, Utensils, Home, Bell } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import * as SecureStore from 'expo-secure-store';
+import { BedDouble, Utensils, Home, Bell, CheckCircle2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '../src/auth/AuthContext';
 import { BrandLogo } from '../src/components/BrandLogo';
 import { PushNotificationService } from '../src/notifications/PushNotificationService';
 import { Colors } from '../src/theme/colors';
-import { Spacing } from '../src/theme/spacing';
+import { BorderRadius, Spacing } from '../src/theme/spacing';
+import { Typography } from '../src/theme/typography';
 
-const { height } = Dimensions.get('window');
+const ONBOARDING_COMPLETED_KEY = 'tijum_onboarding_completed_v1';
+
+async function getOnboardingCompleted(): Promise<boolean> {
+    try {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            return (
+                window.localStorage?.getItem(ONBOARDING_COMPLETED_KEY) === '1'
+            );
+        }
+        const val = await SecureStore.getItemAsync(ONBOARDING_COMPLETED_KEY);
+        return val === '1';
+    } catch {
+        return false;
+    }
+}
+
+async function markOnboardingCompleted(): Promise<void> {
+    try {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            window.localStorage?.setItem(ONBOARDING_COMPLETED_KEY, '1');
+            return;
+        }
+        await SecureStore.setItemAsync(ONBOARDING_COMPLETED_KEY, '1');
+    } catch {
+        // Non-critical preference write
+    }
+}
 
 const ONBOARDING_SLIDES = [
     {
@@ -56,18 +86,41 @@ const ONBOARDING_SLIDES = [
 
 export default function WelcomeScreen() {
     const router = useRouter();
+    const { height } = useWindowDimensions();
     const { token, accountType, isLoading } = useAuth();
     const [activeSlide, setActiveSlide] = useState(0);
+    const [checkingGate, setCheckingGate] = useState(true);
 
     useEffect(() => {
-        if (!isLoading && token && accountType) {
-            if (accountType === 'customer') {
-                router.replace('/(customer)/explore');
-            } else if (accountType === 'partner') {
-                router.replace('/(partner)/dashboard');
-            }
+        if (isLoading) {
+            return;
         }
-    }, [isLoading, token, accountType]);
+
+        if (token && accountType) {
+            router.replace(
+                accountType === 'partner'
+                    ? '/(partner)/dashboard'
+                    : '/(customer)/explore',
+            );
+            return;
+        }
+
+        let cancelled = false;
+        void getOnboardingCompleted().then((completed) => {
+            if (cancelled) {
+                return;
+            }
+            if (completed) {
+                router.replace('/(customer)/explore');
+            } else {
+                setCheckingGate(false);
+            }
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isLoading, token, accountType, router]);
 
     const handleNext = () => {
         if (activeSlide < ONBOARDING_SLIDES.length - 1) {
@@ -109,7 +162,8 @@ export default function WelcomeScreen() {
         }
     };
 
-    const goToAccountHome = () => {
+    const goToAccountHome = async () => {
+        await markOnboardingCompleted();
         router.replace(
             accountType === 'partner'
                 ? '/(partner)/dashboard'
@@ -119,13 +173,28 @@ export default function WelcomeScreen() {
 
     const handlePermissionContinue = async () => {
         await requestAllPermissions();
-        goToAccountHome();
+        await goToAccountHome();
     };
 
     const handleSkip = () => {
-        goToAccountHome();
+        goToAccountHome().catch(() => {});
     };
 
+    if (isLoading || checkingGate) {
+        return (
+            <View style={styles.splashLoading}>
+                <StatusBar style="light" />
+                <BrandLogo size={148} tone="light" />
+                <ActivityIndicator
+                    color={Colors.coral}
+                    size="small"
+                    style={{ marginTop: Spacing.lg }}
+                />
+            </View>
+        );
+    }
+
+    const heroHeight = Math.min(Math.max(height * 0.44, 240), 420);
     const currentSlide = ONBOARDING_SLIDES[activeSlide];
     const isPermissionSlide = currentSlide.isPermissionSlide;
     const CurrentIcon = currentSlide.Icon;
@@ -134,7 +203,7 @@ export default function WelcomeScreen() {
         <View style={styles.container}>
             <StatusBar style="light" />
             {/* Top Half: Visual Hero Image or Illustration */}
-            <View style={styles.topHeroContainer}>
+            <View style={[styles.topHeroContainer, { height: heroHeight }]}>
                 {isPermissionSlide ? (
                     <View style={styles.permissionGraphicContainer}>
                         {/* Phone Illustration with Bell */}
@@ -155,7 +224,7 @@ export default function WelcomeScreen() {
                 )}
 
                 {/* Top Bar with Brand Logo and Skip */}
-                <SafeAreaView style={styles.topBarSafe}>
+                <SafeAreaView edges={['top']} style={styles.topBarSafe}>
                     <View style={styles.topBar}>
                         <View style={styles.logoBadge}>
                             <BrandLogo
@@ -167,6 +236,8 @@ export default function WelcomeScreen() {
                         {!isPermissionSlide && (
                             <TouchableOpacity
                                 style={styles.skipBtn}
+                                accessibilityLabel="Skip onboarding"
+                                accessibilityRole="button"
                                 onPress={() =>
                                     setActiveSlide(ONBOARDING_SLIDES.length - 1)
                                 }
@@ -183,11 +254,14 @@ export default function WelcomeScreen() {
             <View style={styles.bottomCard}>
                 {/* Floating Round Coral Icon Badge */}
                 <View style={styles.floatingBadge}>
-                    <CurrentIcon size={26} color={Colors.white} />
+                    <CurrentIcon size={26} color={Colors.deepPlum} />
                 </View>
 
-                {/* Content Area */}
-                <View style={styles.contentArea}>
+                <ScrollView
+                    style={styles.bottomScroll}
+                    contentContainerStyle={styles.contentArea}
+                    showsVerticalScrollIndicator={false}
+                >
                     <Text style={styles.slideTitle}>{currentSlide.title}</Text>
 
                     {isPermissionSlide ? (
@@ -196,18 +270,21 @@ export default function WelcomeScreen() {
                                 <View
                                     style={[
                                         styles.permissionIconBadge,
-                                        { backgroundColor: '#FFF3EA' },
+                                        { backgroundColor: Colors.peachSoft },
                                     ]}
                                 >
-                                    <Bell size={18} color={Colors.coral} />
+                                    <Bell
+                                        size={18}
+                                        color={Colors.coralDark}
+                                    />
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <Text style={styles.permissionItemTitle}>
-                                        Push Notifications
+                                        Booking & Stay Alerts
                                     </Text>
                                     <Text style={styles.permissionItemSubtitle}>
-                                        Booking confirmations, check-in codes &
-                                        meal timing alerts
+                                        Payment confirmations, check-in room
+                                        assignments & support updates
                                     </Text>
                                 </View>
                             </View>
@@ -215,18 +292,21 @@ export default function WelcomeScreen() {
                                 <View
                                     style={[
                                         styles.permissionIconBadge,
-                                        { backgroundColor: '#EFF6FF' },
+                                        { backgroundColor: Colors.emeraldLight },
                                     ]}
                                 >
-                                    <Home size={18} color="#2563EB" />
+                                    <CheckCircle2
+                                        size={18}
+                                        color={Colors.successText}
+                                    />
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <Text style={styles.permissionItemTitle}>
-                                        Nearby Stays Discovery
+                                        Verified Stays & Meal Disclosures
                                     </Text>
                                     <Text style={styles.permissionItemSubtitle}>
-                                        Explore verified hostels, homestays, and
-                                        co-living closest to you
+                                        Browse hostels, homestays & co-living
+                                        spaces with clear inclusions
                                     </Text>
                                 </View>
                             </View>
@@ -262,6 +342,12 @@ export default function WelcomeScreen() {
                     {/* Primary Action Button */}
                     <TouchableOpacity
                         style={styles.primaryButton}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                            isPermissionSlide
+                                ? 'Enable Notifications and Continue'
+                                : 'Next onboarding slide'
+                        }
                         onPress={
                             isPermissionSlide
                                 ? handlePermissionContinue
@@ -271,7 +357,7 @@ export default function WelcomeScreen() {
                     >
                         <Text style={styles.primaryButtonText}>
                             {isPermissionSlide
-                                ? 'Allow Permissions & Get Started'
+                                ? 'Enable Alerts & Explore Stays'
                                 : 'Next →'}
                         </Text>
                     </TouchableOpacity>
@@ -280,17 +366,24 @@ export default function WelcomeScreen() {
                     {isPermissionSlide ? (
                         <TouchableOpacity
                             style={styles.secondaryTextBtn}
+                            accessibilityRole="button"
+                            accessibilityLabel="Continue without enabling notifications"
                             onPress={handleSkip}
                             activeOpacity={0.8}
                         >
-                            <Text style={styles.secondaryText}>Skip</Text>
+                            <Text style={styles.secondaryText}>
+                                Skip for now
+                            </Text>
                         </TouchableOpacity>
                     ) : (
                         <View style={styles.footerLinksRow}>
                             <TouchableOpacity
-                                onPress={() =>
-                                    router.push('/(auth)/customer-login')
-                                }
+                                style={styles.footerLinkBtn}
+                                accessibilityRole="button"
+                                onPress={() => {
+                                    void markOnboardingCompleted();
+                                    router.push('/(auth)/customer-login');
+                                }}
                                 activeOpacity={0.8}
                             >
                                 <Text style={styles.linkText}>
@@ -302,9 +395,12 @@ export default function WelcomeScreen() {
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                onPress={() =>
-                                    router.push('/(auth)/owner-login')
-                                }
+                                style={styles.footerLinkBtn}
+                                accessibilityRole="button"
+                                onPress={() => {
+                                    void markOnboardingCompleted();
+                                    router.push('/(auth)/owner-login');
+                                }}
                                 activeOpacity={0.8}
                             >
                                 <Text style={styles.partnerLinkText}>
@@ -313,19 +409,24 @@ export default function WelcomeScreen() {
                             </TouchableOpacity>
                         </View>
                     )}
-                </View>
+                </ScrollView>
             </View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
+    splashLoading: {
+        flex: 1,
+        backgroundColor: Colors.deepPlum,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     container: {
         flex: 1,
         backgroundColor: Colors.deepPlum,
     },
     topHeroContainer: {
-        height: height * 0.52,
         width: '100%',
         position: 'relative',
         backgroundColor: Colors.deepPlum,
@@ -367,14 +468,18 @@ const styles = StyleSheet.create({
         letterSpacing: 0.8,
     },
     skipBtn: {
-        backgroundColor: 'rgba(255, 255, 255, 0.25)',
-        paddingVertical: 6,
-        paddingHorizontal: 14,
-        borderRadius: 16,
+        backgroundColor: 'rgba(38, 24, 36, 0.72)',
+        minHeight: 44,
+        minWidth: 64,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: BorderRadius.pill,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     skipBtnText: {
         color: Colors.white,
-        fontWeight: '700',
+        fontFamily: Typography.fontFamily.bodyBold,
         fontSize: 13,
     },
     permissionGraphicContainer: {
@@ -420,14 +525,17 @@ const styles = StyleSheet.create({
     },
     bottomCard: {
         flex: 1,
-        backgroundColor: Colors.warmOffWhite,
+        backgroundColor: Colors.cream,
         borderTopLeftRadius: 36,
         borderTopRightRadius: 36,
         marginTop: -32,
         position: 'relative',
         paddingHorizontal: Spacing.xl,
-        paddingTop: Spacing.xl + 12,
+        paddingTop: Spacing.xl + 16,
         alignItems: 'center',
+    },
+    bottomScroll: {
+        width: '100%',
     },
     floatingBadge: {
         position: 'absolute',
@@ -447,28 +555,30 @@ const styles = StyleSheet.create({
     contentArea: {
         width: '100%',
         alignItems: 'center',
-        flex: 1,
+        flexGrow: 1,
         justifyContent: 'space-between',
-        paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+        paddingBottom: Platform.OS === 'ios' ? 28 : 20,
     },
     slideTitle: {
+        fontFamily: Typography.fontFamily.heading,
         fontSize: 24,
-        fontWeight: '800',
         color: Colors.deepPlum,
         textAlign: 'center',
         marginTop: 6,
     },
     slideSubtitle: {
+        fontFamily: Typography.fontFamily.body,
         fontSize: 15,
-        color: Colors.gray600,
+        color: Colors.inkSecondary,
         textAlign: 'center',
         marginTop: 8,
         lineHeight: 22,
         paddingHorizontal: Spacing.md,
     },
     slideNote: {
+        fontFamily: Typography.fontFamily.body,
         fontSize: 12,
-        color: Colors.gray400,
+        color: Colors.inkMuted,
         textAlign: 'center',
         marginTop: 4,
     },
@@ -484,7 +594,7 @@ const styles = StyleSheet.create({
     },
     activeDot: {
         width: 22,
-        backgroundColor: Colors.coral,
+        backgroundColor: Colors.deepPlum,
     },
     inactiveDot: {
         width: 6,
@@ -492,9 +602,9 @@ const styles = StyleSheet.create({
     },
     primaryButton: {
         width: '100%',
-        height: 52,
+        minHeight: 52,
         backgroundColor: Colors.deepPlum,
-        borderRadius: 14,
+        borderRadius: BorderRadius.pill,
         justifyContent: 'center',
         alignItems: 'center',
         shadowColor: '#000',
@@ -505,15 +615,19 @@ const styles = StyleSheet.create({
     },
     primaryButtonText: {
         color: Colors.white,
-        fontWeight: '700',
+        fontFamily: Typography.fontFamily.heading,
         fontSize: 16,
     },
     secondaryTextBtn: {
+        minHeight: 48,
         paddingVertical: Spacing.sm,
+        paddingHorizontal: Spacing.lg,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     secondaryText: {
-        color: Colors.gray500,
-        fontWeight: '600',
+        color: Colors.inkSecondary,
+        fontFamily: Typography.fontFamily.bodyBold,
         fontSize: 14,
     },
     footerLinksRow: {
@@ -523,18 +637,24 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingTop: Spacing.xs,
     },
+    footerLinkBtn: {
+        minHeight: 48,
+        justifyContent: 'center',
+        paddingHorizontal: 4,
+    },
     linkText: {
+        fontFamily: Typography.fontFamily.body,
         fontSize: 13,
-        color: Colors.gray600,
+        color: Colors.inkSecondary,
     },
     linkTextHighlight: {
-        color: Colors.coral,
-        fontWeight: '700',
+        color: Colors.coralDark,
+        fontFamily: Typography.fontFamily.bodyBold,
     },
     partnerLinkText: {
+        fontFamily: Typography.fontFamily.bodyBold,
         fontSize: 13,
         color: Colors.deepPlum,
-        fontWeight: '700',
     },
     permissionCardsBox: {
         width: '100%',

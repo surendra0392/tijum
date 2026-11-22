@@ -1,15 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
     Image,
     RefreshControl,
-    SafeAreaView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import {
     Calendar,
@@ -21,6 +25,7 @@ import { CustomerApi } from '../../../src/api/customer';
 import { Reservation } from '../../../src/api/types';
 import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import { ReservationStatusBadge } from '../../../src/components/ReservationStatusBadge';
+import { SkeletonCard } from '../../../src/components/Skeleton';
 import { useAuth } from '../../../src/auth/AuthContext';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
@@ -29,88 +34,111 @@ import {
     resolveReservationListActionRoute,
 } from '../../../src/utils/reservationState';
 
-const FILTER_TABS = [
+const FILTER_TABS: Array<{
+    label: string;
+    value: 'upcoming' | 'awaiting_action' | 'past' | 'cancelled';
+}> = [
     { label: 'Upcoming', value: 'upcoming' },
-    { label: 'Awaiting Action', value: 'awaiting_action' },
+    { label: 'Action', value: 'awaiting_action' },
     { label: 'Past', value: 'past' },
     { label: 'Cancelled', value: 'cancelled' },
 ];
 
 export default function CustomerBookingsScreen() {
     const router = useRouter();
-    const { token, authState, isLoading: authLoading } = useAuth();
+    const insets = useSafeAreaInsets();
+    const isFocused = useIsFocused();
+    const { token, authState, isLoading: authLoading, sessionEpoch } = useAuth();
     const [reservations, setReservations] = useState<Reservation[]>([]);
     const [loading, setLoading] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-    const [activeTab, setActiveTab] = useState('upcoming');
-    const [isUnauthenticated, setIsUnauthenticated] = useState(false);
+    const [activeTab, setActiveTab] = useState<
+        'upcoming' | 'awaiting_action' | 'past' | 'cancelled'
+    >('upcoming');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [lastPage, setLastPage] = useState(1);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (authLoading) return;
-        if (
-            !token ||
-            authState === 'guest' ||
-            authState === 'session_expired'
-        ) {
-            setIsUnauthenticated(true);
-            setLoading(false);
-            return;
-        }
-        setIsUnauthenticated(false);
-        void loadReservations();
-    }, [activeTab, token, authState, authLoading]);
+    const isUnauthenticated =
+        !token ||
+        authState === 'guest' ||
+        authState === 'session_expired' ||
+        authState === 'owner_authenticated';
+    const isCustomerAuthed =
+        !isUnauthenticated && authState === 'customer_authenticated';
 
-    const loadReservations = async () => {
-        if (
-            !token ||
-            authState === 'guest' ||
-            authState === 'session_expired'
-        ) {
-            setIsUnauthenticated(true);
-            setLoading(false);
+    useEffect(() => {
+        setReservations([]);
+        setCurrentPage(1);
+        setLastPage(1);
+    }, [sessionEpoch]);
+
+    const loadReservations = useCallback(
+        async (
+            pageToLoad: number = 1,
+            options?: { append?: boolean; silent?: boolean },
+        ) => {
+            if (!isCustomerAuthed) {
+                setReservations([]);
+                setLoading(false);
+                setLoadingMore(false);
+                return;
+            }
+            try {
+                if (options?.append) {
+                    setLoadingMore(true);
+                } else if (!options?.silent) {
+                    setLoading(true);
+                }
+                setErrorMessage(null);
+                const res = await CustomerApi.getReservations(
+                    activeTab,
+                    pageToLoad,
+                );
+                const items = Array.isArray(res.data) ? res.data : [];
+                setReservations((prev) =>
+                    options?.append ? [...prev, ...items] : items,
+                );
+                setCurrentPage(res.meta?.current_page ?? pageToLoad);
+                setLastPage(res.meta?.last_page ?? pageToLoad);
+            } catch (e: any) {
+                setErrorMessage(
+                    e.message ||
+                        'Failed to load your reservations. Please try again.',
+                );
+                if (!options?.append) {
+                    setReservations([]);
+                }
+            } finally {
+                setLoading(false);
+                setLoadingMore(false);
+            }
+        },
+        [activeTab, isCustomerAuthed],
+    );
+
+    useEffect(() => {
+        if (authLoading || !isFocused || !isCustomerAuthed) {
             return;
         }
-        try {
-            setLoading(true);
-            setErrorMessage(null);
-            setIsUnauthenticated(false);
-            const res = await CustomerApi.getReservations(
-                activeTab as
-                    | 'upcoming'
-                    | 'awaiting_action'
-                    | 'past'
-                    | 'cancelled',
-            );
-            if (res.data && res.data.length > 0) {
-                setReservations(res.data);
-            } else {
-                setReservations([]);
-            }
-        } catch (e: any) {
-            setErrorMessage(
-                e.message ||
-                    'Failed to load your reservations. Please try again.',
-            );
-            setReservations([]);
-        } finally {
-            setLoading(false);
-        }
-    };
+        void loadReservations(1);
+    }, [activeTab, authLoading, isFocused, isCustomerAuthed, loadReservations]);
 
     const onRefresh = async () => {
-        if (
-            !token ||
-            authState === 'guest' ||
-            authState === 'session_expired'
-        ) {
-            setIsUnauthenticated(true);
+        if (!isCustomerAuthed) {
             return;
         }
         setRefreshing(true);
-        setErrorMessage(null);
-        await loadReservations();
+        await loadReservations(1, { silent: true });
         setRefreshing(false);
+    };
+
+    const handleLoadMore = () => {
+        if (loading || loadingMore || refreshing || currentPage >= lastPage) {
+            return;
+        }
+        void loadReservations(currentPage + 1, { append: true });
     };
 
     const displayList = reservations;
@@ -119,7 +147,9 @@ export default function CustomerBookingsScreen() {
         const reference = item.reference ?? item.booking_reference;
         const rawAmount = item.total_amount_paise / 100;
         const nights = item.total_stay_days ?? item.duration_quantity;
-        const photoUrl = item.property.cover_image_url;
+        const photoUrl = item.property?.cover_image_url ?? null;
+        const propertyName =
+            item.property_name ?? item.property?.name ?? 'Verified Stay';
         const isAwaitingPayment = canPayReservation(item);
 
         return (
@@ -163,11 +193,11 @@ export default function CustomerBookingsScreen() {
                                     </View>
                                 ) : null}
                             </View>
-                            <ChevronRight size={16} color={Colors.coral} />
+                            <ChevronRight size={16} color={Colors.coralDark} />
                         </View>
 
                         <Text style={styles.propertyName} numberOfLines={1}>
-                            {item.property_name ?? item.property.name}
+                            {propertyName}
                         </Text>
 
                         <View style={styles.metaRow}>
@@ -209,16 +239,15 @@ export default function CustomerBookingsScreen() {
         );
     };
 
-    if (
-        !authLoading &&
-        (isUnauthenticated ||
-            !token ||
-            authState === 'guest' ||
-            authState === 'session_expired')
-    ) {
+    if (!authLoading && isUnauthenticated) {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.plumHeader}>
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <View
+                    style={[
+                        styles.plumHeader,
+                        { paddingTop: Math.max(insets.top, Spacing.base) },
+                    ]}
+                >
                     <Text style={styles.headerTitle}>My Bookings</Text>
                     <Text style={styles.headerSubtitle}>
                         Track your verified food-inclusive stays
@@ -238,9 +267,14 @@ export default function CustomerBookingsScreen() {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['bottom']}>
             {/* Curved Deep Plum Header */}
-            <View style={styles.plumHeader}>
+            <View
+                style={[
+                    styles.plumHeader,
+                    { paddingTop: Math.max(insets.top, Spacing.base) },
+                ]}
+            >
                 <Text style={styles.headerTitle}>My Bookings</Text>
                 <Text style={styles.headerSubtitle}>
                     Manage your upcoming stays & reservations
@@ -257,6 +291,8 @@ export default function CustomerBookingsScreen() {
                             style={[styles.tab, isActive && styles.activeTab]}
                             onPress={() => setActiveTab(tab.value)}
                             activeOpacity={0.8}
+                            accessibilityRole="tab"
+                            accessibilityState={{ selected: isActive }}
                         >
                             <Text
                                 style={[
@@ -271,26 +307,25 @@ export default function CustomerBookingsScreen() {
                 })}
             </View>
 
-            {loading ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={Colors.deepPlum} />
+            {loading && !refreshing && reservations.length === 0 ? (
+                <View style={styles.listContainer}>
+                    <SkeletonCard />
+                    <SkeletonCard />
+                    <SkeletonCard />
                 </View>
-            ) : errorMessage ? (
-                <SafeAreaView style={styles.container}>
-                    <View style={styles.errorContainer}>
-                        <AlertCircle size={48} color={Colors.coral} />
-                        <Text style={styles.errorTitle}>
-                            Unable to Load Stays
-                        </Text>
-                        <Text style={styles.errorSubtitle}>{errorMessage}</Text>
-                        <TouchableOpacity
-                            style={styles.retryBtn}
-                            onPress={onRefresh}
-                        >
-                            <Text style={styles.retryBtnText}>Try Again</Text>
-                        </TouchableOpacity>
-                    </View>
-                </SafeAreaView>
+            ) : errorMessage && reservations.length === 0 ? (
+                <View style={styles.errorContainer}>
+                    <AlertCircle size={48} color={Colors.coralDark} />
+                    <Text style={styles.errorTitle}>Unable to Load Stays</Text>
+                    <Text style={styles.errorSubtitle}>{errorMessage}</Text>
+                    <TouchableOpacity
+                        style={styles.retryBtn}
+                        onPress={() => void loadReservations(1)}
+                        accessibilityRole="button"
+                    >
+                        <Text style={styles.retryBtnText}>Try Again</Text>
+                    </TouchableOpacity>
+                </View>
             ) : (
                 <FlatList
                     data={displayList}
@@ -303,13 +338,31 @@ export default function CustomerBookingsScreen() {
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={onRefresh}
+                            colors={[Colors.deepPlum]}
+                            tintColor={Colors.deepPlum}
                         />
+                    }
+                    onEndReached={handleLoadMore}
+                    onEndReachedThreshold={0.4}
+                    ListFooterComponent={
+                        loadingMore ? (
+                            <View style={{ paddingVertical: Spacing.md }}>
+                                <ActivityIndicator
+                                    size="small"
+                                    color={Colors.deepPlum}
+                                />
+                            </View>
+                        ) : null
                     }
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
                             <Calendar size={48} color={Colors.gray400} />
                             <Text style={styles.emptyTitle}>
-                                No {activeTab} bookings
+                                No{' '}
+                                {FILTER_TABS.find(
+                                    (t) => t.value === activeTab,
+                                )?.label.toLowerCase() || activeTab}{' '}
+                                bookings
                             </Text>
                             <Text style={styles.emptySubtitle}>
                                 Browse properties and book your next stay!
@@ -319,6 +372,7 @@ export default function CustomerBookingsScreen() {
                                 onPress={() =>
                                     router.push('/(customer)/explore')
                                 }
+                                accessibilityRole="button"
                             >
                                 <Text style={styles.exploreBtnText}>
                                     Explore Stays
@@ -405,7 +459,9 @@ const styles = StyleSheet.create({
     },
     tab: {
         flex: 1,
-        paddingVertical: 9,
+        minHeight: 44,
+        paddingVertical: 10,
+        justifyContent: 'center',
         alignItems: 'center',
         borderRadius: BorderRadius.pill,
     },
@@ -512,8 +568,10 @@ const styles = StyleSheet.create({
         color: Colors.deepPlum,
     },
     viewDetailsBtn: {
+        minHeight: 44,
+        justifyContent: 'center',
         paddingHorizontal: 14,
-        paddingVertical: 6,
+        paddingVertical: 10,
         borderRadius: BorderRadius.pill,
         borderWidth: 1,
         borderColor: Colors.deepPlum,
@@ -545,9 +603,11 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     exploreBtn: {
+        minHeight: 48,
+        justifyContent: 'center',
         backgroundColor: Colors.deepPlum,
-        paddingHorizontal: 20,
-        paddingVertical: 10,
+        paddingHorizontal: 24,
+        paddingVertical: 12,
         borderRadius: BorderRadius.pill,
     },
     exploreBtnText: {
@@ -577,9 +637,11 @@ const styles = StyleSheet.create({
         maxWidth: 280,
     },
     retryBtn: {
+        minHeight: 48,
+        justifyContent: 'center',
         backgroundColor: Colors.deepPlum,
-        paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.xs + 2,
+        paddingHorizontal: Spacing.lg,
+        paddingVertical: Spacing.sm,
         borderRadius: BorderRadius.md,
         marginTop: Spacing.md,
     },

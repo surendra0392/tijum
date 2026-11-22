@@ -3,6 +3,7 @@ import {
     ActivityIndicator,
     Alert,
     KeyboardAvoidingView,
+    Linking,
     Platform,
     ScrollView,
     StyleSheet,
@@ -10,6 +11,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import {
     ChevronDown,
     ChevronUp,
@@ -18,7 +21,9 @@ import {
     Phone,
 } from 'lucide-react-native';
 import { useAuth } from '../src/auth/AuthContext';
+import { CustomerApi } from '../src/api/customer';
 import { PublicApi } from '../src/api/public';
+import { AppHeader } from '../src/components/AppHeader';
 import { Button } from '../src/components/Button';
 import { Input } from '../src/components/Input';
 import { Colors } from '../src/theme/colors';
@@ -38,9 +43,11 @@ const SUBJECTS = [
 ] as const;
 
 export default function HelpCentreScreen() {
-    const { user } = useAuth();
+    const router = useRouter();
+    const { user, authState } = useAuth();
     const [faqs, setFaqs] = useState<FaqItem[]>([]);
     const [loadingFaqs, setLoadingFaqs] = useState(true);
+    const [faqsError, setFaqsError] = useState<string | null>(null);
     const [openId, setOpenId] = useState<number | null>(null);
     const [name, setName] = useState(user?.name ?? '');
     const [email, setEmail] = useState(user?.email ?? '');
@@ -51,14 +58,24 @@ export default function HelpCentreScreen() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
 
-    useEffect(() => {
+    const loadFaqs = () => {
+        setLoadingFaqs(true);
+        setFaqsError(null);
         PublicApi.getFaqs()
             .then((res) => {
                 setFaqs(Array.isArray(res.data) ? res.data : []);
             })
-            .catch(() => {})
+            .catch((err: any) => {
+                setFaqsError(err?.message || 'Unable to load FAQs right now.');
+            })
             .finally(() => setLoadingFaqs(false));
+    };
+
+    useEffect(() => {
+        loadFaqs();
     }, []);
+
+    const isCustomerAuthed = authState === 'customer_authenticated';
 
     const handleSubmit = async () => {
         if (
@@ -74,22 +91,60 @@ export default function HelpCentreScreen() {
         setSubmitting(true);
         setError('');
         try {
-            await PublicApi.submitContact({
-                name: name.trim(),
-                email: email.trim(),
-                mobile: mobile.trim(),
-                subject,
-                message: message.trim(),
-            });
-            setMessage('');
-            Alert.alert(
-                'Message Sent',
-                'Our support team will get back to you within 24 hours.',
+            if (isCustomerAuthed) {
+                const subjectLabel =
+                    SUBJECTS.find((s) => s.value === subject)?.label || 'General';
+                const ticketRes = await CustomerApi.createSupportTicket({
+                    subject: `[${subjectLabel}] Inquiry from ${name.trim()}`,
+                    category: subject === 'booking' ? 'booking' : 'general',
+                    priority: 'standard',
+                    message: `${message.trim()}\n\nContact Phone: ${mobile.trim()}`,
+                });
+                const ref = ticketRes.data?.ticket_reference;
+                setMessage('');
+                Alert.alert(
+                    'Support Ticket Created',
+                    ref
+                        ? `Your tracked support ticket (${ref}) has been submitted to TIJUM Support.`
+                        : 'Your tracked support ticket has been submitted.',
+                    [
+                        ...(ref
+                            ? [
+                                  {
+                                      text: 'View Ticket',
+                                      onPress: () =>
+                                          router.push(
+                                              `/(customer)/support/ticket/${ref}`,
+                                          ),
+                                  },
+                              ]
+                            : []),
+                        { text: 'OK' },
+                    ],
+                );
+                return;
+            }
+
+            const emailSubject = encodeURIComponent(
+                `TIJUM ${subject.toUpperCase()} Support Inquiry - ${name.trim()}`,
             );
+            const emailBody = encodeURIComponent(
+                `Name: ${name.trim()}\nEmail: ${email.trim()}\nPhone: ${mobile.trim()}\n\nMessage:\n${message.trim()}`,
+            );
+            const mailtoUrl = `mailto:support@tijum.com?subject=${emailSubject}&body=${emailBody}`;
+            const canOpen = await Linking.canOpenURL(mailtoUrl);
+            if (!canOpen) {
+                setError(
+                    'Email app unavailable on this device. Please email support@tijum.com directly or sign in to create a tracked ticket.',
+                );
+                return;
+            }
+            await Linking.openURL(mailtoUrl);
+            setMessage('');
         } catch (err: any) {
             setError(
                 err?.message ||
-                    'Could not send your message. Please try again.',
+                    'Could not submit your inquiry. Please try again.',
             );
         } finally {
             setSubmitting(false);
@@ -97,166 +152,224 @@ export default function HelpCentreScreen() {
     };
 
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-            <ScrollView
-                contentContainerStyle={styles.content}
-                keyboardShouldPersistTaps="handled"
+        <SafeAreaView style={styles.container} edges={['bottom']}>
+            <AppHeader title="Help Centre" showBack />
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             >
-                <View style={styles.hero}>
-                    <LifeBuoy size={28} color={Colors.coral} />
-                    <Text style={styles.heroTitle}>How can we help?</Text>
-                    <Text style={styles.heroSubtitle}>
-                        Browse common questions or send our support team a
-                        message.
-                    </Text>
-                </View>
-
-                <View style={styles.contactRow}>
-                    <View style={styles.contactCard}>
-                        <Phone size={18} color={Colors.deepPlum} />
-                        <Text style={styles.contactLabel}>Call us</Text>
-                        <Text style={styles.contactValue}>+91 81423 34033</Text>
-                    </View>
-                    <View style={styles.contactCard}>
-                        <Mail size={18} color={Colors.deepPlum} />
-                        <Text style={styles.contactLabel}>Email</Text>
-                        <Text style={styles.contactValue}>
-                            support@tijum.com
+                <ScrollView
+                    contentContainerStyle={styles.content}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <View style={styles.hero}>
+                        <LifeBuoy size={28} color={Colors.coral} />
+                        <Text style={styles.heroTitle}>How can we help?</Text>
+                        <Text style={styles.heroSubtitle}>
+                            Browse common questions or reach our support desk
+                            directly.
                         </Text>
                     </View>
-                </View>
 
-                <Text style={styles.sectionTitle}>
-                    Frequently Asked Questions
-                </Text>
-                {loadingFaqs ? (
-                    <ActivityIndicator
-                        color={Colors.coral}
-                        style={styles.loader}
-                    />
-                ) : faqs.length === 0 ? (
-                    <Text style={styles.mutedText}>
-                        FAQs are unavailable right now. Send us a message below.
-                    </Text>
-                ) : (
-                    faqs.map((faq) => {
-                        const isOpen = openId === faq.id;
-                        return (
-                            <View key={faq.id} style={styles.faqCard}>
-                                <TouchableOpacity
-                                    style={styles.faqHeader}
-                                    onPress={() =>
-                                        setOpenId(isOpen ? null : faq.id)
-                                    }
-                                    activeOpacity={0.7}
-                                >
-                                    <Text style={styles.faqQuestion}>
-                                        {faq.question}
-                                    </Text>
-                                    {isOpen ? (
-                                        <ChevronUp
-                                            size={18}
-                                            color={Colors.inkMuted}
-                                        />
-                                    ) : (
-                                        <ChevronDown
-                                            size={18}
-                                            color={Colors.inkMuted}
-                                        />
-                                    )}
-                                </TouchableOpacity>
-                                {isOpen ? (
-                                    <Text style={styles.faqAnswer}>
-                                        {faq.answer}
-                                    </Text>
-                                ) : null}
-                            </View>
-                        );
-                    })
-                )}
-
-                <Text style={[styles.sectionTitle, { marginTop: Spacing.lg }]}>
-                    Send a Message
-                </Text>
-                <View style={styles.formCard}>
-                    <Input
-                        label="Full Name"
-                        value={name}
-                        onChangeText={setName}
-                        placeholder="Your name"
-                    />
-                    <Input
-                        label="Email Address"
-                        value={email}
-                        onChangeText={setEmail}
-                        placeholder="you@example.com"
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                    />
-                    <Input
-                        label="Mobile Number"
-                        value={mobile}
-                        onChangeText={setMobile}
-                        placeholder="+91 98765 43210"
-                        keyboardType="phone-pad"
-                    />
-
-                    <Text style={styles.fieldLabel}>What is this about?</Text>
-                    <View style={styles.subjectRow}>
-                        {SUBJECTS.map((option) => {
-                            const active = subject === option.value;
-                            return (
-                                <TouchableOpacity
-                                    key={option.value}
-                                    style={[
-                                        styles.subjectChip,
-                                        active && styles.subjectChipActive,
-                                    ]}
-                                    onPress={() => setSubject(option.value)}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.subjectText,
-                                            active && styles.subjectTextActive,
-                                        ]}
-                                    >
-                                        {option.label}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
+                    <View style={styles.contactRow}>
+                        <TouchableOpacity
+                            style={styles.contactCard}
+                            onPress={() =>
+                                void Linking.openURL('tel:+918142334033')
+                            }
+                            activeOpacity={0.85}
+                            accessibilityRole="button"
+                            accessibilityLabel="Call TIJUM Support"
+                        >
+                            <Phone size={18} color={Colors.deepPlum} />
+                            <Text style={styles.contactLabel}>Call us</Text>
+                            <Text style={styles.contactValue}>
+                                +91 81423 34033
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.contactCard}
+                            onPress={() =>
+                                void Linking.openURL(
+                                    'mailto:support@tijum.com',
+                                )
+                            }
+                            activeOpacity={0.85}
+                            accessibilityRole="button"
+                            accessibilityLabel="Email TIJUM Support"
+                        >
+                            <Mail size={18} color={Colors.deepPlum} />
+                            <Text style={styles.contactLabel}>Email</Text>
+                            <Text style={styles.contactValue}>
+                                support@tijum.com
+                            </Text>
+                        </TouchableOpacity>
                     </View>
 
-                    <Input
-                        label="Message"
-                        value={message}
-                        onChangeText={setMessage}
-                        placeholder="Tell us what happened and how we can help."
-                        multiline
-                        numberOfLines={5}
-                        style={styles.messageInput}
-                    />
+                    <Text style={styles.sectionTitle}>
+                        Frequently Asked Questions
+                    </Text>
+                    {loadingFaqs ? (
+                        <ActivityIndicator
+                            color={Colors.deepPlum}
+                            style={styles.loader}
+                        />
+                    ) : faqsError ? (
+                        <View style={styles.faqCard}>
+                            <View style={{ padding: Spacing.base }}>
+                                <Text style={styles.errorText}>{faqsError}</Text>
+                                <Button
+                                    title="Retry FAQs"
+                                    variant="outline"
+                                    size="sm"
+                                    onPress={loadFaqs}
+                                />
+                            </View>
+                        </View>
+                    ) : faqs.length === 0 ? (
+                        <Text style={styles.mutedText}>
+                            FAQs are unavailable right now. Send us a message
+                            below.
+                        </Text>
+                    ) : (
+                        faqs.map((faq) => {
+                            const isOpen = openId === faq.id;
+                            return (
+                                <View key={faq.id} style={styles.faqCard}>
+                                    <TouchableOpacity
+                                        style={styles.faqHeader}
+                                        onPress={() =>
+                                            setOpenId(isOpen ? null : faq.id)
+                                        }
+                                        activeOpacity={0.7}
+                                        accessibilityRole="button"
+                                    >
+                                        <Text style={styles.faqQuestion}>
+                                            {faq.question}
+                                        </Text>
+                                        {isOpen ? (
+                                            <ChevronUp
+                                                size={18}
+                                                color={Colors.inkMuted}
+                                            />
+                                        ) : (
+                                            <ChevronDown
+                                                size={18}
+                                                color={Colors.inkMuted}
+                                            />
+                                        )}
+                                    </TouchableOpacity>
+                                    {isOpen ? (
+                                        <Text style={styles.faqAnswer}>
+                                            {faq.answer}
+                                        </Text>
+                                    ) : null}
+                                </View>
+                            );
+                        })
+                    )}
 
-                    {error ? (
-                        <Text style={styles.errorText}>{error}</Text>
-                    ) : null}
+                    <Text
+                        style={[styles.sectionTitle, { marginTop: Spacing.lg }]}
+                    >
+                        {isCustomerAuthed
+                            ? 'Open a Support Ticket'
+                            : 'Email TIJUM Support'}
+                    </Text>
+                    <View style={styles.formCard}>
+                        <Input
+                            label="Full Name"
+                            value={name}
+                            onChangeText={setName}
+                            placeholder="Your name"
+                        />
+                        <Input
+                            label="Email Address"
+                            value={email}
+                            onChangeText={setEmail}
+                            placeholder="you@example.com"
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                        />
+                        <Input
+                            label="Mobile Number"
+                            value={mobile}
+                            onChangeText={setMobile}
+                            placeholder="+91 98765 43210"
+                            keyboardType="phone-pad"
+                        />
 
-                    <Button
-                        title="Send Message"
-                        onPress={handleSubmit}
-                        loading={submitting}
-                        size="lg"
-                    />
-                </View>
+                        <Text style={styles.fieldLabel}>What is this about?</Text>
+                        <View style={styles.subjectRow}>
+                            {SUBJECTS.map((option) => {
+                                const active = subject === option.value;
+                                return (
+                                    <TouchableOpacity
+                                        key={option.value}
+                                        style={[
+                                            styles.subjectChip,
+                                            active && styles.subjectChipActive,
+                                        ]}
+                                        onPress={() => setSubject(option.value)}
+                                        accessibilityRole="button"
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.subjectText,
+                                                active &&
+                                                    styles.subjectTextActive,
+                                            ]}
+                                        >
+                                            {option.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
 
-                <Text style={styles.hoursText}>
-                    Support hours: 9:00 AM – 9:00 PM IST, Monday to Saturday.
-                </Text>
-            </ScrollView>
-        </KeyboardAvoidingView>
+                        <Input
+                            label="Message"
+                            value={message}
+                            onChangeText={setMessage}
+                            placeholder="Tell us what happened and how we can help."
+                            multiline
+                            numberOfLines={5}
+                            style={styles.messageInput}
+                        />
+
+                        {error ? (
+                            <Text style={styles.errorText}>{error}</Text>
+                        ) : null}
+
+                        <Button
+                            title={
+                                isCustomerAuthed
+                                    ? 'Submit Support Ticket'
+                                    : 'Compose Support Email'
+                            }
+                            onPress={handleSubmit}
+                            loading={submitting}
+                            size="lg"
+                        />
+                        {!isCustomerAuthed ? (
+                            <Button
+                                title="Sign In for In-App Ticket Tracking"
+                                variant="outline"
+                                onPress={() =>
+                                    router.push('/(auth)/customer-login')
+                                }
+                                style={{ marginTop: Spacing.sm }}
+                            />
+                        ) : null}
+                    </View>
+
+                    <Text style={styles.hoursText}>
+                        Support hours: 9:00 AM – 9:00 PM IST, Monday to
+                        Saturday.
+                    </Text>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
     );
 }
 
@@ -342,6 +455,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: Spacing.sm,
+        minHeight: 48,
         padding: Spacing.base,
     },
     faqQuestion: {
@@ -377,8 +491,10 @@ const styles = StyleSheet.create({
     },
     subjectChip: {
         flex: 1,
+        minHeight: 44,
         alignItems: 'center',
-        paddingVertical: 9,
+        justifyContent: 'center',
+        paddingVertical: 10,
         borderRadius: BorderRadius.full,
         backgroundColor: Colors.surfaceSubtle,
         borderWidth: 1,

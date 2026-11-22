@@ -1,105 +1,199 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-    View,
-    Text,
-    ScrollView,
-    StyleSheet,
     ActivityIndicator,
+    Alert,
     Image,
-    TouchableOpacity,
-    SafeAreaView,
-    Modal,
     Linking,
+    Modal,
+    RefreshControl,
+    ScrollView,
+    Share,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
-    Building2,
-    MapPin,
-    ExternalLink,
-    UtensilsCrossed,
     BedDouble,
-    Users,
-    CheckCircle2,
-    XCircle,
-    Info,
-    Sparkles,
+    Building2,
     Check,
-    Star,
-    Images,
+    CheckCircle2,
     ChevronLeft,
     ChevronRight,
+    ExternalLink,
+    Heart,
+    Images,
+    Info,
+    MapPin,
+    Share2,
+    Sparkles,
+    Star,
+    Users,
+    UtensilsCrossed,
     X,
 } from 'lucide-react-native';
+import { CustomerApi } from '../../../../src/api/customer';
 import { PublicApi } from '../../../../src/api/public';
 import { PropertyDetail } from '../../../../src/api/types';
+import { useAuth } from '../../../../src/auth/AuthContext';
+import { AppHeader } from '../../../../src/components/AppHeader';
+import { Badge } from '../../../../src/components/Badge';
+import { Button } from '../../../../src/components/Button';
+import { CategoryBadge } from '../../../../src/components/CategoryBadge';
+import { MealBadge } from '../../../../src/components/MealBadge';
+import { StayTimingBadge } from '../../../../src/components/StayTimingBadge';
+import { getCanonicalCategory } from '../../../../src/constants/categories';
 import { Colors } from '../../../../src/theme/colors';
 import { Spacing } from '../../../../src/theme/spacing';
 import { Typography } from '../../../../src/theme/typography';
-import { MealBadge } from '../../../../src/components/MealBadge';
-import { StayTimingBadge } from '../../../../src/components/StayTimingBadge';
-import { Badge } from '../../../../src/components/Badge';
-import { CategoryBadge } from '../../../../src/components/CategoryBadge';
-import { Button } from '../../../../src/components/Button';
-import { getCanonicalCategory } from '../../../../src/constants/categories';
 
 export default function PropertyDetailScreen() {
     const { slug } = useLocalSearchParams<{ slug: string }>();
     const router = useRouter();
+    const insets = useSafeAreaInsets();
+    const { token, authState } = useAuth();
     const [property, setProperty] = useState<PropertyDetail | null>(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [galleryModalVisible, setGalleryModalVisible] = useState(false);
     const [activeGalleryIndex, setActiveGalleryIndex] = useState(0);
+    const [selectedRoomTypeId, setSelectedRoomTypeId] = useState<
+        number | null
+    >(null);
+    const [isWishlisted, setIsWishlisted] = useState(false);
+
+    const loadProperty = useCallback(
+        async (isRefresh = false) => {
+            if (!slug) {
+                return;
+            }
+            try {
+                if (isRefresh) {
+                    setRefreshing(true);
+                } else {
+                    setLoading(true);
+                }
+                setError(null);
+                const res = await PublicApi.getProperty(slug);
+                if (res.data) {
+                    setProperty(res.data);
+                    const rooms = res.data.room_types || [];
+                    setSelectedRoomTypeId((prev) =>
+                        prev && rooms.some((r) => r.id === prev)
+                            ? prev
+                            : (rooms[0]?.id ?? null),
+                    );
+                } else {
+                    setProperty(null);
+                    setError('Property details are unavailable.');
+                }
+            } catch (loadError: unknown) {
+                setProperty(null);
+                setError(
+                    loadError instanceof Error
+                        ? loadError.message
+                        : 'Unable to load this property. Please try again.',
+                );
+            } finally {
+                setLoading(false);
+                setRefreshing(false);
+            }
+        },
+        [slug],
+    );
 
     useEffect(() => {
-        if (slug) {
-            void loadProperty();
-        }
-    }, [slug]);
+        void loadProperty();
+    }, [loadProperty]);
 
-    const loadProperty = async () => {
+    useEffect(() => {
+        if (!token || authState !== 'customer_authenticated' || !property) {
+            setIsWishlisted(false);
+            return;
+        }
+        void CustomerApi.getWishlist()
+            .then((res) => {
+                const list = Array.isArray(res.data) ? res.data : [];
+                setIsWishlisted(list.some((item) => item.id === property.id));
+            })
+            .catch(() => {});
+    }, [authState, token, property?.id]);
+
+    const handleToggleWishlist = async () => {
+        if (!property) {
+            return;
+        }
+        if (!token || authState !== 'customer_authenticated') {
+            router.push('/(auth)/customer-login');
+            return;
+        }
+        const prev = isWishlisted;
+        setIsWishlisted(!prev);
         try {
-            setLoading(true);
-            setError(null);
-            const res = await PublicApi.getProperty(slug);
-            if (res.data) {
-                setProperty(res.data);
-            } else {
-                setProperty(null);
-                setError('Property details are unavailable.');
-            }
-        } catch (loadError: unknown) {
-            setProperty(null);
-            setError(
-                loadError instanceof Error
-                    ? loadError.message
-                    : 'Unable to load this property. Please try again.',
-            );
-        } finally {
-            setLoading(false);
+            const res = await CustomerApi.toggleWishlist(property.id);
+            setIsWishlisted(res.wishlisted);
+        } catch {
+            setIsWishlisted(prev);
+            Alert.alert('Wishlist Error', 'Could not update wishlist status.');
+        }
+    };
+
+    const handleShareProperty = async () => {
+        if (!property) {
+            return;
+        }
+        try {
+            await Share.share({
+                title: property.name,
+                message: `Check out ${property.name} on TIJUM: https://tijum.com/properties/${property.slug}`,
+            });
+        } catch {
+            // User cancelled share sheet
         }
     };
 
     if (loading) {
         return (
-            <View style={styles.center}>
-                <ActivityIndicator size="large" color={Colors.coral} />
-                <Text style={styles.loadingText}>Loading stay details...</Text>
+            <View style={styles.container}>
+                <AppHeader
+                    title="Stay Details"
+                    showBack
+                    fallbackRoute="/(customer)/explore"
+                />
+                <View style={styles.center}>
+                    <ActivityIndicator size="large" color={Colors.deepPlum} />
+                    <Text style={styles.loadingText}>
+                        Loading stay details...
+                    </Text>
+                </View>
             </View>
         );
     }
 
     if (error || !property) {
         return (
-            <View style={styles.center}>
-                <Text style={styles.errorText}>
-                    {error || 'Property not found.'}
-                </Text>
-                <Button
-                    title="Retry"
-                    onPress={loadProperty}
-                    style={{ marginTop: Spacing.md }}
+            <View style={styles.container}>
+                <AppHeader
+                    title="Stay Details"
+                    showBack
+                    fallbackRoute="/(customer)/explore"
                 />
+                <View style={styles.center}>
+                    <Text style={styles.errorText}>
+                        {error || 'Property not found.'}
+                    </Text>
+                    <Button
+                        title="Retry"
+                        onPress={() => void loadProperty()}
+                        style={{ marginTop: Spacing.md }}
+                    />
+                </View>
             </View>
         );
     }
@@ -118,20 +212,76 @@ export default function PropertyDetailScreen() {
                 ]
               : [];
 
-    const startingPrice = property.starting_price_daily_paise
-        ? { amount: property.starting_price_daily_paise / 100, unit: 'day' }
-        : property.starting_price_weekly_paise
-          ? { amount: property.starting_price_weekly_paise / 100, unit: 'week' }
-          : property.starting_price_monthly_paise
-            ? {
-                  amount: property.starting_price_monthly_paise / 100,
-                  unit: 'month',
-              }
-            : null;
+    const startingPrice =
+        property.starting_price_daily_paise &&
+        property.starting_price_daily_paise > 0
+            ? { amount: property.starting_price_daily_paise / 100, unit: 'day' }
+            : property.starting_price_weekly_paise &&
+                property.starting_price_weekly_paise > 0
+              ? {
+                    amount: property.starting_price_weekly_paise / 100,
+                    unit: 'week',
+                }
+              : property.starting_price_monthly_paise &&
+                  property.starting_price_monthly_paise > 0
+                ? {
+                      amount: property.starting_price_monthly_paise / 100,
+                      unit: 'month',
+                  }
+                : null;
+
+    const ratingValue = Number(
+        property.rating_average ?? property.rating ?? 0,
+    );
 
     return (
-        <SafeAreaView style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+        <SafeAreaView edges={['bottom']} style={styles.container}>
+            <AppHeader
+                title={property.name}
+                subtitle={property.locality || undefined}
+                showBack
+                fallbackRoute="/(customer)/explore"
+                rightAction={
+                    <View style={styles.headerActionsRow}>
+                        <TouchableOpacity
+                            style={styles.headerIconBtn}
+                            accessibilityRole="button"
+                            accessibilityLabel="Share stay link"
+                            onPress={() => void handleShareProperty()}
+                        >
+                            <Share2 size={18} color={Colors.white} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.headerIconBtn}
+                            accessibilityRole="button"
+                            accessibilityLabel={
+                                isWishlisted
+                                    ? 'Remove from wishlist'
+                                    : 'Save to wishlist'
+                            }
+                            onPress={() => void handleToggleWishlist()}
+                        >
+                            <Heart
+                                size={18}
+                                color={isWishlisted ? Colors.coral : Colors.white}
+                                fill={isWishlisted ? Colors.coral : 'none'}
+                            />
+                        </TouchableOpacity>
+                    </View>
+                }
+            />
+            <ScrollView
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    { paddingBottom: 96 + Math.max(insets.bottom, 12) },
+                ]}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={() => void loadProperty(true)}
+                    />
+                }
+            >
                 {/* Cover Image & Gallery Trigger */}
                 <TouchableOpacity
                     activeOpacity={0.9}
@@ -351,126 +501,171 @@ export default function PropertyDetailScreen() {
 
                         {property.room_types &&
                         property.room_types.length > 0 ? (
-                            property.room_types.map((room) => (
-                                <View key={room.id} style={styles.roomCard}>
-                                    <View style={styles.rowBetween}>
-                                        <Text style={styles.roomName}>
-                                            {room.name}
-                                        </Text>
-                                        <Badge
-                                            label={
-                                                room.sharing_type ||
-                                                room.sharing_label ||
-                                                (room.is_shared
-                                                    ? 'Shared Room'
-                                                    : 'Private Room')
-                                            }
-                                            variant="secondary"
-                                        />
-                                    </View>
-
-                                    <View style={styles.pricingRow}>
-                                        <View style={styles.priceBox}>
-                                            <Text style={styles.priceLabel}>
-                                                Daily
+                            property.room_types.map((room) => {
+                                const isRoomSelected =
+                                    selectedRoomTypeId === room.id;
+                                const hasLiveAvailability =
+                                    typeof room.available_rooms_count ===
+                                    'number';
+                                return (
+                                    <TouchableOpacity
+                                        key={room.id}
+                                        activeOpacity={0.85}
+                                        accessibilityRole="button"
+                                        accessibilityState={{
+                                            selected: isRoomSelected,
+                                        }}
+                                        onPress={() =>
+                                            setSelectedRoomTypeId(room.id)
+                                        }
+                                        style={[
+                                            styles.roomCard,
+                                            isRoomSelected &&
+                                                styles.roomCardSelected,
+                                        ]}
+                                    >
+                                        <View style={styles.rowBetween}>
+                                            <Text style={styles.roomName}>
+                                                {room.name}
                                             </Text>
-                                            <Text style={styles.priceValue}>
-                                                ₹
-                                                {(
-                                                    room.price_daily_paise / 100
-                                                ).toLocaleString('en-IN')}
-                                            </Text>
-                                        </View>
-                                        <View style={styles.priceBox}>
-                                            <Text style={styles.priceLabel}>
-                                                Weekly
-                                            </Text>
-                                            <Text style={styles.priceValue}>
-                                                ₹
-                                                {(
-                                                    room.price_weekly_paise /
-                                                    100
-                                                ).toLocaleString('en-IN')}
-                                            </Text>
-                                        </View>
-                                        <View style={styles.priceBox}>
-                                            <Text style={styles.priceLabel}>
-                                                Monthly
-                                            </Text>
-                                            <Text style={styles.priceValue}>
-                                                ₹
-                                                {(
-                                                    room.price_monthly_paise /
-                                                    100
-                                                ).toLocaleString('en-IN')}
-                                            </Text>
-                                        </View>
-                                    </View>
-
-                                    <View style={styles.roomFooter}>
-                                        <View style={styles.inlineMetaRow}>
-                                            <Users
-                                                size={13}
-                                                color={Colors.gray600}
-                                                style={{ marginRight: 4 }}
+                                            <Badge
+                                                label={
+                                                    room.sharing_type ||
+                                                    room.sharing_label ||
+                                                    (room.is_shared
+                                                        ? 'Shared Room'
+                                                        : 'Private Room')
+                                                }
+                                                variant={
+                                                    isRoomSelected
+                                                        ? 'primary'
+                                                        : 'secondary'
+                                                }
                                             />
-                                            <Text style={styles.capacityText}>
-                                                Max Guests:{' '}
-                                                {room.capacity_per_room ||
-                                                    room.max_guests_per_room}
-                                            </Text>
                                         </View>
-                                        <View style={styles.inlineMetaRow}>
-                                            {(room.available_rooms_count ??
-                                                room.total_rooms ??
-                                                1) > 0 ? (
-                                                <>
-                                                    <CheckCircle2
-                                                        size={13}
-                                                        color={Colors.emerald}
-                                                        style={{
-                                                            marginRight: 4,
-                                                        }}
-                                                    />
-                                                    <Text
-                                                        style={[
-                                                            styles.inventoryText,
-                                                            {
-                                                                color: Colors.emerald,
-                                                            },
-                                                        ]}
-                                                    >
-                                                        {room.available_rooms_count ??
-                                                            room.total_rooms ??
-                                                            'Available'}{' '}
-                                                        rooms available
-                                                    </Text>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <XCircle
-                                                        size={13}
-                                                        color={Colors.rose}
-                                                        style={{
-                                                            marginRight: 4,
-                                                        }}
-                                                    />
-                                                    <Text
-                                                        style={[
-                                                            styles.inventoryText,
-                                                            {
-                                                                color: Colors.rose,
-                                                            },
-                                                        ]}
-                                                    >
-                                                        Currently full
-                                                    </Text>
-                                                </>
-                                            )}
+
+                                        <View style={styles.pricingRow}>
+                                            <View style={styles.priceBox}>
+                                                <Text style={styles.priceLabel}>
+                                                    Daily
+                                                </Text>
+                                                <Text style={styles.priceValue}>
+                                                    {room.price_daily_paise > 0
+                                                        ? `₹${(
+                                                              room.price_daily_paise /
+                                                              100
+                                                          ).toLocaleString(
+                                                              'en-IN',
+                                                          )}`
+                                                        : '—'}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.priceBox}>
+                                                <Text style={styles.priceLabel}>
+                                                    Weekly
+                                                </Text>
+                                                <Text style={styles.priceValue}>
+                                                    {room.price_weekly_paise > 0
+                                                        ? `₹${(
+                                                              room.price_weekly_paise /
+                                                              100
+                                                          ).toLocaleString(
+                                                              'en-IN',
+                                                          )}`
+                                                        : '—'}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.priceBox}>
+                                                <Text style={styles.priceLabel}>
+                                                    Monthly
+                                                </Text>
+                                                <Text style={styles.priceValue}>
+                                                    {room.price_monthly_paise >
+                                                    0
+                                                        ? `₹${(
+                                                              room.price_monthly_paise /
+                                                              100
+                                                          ).toLocaleString(
+                                                              'en-IN',
+                                                          )}`
+                                                        : '—'}
+                                                </Text>
+                                            </View>
                                         </View>
-                                    </View>
-                                </View>
-                            ))
+
+                                        <View style={styles.roomFooter}>
+                                            <View style={styles.inlineMetaRow}>
+                                                <Users
+                                                    size={13}
+                                                    color={Colors.inkSecondary}
+                                                    style={{ marginRight: 4 }}
+                                                />
+                                                <Text
+                                                    style={styles.capacityText}
+                                                >
+                                                    Max Guests:{' '}
+                                                    {room.capacity_per_room ||
+                                                        room.max_guests_per_room}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.inlineMetaRow}>
+                                                {hasLiveAvailability ? (
+                                                    (room.available_rooms_count ??
+                                                        0) > 0 ? (
+                                                        <>
+                                                            <CheckCircle2
+                                                                size={13}
+                                                                color={
+                                                                    Colors.success
+                                                                }
+                                                                style={{
+                                                                    marginRight: 4,
+                                                                }}
+                                                            />
+                                                            <Text
+                                                                style={[
+                                                                    styles.inventoryText,
+                                                                    {
+                                                                        color: Colors.successText,
+                                                                    },
+                                                                ]}
+                                                            >
+                                                                {
+                                                                    room.available_rooms_count
+                                                                }{' '}
+                                                                available
+                                                            </Text>
+                                                        </>
+                                                    ) : (
+                                                        <Text
+                                                            style={[
+                                                                styles.inventoryText,
+                                                                {
+                                                                    color: Colors.dangerText,
+                                                                },
+                                                            ]}
+                                                        >
+                                                            Currently full
+                                                        </Text>
+                                                    )
+                                                ) : (
+                                                    <Text
+                                                        style={
+                                                            styles.inventoryText
+                                                        }
+                                                    >
+                                                        {room.total_rooms} room
+                                                        {room.total_rooms === 1
+                                                            ? ''
+                                                            : 's'}{' '}
+                                                        total
+                                                    </Text>
+                                                )}
+                                            </View>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })
                         ) : (
                             <Text style={styles.emptyText}>
                                 No room categories listed for this property yet.
@@ -548,14 +743,12 @@ export default function PropertyDetailScreen() {
                             </View>
                             <Badge
                                 label={
-                                    (property.rating ?? 0) > 0
-                                        ? `${(property.rating ?? 0).toFixed(1)} (${property.reviews_count})`
+                                    ratingValue > 0
+                                        ? `${ratingValue.toFixed(1)} (${property.reviews_count})`
                                         : 'New'
                                 }
                                 variant={
-                                    (property.rating ?? 0) >= 4
-                                        ? 'accent'
-                                        : 'secondary'
+                                    ratingValue >= 4 ? 'accent' : 'secondary'
                                 }
                             />
                         </View>
@@ -565,13 +758,15 @@ export default function PropertyDetailScreen() {
                                 <View key={rev.id} style={styles.reviewCard}>
                                     <View style={styles.rowBetween}>
                                         <Text style={styles.reviewerName}>
-                                            {rev.customer_name}
+                                            {rev.customer_display_name ||
+                                                rev.customer_name ||
+                                                'Verified Guest'}
                                         </Text>
                                         <View style={styles.inlineMetaRow}>
                                             <Star
                                                 size={12}
-                                                color="#D97706"
-                                                fill="#D97706"
+                                                color="#B45309"
+                                                fill="#B45309"
                                                 style={{ marginRight: 4 }}
                                             />
                                             <Text style={styles.reviewRating}>
@@ -580,7 +775,9 @@ export default function PropertyDetailScreen() {
                                         </View>
                                     </View>
                                     <Text style={styles.reviewDate}>
-                                        {rev.created_at}
+                                        {rev.published_at ||
+                                            rev.created_at ||
+                                            ''}
                                     </Text>
                                     {rev.title ? (
                                         <Text style={styles.reviewTitle}>
@@ -598,7 +795,10 @@ export default function PropertyDetailScreen() {
                                             <Text
                                                 style={styles.ownerReplyTitle}
                                             >
-                                                Owner Response:
+                                                Partner Response
+                                                {rev.owner_reply_at
+                                                    ? ` • ${rev.owner_reply_at}`
+                                                    : ''}
                                             </Text>
                                             <Text style={styles.ownerReplyBody}>
                                                 {rev.owner_reply}
@@ -618,7 +818,12 @@ export default function PropertyDetailScreen() {
             </ScrollView>
 
             {/* Floating Bottom Booking Action */}
-            <View style={styles.bottomBar}>
+            <View
+                style={[
+                    styles.bottomBar,
+                    { paddingBottom: Math.max(insets.bottom, Spacing.md) },
+                ]}
+            >
                 <View>
                     <Text style={styles.bottomPriceLabel}>Starting from</Text>
                     <Text style={styles.bottomPriceValue}>
@@ -635,6 +840,12 @@ export default function PropertyDetailScreen() {
                             params: {
                                 property_id: property.id,
                                 property_slug: property.slug,
+                                ...(selectedRoomTypeId
+                                    ? {
+                                          property_room_type_id:
+                                              selectedRoomTypeId,
+                                      }
+                                    : {}),
                             },
                         })
                     }
@@ -649,7 +860,15 @@ export default function PropertyDetailScreen() {
                 animationType="fade"
                 onRequestClose={() => setGalleryModalVisible(false)}
             >
-                <View style={styles.galleryModalOverlay}>
+                <View
+                    style={[
+                        styles.galleryModalOverlay,
+                        {
+                            paddingTop: Math.max(insets.top, Spacing.md),
+                            paddingBottom: Math.max(insets.bottom, Spacing.md),
+                        },
+                    ]}
+                >
                     {/* Gallery Header */}
                     <View style={styles.galleryModalHeader}>
                         <Text style={styles.galleryModalCount}>
@@ -660,6 +879,7 @@ export default function PropertyDetailScreen() {
                         <TouchableOpacity
                             onPress={() => setGalleryModalVisible(false)}
                             style={styles.galleryCloseBtn}
+                            accessibilityRole="button"
                             accessibilityLabel="Close Gallery"
                         >
                             <X size={24} color={Colors.white} />
@@ -901,13 +1121,30 @@ const styles = StyleSheet.create({
         color: '#92400E',
         fontWeight: '600',
     },
+    headerActionsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    headerIconBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255, 255, 255, 0.16)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     roomCard: {
-        backgroundColor: Colors.warmOffWhite,
+        backgroundColor: Colors.cream,
         borderRadius: 12,
         padding: Spacing.md,
-        borderWidth: 1,
-        borderColor: Colors.gray200,
+        borderWidth: 1.5,
+        borderColor: Colors.borderSubtle,
         marginBottom: Spacing.md,
+    },
+    roomCardSelected: {
+        borderColor: Colors.deepPlum,
+        backgroundColor: Colors.white,
     },
     roomName: {
         ...Typography.labelLarge,
@@ -1060,21 +1297,19 @@ const styles = StyleSheet.create({
     },
     errorText: {
         ...Typography.bodyMedium,
-        color: Colors.coral,
+        color: Colors.danger,
         textAlign: 'center',
     },
     galleryModalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.94)',
         justifyContent: 'space-between',
-        paddingVertical: Spacing.xl,
     },
     galleryModalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: Spacing.lg,
-        paddingTop: Spacing.md,
     },
     galleryModalCount: {
         ...Typography.labelMedium,
@@ -1082,7 +1317,10 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     galleryCloseBtn: {
-        padding: Spacing.xs,
+        width: 48,
+        height: 48,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     galleryMainView: {
         flex: 1,
@@ -1142,16 +1380,17 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     mapPinLink: {
+        minHeight: 44,
         flexDirection: 'row',
         alignItems: 'center',
         alignSelf: 'flex-start',
         marginBottom: Spacing.sm,
-        paddingVertical: 4,
+        paddingVertical: 6,
     },
     mapPinLinkText: {
         ...Typography.bodySmall,
-        color: Colors.coral,
-        fontWeight: '700',
+        color: Colors.coralDark,
+        fontFamily: Typography.fontFamily.bodyBold,
     },
     mapPinUnavailableText: {
         ...Typography.bodySmall,

@@ -5,12 +5,13 @@ import {
     Alert,
     FlatList,
     RefreshControl,
-    SafeAreaView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
 import {
     Share2,
     Copy,
@@ -21,6 +22,9 @@ import {
 } from 'lucide-react-native';
 import { RewardsApi } from '../../../src/api/rewards';
 import { ReferralItem, ReferralProfile } from '../../../src/api/types';
+import { AppHeader } from '../../../src/components/AppHeader';
+import { ExceptionalState } from '../../../src/components/ExceptionalState';
+import { RequireAuth } from '../../../src/components/RequireAuth';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
@@ -29,6 +33,7 @@ export default function ReferralsScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [profile, setProfile] = useState<ReferralProfile | null>(null);
     const [referrals, setReferrals] = useState<ReferralItem[]>([]);
 
@@ -38,6 +43,7 @@ export default function ReferralsScreen() {
         } else {
             setLoading(true);
         }
+        setErrorMessage(null);
 
         try {
             const res = await RewardsApi.getReferralProfile();
@@ -45,8 +51,10 @@ export default function ReferralsScreen() {
                 setProfile(res.data.profile);
                 setReferrals(res.data.referrals || []);
             }
-        } catch {
-            // Handled without fabricated data
+        } catch (err: any) {
+            setErrorMessage(
+                err?.message || 'Unable to load your referral profile.',
+            );
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -57,8 +65,13 @@ export default function ReferralsScreen() {
         void loadReferrals();
     }, []);
 
-    const handleCopyCode = () => {
+    const handleCopyCode = async () => {
         if (!profile?.referral_code) return;
+        try {
+            await Clipboard.setStringAsync(profile.referral_code);
+        } catch {
+            // Non-blocking fallback
+        }
         setCopied(true);
         const refereeReward = profile.referee_reward_points
             ? `${profile.referee_reward_points} bonus points`
@@ -71,7 +84,7 @@ export default function ReferralsScreen() {
     };
 
     const handleNativeShare = async () => {
-        if (!profile) return;
+        if (!profile?.referral_code) return;
         try {
             const refereeReward = profile.referee_reward_points
                 ? `${profile.referee_reward_points} loyalty points`
@@ -85,7 +98,7 @@ export default function ReferralsScreen() {
                     url: profile.referral_link,
                 });
             } else {
-                handleCopyCode();
+                await handleCopyCode();
             }
         } catch {
             // User cancelled share
@@ -118,44 +131,48 @@ export default function ReferralsScreen() {
                 </Text>
 
                 {/* Referral Code & Share Controls */}
-                <View style={styles.codeCard}>
-                    <Text style={styles.codeLabel}>
-                        YOUR UNIQUE REFERRAL CODE
-                    </Text>
-                    <View style={styles.codeRow}>
-                        <Text style={styles.codeText}>
-                            {profile?.referral_code || 'TIJUM-REF'}
+                {profile?.referral_code ? (
+                    <View style={styles.codeCard}>
+                        <Text style={styles.codeLabel}>
+                            YOUR UNIQUE REFERRAL CODE
                         </Text>
+                        <View style={styles.codeRow}>
+                            <Text style={styles.codeText}>
+                                {profile.referral_code}
+                            </Text>
+                            <TouchableOpacity
+                                style={styles.copyButton}
+                                onPress={() => void handleCopyCode()}
+                                accessibilityRole="button"
+                            >
+                                <Copy
+                                    size={14}
+                                    color={Colors.deepPlum}
+                                    style={{ marginRight: 4 }}
+                                />
+                                <Text style={styles.copyButtonText}>
+                                    {copied ? 'Copied' : 'Copy'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+
                         <TouchableOpacity
-                            style={styles.copyButton}
-                            onPress={handleCopyCode}
+                            style={styles.shareButton}
+                            onPress={() => void handleNativeShare()}
+                            activeOpacity={0.85}
+                            accessibilityRole="button"
                         >
-                            <Copy
-                                size={14}
+                            <Share2
+                                size={16}
                                 color={Colors.deepPlum}
-                                style={{ marginRight: 4 }}
+                                style={{ marginRight: 6 }}
                             />
-                            <Text style={styles.copyButtonText}>
-                                {copied ? 'Copied' : 'Copy'}
+                            <Text style={styles.shareButtonText}>
+                                Share Referral Link
                             </Text>
                         </TouchableOpacity>
                     </View>
-
-                    <TouchableOpacity
-                        style={styles.shareButton}
-                        onPress={handleNativeShare}
-                        activeOpacity={0.85}
-                    >
-                        <Share2
-                            size={16}
-                            color={Colors.white}
-                            style={{ marginRight: 6 }}
-                        />
-                        <Text style={styles.shareButtonText}>
-                            Share Referral Link
-                        </Text>
-                    </TouchableOpacity>
-                </View>
+                ) : null}
             </View>
 
             {/* Referral Stats Grid */}
@@ -244,44 +261,68 @@ export default function ReferralsScreen() {
     );
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            {loading ? (
-                <View style={styles.center}>
-                    <ActivityIndicator size="large" color={Colors.coral} />
-                    <Text style={styles.loadingText}>
-                        Loading referral data...
-                    </Text>
-                </View>
-            ) : (
-                <FlatList
-                    data={referrals}
-                    keyExtractor={(item: any) => String(item.id)}
-                    contentContainerStyle={styles.listContent}
-                    ListHeaderComponent={renderHeader}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={() => loadReferrals(true)}
+        <RequireAuth role="customer">
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+                <AppHeader
+                    title="Refer & Earn"
+                    showBack
+                    fallbackRoute="/(customer)/rewards"
+                />
+                {errorMessage && !profile ? (
+                    <ExceptionalState
+                        type="no-internet"
+                        title="Referrals Unavailable"
+                        description={errorMessage}
+                        actionLabel="Try Again"
+                        onAction={() => void loadReferrals()}
+                    />
+                ) : loading && !refreshing ? (
+                    <View style={styles.center}>
+                        <ActivityIndicator
+                            size="large"
+                            color={Colors.deepPlum}
                         />
-                    }
-                    ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <Users
-                                size={36}
-                                color={Colors.gray300}
-                                style={{ marginBottom: 8 }}
+                        <Text style={styles.loadingText}>
+                            Loading referral data...
+                        </Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={referrals}
+                        keyExtractor={(item: ReferralItem) => String(item.id)}
+                        contentContainerStyle={styles.listContent}
+                        ListHeaderComponent={renderHeader}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={() => loadReferrals(true)}
+                                colors={[Colors.deepPlum]}
+                                tintColor={Colors.deepPlum}
                             />
-                            <Text style={styles.emptyTitle}>
-                                No referrals yet
-                            </Text>
-                            <Text style={styles.emptySubtitle}>
-                                Tap "Share Referral Link" above to send
-                                invitations to friends and start earning points!
-                            </Text>
-                        </View>
-                    }
-                    renderItem={({ item }: { item: any }) => {
-                        const isCompleted = item.status === 'stay_completed';
+                        }
+                        ListEmptyComponent={
+                            <View style={styles.emptyContainer}>
+                                <Users
+                                    size={36}
+                                    color={Colors.gray300}
+                                    style={{ marginBottom: 8 }}
+                                />
+                                <Text style={styles.emptyTitle}>
+                                    No referrals yet
+                                </Text>
+                                <Text style={styles.emptySubtitle}>
+                                    Tap "Share Referral Link" above to send
+                                    invitations to friends and start earning
+                                    points!
+                                </Text>
+                            </View>
+                        }
+                        renderItem={({ item }: { item: ReferralItem }) => {
+                            const isCompleted =
+                                item.status === 'qualified' ||
+                                item.status === 'reward_credited' ||
+                                item.status === 'rewarded' ||
+                                item.status === 'stay_completed';
                         return (
                             <View style={styles.referralCard}>
                                 <View style={styles.referralIcon}>
@@ -324,7 +365,8 @@ export default function ReferralsScreen() {
                     }}
                 />
             )}
-        </SafeAreaView>
+            </SafeAreaView>
+        </RequireAuth>
     );
 }
 
@@ -412,19 +454,21 @@ const styles = StyleSheet.create({
         letterSpacing: 1,
     },
     copyButton: {
+        minHeight: 44,
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: Colors.softPeach,
-        paddingHorizontal: Spacing.sm,
-        paddingVertical: 4,
+        paddingHorizontal: Spacing.md,
+        paddingVertical: 8,
         borderRadius: 6,
     },
     copyButtonText: {
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: '700',
         color: Colors.deepPlum,
     },
     shareButton: {
+        minHeight: 48,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -433,9 +477,9 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
     },
     shareButtonText: {
-        color: Colors.white,
+        color: Colors.deepPlum,
         fontSize: Typography.fontSize.sm,
-        fontWeight: '700',
+        fontWeight: '800',
     },
     statsGrid: {
         flexDirection: 'row',

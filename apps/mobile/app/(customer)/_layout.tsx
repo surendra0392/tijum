@@ -89,7 +89,7 @@ export default function CustomerTabsLayout() {
                 name="explore/property/[slug]"
                 options={{
                     href: null,
-                    headerTitle: 'Stay Details',
+                    headerShown: false,
                     tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
@@ -97,7 +97,7 @@ export default function CustomerTabsLayout() {
                 name="bookings/[reference]"
                 options={{
                     href: null,
-                    headerTitle: 'Reservation Details',
+                    headerShown: false,
                     tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
@@ -105,7 +105,7 @@ export default function CustomerTabsLayout() {
                 name="bookings/create"
                 options={{
                     href: null,
-                    headerTitle: 'Confirm Booking',
+                    headerShown: false,
                     tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
@@ -137,7 +137,7 @@ export default function CustomerTabsLayout() {
                 name="rewards/index"
                 options={{
                     href: null,
-                    headerTitle: 'Rewards & Points',
+                    headerShown: false,
                     tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
@@ -145,7 +145,7 @@ export default function CustomerTabsLayout() {
                 name="rewards/points"
                 options={{
                     href: null,
-                    headerTitle: 'Points Wallet',
+                    headerShown: false,
                     tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
@@ -153,7 +153,7 @@ export default function CustomerTabsLayout() {
                 name="rewards/referrals"
                 options={{
                     href: null,
-                    headerTitle: 'Refer & Earn',
+                    headerShown: false,
                     tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
@@ -161,7 +161,7 @@ export default function CustomerTabsLayout() {
                 name="rewards/coupons"
                 options={{
                     href: null,
-                    headerTitle: 'Available Coupons',
+                    headerShown: false,
                     tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
@@ -169,7 +169,7 @@ export default function CustomerTabsLayout() {
                 name="profile/edit"
                 options={{
                     href: null,
-                    headerTitle: 'Edit Profile',
+                    headerShown: false,
                     tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
@@ -177,7 +177,7 @@ export default function CustomerTabsLayout() {
                 name="profile/security"
                 options={{
                     href: null,
-                    headerTitle: 'Account Security',
+                    headerShown: false,
                     tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
@@ -185,7 +185,7 @@ export default function CustomerTabsLayout() {
                 name="reviews/index"
                 options={{
                     href: null,
-                    headerTitle: 'My Reviews',
+                    headerShown: false,
                     tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />

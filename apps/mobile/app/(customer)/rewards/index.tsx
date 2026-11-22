@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     RefreshControl,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import {
     Coins,
@@ -23,12 +24,15 @@ import {
     Info,
 } from 'lucide-react-native';
 import { RewardsApi, RewardsOverviewResponse } from '../../../src/api/rewards';
+import { AppHeader } from '../../../src/components/AppHeader';
+import { RequireAuth } from '../../../src/components/RequireAuth';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 
 export default function RewardsDashboardScreen() {
     const router = useRouter();
+    const isFocused = useIsFocused();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -63,71 +67,103 @@ export default function RewardsDashboardScreen() {
     };
 
     useEffect(() => {
-        void loadRewards();
-    }, []);
+        if (isFocused) {
+            void loadRewards(overview !== null);
+        }
+    }, [isFocused]);
 
-    if (loading && !refreshing) {
+    if (loading && !refreshing && !overview) {
         return (
-            <SafeAreaView style={styles.safeArea}>
-                <View style={styles.center}>
-                    <ActivityIndicator size="large" color={Colors.coral} />
-                    <Text style={styles.loadingText}>
-                        Loading rewards profile...
-                    </Text>
-                </View>
-            </SafeAreaView>
+            <RequireAuth role="customer">
+                <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+                    <AppHeader
+                        title="Rewards & Points"
+                        showBack
+                        fallbackRoute="/(customer)/profile"
+                    />
+                    <View style={styles.center}>
+                        <ActivityIndicator
+                            size="large"
+                            color={Colors.deepPlum}
+                        />
+                        <Text style={styles.loadingText}>
+                            Loading rewards profile...
+                        </Text>
+                    </View>
+                </SafeAreaView>
+            </RequireAuth>
         );
     }
 
     if (errorMessage && !overview) {
         return (
-            <SafeAreaView style={styles.safeArea}>
-                <View style={styles.center}>
-                    <Info size={40} color={Colors.textTertiary} />
-                    <Text style={styles.emptyTitle}>Rewards Unavailable</Text>
-                    <Text style={styles.emptySubtitle}>{errorMessage}</Text>
-                    <TouchableOpacity
-                        style={styles.retryBtn}
-                        onPress={() => loadRewards(false)}
-                    >
-                        <Text style={styles.retryBtnText}>Try Again</Text>
-                    </TouchableOpacity>
-                </View>
-            </SafeAreaView>
+            <RequireAuth role="customer">
+                <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+                    <AppHeader
+                        title="Rewards & Points"
+                        showBack
+                        fallbackRoute="/(customer)/profile"
+                    />
+                    <View style={styles.center}>
+                        <Info size={40} color={Colors.textTertiary} />
+                        <Text style={styles.emptyTitle}>
+                            Rewards Unavailable
+                        </Text>
+                        <Text style={styles.emptySubtitle}>{errorMessage}</Text>
+                        <TouchableOpacity
+                            style={styles.retryBtn}
+                            onPress={() => loadRewards(false)}
+                            accessibilityRole="button"
+                        >
+                            <Text style={styles.retryBtnText}>Try Again</Text>
+                        </TouchableOpacity>
+                    </View>
+                </SafeAreaView>
+            </RequireAuth>
         );
     }
 
     const wallet = overview?.wallet;
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            <ScrollView
-                style={styles.container}
-                contentContainerStyle={styles.contentContainer}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={() => loadRewards(true)}
-                    />
-                }
-            >
-                {/* Hero Rewards Card */}
-                <View style={styles.heroCard}>
-                    <View style={styles.heroHeader}>
-                        <View style={styles.heroBadge}>
-                            <Sparkles
-                                size={12}
-                                color="#F59E0B"
-                                style={{ marginRight: 4 }}
-                            />
-                            <Text style={styles.heroBadgeText}>
-                                TIJUM LOYALTY CLUB
-                            </Text>
+        <RequireAuth role="customer">
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+                <AppHeader
+                    title="Rewards & Points"
+                    showBack
+                    fallbackRoute="/(customer)/profile"
+                />
+                <ScrollView
+                    style={styles.container}
+                    contentContainerStyle={styles.contentContainer}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={() => loadRewards(true)}
+                            colors={[Colors.deepPlum]}
+                            tintColor={Colors.deepPlum}
+                        />
+                    }
+                >
+                    {/* Hero Rewards Card */}
+                    <View style={styles.heroCard}>
+                        <View style={styles.heroHeader}>
+                            <View style={styles.heroBadge}>
+                                <Sparkles
+                                    size={12}
+                                    color="#F59E0B"
+                                    style={{ marginRight: 4 }}
+                                />
+                                <Text style={styles.heroBadgeText}>
+                                    TIJUM LOYALTY CLUB
+                                </Text>
+                            </View>
+                            {wallet?.point_to_inr_rate ? (
+                                <Text style={styles.rateBadgeText}>
+                                    1 pt = ₹{wallet.point_to_inr_rate}
+                                </Text>
+                            ) : null}
                         </View>
-                        <Text style={styles.rateBadgeText}>
-                            1 pt = ₹{wallet?.point_to_inr_rate || 0.25}
-                        </Text>
-                    </View>
 
                     <Text style={styles.pointsLabel}>Available Balance</Text>
                     <View style={styles.pointsRow}>
@@ -245,11 +281,18 @@ export default function RewardsDashboardScreen() {
                     <View style={styles.actionTextContainer}>
                         <View style={styles.titleWithBadge}>
                             <Text style={styles.actionTitle}>Refer & Earn</Text>
-                            <View style={styles.hotBadge}>
-                                <Text style={styles.hotBadgeText}>
-                                    +500 PTS
-                                </Text>
-                            </View>
+                            {overview?.referral_profile?.referrer_reward_points ? (
+                                <View style={styles.hotBadge}>
+                                    <Text style={styles.hotBadgeText}>
+                                        +
+                                        {
+                                            overview.referral_profile
+                                                .referrer_reward_points
+                                        }{' '}
+                                        PTS
+                                    </Text>
+                                </View>
+                            ) : null}
                         </View>
                         <Text style={styles.actionSubtitle}>
                             Invite friends to TIJUM. Both of you earn points on
@@ -378,8 +421,8 @@ export default function RewardsDashboardScreen() {
                                         ]}
                                     >
                                         {isCredit
-                                            ? `+${tx.points}`
-                                            : `-${tx.points}`}{' '}
+                                            ? `+${Math.abs(tx.points)}`
+                                            : `-${Math.abs(tx.points)}`}{' '}
                                         pts
                                     </Text>
                                     <Text style={styles.txStatus}>
@@ -421,8 +464,9 @@ export default function RewardsDashboardScreen() {
                         across all verified stays.
                     </Text>
                 </View>
-            </ScrollView>
-        </SafeAreaView>
+                </ScrollView>
+            </SafeAreaView>
+        </RequireAuth>
     );
 }
 

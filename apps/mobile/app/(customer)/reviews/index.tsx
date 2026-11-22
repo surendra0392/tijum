@@ -8,9 +8,14 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { Star } from 'lucide-react-native';
 import { CustomerApi } from '../../../src/api/customer';
+import { AppHeader } from '../../../src/components/AppHeader';
+import { ExceptionalState } from '../../../src/components/ExceptionalState';
+import { RequireAuth } from '../../../src/components/RequireAuth';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
 
@@ -37,6 +42,7 @@ interface EligibleReview {
 
 export default function MyReviewsScreen() {
     const router = useRouter();
+    const isFocused = useIsFocused();
     const [reviews, setReviews] = useState<ReviewRecord[]>([]);
     const [eligible, setEligible] = useState<EligibleReview[]>([]);
     const [loading, setLoading] = useState(true);
@@ -69,8 +75,10 @@ export default function MyReviewsScreen() {
     }, []);
 
     useEffect(() => {
-        void load();
-    }, [load]);
+        if (isFocused) {
+            void load();
+        }
+    }, [isFocused, load]);
 
     const renderReview = ({ item }: { item: ReviewRecord }) => {
         const rating = item.overall_rating ?? item.rating ?? 0;
@@ -119,91 +127,118 @@ export default function MyReviewsScreen() {
     };
 
     return (
-        <View style={styles.container}>
-            {loading ? (
-                <View style={styles.center}>
-                    <ActivityIndicator color={Colors.coral} />
-                </View>
-            ) : (
-                <FlatList
-                    data={reviews}
-                    keyExtractor={(item: any) => String(item.id)}
-                    renderItem={renderReview}
-                    contentContainerStyle={styles.listContent}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={() => load(true)}
-                            tintColor={Colors.coral}
-                        />
-                    }
-                    ListHeaderComponent={
-                        <>
-                            {eligible.length > 0 ? (
-                                <View style={styles.eligibleCard}>
-                                    <Text style={styles.eligibleTitle}>
-                                        Reviews waiting for you
-                                    </Text>
-                                    {eligible.map((item: any) => (
-                                        <TouchableOpacity
-                                            key={item.booking_reference}
-                                            style={styles.eligibleRow}
-                                            onPress={() =>
-                                                router.push({
-                                                    pathname:
-                                                        '/(customer)/bookings/[reference]',
-                                                    params: {
-                                                        reference:
-                                                            item.booking_reference,
-                                                    },
-                                                })
-                                            }
-                                        >
-                                            <View style={{ flex: 1 }}>
-                                                <Text
-                                                    style={styles.eligibleName}
-                                                >
-                                                    {item.property_name ||
-                                                        item.booking_reference}
-                                                </Text>
-                                                <Text
-                                                    style={styles.eligibleMeta}
-                                                >
-                                                    Share your experience
-                                                    {item.days_remaining !==
-                                                    undefined
-                                                        ? ` · ${item.days_remaining} days left`
-                                                        : ''}
-                                                </Text>
-                                            </View>
-                                            <Text style={styles.eligibleAction}>
-                                                Review
-                                            </Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
-                            ) : null}
-
-                            <Text style={styles.sectionTitle}>
-                                Your Reviews
-                            </Text>
-                        </>
-                    }
-                    ListEmptyComponent={
-                        <View style={styles.emptyState}>
-                            <Star size={36} color={Colors.gray300} />
-                            <Text style={styles.emptyTitle}>
-                                No reviews yet
-                            </Text>
-                            <Text style={styles.emptyBody}>
-                                {error ||
-                                    'After your stay, you can rate the property and help other guests choose with confidence.'}
-                            </Text>
-                        </View>
-                    }
+        <RequireAuth role="customer">
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <AppHeader
+                    title="My Reviews"
+                    showBack
+                    fallbackRoute="/(customer)/profile"
                 />
-            )}
-        </View>
+                {loading && !refreshing ? (
+                    <View style={styles.center}>
+                        <ActivityIndicator
+                            size="large"
+                            color={Colors.deepPlum}
+                        />
+                    </View>
+                ) : error && reviews.length === 0 ? (
+                    <ExceptionalState
+                        type="no-internet"
+                        title="Reviews Unavailable"
+                        description={error}
+                        actionLabel="Try Again"
+                        onAction={() => void load()}
+                    />
+                ) : (
+                    <FlatList
+                        data={reviews}
+                        keyExtractor={(item: any) => String(item.id)}
+                        renderItem={renderReview}
+                        contentContainerStyle={styles.listContent}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={() => load(true)}
+                                colors={[Colors.deepPlum]}
+                                tintColor={Colors.deepPlum}
+                            />
+                        }
+                        ListHeaderComponent={
+                            <>
+                                {eligible.length > 0 ? (
+                                    <View style={styles.eligibleCard}>
+                                        <Text style={styles.eligibleTitle}>
+                                            Reviews waiting for you
+                                        </Text>
+                                        {eligible.map((item: any) => (
+                                            <TouchableOpacity
+                                                key={item.booking_reference}
+                                                style={styles.eligibleRow}
+                                                onPress={() =>
+                                                    router.push({
+                                                        pathname:
+                                                            '/(customer)/bookings/[reference]',
+                                                        params: {
+                                                            reference:
+                                                                item.booking_reference,
+                                                        },
+                                                    })
+                                                }
+                                                accessibilityRole="button"
+                                            >
+                                                <View style={{ flex: 1 }}>
+                                                    <Text
+                                                        style={
+                                                            styles.eligibleName
+                                                        }
+                                                    >
+                                                        {item.property_name ||
+                                                            item.booking_reference}
+                                                    </Text>
+                                                    <Text
+                                                        style={
+                                                            styles.eligibleMeta
+                                                        }
+                                                    >
+                                                        Share your experience
+                                                        {item.days_remaining !==
+                                                        undefined
+                                                            ? ` · ${item.days_remaining} days left`
+                                                            : ''}
+                                                    </Text>
+                                                </View>
+                                                <Text
+                                                    style={styles.eligibleAction}
+                                                >
+                                                    Review
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                ) : null}
+
+                                <Text style={styles.sectionTitle}>
+                                    Your Reviews
+                                </Text>
+                            </>
+                        }
+                        ListEmptyComponent={
+                            <View style={styles.emptyState}>
+                                <Star size={36} color={Colors.gray300} />
+                                <Text style={styles.emptyTitle}>
+                                    No reviews yet
+                                </Text>
+                                <Text style={styles.emptyBody}>
+                                    After your stay, you can rate the property
+                                    and help other guests choose with
+                                    confidence.
+                                </Text>
+                            </View>
+                        }
+                    />
+                )}
+            </SafeAreaView>
+        </RequireAuth>
     );
 }
 
@@ -238,6 +273,7 @@ const styles = StyleSheet.create({
     eligibleRow: {
         flexDirection: 'row',
         alignItems: 'center',
+        minHeight: 48,
         paddingVertical: Spacing.sm,
         borderTopWidth: 1,
         borderTopColor: Colors.peachSoft,
@@ -255,7 +291,7 @@ const styles = StyleSheet.create({
     eligibleAction: {
         fontSize: 13,
         fontWeight: '800',
-        color: Colors.coral,
+        color: Colors.coralDark,
     },
     sectionTitle: {
         fontSize: 17,

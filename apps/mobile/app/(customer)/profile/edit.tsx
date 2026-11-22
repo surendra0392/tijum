@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     Alert,
     KeyboardAvoidingView,
@@ -9,9 +9,12 @@ import {
     Text,
     View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation, useRouter } from 'expo-router';
 import { useAuth } from '../../../src/auth/AuthContext';
 import { CustomerApi } from '../../../src/api/customer';
+import { AppHeader } from '../../../src/components/AppHeader';
+import { RequireAuth } from '../../../src/components/RequireAuth';
 import { Button } from '../../../src/components/Button';
 import { Input } from '../../../src/components/Input';
 import { Colors } from '../../../src/theme/colors';
@@ -19,6 +22,7 @@ import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 
 export default function EditCustomerProfileScreen() {
     const router = useRouter();
+    const navigation = useNavigation();
     const { user, refreshProfile } = useAuth();
     const [name, setName] = useState(user?.name ?? '');
     const [phone, setPhone] = useState(user?.phone ?? '');
@@ -27,6 +31,12 @@ export default function EditCustomerProfileScreen() {
     );
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const savedBaselineRef = useRef({
+        name: user?.name ?? '',
+        phone: user?.phone ?? '',
+        marketingConsent: user?.marketing_consent ?? false,
+    });
+    const allowExitRef = useRef(false);
 
     useEffect(() => {
         CustomerApi.getProfile()
@@ -35,10 +45,45 @@ export default function EditCustomerProfileScreen() {
                     setName(res.data.name);
                     setPhone(res.data.phone ?? '');
                     setMarketingConsent(res.data.marketing_consent);
+                    savedBaselineRef.current = {
+                        name: res.data.name,
+                        phone: res.data.phone ?? '',
+                        marketingConsent: res.data.marketing_consent,
+                    };
                 }
             })
             .catch(() => {});
     }, []);
+
+    const isDirty =
+        name.trim() !== savedBaselineRef.current.name.trim() ||
+        phone.trim() !== savedBaselineRef.current.phone.trim() ||
+        marketingConsent !== savedBaselineRef.current.marketingConsent;
+
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+            if (!isDirty || allowExitRef.current || loading) {
+                return;
+            }
+            e.preventDefault();
+            Alert.alert(
+                'Discard Changes?',
+                'You have unsaved profile changes. Do you want to leave without saving?',
+                [
+                    { text: 'Keep Editing', style: 'cancel' },
+                    {
+                        text: 'Discard',
+                        style: 'destructive',
+                        onPress: () => {
+                            allowExitRef.current = true;
+                            navigation.dispatch(e.data.action);
+                        },
+                    },
+                ],
+            );
+        });
+        return unsubscribe;
+    }, [navigation, isDirty, loading]);
 
     const handleSave = async () => {
         const trimmedName = name.trim();
@@ -50,12 +95,19 @@ export default function EditCustomerProfileScreen() {
         setLoading(true);
         setError('');
         try {
+            const trimmedPhone = phone.trim();
             await CustomerApi.updateProfile({
                 name: trimmedName,
-                phone: phone.trim() || undefined,
+                phone: trimmedPhone.length > 0 ? trimmedPhone : null,
                 marketing_consent: marketingConsent,
             });
+            savedBaselineRef.current = {
+                name: trimmedName,
+                phone: trimmedPhone,
+                marketingConsent,
+            };
             await refreshProfile().catch(() => {});
+            allowExitRef.current = true;
             Alert.alert(
                 'Profile Updated',
                 'Your profile details have been saved.',
@@ -72,14 +124,21 @@ export default function EditCustomerProfileScreen() {
     };
 
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-            <ScrollView
-                contentContainerStyle={styles.content}
-                keyboardShouldPersistTaps="handled"
-            >
+        <RequireAuth role="customer">
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <AppHeader
+                    title="Edit Profile"
+                    showBack
+                    fallbackRoute="/(customer)/profile"
+                />
+                <KeyboardAvoidingView
+                    style={{ flex: 1 }}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                >
+                    <ScrollView
+                        contentContainerStyle={styles.content}
+                        keyboardShouldPersistTaps="handled"
+                    >
                 <Text style={styles.heading}>Personal Details</Text>
                 <Text style={styles.subheading}>
                     Keep your contact information up to date so we can reach you
@@ -136,8 +195,10 @@ export default function EditCustomerProfileScreen() {
                     size="lg"
                     style={styles.saveButton}
                 />
-            </ScrollView>
-        </KeyboardAvoidingView>
+                    </ScrollView>
+                </KeyboardAvoidingView>
+            </SafeAreaView>
+        </RequireAuth>
     );
 }
 

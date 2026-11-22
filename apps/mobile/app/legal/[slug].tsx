@@ -6,8 +6,11 @@ import {
     Text,
     View,
 } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { PublicApi } from '../../src/api/public';
+import { AppHeader } from '../../src/components/AppHeader';
+import { Button } from '../../src/components/Button';
 import { Colors } from '../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../src/theme/spacing';
 
@@ -90,7 +93,7 @@ const PRIVACY_SECTIONS: LegalSection[] = [
         intro: 'We collect information necessary to provide safe stay discovery, reservations, and property partner operations:',
         bullets: [
             'Account Information: Full name, valid mobile number, email address, password hash, and preferences.',
-            'Mobile Phone Verification: Mobile numbers are verified via SMS OTP for dual-identifier sign-in and critical booking alerts.',
+            'Email & Account Verification: Email addresses are verified via confirmation links for account security and booking alerts.',
             'Property Partner Details: Owner name, contact phone, trade name, accommodation category, physical location, photos, inventories, and settlement banking details.',
             'Booking & Transaction Data: Reservation history, room types, immutable pricing snapshots, gateway payment references (Razorpay), and check-in preferences.',
             'Technical & Device Data: IP address, browser details, device tokens, and search preferences used for relevant discovery.',
@@ -113,7 +116,7 @@ const PRIVACY_SECTIONS: LegalSection[] = [
         bullets: [
             'Property Partners: On booking confirmation, the host receives guest name, mobile contact, check-in date, and room type solely to prepare check-in and allocate a physical room.',
             'Payment Processors: Card and UPI checkouts run directly through PCI-DSS compliant gateways (Razorpay). TIJUM never stores card numbers or bank PINs.',
-            'Communications Infrastructure: Verified SMS/email providers deliver time-critical booking confirmations and OTP alerts.',
+            'Communications Infrastructure: Verified email and push notification providers deliver time-critical booking confirmations and alerts (SMS/WhatsApp delivery is disabled per current system configuration).',
             'Legal Mandates: Information may be disclosed when legally compelled under applicable Indian laws or judicial orders.',
         ],
     },
@@ -154,6 +157,7 @@ function stripHtml(value: string): string {
 }
 
 export default function LegalScreen() {
+    const router = useRouter();
     const params = useLocalSearchParams<{ slug?: string }>();
     const slug = String(params.slug || 'about');
     const [aboutBlocks, setAboutBlocks] = useState<any[]>([]);
@@ -164,14 +168,19 @@ export default function LegalScreen() {
 
     const isTerms = slug === 'terms';
     const isPrivacy = slug === 'privacy';
+    const isAbout = slug === 'about';
+    const isKnownSlug = isTerms || isPrivacy || isAbout;
     const pageTitle = isTerms
         ? 'Terms & Conditions'
         : isPrivacy
           ? 'Privacy Policy'
-          : 'About TIJUM';
+          : isAbout
+            ? 'About TIJUM'
+            : 'Legal Document';
 
     useEffect(() => {
-        if (slug !== 'about') {
+        if (!isAbout) {
+            setLoading(false);
             return;
         }
 
@@ -193,7 +202,7 @@ export default function LegalScreen() {
                 );
             })
             .finally(() => setLoading(false));
-    }, [slug]);
+    }, [slug, isAbout]);
 
     const sections = isTerms
         ? TERMS_SECTIONS
@@ -201,9 +210,48 @@ export default function LegalScreen() {
           ? PRIVACY_SECTIONS
           : [];
 
+    if (!isKnownSlug) {
+        return (
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <AppHeader title={pageTitle} showBack />
+                <ScrollView
+                    style={styles.container}
+                    contentContainerStyle={styles.content}
+                >
+                    <View style={styles.sectionCard}>
+                        <Text style={styles.sectionTitle}>
+                            Document Not Found
+                        </Text>
+                        <Text style={styles.sectionIntro}>
+                            The requested document ("{slug}") could not be found.
+                            Choose one of TIJUM's published legal policies below:
+                        </Text>
+                        <Button
+                            title="View Terms & Conditions"
+                            onPress={() => router.replace('/legal/terms')}
+                            style={{ marginTop: Spacing.sm }}
+                        />
+                        <Button
+                            title="View Privacy Policy"
+                            variant="outline"
+                            onPress={() => router.replace('/legal/privacy')}
+                            style={{ marginTop: Spacing.sm }}
+                        />
+                        <Button
+                            title="View About TIJUM"
+                            variant="outline"
+                            onPress={() => router.replace('/legal/about')}
+                            style={{ marginTop: Spacing.sm }}
+                        />
+                    </View>
+                </ScrollView>
+            </SafeAreaView>
+        );
+    }
+
     return (
-        <>
-            <Stack.Screen options={{ title: pageTitle }} />
+        <SafeAreaView style={styles.container} edges={['bottom']}>
+            <AppHeader title={pageTitle} showBack />
             <ScrollView
                 style={styles.container}
                 contentContainerStyle={styles.content}
@@ -358,7 +406,7 @@ export default function LegalScreen() {
                     34033 (9:00 AM – 9:00 PM IST, Mon–Sat).
                 </Text>
             </ScrollView>
-        </>
+        </SafeAreaView>
     );
 }
 

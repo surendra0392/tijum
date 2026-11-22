@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -7,7 +7,6 @@ import {
     Modal,
     Platform,
     RefreshControl,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
@@ -15,6 +14,11 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import {
     Search,
@@ -44,6 +48,7 @@ import {
 import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import { BrandLogo } from '../../../src/components/BrandLogo';
 import { PropertyCard } from '../../../src/components/PropertyCard';
+import { SkeletonCard } from '../../../src/components/Skeleton';
 import { Input } from '../../../src/components/Input';
 import { Button } from '../../../src/components/Button';
 import { Colors } from '../../../src/theme/colors';
@@ -91,12 +96,33 @@ const GENDER_OPTIONS: Array<{ key: 'all' | 'male' | 'female'; label: string }> =
         { key: 'female', label: 'Women Only' },
     ];
 
+interface ActiveFiltersState {
+    city: string;
+    category: 'all' | CanonicalCategorySlug;
+    searchQuery: string;
+    filterAc: boolean;
+    gender: 'all' | 'male' | 'female';
+    breakfast: boolean;
+    lunch: boolean;
+    dinner: boolean;
+    sharing: number | null;
+    minPrice: string;
+    maxPrice: string;
+    checkInDate: string;
+    checkOutDate: string;
+}
+
 export default function ExploreScreen() {
     const router = useRouter();
-    const { token, authState } = useAuth();
+    const isFocused = useIsFocused();
+    const insets = useSafeAreaInsets();
+    const { token, authState, sessionEpoch } = useAuth();
     const [properties, setProperties] = useState<PropertyCardType[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [lastPage, setLastPage] = useState(1);
     const [selectedCategory, setSelectedCategory] = useState<
         'all' | CanonicalCategorySlug
     >('all');
@@ -117,14 +143,32 @@ export default function ExploreScreen() {
     const [maxPrice, setMaxPrice] = useState('');
     const [checkInDate, setCheckInDate] = useState('');
     const [checkOutDate, setCheckOutDate] = useState('');
+
+    // Staged draft state for Filters Modal (applied only on explicit tap)
+    const [draftCity, setDraftCity] = useState('All');
+    const [draftBreakfast, setDraftBreakfast] = useState(false);
+    const [draftLunch, setDraftLunch] = useState(false);
+    const [draftDinner, setDraftDinner] = useState(false);
+    const [draftSharing, setDraftSharing] = useState<number | null>(null);
+    const [draftMinPrice, setDraftMinPrice] = useState('');
+    const [draftMaxPrice, setDraftMaxPrice] = useState('');
+    const [draftCheckInDate, setDraftCheckInDate] = useState('');
+    const [draftCheckOutDate, setDraftCheckOutDate] = useState('');
+
     const [advancedModalVisible, setAdvancedModalVisible] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [errorStatus, setErrorStatus] = useState<number | null>(null);
     const [wishlistedIds, setWishlistedIds] = useState<Set<number>>(new Set());
+    const [unreadCount, setUnreadCount] = useState(0);
 
-    // Restore customer wishlist state on mount
+    // Restore customer wishlist & unread badge state on auth/focus/epoch
     useEffect(() => {
         if (!token || authState !== 'customer_authenticated') {
             setWishlistedIds(new Set());
+            setUnreadCount(0);
+            return;
+        }
+        if (!isFocused) {
             return;
         }
 
@@ -135,7 +179,13 @@ export default function ExploreScreen() {
                 }
             })
             .catch(() => {});
-    }, [authState, token]);
+
+        void CustomerApi.getUnreadCount()
+            .then((res) => {
+                setUnreadCount(Number(res?.data?.unread_count ?? 0));
+            })
+            .catch(() => {});
+    }, [authState, token, sessionEpoch, isFocused]);
 
     const handleToggleWishlist = async (propertyId: number) => {
         if (!token || authState !== 'customer_authenticated') {
@@ -158,7 +208,7 @@ export default function ExploreScreen() {
             const response = await CustomerApi.toggleWishlist(propertyId);
             setWishlistedIds((current) => {
                 const next = new Set(current);
-                if (response.data.wishlisted) {
+                if (response.wishlisted) {
                     next.add(propertyId);
                 } else {
                     next.delete(propertyId);
@@ -183,6 +233,7 @@ export default function ExploreScreen() {
     };
 
     const activeFiltersCount =
+        (selectedCity !== 'All' ? 1 : 0) +
         (filterAc ? 1 : 0) +
         (selectedGender !== 'all' ? 1 : 0) +
         (filterBreakfast ? 1 : 0) +
@@ -192,7 +243,33 @@ export default function ExploreScreen() {
         (minPrice || maxPrice ? 1 : 0) +
         (checkInDate ? 1 : 0);
 
+    const openAdvancedModal = () => {
+        setDraftCity(selectedCity);
+        setDraftBreakfast(filterBreakfast);
+        setDraftLunch(filterLunch);
+        setDraftDinner(filterDinner);
+        setDraftSharing(selectedSharing);
+        setDraftMinPrice(minPrice);
+        setDraftMaxPrice(maxPrice);
+        setDraftCheckInDate(checkInDate);
+        setDraftCheckOutDate(checkOutDate);
+        setAdvancedModalVisible(true);
+    };
+
+    const resetDraftFilters = () => {
+        setDraftCity('All');
+        setDraftBreakfast(false);
+        setDraftLunch(false);
+        setDraftDinner(false);
+        setDraftSharing(null);
+        setDraftMinPrice('');
+        setDraftMaxPrice('');
+        setDraftCheckInDate('');
+        setDraftCheckOutDate('');
+    };
+
     const resetAdvancedFilters = () => {
+        setSelectedCity('All');
         setFilterBreakfast(false);
         setFilterLunch(false);
         setFilterDinner(false);
@@ -201,96 +278,160 @@ export default function ExploreScreen() {
         setMaxPrice('');
         setCheckInDate('');
         setCheckOutDate('');
+        resetDraftFilters();
     };
 
-    const loadProperties = async (isRefresh = false) => {
-        if (isRefresh) {
-            setRefreshing(true);
-        } else {
-            setLoading(true);
+    const fetchProperties = useCallback(
+        async (
+            pageNum: number = 1,
+            isRefresh: boolean = false,
+            override?: Partial<ActiveFiltersState>,
+        ) => {
+            const effCity = override?.city ?? selectedCity;
+            const effCat = override?.category ?? selectedCategory;
+            const effSearch = override?.searchQuery ?? searchQuery;
+            const effAc = override?.filterAc ?? filterAc;
+            const effGender = override?.gender ?? selectedGender;
+            const effBreakfast = override?.breakfast ?? filterBreakfast;
+            const effLunch = override?.lunch ?? filterLunch;
+            const effDinner = override?.dinner ?? filterDinner;
+            const effSharing =
+                override && 'sharing' in override
+                    ? override.sharing
+                    : selectedSharing;
+            const effMinPrice = override?.minPrice ?? minPrice;
+            const effMaxPrice = override?.maxPrice ?? maxPrice;
+            const effCheckIn = override?.checkInDate ?? checkInDate;
+            const effCheckOut = override?.checkOutDate ?? checkOutDate;
+
+            if (pageNum > 1) {
+                setLoadingMore(true);
+            } else if (isRefresh) {
+                setRefreshing(true);
+            } else {
+                setLoading(true);
+            }
+            setErrorMessage(null);
+            setErrorStatus(null);
+
+            try {
+                const filters: Record<string, any> = { page: pageNum };
+                if (effCity !== 'All') {
+                    filters.city = effCity.toLowerCase();
+                }
+                if (effCat !== 'all') {
+                    filters.category = effCat;
+                }
+                if (effSearch.trim()) {
+                    filters.locality = effSearch.trim();
+                }
+                if (effAc) {
+                    filters.ac = true;
+                }
+                if (effGender !== 'all') {
+                    filters.gender = effGender;
+                    filters.gender_preference = effGender;
+                }
+                if (effBreakfast) {
+                    filters.breakfast = true;
+                }
+                if (effLunch) {
+                    filters.lunch = true;
+                }
+                if (effDinner) {
+                    filters.dinner = true;
+                }
+                if (effSharing) {
+                    filters.sharing_capacity =
+                        effSharing === 4 ? [4, 5, 6, 7, 8] : effSharing;
+                }
+                if (effMinPrice && !isNaN(Number(effMinPrice))) {
+                    filters.min_price = Number(effMinPrice) * 100;
+                }
+                if (effMaxPrice && !isNaN(Number(effMaxPrice))) {
+                    filters.max_price = Number(effMaxPrice) * 100;
+                }
+                if (effCheckIn.trim()) {
+                    filters.check_in_date = effCheckIn.trim();
+                }
+                if (effCheckOut.trim()) {
+                    filters.check_out_date = effCheckOut.trim();
+                }
+
+                const res = await PublicApi.getProperties(filters);
+                let nextProperties = res.data || [];
+
+                // Local normalization filter to ensure client displays strictly matching canonical category
+                if (effCat !== 'all') {
+                    nextProperties = nextProperties.filter((p) => {
+                        const rawCat = p.category?.slug || p.category?.name;
+                        const normalized = normalizeCategorySlug(rawCat);
+                        return normalized === effCat;
+                    });
+                }
+
+                if (pageNum > 1) {
+                    setProperties((prev) => {
+                        const seen = new Set(prev.map((item) => item.id));
+                        return [
+                            ...prev,
+                            ...nextProperties.filter(
+                                (item) => !seen.has(item.id),
+                            ),
+                        ];
+                    });
+                } else {
+                    setProperties(nextProperties);
+                }
+
+                setCurrentPage(res.meta?.current_page ?? pageNum);
+                setLastPage(res.meta?.last_page ?? pageNum);
+            } catch (err: any) {
+                if (pageNum === 1) {
+                    setProperties([]);
+                    setErrorStatus(
+                        typeof err?.status === 'number' ? err.status : null,
+                    );
+                    setErrorMessage(
+                        err?.message ||
+                            'Unable to load stays. Please try again.',
+                    );
+                }
+            } finally {
+                setLoading(false);
+                setRefreshing(false);
+                setLoadingMore(false);
+            }
+        },
+        [
+            selectedCity,
+            selectedCategory,
+            searchQuery,
+            filterAc,
+            selectedGender,
+            filterBreakfast,
+            filterLunch,
+            filterDinner,
+            selectedSharing,
+            minPrice,
+            maxPrice,
+            checkInDate,
+            checkOutDate,
+        ],
+    );
+
+    const loadProperties = (isRefresh = false) =>
+        fetchProperties(1, isRefresh);
+
+    const loadMoreProperties = () => {
+        if (loading || refreshing || loadingMore || currentPage >= lastPage) {
+            return;
         }
-        setErrorMessage(null);
-
-        try {
-            const filters: any = {};
-            if (selectedCity !== 'All') {
-                filters.city = selectedCity.toLowerCase();
-            }
-            if (selectedCategory !== 'all') {
-                filters.category = selectedCategory;
-            }
-            if (searchQuery.trim()) {
-                filters.locality = searchQuery.trim();
-            }
-            if (filterAc) {
-                filters.ac = true;
-            }
-            if (selectedGender !== 'all') {
-                filters.gender = selectedGender;
-                filters.gender_preference = selectedGender;
-            }
-            if (filterBreakfast) {
-                filters.breakfast = true;
-            }
-            if (filterLunch) {
-                filters.lunch = true;
-            }
-            if (filterDinner) {
-                filters.dinner = true;
-            }
-            if (selectedSharing) {
-                filters.sharing_capacity = selectedSharing;
-            }
-            if (minPrice && !isNaN(Number(minPrice))) {
-                filters.min_price = Number(minPrice) * 100;
-            }
-            if (maxPrice && !isNaN(Number(maxPrice))) {
-                filters.max_price = Number(maxPrice) * 100;
-            }
-            if (checkInDate.trim()) {
-                filters.check_in_date = checkInDate.trim();
-            }
-            if (checkOutDate.trim()) {
-                filters.check_out_date = checkOutDate.trim();
-            }
-
-            const res = await PublicApi.getProperties(filters);
-            let nextProperties = res.data || [];
-
-            // Local normalization filter to ensure client displays strictly matching canonical category
-            if (selectedCategory !== 'all') {
-                nextProperties = nextProperties.filter((p) => {
-                    const rawCat = p.category?.slug || p.category?.name;
-                    const normalized = normalizeCategorySlug(rawCat);
-                    return normalized === selectedCategory;
-                });
-            }
-
-            if (
-                nextProperties.length === 0 &&
-                !searchQuery.trim() &&
-                !minPrice &&
-                !maxPrice
-            ) {
-                nextProperties = [];
-            }
-
-            setProperties(nextProperties);
-        } catch (propertyLoadError: unknown) {
-            setProperties([]);
-            setErrorMessage(
-                propertyLoadError instanceof Error
-                    ? propertyLoadError.message
-                    : 'Unable to load stays. Please try again.',
-            );
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
+        void fetchProperties(currentPage + 1, false);
     };
 
     useEffect(() => {
-        void loadProperties();
+        void fetchProperties(1, false);
     }, [
         selectedCity,
         selectedCategory,
@@ -300,6 +441,10 @@ export default function ExploreScreen() {
         filterLunch,
         filterDinner,
         selectedSharing,
+        minPrice,
+        maxPrice,
+        checkInDate,
+        checkOutDate,
     ]);
 
     // Fetch cities from API for city selector
@@ -353,16 +498,28 @@ export default function ExploreScreen() {
     };
 
     const guarantee = getGuaranteeContent();
+    const selectedCityLabel =
+        selectedCity === 'All'
+            ? 'All Cities'
+            : cities.find((c) => c.value === selectedCity)?.label ||
+              selectedCity;
 
     return (
         <View style={styles.container}>
             {/* Top Curved Plum Header */}
-            <View style={styles.plumHeader}>
-                <SafeAreaView>
+            <View
+                style={[
+                    styles.plumHeader,
+                    { paddingTop: Math.max(insets.top, Spacing.sm) + 4 },
+                ]}
+            >
+                <SafeAreaView edges={[]}>
                     <View style={styles.plumHeaderTopRow}>
                         <TouchableOpacity
                             style={styles.locationSelector}
-                            onPress={() => setAdvancedModalVisible(true)}
+                            accessibilityRole="button"
+                            accessibilityLabel="Select city or filters"
+                            onPress={openAdvancedModal}
                             activeOpacity={0.8}
                         >
                             <MapPin
@@ -371,9 +528,7 @@ export default function ExploreScreen() {
                                 style={{ marginRight: 4 }}
                             />
                             <Text style={styles.locationText}>
-                                {selectedCity === 'All'
-                                    ? 'All Cities'
-                                    : selectedCity}
+                                {selectedCityLabel}
                             </Text>
                             <ChevronDown
                                 size={14}
@@ -384,13 +539,21 @@ export default function ExploreScreen() {
 
                         <TouchableOpacity
                             style={styles.notificationBell}
+                            accessibilityRole="button"
+                            accessibilityLabel={
+                                unreadCount > 0
+                                    ? `Notifications, ${unreadCount} unread`
+                                    : 'Notifications'
+                            }
                             onPress={() =>
                                 router.push('/(customer)/notifications')
                             }
                             activeOpacity={0.8}
                         >
                             <Bell size={18} color={Colors.white} />
-                            <View style={styles.notificationBadgeDot} />
+                            {unreadCount > 0 ? (
+                                <View style={styles.notificationBadgeDot} />
+                            ) : null}
                         </TouchableOpacity>
                     </View>
 
@@ -401,12 +564,13 @@ export default function ExploreScreen() {
                     <View style={styles.searchBar}>
                         <Search
                             size={18}
-                            color={Colors.gray400}
+                            color={Colors.inkMuted}
                             style={styles.searchIcon}
                         />
                         <TextInput
-                            placeholder="Search properties..."
-                            placeholderTextColor={Colors.gray400}
+                            placeholder="Search locality, landmark or stay..."
+                            placeholderTextColor={Colors.inkMuted}
+                            accessibilityLabel="Search properties by locality or name"
                             style={styles.searchInput}
                             value={searchQuery}
                             onChangeText={setSearchQuery}
@@ -415,26 +579,32 @@ export default function ExploreScreen() {
                         />
                         {searchQuery ? (
                             <TouchableOpacity
+                                accessibilityRole="button"
+                                accessibilityLabel="Clear search query"
                                 onPress={() => {
                                     setSearchQuery('');
-                                    void loadProperties();
+                                    void fetchProperties(1, false, {
+                                        searchQuery: '',
+                                    });
                                 }}
-                                style={{ marginRight: 6 }}
+                                style={styles.searchIconBtn}
                             >
-                                <X size={16} color={Colors.gray400} />
+                                <X size={16} color={Colors.inkMuted} />
                             </TouchableOpacity>
                         ) : null}
                         <TouchableOpacity
-                            onPress={() => setAdvancedModalVisible(true)}
+                            accessibilityRole="button"
+                            accessibilityLabel="Open stay filters"
+                            onPress={openAdvancedModal}
                             style={styles.searchFilterBtn}
                             activeOpacity={0.8}
                         >
                             <SlidersHorizontal
-                                size={15}
+                                size={16}
                                 color={
                                     activeFiltersCount > 0
-                                        ? Colors.coral
-                                        : Colors.gray500
+                                        ? Colors.coralDark
+                                        : Colors.deepPlum
                                 }
                             />
                         </TouchableOpacity>
@@ -497,7 +667,8 @@ export default function ExploreScreen() {
                 >
                     <TouchableOpacity
                         activeOpacity={0.8}
-                        onPress={() => setAdvancedModalVisible(true)}
+                        accessibilityRole="button"
+                        onPress={openAdvancedModal}
                         style={[
                             styles.cityPill,
                             activeFiltersCount > 0 && styles.filterPillActive,
@@ -637,23 +808,57 @@ export default function ExploreScreen() {
 
             {/* Main List */}
             {loading ? (
-                <View style={styles.centerContainer}>
-                    <ActivityIndicator
-                        size="large"
-                        color={Colors.plumPrimary}
-                    />
-                    <Text style={styles.loadingText}>
-                        Finding verified food-inclusive stays...
-                    </Text>
-                </View>
+                <ScrollView
+                    contentContainerStyle={styles.listContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <SkeletonCard />
+                    <SkeletonCard />
+                </ScrollView>
             ) : errorMessage && properties.length === 0 ? (
                 <View style={styles.centerContainer}>
                     <ExceptionalState
-                        type="no-internet"
-                        title="Unable to Load Stays"
+                        type={
+                            errorStatus === 422 ? 'no-results' : 'no-internet'
+                        }
+                        title={
+                            errorStatus === 422
+                                ? 'Adjust Search Filters'
+                                : 'Unable to Load Stays'
+                        }
                         description={errorMessage}
-                        primaryActionLabel="Tap to Retry"
-                        onPrimaryAction={() => loadProperties()}
+                        primaryActionLabel={
+                            errorStatus === 422
+                                ? 'Reset Filters'
+                                : 'Tap to Retry'
+                        }
+                        onPrimaryAction={() => {
+                            if (errorStatus === 422) {
+                                setSelectedCategory('all');
+                                setSelectedCity('All');
+                                setSearchQuery('');
+                                setFilterAc(false);
+                                setSelectedGender('all');
+                                resetAdvancedFilters();
+                                void fetchProperties(1, false, {
+                                    city: 'All',
+                                    category: 'all',
+                                    searchQuery: '',
+                                    filterAc: false,
+                                    gender: 'all',
+                                    breakfast: false,
+                                    lunch: false,
+                                    dinner: false,
+                                    sharing: null,
+                                    minPrice: '',
+                                    maxPrice: '',
+                                    checkInDate: '',
+                                    checkOutDate: '',
+                                });
+                            } else {
+                                void loadProperties();
+                            }
+                        }}
                     />
                 </View>
             ) : (
@@ -661,6 +866,8 @@ export default function ExploreScreen() {
                     data={properties}
                     keyExtractor={(item: any) => String(item.id)}
                     contentContainerStyle={styles.listContent}
+                    onEndReached={loadMoreProperties}
+                    onEndReachedThreshold={0.35}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
@@ -837,9 +1044,33 @@ export default function ExploreScreen() {
                                 setFilterAc(false);
                                 setSelectedGender('all');
                                 resetAdvancedFilters();
-                                void loadProperties();
+                                void fetchProperties(1, false, {
+                                    city: 'All',
+                                    category: 'all',
+                                    searchQuery: '',
+                                    filterAc: false,
+                                    gender: 'all',
+                                    breakfast: false,
+                                    lunch: false,
+                                    dinner: false,
+                                    sharing: null,
+                                    minPrice: '',
+                                    maxPrice: '',
+                                    checkInDate: '',
+                                    checkOutDate: '',
+                                });
                             }}
                         />
+                    }
+                    ListFooterComponent={
+                        loadingMore ? (
+                            <View style={{ paddingVertical: Spacing.md }}>
+                                <ActivityIndicator
+                                    size="small"
+                                    color={Colors.deepPlum}
+                                />
+                            </View>
+                        ) : null
                     }
                     renderItem={({ item }: { item: any }) => (
                         <PropertyCard
@@ -894,7 +1125,41 @@ export default function ExploreScreen() {
                         <ScrollView
                             contentContainerStyle={styles.modalScroll}
                             showsVerticalScrollIndicator={false}
+                            keyboardShouldPersistTaps="handled"
                         >
+                            {/* City */}
+                            <Text style={styles.filterGroupTitle}>City</Text>
+                            <View style={styles.chipsWrap}>
+                                {cities.map((city) => {
+                                    const isSelected = draftCity === city.value;
+                                    return (
+                                        <TouchableOpacity
+                                            key={city.value}
+                                            style={[
+                                                styles.filterChip,
+                                                isSelected &&
+                                                    styles.filterChipActive,
+                                            ]}
+                                            onPress={() =>
+                                                setDraftCity(city.value)
+                                            }
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.filterChipText,
+                                                    isSelected &&
+                                                        styles.filterChipTextActive,
+                                                ]}
+                                            >
+                                                {city.value === 'All'
+                                                    ? 'All Cities'
+                                                    : city.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+
                             {/* Dates */}
                             <Text style={styles.filterGroupTitle}>
                                 Stay Dates
@@ -904,8 +1169,8 @@ export default function ExploreScreen() {
                                     <Input
                                         label="Check-in Date"
                                         placeholder="YYYY-MM-DD"
-                                        value={checkInDate}
-                                        onChangeText={setCheckInDate}
+                                        value={draftCheckInDate}
+                                        onChangeText={setDraftCheckInDate}
                                     />
                                 </View>
                                 <View style={{ width: Spacing.sm }} />
@@ -913,8 +1178,8 @@ export default function ExploreScreen() {
                                     <Input
                                         label="Check-out Date"
                                         placeholder="YYYY-MM-DD"
-                                        value={checkOutDate}
-                                        onChangeText={setCheckOutDate}
+                                        value={draftCheckOutDate}
+                                        onChangeText={setDraftCheckOutDate}
                                     />
                                 </View>
                             </View>
@@ -931,17 +1196,17 @@ export default function ExploreScreen() {
                                 <TouchableOpacity
                                     style={[
                                         styles.filterChip,
-                                        filterBreakfast &&
+                                        draftBreakfast &&
                                             styles.filterChipActive,
                                     ]}
                                     onPress={() =>
-                                        setFilterBreakfast(!filterBreakfast)
+                                        setDraftBreakfast(!draftBreakfast)
                                     }
                                 >
                                     <Utensils
                                         size={14}
                                         color={
-                                            filterBreakfast
+                                            draftBreakfast
                                                 ? Colors.white
                                                 : Colors.gray700
                                         }
@@ -950,7 +1215,7 @@ export default function ExploreScreen() {
                                     <Text
                                         style={[
                                             styles.filterChipText,
-                                            filterBreakfast &&
+                                            draftBreakfast &&
                                                 styles.filterChipTextActive,
                                         ]}
                                     >
@@ -961,14 +1226,14 @@ export default function ExploreScreen() {
                                 <TouchableOpacity
                                     style={[
                                         styles.filterChip,
-                                        filterLunch && styles.filterChipActive,
+                                        draftLunch && styles.filterChipActive,
                                     ]}
-                                    onPress={() => setFilterLunch(!filterLunch)}
+                                    onPress={() => setDraftLunch(!draftLunch)}
                                 >
                                     <Utensils
                                         size={14}
                                         color={
-                                            filterLunch
+                                            draftLunch
                                                 ? Colors.white
                                                 : Colors.gray700
                                         }
@@ -977,7 +1242,7 @@ export default function ExploreScreen() {
                                     <Text
                                         style={[
                                             styles.filterChipText,
-                                            filterLunch &&
+                                            draftLunch &&
                                                 styles.filterChipTextActive,
                                         ]}
                                     >
@@ -988,16 +1253,14 @@ export default function ExploreScreen() {
                                 <TouchableOpacity
                                     style={[
                                         styles.filterChip,
-                                        filterDinner && styles.filterChipActive,
+                                        draftDinner && styles.filterChipActive,
                                     ]}
-                                    onPress={() =>
-                                        setFilterDinner(!filterDinner)
-                                    }
+                                    onPress={() => setDraftDinner(!draftDinner)}
                                 >
                                     <Utensils
                                         size={14}
                                         color={
-                                            filterDinner
+                                            draftDinner
                                                 ? Colors.white
                                                 : Colors.gray700
                                         }
@@ -1006,7 +1269,7 @@ export default function ExploreScreen() {
                                     <Text
                                         style={[
                                             styles.filterChipText,
-                                            filterDinner &&
+                                            draftDinner &&
                                                 styles.filterChipTextActive,
                                         ]}
                                     >
@@ -1027,7 +1290,7 @@ export default function ExploreScreen() {
                                     { capacity: 4, label: '4+ Share' },
                                 ].map((item: any) => {
                                     const isSelected =
-                                        selectedSharing === item.capacity;
+                                        draftSharing === item.capacity;
                                     return (
                                         <TouchableOpacity
                                             key={item.capacity}
@@ -1037,7 +1300,7 @@ export default function ExploreScreen() {
                                                     styles.filterChipActive,
                                             ]}
                                             onPress={() =>
-                                                setSelectedSharing(
+                                                setDraftSharing(
                                                     isSelected
                                                         ? null
                                                         : item.capacity,
@@ -1077,8 +1340,8 @@ export default function ExploreScreen() {
                                         label="Min Monthly (₹)"
                                         placeholder="e.g. 5000"
                                         keyboardType="numeric"
-                                        value={minPrice}
-                                        onChangeText={setMinPrice}
+                                        value={draftMinPrice}
+                                        onChangeText={setDraftMinPrice}
                                     />
                                 </View>
                                 <View style={{ width: Spacing.sm }} />
@@ -1087,8 +1350,8 @@ export default function ExploreScreen() {
                                         label="Max Monthly (₹)"
                                         placeholder="e.g. 25000"
                                         keyboardType="numeric"
-                                        value={maxPrice}
-                                        onChangeText={setMaxPrice}
+                                        value={draftMaxPrice}
+                                        onChangeText={setDraftMaxPrice}
                                     />
                                 </View>
                             </View>
@@ -1098,14 +1361,22 @@ export default function ExploreScreen() {
                                 <Button
                                     title="Reset All"
                                     variant="outline"
-                                    onPress={resetAdvancedFilters}
+                                    onPress={resetDraftFilters}
                                     style={{ flex: 1 }}
                                 />
                                 <Button
                                     title="Apply Filters"
                                     onPress={() => {
+                                        setSelectedCity(draftCity);
+                                        setFilterBreakfast(draftBreakfast);
+                                        setFilterLunch(draftLunch);
+                                        setFilterDinner(draftDinner);
+                                        setSelectedSharing(draftSharing);
+                                        setMinPrice(draftMinPrice);
+                                        setMaxPrice(draftMaxPrice);
+                                        setCheckInDate(draftCheckInDate);
+                                        setCheckOutDate(draftCheckOutDate);
                                         setAdvancedModalVisible(false);
-                                        void loadProperties();
                                     }}
                                     style={{ flex: 1 }}
                                 />
@@ -1139,21 +1410,22 @@ const styles = StyleSheet.create({
         marginBottom: Spacing.sm,
     },
     locationSelector: {
+        minHeight: 44,
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'rgba(255, 255, 255, 0.15)',
         paddingHorizontal: Spacing.md,
-        paddingVertical: 6,
+        paddingVertical: 8,
         borderRadius: BorderRadius.pill,
     },
     locationText: {
+        fontFamily: Typography.fontFamily.bodyBold,
         fontSize: Typography.fontSize.xs,
-        fontWeight: '700',
         color: Colors.white,
     },
     notificationBell: {
-        width: 36,
-        height: 36,
+        width: 48,
+        height: 48,
         borderRadius: BorderRadius.pill,
         backgroundColor: 'rgba(255, 255, 255, 0.15)',
         alignItems: 'center',
@@ -1225,12 +1497,22 @@ const styles = StyleSheet.create({
     },
     searchInput: {
         flex: 1,
+        minHeight: 40,
+        fontFamily: Typography.fontFamily.body,
         fontSize: Typography.fontSize.sm,
         color: Colors.inkPrimary,
     },
+    searchIconBtn: {
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     searchFilterBtn: {
-        padding: 4,
-        marginLeft: 4,
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     categoriesSection: {
         marginBottom: Spacing.md,
@@ -1248,9 +1530,9 @@ const styles = StyleSheet.create({
         color: Colors.deepPlum,
     },
     seeAllText: {
+        fontFamily: Typography.fontFamily.bodyBold,
         fontSize: 13,
-        fontWeight: '700',
-        color: Colors.coral,
+        color: Colors.coralDark,
     },
     categoryCardsRow: {
         flexDirection: 'row',
@@ -1269,8 +1551,8 @@ const styles = StyleSheet.create({
         ...Shadows.subtle,
     },
     visualCatCardActive: {
-        borderColor: Colors.coral,
-        backgroundColor: '#FFF9F7',
+        borderColor: Colors.deepPlum,
+        backgroundColor: Colors.peachCream,
     },
     visualCatImg: {
         width: '100%',
@@ -1279,12 +1561,12 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     visualCatLabel: {
+        fontFamily: Typography.fontFamily.bodyBold,
         fontSize: 12,
-        fontWeight: '700',
         color: Colors.deepPlum,
     },
     visualCatLabelActive: {
-        color: Colors.coral,
+        color: Colors.coralDark,
     },
     categoryPillContainer: {
         paddingHorizontal: Spacing.base,

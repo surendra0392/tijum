@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -10,7 +9,7 @@ import {
     View,
 } from 'react-native';
 import { AlertCircle } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthContext';
 import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
@@ -20,15 +19,25 @@ import { Typography } from '../../src/theme/typography';
 
 export default function CustomerRegisterScreen() {
     const router = useRouter();
-    const { registerCustomer } = useAuth();
+    const params = useLocalSearchParams<{ referral_code?: string }>();
+    const { registerCustomer, consumePendingRedirect } = useAuth();
 
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
+    const [referralCode, setReferralCode] = useState(
+        typeof params.referral_code === 'string' ? params.referral_code : '',
+    );
     const [termsAccepted, setTermsAccepted] = useState(false);
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+
+    useEffect(() => {
+        if (typeof params.referral_code === 'string' && params.referral_code) {
+            setReferralCode(params.referral_code);
+        }
+    }, [params.referral_code]);
 
     const handleRegister = async () => {
         if (!name.trim() || !email.trim() || !password) {
@@ -61,19 +70,14 @@ export default function CustomerRegisterScreen() {
                 email: email.trim(),
                 phone: phone.trim(),
                 password,
-                terms_accepted: true,
+                terms_accepted: termsAccepted,
                 marketing_consent: false,
+                ...(referralCode.trim()
+                    ? { referral_code: referralCode.trim().toUpperCase() }
+                    : {}),
             });
-            Alert.alert(
-                'Account Created',
-                'Welcome to TIJUM! Please verify your email address using the link we sent to your inbox.',
-                [
-                    {
-                        text: 'Continue',
-                        onPress: () => router.replace('/(customer)/explore'),
-                    },
-                ],
-            );
+            const pendingTarget = consumePendingRedirect();
+            router.replace((pendingTarget || '/(customer)/explore') as never);
         } catch (err: any) {
             setErrorMessage(
                 err?.message || 'Registration failed. Please check the form.',
@@ -85,10 +89,13 @@ export default function CustomerRegisterScreen() {
 
     return (
         <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.keyboardView}
         >
-            <ScrollView contentContainerStyle={styles.container}>
+            <ScrollView
+                contentContainerStyle={styles.container}
+                keyboardShouldPersistTaps="handled"
+            >
                 <View style={styles.header}>
                     <Text style={styles.title}>Join TIJUM</Text>
                     <Text style={styles.subtitle}>
@@ -141,21 +148,35 @@ export default function CustomerRegisterScreen() {
                         onChangeText={setPassword}
                     />
 
+                    <Input
+                        label="Referral Code (Optional)"
+                        placeholder="e.g. TIJUMFRIEND"
+                        autoCapitalize="characters"
+                        autoCorrect={false}
+                        value={referralCode}
+                        onChangeText={setReferralCode}
+                    />
+
                     {/* Terms & Conditions Acceptance */}
                     <View style={styles.termsRow}>
                         <TouchableOpacity
-                            style={[
-                                styles.checkbox,
-                                termsAccepted && styles.checkboxActive,
-                            ]}
+                            style={styles.checkboxHitTarget}
                             activeOpacity={0.8}
                             accessibilityRole="checkbox"
+                            accessibilityLabel="Accept Terms & Conditions and Privacy Policy"
                             accessibilityState={{ checked: termsAccepted }}
                             onPress={() => setTermsAccepted(!termsAccepted)}
                         >
-                            {termsAccepted && (
-                                <Text style={styles.checkmark}>✓</Text>
-                            )}
+                            <View
+                                style={[
+                                    styles.checkbox,
+                                    termsAccepted && styles.checkboxActive,
+                                ]}
+                            >
+                                {termsAccepted && (
+                                    <Text style={styles.checkmark}>✓</Text>
+                                )}
+                            </View>
                         </TouchableOpacity>
                         <Text style={styles.termsText}>
                             <Text
@@ -200,7 +221,9 @@ export default function CustomerRegisterScreen() {
                         Already have an account?{' '}
                     </Text>
                     <TouchableOpacity
-                        onPress={() => router.push('/(auth)/customer-login')}
+                        style={styles.footerLinkBtn}
+                        accessibilityRole="button"
+                        onPress={() => router.replace('/(auth)/customer-login')}
                     >
                         <Text style={styles.linkText}>Sign In</Text>
                     </TouchableOpacity>
@@ -263,15 +286,21 @@ const styles = StyleSheet.create({
     termsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: Spacing.sm,
+        marginVertical: Spacing.xs,
+    },
+    checkboxHitTarget: {
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: -10,
     },
     checkbox: {
-        width: 20,
-        height: 20,
-        borderRadius: 4,
+        width: 22,
+        height: 22,
+        borderRadius: 5,
         borderWidth: 2,
         borderColor: Colors.gray400,
-        marginRight: Spacing.sm,
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: Colors.white,
@@ -288,27 +317,34 @@ const styles = StyleSheet.create({
     },
     termsText: {
         flex: 1,
+        fontFamily: Typography.fontFamily.body,
         fontSize: Typography.fontSize.xs,
-        color: Colors.gray700,
-        lineHeight: 16,
+        color: Colors.inkSecondary,
+        lineHeight: 18,
     },
     termsLink: {
-        color: Colors.coral,
-        fontWeight: '700',
+        color: Colors.coralDark,
+        fontFamily: Typography.fontFamily.bodyBold,
     },
     footer: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: Spacing.xl,
+        marginTop: Spacing.lg,
+    },
+    footerLinkBtn: {
+        minHeight: 44,
+        justifyContent: 'center',
+        paddingHorizontal: 4,
     },
     footerText: {
+        fontFamily: Typography.fontFamily.body,
         fontSize: Typography.fontSize.sm,
-        color: Colors.gray600,
+        color: Colors.inkSecondary,
     },
     linkText: {
+        fontFamily: Typography.fontFamily.heading,
         fontSize: Typography.fontSize.sm,
-        fontWeight: '700',
-        color: Colors.coral,
+        color: Colors.coralDark,
     },
 });

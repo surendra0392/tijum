@@ -10,14 +10,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import {
-    AlertCircle,
-    X,
-    Eye,
-    EyeOff,
-    Check,
-    ShieldCheck,
-} from 'lucide-react-native';
+import { AlertCircle, X, ShieldCheck } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthContext';
 import { classifyCustomerLoginError } from '../../src/auth/payloads';
@@ -31,15 +24,16 @@ import { Typography } from '../../src/theme/typography';
 
 export default function CustomerLoginScreen() {
     const router = useRouter();
-    const { loginCustomer, authState } = useAuth();
+    const {
+        loginCustomer,
+        authState,
+        authNotice,
+        clearAuthNotice,
+        consumePendingRedirect,
+    } = useAuth();
 
-    const [activeTab, setActiveTab] = useState<'customer' | 'owner'>(
-        'customer',
-    );
     const [loginIdentifier, setLoginIdentifier] = useState('');
     const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [rememberMe, setRememberMe] = useState(true);
     const [twoFactorRequired, setTwoFactorRequired] = useState(false);
     const [twoFactorMode, setTwoFactorMode] = useState<'totp' | 'recovery'>(
         'totp',
@@ -79,14 +73,12 @@ export default function CustomerLoginScreen() {
 
         if (!loginIdentifier.trim() || !password) {
             setErrorMessage(
-                activeTab === 'customer'
-                    ? 'Please enter your email or mobile phone and password.'
-                    : 'Please enter your registered partner email and password.',
+                'Please enter your email or mobile phone and password.',
             );
             return;
         }
 
-        if (activeTab === 'customer' && twoFactorRequired) {
+        if (twoFactorRequired) {
             if (twoFactorMode === 'recovery' && !recoveryCode.trim()) {
                 setErrorMessage('Please enter one of your recovery codes.');
                 return;
@@ -101,27 +93,20 @@ export default function CustomerLoginScreen() {
 
         setLoading(true);
         setErrorMessage('');
+        clearAuthNotice();
         try {
-            if (activeTab === 'customer') {
-                await loginCustomer(
-                    loginIdentifier.trim(),
-                    password,
-                    twoFactorRequired
-                        ? twoFactorMode === 'recovery'
-                            ? { recoveryCode }
-                            : { code: totpCode }
-                        : undefined,
-                );
-                resetTwoFactorChallenge();
-                router.replace('/(customer)/explore');
-            } else {
-                Alert.alert(
-                    'Partner Login',
-                    'Please use the Partner Portal sign-in page.',
-                    [{ text: 'OK' }],
-                );
-                router.replace('/(auth)/owner-login');
-            }
+            await loginCustomer(
+                loginIdentifier.trim(),
+                password,
+                twoFactorRequired
+                    ? twoFactorMode === 'recovery'
+                        ? { recoveryCode }
+                        : { code: totpCode }
+                    : undefined,
+            );
+            resetTwoFactorChallenge();
+            const pendingTarget = consumePendingRedirect();
+            router.replace((pendingTarget || '/(customer)/explore') as never);
         } catch (err: any) {
             const classification = classifyCustomerLoginError(err);
             if (classification.kind === 'two_factor_required') {
@@ -157,7 +142,7 @@ export default function CustomerLoginScreen() {
 
         try {
             setResetLoading(true);
-            await PublicApi.forgotPassword(resetEmail.trim(), activeTab);
+            await PublicApi.forgotPassword(resetEmail.trim(), 'customer');
             Alert.alert(
                 'Password Reset Link Sent',
                 'If an account exists with this email, you will receive password reset instructions shortly.',
@@ -177,11 +162,12 @@ export default function CustomerLoginScreen() {
 
     return (
         <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.keyboardView}
         >
             <ScrollView
                 contentContainerStyle={styles.container}
+                keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
             >
                 {/* Curved Plum Hero Banner with TIJUM Logo */}
@@ -193,56 +179,36 @@ export default function CustomerLoginScreen() {
                 <View style={styles.cardContainer}>
                     <Text style={styles.welcomeTitle}>Welcome Back!</Text>
                     <Text style={styles.welcomeSubtitle}>
-                        Sign in to continue your journey
+                        Sign in to continue your stay search
                     </Text>
 
-                    {/* Role Segmented Switch: Customer vs Owner */}
+                    {/* Role Segmented Switch: Customer vs Partner */}
                     <View style={styles.segmentedContainer}>
-                        <TouchableOpacity
-                            style={[
-                                styles.segmentTab,
-                                activeTab === 'customer' &&
-                                    styles.segmentTabActive,
-                            ]}
-                            onPress={() => {
-                                setActiveTab('customer');
-                                setErrorMessage('');
-                                resetTwoFactorChallenge();
-                            }}
-                            activeOpacity={0.8}
+                        <View
+                            style={[styles.segmentTab, styles.segmentTabActive]}
                         >
                             <Text
                                 style={[
                                     styles.segmentText,
-                                    activeTab === 'customer' &&
-                                        styles.segmentTextActive,
+                                    styles.segmentTextActive,
                                 ]}
                             >
                                 Customer
                             </Text>
-                        </TouchableOpacity>
+                        </View>
 
                         <TouchableOpacity
-                            style={[
-                                styles.segmentTab,
-                                activeTab === 'owner' &&
-                                    styles.segmentTabActive,
-                            ]}
+                            style={styles.segmentTab}
+                            accessibilityRole="button"
+                            accessibilityLabel="Switch to Partner Portal sign-in"
                             onPress={() => {
-                                setActiveTab('owner');
-                                setErrorMessage('');
-                                resetTwoFactorChallenge();
+                                clearAuthNotice();
+                                router.replace('/(auth)/owner-login');
                             }}
                             activeOpacity={0.8}
                         >
-                            <Text
-                                style={[
-                                    styles.segmentText,
-                                    activeTab === 'owner' &&
-                                        styles.segmentTextActive,
-                                ]}
-                            >
-                                Owner
+                            <Text style={styles.segmentText}>
+                                Partner Portal
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -253,7 +219,8 @@ export default function CustomerLoginScreen() {
                         meal disclosures, payments, and verified reviews.
                     </Text>
 
-                    {authState === 'session_expired' && !errorMessage ? (
+                    {(authState === 'session_expired' || authNotice) &&
+                    !errorMessage ? (
                         <View style={styles.sessionNoticeBox}>
                             <ShieldCheck
                                 size={16}
@@ -261,9 +228,8 @@ export default function CustomerLoginScreen() {
                                 style={{ marginRight: 6 }}
                             />
                             <Text style={styles.sessionNoticeText}>
-                                Your session ended (for example, after a
-                                password change or sign-out). Please sign in
-                                again.
+                                {authNotice ||
+                                    'Your session ended (for example, after a password change or sign-out). Please sign in again.'}
                             </Text>
                         </View>
                     ) : null}
@@ -272,7 +238,7 @@ export default function CustomerLoginScreen() {
                         <View style={styles.errorBox}>
                             <AlertCircle
                                 size={16}
-                                color={Colors.rose}
+                                color={Colors.danger}
                                 style={{ marginRight: 6 }}
                             />
                             <Text style={styles.errorText}>
@@ -286,21 +252,9 @@ export default function CustomerLoginScreen() {
                     {/* Form Fields */}
                     <View style={styles.form}>
                         <Input
-                            label={
-                                activeTab === 'customer'
-                                    ? 'Email Address or Mobile'
-                                    : 'Partner Email Address'
-                            }
-                            placeholder={
-                                activeTab === 'customer'
-                                    ? 'name@example.com or 9876543210'
-                                    : 'owner@property.com'
-                            }
-                            keyboardType={
-                                activeTab === 'customer'
-                                    ? 'default'
-                                    : 'email-address'
-                            }
+                            label="Email Address or Mobile"
+                            placeholder="name@example.com or 9876543210"
+                            keyboardType="default"
                             autoCapitalize="none"
                             value={loginIdentifier}
                             onChangeText={(value) => {
@@ -311,33 +265,20 @@ export default function CustomerLoginScreen() {
                             }}
                         />
 
-                        <View style={{ position: 'relative' }}>
-                            <Input
-                                label="Password"
-                                placeholder="••••••••"
-                                secureTextEntry={!showPassword}
-                                value={password}
-                                onChangeText={(value) => {
-                                    setPassword(value);
-                                    if (twoFactorRequired) {
-                                        resetTwoFactorChallenge();
-                                    }
-                                }}
-                            />
-                            <TouchableOpacity
-                                style={styles.eyeToggleBtn}
-                                onPress={() => setShowPassword(!showPassword)}
-                                activeOpacity={0.7}
-                            >
-                                {showPassword ? (
-                                    <EyeOff size={18} color={Colors.gray500} />
-                                ) : (
-                                    <Eye size={18} color={Colors.gray500} />
-                                )}
-                            </TouchableOpacity>
-                        </View>
+                        <Input
+                            label="Password"
+                            placeholder="••••••••"
+                            secureTextEntry
+                            value={password}
+                            onChangeText={(value) => {
+                                setPassword(value);
+                                if (twoFactorRequired) {
+                                    resetTwoFactorChallenge();
+                                }
+                            }}
+                        />
 
-                        {twoFactorRequired && activeTab === 'customer' ? (
+                        {twoFactorRequired ? (
                             <View style={styles.twoFactorBox}>
                                 <View style={styles.twoFactorHeader}>
                                     <ShieldCheck
@@ -375,6 +316,8 @@ export default function CustomerLoginScreen() {
                                 )}
                                 <View style={styles.twoFactorActions}>
                                     <TouchableOpacity
+                                        style={styles.textHitTarget}
+                                        accessibilityRole="button"
                                         onPress={() => {
                                             setTwoFactorMode((mode) =>
                                                 mode === 'totp'
@@ -392,6 +335,8 @@ export default function CustomerLoginScreen() {
                                         </Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
+                                        style={styles.textHitTarget}
+                                        accessibilityRole="button"
                                         onPress={() => {
                                             resetTwoFactorChallenge();
                                             setErrorMessage('');
@@ -406,29 +351,11 @@ export default function CustomerLoginScreen() {
                             </View>
                         ) : null}
 
-                        {/* Remember Me & Forgot Password Row */}
+                        {/* Forgot Password Row */}
                         <View style={styles.forgotPasswordRow}>
                             <TouchableOpacity
-                                style={styles.rememberMeRow}
-                                onPress={() => setRememberMe(!rememberMe)}
-                                activeOpacity={0.8}
-                            >
-                                <View
-                                    style={[
-                                        styles.checkbox,
-                                        rememberMe && styles.checkboxActive,
-                                    ]}
-                                >
-                                    {rememberMe ? (
-                                        <Check size={12} color={Colors.white} />
-                                    ) : null}
-                                </View>
-                                <Text style={styles.rememberMeText}>
-                                    Remember Me
-                                </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
+                                style={styles.textHitTarget}
+                                accessibilityRole="button"
                                 onPress={() => setShowForgotModal(true)}
                                 activeOpacity={0.7}
                             >
@@ -443,11 +370,9 @@ export default function CustomerLoginScreen() {
                             title={
                                 retryCountdownSeconds > 0
                                     ? `Try again in ${retryCountdownSeconds}s`
-                                    : activeTab === 'customer'
-                                      ? twoFactorRequired
-                                          ? 'Verify & Sign In'
-                                          : 'Log In'
-                                      : 'Log In as Partner'
+                                    : twoFactorRequired
+                                      ? 'Verify & Sign In'
+                                      : 'Log In'
                             }
                             variant="primary"
                             size="lg"
@@ -456,62 +381,34 @@ export default function CustomerLoginScreen() {
                             onPress={handleLogin}
                             style={styles.loginButton}
                         />
-
-                        {/* Divider */}
-                        <View style={styles.dividerRow}>
-                            <View style={styles.dividerLine} />
-                            <Text style={styles.dividerText}>
-                                or continue with
-                            </Text>
-                            <View style={styles.dividerLine} />
-                        </View>
-
-                        {/* Social Buttons */}
-                        <View style={styles.socialButtonsRow}>
-                            <TouchableOpacity
-                                style={styles.socialBtn}
-                                activeOpacity={0.8}
-                                onPress={() =>
-                                    Alert.alert(
-                                        'Social Sign-In',
-                                        'Google sign-in is available through web SSO.',
-                                    )
-                                }
-                            >
-                                <Text style={styles.socialBtnText}>Google</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.socialBtn}
-                                activeOpacity={0.8}
-                                onPress={() =>
-                                    Alert.alert(
-                                        'Social Sign-In',
-                                        'Apple sign-in is available through Apple ID.',
-                                    )
-                                }
-                            >
-                                <Text style={styles.socialBtnText}>Apple</Text>
-                            </TouchableOpacity>
-                        </View>
                     </View>
 
-                    {/* Footer Link: Sign Up */}
+                    {/* Footer Links */}
                     <View style={styles.footer}>
                         <Text style={styles.footerText}>
-                            Don't have an account?{' '}
+                            Don&apos;t have an account?{' '}
                         </Text>
                         <TouchableOpacity
+                            style={styles.textHitTarget}
+                            accessibilityRole="button"
                             onPress={() =>
-                                router.push(
-                                    activeTab === 'customer'
-                                        ? '/(auth)/customer-register'
-                                        : '/(auth)/owner-register',
-                                )
+                                router.push('/(auth)/customer-register')
                             }
                         >
                             <Text style={styles.linkText}>Sign Up</Text>
                         </TouchableOpacity>
                     </View>
+
+                    <TouchableOpacity
+                        style={styles.guestBrowseBtn}
+                        accessibilityRole="button"
+                        onPress={() => router.replace('/(customer)/explore')}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.guestBrowseText}>
+                            Browse Stays as Guest →
+                        </Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Forgot Password Modal */}
@@ -528,18 +425,18 @@ export default function CustomerLoginScreen() {
                                     Reset Password
                                 </Text>
                                 <TouchableOpacity
+                                    style={styles.modalCloseBtn}
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Close reset password dialog"
                                     onPress={() => setShowForgotModal(false)}
                                 >
-                                    <X size={20} color={Colors.gray500} />
+                                    <X size={20} color={Colors.inkSecondary} />
                                 </TouchableOpacity>
                             </View>
                             <Text style={styles.modalSubtitle}>
-                                Enter your registered{' '}
-                                {activeTab === 'customer'
-                                    ? 'customer'
-                                    : 'partner'}{' '}
-                                email address and we'll send you instructions to
-                                reset your password.
+                                Enter your registered customer email address and
+                                we&apos;ll send you instructions to reset your
+                                password.
                             </Text>
                             <Input
                                 label="Registered Email"
@@ -641,8 +538,10 @@ const styles = StyleSheet.create({
     },
     segmentTab: {
         flex: 1,
+        minHeight: 44,
         paddingVertical: 10,
         alignItems: 'center',
+        justifyContent: 'center',
         borderRadius: 10,
     },
     segmentTabActive: {
@@ -654,73 +553,48 @@ const styles = StyleSheet.create({
         elevation: 2,
     },
     segmentText: {
+        fontFamily: Typography.fontFamily.bodyMedium,
         fontSize: 14,
-        fontWeight: '600',
-        color: Colors.gray600,
+        color: Colors.inkSecondary,
     },
     segmentTextActive: {
         color: Colors.deepPlum,
-        fontWeight: '800',
+        fontFamily: Typography.fontFamily.heading,
     },
     disclosureNotice: {
-        fontSize: 11,
-        color: Colors.gray500,
+        fontFamily: Typography.fontFamily.body,
+        fontSize: 12,
+        color: Colors.inkMuted,
         textAlign: 'center',
         marginBottom: Spacing.md,
-        lineHeight: 16,
+        lineHeight: 17,
     },
     form: {
-        gap: Spacing.sm,
-    },
-    eyeToggleBtn: {
-        position: 'absolute',
-        right: 14,
-        top: 36,
-        padding: 6,
+        gap: Spacing.xs,
     },
     forgotPasswordRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-end',
         alignItems: 'center',
-        marginTop: 2,
         marginBottom: Spacing.xs,
     },
-    rememberMeRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    checkbox: {
-        width: 18,
-        height: 18,
-        borderRadius: 4,
-        borderWidth: 1.5,
-        borderColor: Colors.gray400,
-        marginRight: 8,
-        alignItems: 'center',
+    textHitTarget: {
+        minHeight: 44,
         justifyContent: 'center',
-    },
-    checkboxActive: {
-        backgroundColor: Colors.deepPlum,
-        borderColor: Colors.deepPlum,
-    },
-    rememberMeText: {
-        ...Typography.bodySmall,
-        color: Colors.gray700,
+        paddingHorizontal: 4,
     },
     forgotPasswordText: {
         ...Typography.bodySmall,
-        color: Colors.coral,
-        fontWeight: '700',
+        color: Colors.coralDark,
+        fontFamily: Typography.fontFamily.bodyBold,
     },
     loginButton: {
-        marginTop: Spacing.sm,
-        backgroundColor: Colors.deepPlum,
-        borderRadius: 12,
+        marginTop: Spacing.xs,
     },
     errorBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFF1F2',
+        backgroundColor: Colors.roseLight,
         padding: Spacing.sm,
         borderRadius: BorderRadius.md,
         marginBottom: Spacing.sm,
@@ -729,18 +603,18 @@ const styles = StyleSheet.create({
     },
     errorText: {
         ...Typography.bodySmall,
-        color: Colors.rose,
+        color: Colors.dangerText,
         flex: 1,
     },
     sessionNoticeBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F5F3FF',
+        backgroundColor: Colors.peachCream,
         padding: Spacing.sm,
         borderRadius: BorderRadius.md,
         marginBottom: Spacing.sm,
         borderWidth: 1,
-        borderColor: '#DDD6FE',
+        borderColor: Colors.softPeach,
     },
     sessionNoticeText: {
         ...Typography.bodySmall,
@@ -749,10 +623,10 @@ const styles = StyleSheet.create({
         lineHeight: 18,
     },
     twoFactorBox: {
-        backgroundColor: '#FFF7ED',
+        backgroundColor: Colors.peachCream,
         borderRadius: BorderRadius.md,
         borderWidth: 1,
-        borderColor: '#FED7AA',
+        borderColor: Colors.softPeach,
         padding: Spacing.md,
         marginTop: Spacing.xs,
     },
@@ -764,11 +638,10 @@ const styles = StyleSheet.create({
     twoFactorTitle: {
         ...Typography.labelMedium,
         color: Colors.deepPlum,
-        fontWeight: '800',
     },
     twoFactorSubtitle: {
         ...Typography.bodySmall,
-        color: Colors.gray700,
+        color: Colors.inkSecondary,
         marginBottom: Spacing.sm,
         lineHeight: 18,
     },
@@ -782,62 +655,45 @@ const styles = StyleSheet.create({
     },
     twoFactorSwitchText: {
         ...Typography.bodySmall,
-        color: Colors.coral,
-        fontWeight: '700',
+        color: Colors.coralDark,
+        fontFamily: Typography.fontFamily.bodyBold,
     },
     twoFactorResetText: {
         ...Typography.bodySmall,
-        color: Colors.gray600,
-        fontWeight: '600',
-    },
-    dividerRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginVertical: Spacing.md,
-    },
-    dividerLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: Colors.gray200,
-    },
-    dividerText: {
-        ...Typography.bodySmall,
-        color: Colors.gray500,
-        marginHorizontal: Spacing.sm,
-    },
-    socialButtonsRow: {
-        flexDirection: 'row',
-        gap: Spacing.sm,
-    },
-    socialBtn: {
-        flex: 1,
-        height: 44,
-        borderWidth: 1,
-        borderColor: Colors.gray300,
-        borderRadius: 10,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: Colors.white,
-    },
-    socialBtnText: {
-        ...Typography.labelMedium,
-        color: Colors.gray700,
-        fontWeight: '600',
+        color: Colors.inkSecondary,
+        fontFamily: Typography.fontFamily.bodyMedium,
     },
     footer: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: Spacing.lg,
+        marginTop: Spacing.md,
     },
     footerText: {
-        ...Typography.bodyMedium,
-        color: Colors.gray600,
+        ...Typography.bodySmall,
+        color: Colors.inkSecondary,
     },
     linkText: {
-        ...Typography.bodyMedium,
-        color: Colors.coral,
-        fontWeight: '800',
+        ...Typography.bodySmall,
+        color: Colors.coralDark,
+        fontFamily: Typography.fontFamily.heading,
+    },
+    guestBrowseBtn: {
+        minHeight: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: Spacing.xs,
+    },
+    guestBrowseText: {
+        fontFamily: Typography.fontFamily.bodyBold,
+        fontSize: 13,
+        color: Colors.deepPlum,
+    },
+    modalCloseBtn: {
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     modalOverlay: {
         flex: 1,

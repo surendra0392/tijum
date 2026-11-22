@@ -3,12 +3,12 @@ import {
     ActivityIndicator,
     FlatList,
     RefreshControl,
-    SafeAreaView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     Coins,
     ArrowDownLeft,
@@ -20,6 +20,8 @@ import {
 } from 'lucide-react-native';
 import { RewardsApi } from '../../../src/api/rewards';
 import { PointsLedgerItem, PointsWallet } from '../../../src/api/types';
+import { AppHeader } from '../../../src/components/AppHeader';
+import { RequireAuth } from '../../../src/components/RequireAuth';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
@@ -34,16 +36,21 @@ const FILTER_TABS = [
 
 export default function PointsWalletScreen() {
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [selectedTab, setSelectedTab] = useState<
         'all' | 'earned' | 'redeemed' | 'pending'
     >('all');
     const [wallet, setWallet] = useState<PointsWallet | null>(null);
     const [ledger, setLedger] = useState<PointsLedgerItem[]>([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [lastPage, setLastPage] = useState(1);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    const loadData = async (isRefresh = false) => {
-        if (isRefresh) {
+    const loadData = async (page: number = 1, append: boolean = false, isRefresh = false) => {
+        if (append) {
+            setLoadingMore(true);
+        } else if (isRefresh) {
             setRefreshing(true);
         } else {
             setLoading(true);
@@ -51,26 +58,43 @@ export default function PointsWalletScreen() {
         setErrorMessage(null);
 
         try {
-            const res = await RewardsApi.getPointsLedger();
+            const res = await RewardsApi.getPointsLedger({ page });
             if (res.data) {
                 setWallet(res.data.wallet);
-                setLedger(res.data.ledger || []);
+                const items = Array.isArray(res.data.ledger)
+                    ? res.data.ledger
+                    : [];
+                setLedger((prev) => (append ? [...prev, ...items] : items));
+                setCurrentPage(res.meta?.current_page ?? page);
+                setLastPage(res.meta?.last_page ?? page);
             }
         } catch (err: any) {
             setErrorMessage(err?.message || 'Failed to load points activity.');
         } finally {
             setLoading(false);
+            setLoadingMore(false);
             setRefreshing(false);
         }
     };
 
     useEffect(() => {
-        void loadData();
+        void loadData(1);
     }, []);
 
-    const filteredLedger = ledger.filter((item: any) => {
-        if (selectedTab === 'earned')
-            return item.direction === 'credit' && item.status === 'completed';
+    const handleLoadMore = () => {
+        if (loading || loadingMore || refreshing || currentPage >= lastPage) {
+            return;
+        }
+        void loadData(currentPage + 1, true);
+    };
+
+    const filteredLedger = ledger.filter((item: PointsLedgerItem) => {
+        if (selectedTab === 'earned') {
+            return (
+                item.direction === 'credit' &&
+                (item.status === 'available' || item.status === 'completed')
+            );
+        }
         if (selectedTab === 'redeemed') return item.direction === 'debit';
         if (selectedTab === 'pending')
             return item.status === 'pending' || item.status === 'reserved';
@@ -163,137 +187,164 @@ export default function PointsWalletScreen() {
     );
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            {errorMessage && !wallet ? (
-                <ExceptionalState
-                    type="no-internet"
-                    title="Points Unavailable"
-                    description={errorMessage}
-                    actionLabel="Try Again"
-                    onAction={() => loadData()}
+        <RequireAuth role="customer">
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+                <AppHeader
+                    title="Points Wallet"
+                    showBack
+                    fallbackRoute="/(customer)/rewards"
                 />
-            ) : loading ? (
-                <View style={styles.center}>
-                    <ActivityIndicator size="large" color={Colors.coral} />
-                    <Text style={styles.loadingText}>
-                        Loading points ledger...
-                    </Text>
-                </View>
-            ) : (
-                <FlatList
-                    data={filteredLedger}
-                    keyExtractor={(item: any) => String(item.id)}
-                    contentContainerStyle={styles.listContent}
-                    ListHeaderComponent={renderHeader}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={() => loadData(true)}
+                {errorMessage && !wallet ? (
+                    <ExceptionalState
+                        type="no-internet"
+                        title="Points Unavailable"
+                        description={errorMessage}
+                        actionLabel="Try Again"
+                        onAction={() => void loadData(1)}
+                    />
+                ) : loading && !refreshing ? (
+                    <View style={styles.center}>
+                        <ActivityIndicator
+                            size="large"
+                            color={Colors.deepPlum}
                         />
-                    }
-                    ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <Coins
-                                size={36}
-                                color={Colors.gray300}
-                                style={{ marginBottom: 8 }}
-                            />
-                            <Text style={styles.emptyTitle}>
-                                No transactions in this category
-                            </Text>
-                            <Text style={styles.emptySubtitle}>
-                                As you complete stays and refer friends, loyalty
-                                activity will appear here.
-                            </Text>
-                        </View>
-                    }
-                    renderItem={({ item }: { item: any }) => {
-                        const isCredit = item.direction === 'credit';
-                        const isPending = item.status === 'pending';
-                        return (
-                            <View style={styles.txRow}>
-                                <View
-                                    style={[
-                                        styles.txIconContainer,
-                                        {
-                                            backgroundColor: isPending
-                                                ? '#FEF3C7'
-                                                : isCredit
-                                                  ? '#ECFDF5'
-                                                  : '#FEF2F2',
-                                        },
-                                    ]}
-                                >
-                                    {isPending ? (
-                                        <Clock size={16} color="#D97706" />
-                                    ) : isCredit ? (
-                                        <ArrowDownLeft
-                                            size={16}
-                                            color="#059669"
-                                        />
-                                    ) : (
-                                        <ArrowUpRight
-                                            size={16}
-                                            color="#DC2626"
-                                        />
-                                    )}
+                        <Text style={styles.loadingText}>
+                            Loading points ledger...
+                        </Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={filteredLedger}
+                        keyExtractor={(item: PointsLedgerItem) =>
+                            String(item.id)
+                        }
+                        contentContainerStyle={styles.listContent}
+                        ListHeaderComponent={renderHeader}
+                        onEndReached={handleLoadMore}
+                        onEndReachedThreshold={0.4}
+                        ListFooterComponent={
+                            loadingMore ? (
+                                <View style={{ paddingVertical: Spacing.md }}>
+                                    <ActivityIndicator
+                                        size="small"
+                                        color={Colors.deepPlum}
+                                    />
                                 </View>
-
-                                <View style={styles.txMain}>
-                                    <View style={styles.txTitleRow}>
-                                        <Text style={styles.txTitle}>
-                                            {item.transaction_type_label}
-                                        </Text>
-                                        <Text
-                                            style={[
-                                                styles.txAmount,
-                                                {
-                                                    color: isPending
-                                                        ? '#D97706'
-                                                        : isCredit
-                                                          ? '#059669'
-                                                          : '#DC2626',
-                                                },
-                                            ]}
-                                        >
-                                            {isCredit
-                                                ? `+${item.points}`
-                                                : `-${item.points}`}{' '}
-                                            pts
-                                        </Text>
-                                    </View>
-                                    <Text style={styles.txDesc}>
-                                        {item.description}
-                                    </Text>
-                                    <View style={styles.txFooter}>
-                                        <View style={styles.dateRow}>
-                                            <Calendar
-                                                size={11}
-                                                color={Colors.gray400}
-                                                style={{ marginRight: 4 }}
+                            ) : null
+                        }
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={() => void loadData(1, false, true)}
+                                colors={[Colors.deepPlum]}
+                                tintColor={Colors.deepPlum}
+                            />
+                        }
+                        ListEmptyComponent={
+                            <View style={styles.emptyContainer}>
+                                <Coins
+                                    size={36}
+                                    color={Colors.gray300}
+                                    style={{ marginBottom: 8 }}
+                                />
+                                <Text style={styles.emptyTitle}>
+                                    No transactions in this category
+                                </Text>
+                                <Text style={styles.emptySubtitle}>
+                                    As you complete stays and refer friends,
+                                    loyalty activity will appear here.
+                                </Text>
+                            </View>
+                        }
+                        renderItem={({ item }: { item: PointsLedgerItem }) => {
+                            const isCredit = item.direction === 'credit';
+                            const isPending = item.status === 'pending';
+                            return (
+                                <View style={styles.txRow}>
+                                    <View
+                                        style={[
+                                            styles.txIconContainer,
+                                            {
+                                                backgroundColor: isPending
+                                                    ? '#FEF3C7'
+                                                    : isCredit
+                                                      ? '#ECFDF5'
+                                                      : '#FEF2F2',
+                                            },
+                                        ]}
+                                    >
+                                        {isPending ? (
+                                            <Clock size={16} color="#D97706" />
+                                        ) : isCredit ? (
+                                            <ArrowDownLeft
+                                                size={16}
+                                                color="#059669"
                                             />
-                                            <Text style={styles.txDate}>
-                                                {item.created_at}
+                                        ) : (
+                                            <ArrowUpRight
+                                                size={16}
+                                                color="#DC2626"
+                                            />
+                                        )}
+                                    </View>
+
+                                    <View style={styles.txMain}>
+                                        <View style={styles.txTitleRow}>
+                                            <Text style={styles.txTitle}>
+                                                {item.transaction_type_label}
+                                            </Text>
+                                            <Text
+                                                style={[
+                                                    styles.txAmount,
+                                                    {
+                                                        color: isPending
+                                                            ? '#D97706'
+                                                            : isCredit
+                                                              ? '#059669'
+                                                              : '#DC2626',
+                                                    },
+                                                ]}
+                                            >
+                                                {isCredit
+                                                    ? `+${Math.abs(item.points)}`
+                                                    : `-${Math.abs(item.points)}`}{' '}
+                                                pts
                                             </Text>
                                         </View>
-                                        {item.booking_reference && (
-                                            <Text style={styles.txRef}>
-                                                Ref: {item.booking_reference}
-                                            </Text>
-                                        )}
-                                        {item.expires_at && (
-                                            <Text style={styles.txExpires}>
-                                                Exp: {item.expires_at}
-                                            </Text>
-                                        )}
+                                        <Text style={styles.txDesc}>
+                                            {item.description}
+                                        </Text>
+                                        <View style={styles.txFooter}>
+                                            <View style={styles.dateRow}>
+                                                <Calendar
+                                                    size={11}
+                                                    color={Colors.gray400}
+                                                    style={{ marginRight: 4 }}
+                                                />
+                                                <Text style={styles.txDate}>
+                                                    {item.created_at}
+                                                </Text>
+                                            </View>
+                                            {item.booking_reference && (
+                                                <Text style={styles.txRef}>
+                                                    Ref:{' '}
+                                                    {item.booking_reference}
+                                                </Text>
+                                            )}
+                                            {item.expires_at && (
+                                                <Text style={styles.txExpires}>
+                                                    Exp: {item.expires_at}
+                                                </Text>
+                                            )}
+                                        </View>
                                     </View>
                                 </View>
-                            </View>
-                        );
-                    }}
-                />
-            )}
-        </SafeAreaView>
+                            );
+                        }}
+                    />
+                )}
+            </SafeAreaView>
+        </RequireAuth>
     );
 }
 
@@ -396,12 +447,15 @@ const styles = StyleSheet.create({
     },
     filterBar: {
         flexDirection: 'row',
-        gap: 6,
+        flexWrap: 'wrap',
+        gap: 8,
         marginBottom: Spacing.xs,
     },
     filterPill: {
+        minHeight: 44,
+        justifyContent: 'center',
         paddingHorizontal: Spacing.md,
-        paddingVertical: 6,
+        paddingVertical: 8,
         borderRadius: BorderRadius.full,
         backgroundColor: Colors.gray100,
         borderWidth: 1,

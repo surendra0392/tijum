@@ -4,15 +4,18 @@ import {
     Alert,
     FlatList,
     RefreshControl,
-    SafeAreaView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
 import { Ticket, Copy, Tag } from 'lucide-react-native';
 import { RewardsApi } from '../../../src/api/rewards';
 import { CouponItem } from '../../../src/api/types';
+import { AppHeader } from '../../../src/components/AppHeader';
+import { RequireAuth } from '../../../src/components/RequireAuth';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
@@ -45,11 +48,14 @@ export default function CouponsScreen() {
 
         try {
             const res = await RewardsApi.getAvailableCoupons();
-            if (res.data && res.data.length > 0) {
-                setCoupons(res.data);
+            setCoupons(Array.isArray(res.data) ? res.data : []);
+        } catch (err: any) {
+            setErrorMessage(
+                err?.message || 'Unable to load available coupons.',
+            );
+            if (!isRefresh) {
+                setCoupons([]);
             }
-        } catch {
-            // Keep existing data on error; do not fall back to showcase
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -60,22 +66,32 @@ export default function CouponsScreen() {
         void loadCoupons();
     }, []);
 
-    const handleCopy = (code: string) => {
+    const handleCopy = async (code: string) => {
+        try {
+            await Clipboard.setStringAsync(code);
+        } catch {
+            // Clipboard may be restricted in non-secure web embeds; still notify user
+        }
         setCopiedCode(code);
         Alert.alert(
             'Coupon Copied!',
-            `Code: ${code}\n\nPaste this promo code in the coupon field at checkout to apply your discount.`,
+            `Code ${code} is copied to your clipboard. Paste it in the promo field at checkout to apply your discount.`,
             [{ text: 'OK', onPress: () => setCopiedCode(null) }],
         );
     };
 
     const filteredCoupons = coupons.filter((c) => {
-        if (selectedTab === 'fixed') return c.offer_type === 'fixed_amount';
-        if (selectedTab === 'percentage') return c.offer_type === 'percentage';
-        if (selectedTab === 'points')
+        if (selectedTab === 'fixed') {
+            return c.offer_type === 'fixed_amount' || c.offer_type === 'combined';
+        }
+        if (selectedTab === 'percentage') {
+            return c.offer_type === 'percentage';
+        }
+        if (selectedTab === 'points') {
             return (
                 c.offer_type === 'points_reward' || c.offer_type === 'combined'
             );
+        }
         return true;
     });
 
@@ -85,170 +101,215 @@ export default function CouponsScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            {/* Header Filter Tabs */}
-            <View style={styles.filterBar}>
-                {FILTER_TABS.map((tab) => {
-                    const isSelected = selectedTab === tab.key;
-                    return (
-                        <TouchableOpacity
-                            key={tab.key}
-                            style={[
-                                styles.filterPill,
-                                isSelected && styles.filterPillActive,
-                            ]}
-                            onPress={() => setSelectedTab(tab.key as any)}
-                        >
-                            <Text
-                                style={[
-                                    styles.filterPillText,
-                                    isSelected && styles.filterPillTextActive,
-                                ]}
-                            >
-                                {tab.label}
-                            </Text>
-                        </TouchableOpacity>
-                    );
-                })}
-            </View>
-
-            {errorMessage && coupons.length === 0 ? (
-                <ExceptionalState
-                    type="no-internet"
-                    title="Coupons Unavailable"
-                    description={errorMessage}
-                    actionLabel="Try Again"
-                    onAction={() => loadCoupons()}
+        <RequireAuth role="customer">
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+                <AppHeader
+                    title="Available Coupons"
+                    showBack
+                    fallbackRoute="/(customer)/rewards"
                 />
-            ) : loading ? (
-                <View style={styles.center}>
-                    <ActivityIndicator size="large" color={Colors.coral} />
-                    <Text style={styles.loadingText}>
-                        Fetching available vouchers...
-                    </Text>
-                </View>
-            ) : (
-                <FlatList
-                    data={filteredCoupons}
-                    keyExtractor={(item: any) => String(item.id)}
-                    contentContainerStyle={styles.listContent}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={() => loadCoupons(true)}
-                        />
-                    }
-                    ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <Ticket
-                                size={40}
-                                color={Colors.gray300}
-                                style={{ marginBottom: 8 }}
-                            />
-                            <Text style={styles.emptyTitle}>
-                                No coupons available right now
-                            </Text>
-                            <Text style={styles.emptySubtitle}>
-                                Check back regularly for seasonal discounts and
-                                festival vouchers!
-                            </Text>
-                        </View>
-                    }
-                    renderItem={({ item }: { item: any }) => {
-                        const isPercentage = item.offer_type === 'percentage';
-                        const isPoints = item.offer_type === 'points_reward';
-                        const discountDisplay = isPercentage
-                            ? `${item.discount_percentage}% OFF`
-                            : isPoints
-                              ? `+${item.points_reward} PTS`
-                              : `${formatPaise(item.discount_amount_paise)} OFF`;
-
+                {/* Header Filter Tabs */}
+                <View style={styles.filterBar}>
+                    {FILTER_TABS.map((tab) => {
+                        const isSelected = selectedTab === tab.key;
                         return (
-                            <View style={styles.couponCard}>
-                                <View style={styles.couponHeader}>
-                                    <View style={styles.badgeRow}>
-                                        <View style={styles.typeBadge}>
-                                            <Tag
-                                                size={11}
-                                                color={Colors.deepPlum}
-                                                style={{ marginRight: 3 }}
-                                            />
-                                            <Text style={styles.typeBadgeText}>
-                                                {isPercentage
-                                                    ? 'PERCENTAGE OFF'
-                                                    : isPoints
-                                                      ? 'BONUS POINTS'
-                                                      : 'FLAT DISCOUNT'}
-                                            </Text>
-                                        </View>
-                                        {item.funding_source === 'platform' && (
-                                            <View style={styles.fundingBadge}>
+                            <TouchableOpacity
+                                key={tab.key}
+                                style={[
+                                    styles.filterPill,
+                                    isSelected && styles.filterPillActive,
+                                ]}
+                                onPress={() => setSelectedTab(tab.key as any)}
+                                accessibilityRole="tab"
+                                accessibilityState={{ selected: isSelected }}
+                            >
+                                <Text
+                                    style={[
+                                        styles.filterPillText,
+                                        isSelected &&
+                                            styles.filterPillTextActive,
+                                    ]}
+                                >
+                                    {tab.label}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+
+                {errorMessage && coupons.length === 0 ? (
+                    <ExceptionalState
+                        type="no-internet"
+                        title="Coupons Unavailable"
+                        description={errorMessage}
+                        actionLabel="Try Again"
+                        onAction={() => loadCoupons()}
+                    />
+                ) : loading ? (
+                    <View style={styles.center}>
+                        <ActivityIndicator
+                            size="large"
+                            color={Colors.deepPlum}
+                        />
+                        <Text style={styles.loadingText}>
+                            Fetching available vouchers...
+                        </Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={filteredCoupons}
+                        keyExtractor={(item: CouponItem) => String(item.id)}
+                        contentContainerStyle={styles.listContent}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={() => loadCoupons(true)}
+                                colors={[Colors.deepPlum]}
+                                tintColor={Colors.deepPlum}
+                            />
+                        }
+                        ListEmptyComponent={
+                            <View style={styles.emptyContainer}>
+                                <Ticket
+                                    size={40}
+                                    color={Colors.gray300}
+                                    style={{ marginBottom: 8 }}
+                                />
+                                <Text style={styles.emptyTitle}>
+                                    No coupons available right now
+                                </Text>
+                                <Text style={styles.emptySubtitle}>
+                                    Check back regularly for seasonal discounts
+                                    and festival vouchers!
+                                </Text>
+                            </View>
+                        }
+                        renderItem={({ item }: { item: CouponItem }) => {
+                            const isPercentage =
+                                item.offer_type === 'percentage';
+                            const isPoints =
+                                item.offer_type === 'points_reward';
+                            const isCombined = item.offer_type === 'combined';
+                            const bonusPts =
+                                item.bonus_points ?? item.points_reward ?? 0;
+                            const minSpend =
+                                item.min_booking_amount_paise ??
+                                item.min_subtotal_paise;
+                            const discountDisplay = isCombined
+                                ? [
+                                      item.discount_amount_paise
+                                          ? `${formatPaise(item.discount_amount_paise)} OFF`
+                                          : item.discount_percentage
+                                            ? `${item.discount_percentage}% OFF`
+                                            : '',
+                                      bonusPts > 0 ? `+${bonusPts} PTS` : '',
+                                  ]
+                                      .filter(Boolean)
+                                      .join(' • ') || 'COMBINED REWARD'
+                                : isPercentage
+                                  ? `${item.discount_percentage ?? 0}% OFF`
+                                  : isPoints
+                                    ? `+${bonusPts} PTS`
+                                    : `${formatPaise(item.discount_amount_paise)} OFF`;
+
+                            return (
+                                <View style={styles.couponCard}>
+                                    <View style={styles.couponHeader}>
+                                        <View style={styles.badgeRow}>
+                                            <View style={styles.typeBadge}>
+                                                <Tag
+                                                    size={11}
+                                                    color={Colors.deepPlum}
+                                                    style={{ marginRight: 3 }}
+                                                />
                                                 <Text
-                                                    style={
-                                                        styles.fundingBadgeText
-                                                    }
+                                                    style={styles.typeBadgeText}
                                                 >
-                                                    TIJUM FUNDED
+                                                    {isCombined
+                                                        ? 'COMBINED OFFER'
+                                                        : isPercentage
+                                                          ? 'PERCENTAGE OFF'
+                                                          : isPoints
+                                                            ? 'BONUS POINTS'
+                                                            : 'FLAT DISCOUNT'}
                                                 </Text>
                                             </View>
-                                        )}
-                                    </View>
-                                    <Text style={styles.discountValue}>
-                                        {discountDisplay}
-                                    </Text>
-                                </View>
-
-                                <Text style={styles.couponTitle}>
-                                    {item.title}
-                                </Text>
-                                <Text style={styles.couponDesc}>
-                                    {item.description}
-                                </Text>
-
-                                <View style={styles.dashedLine} />
-
-                                <View style={styles.couponFooter}>
-                                    <View style={styles.codePill}>
-                                        <Text style={styles.codeText}>
-                                            {item.code}
-                                        </Text>
-                                        <TouchableOpacity
-                                            style={styles.copyBtn}
-                                            onPress={() =>
-                                                handleCopy(item.code)
-                                            }
-                                        >
-                                            <Copy
-                                                size={12}
-                                                color={Colors.coral}
-                                                style={{ marginRight: 3 }}
-                                            />
-                                            <Text style={styles.copyBtnText}>
-                                                {copiedCode === item.code
-                                                    ? 'Copied'
-                                                    : 'Copy'}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    <View style={styles.termsInfo}>
-                                        <Text style={styles.termsText}>
-                                            Min spend:{' '}
-                                            {formatPaise(
-                                                item.min_subtotal_paise,
+                                            {item.funding_source ===
+                                                'platform' && (
+                                                <View
+                                                    style={styles.fundingBadge}
+                                                >
+                                                    <Text
+                                                        style={
+                                                            styles.fundingBadgeText
+                                                        }
+                                                    >
+                                                        TIJUM FUNDED
+                                                    </Text>
+                                                </View>
                                             )}
-                                        </Text>
-                                        <Text style={styles.termsText}>
-                                            Valid till: {item.expires_at}
+                                        </View>
+                                        <Text style={styles.discountValue}>
+                                            {discountDisplay}
                                         </Text>
                                     </View>
+
+                                    <Text style={styles.couponTitle}>
+                                        {item.title}
+                                    </Text>
+                                    {item.description ? (
+                                        <Text style={styles.couponDesc}>
+                                            {item.description}
+                                        </Text>
+                                    ) : null}
+
+                                    <View style={styles.dashedLine} />
+
+                                    <View style={styles.couponFooter}>
+                                        <View style={styles.codePill}>
+                                            <Text style={styles.codeText}>
+                                                {item.code}
+                                            </Text>
+                                            <TouchableOpacity
+                                                style={styles.copyBtn}
+                                                onPress={() =>
+                                                    void handleCopy(item.code)
+                                                }
+                                                accessibilityRole="button"
+                                                accessibilityLabel={`Copy coupon ${item.code}`}
+                                            >
+                                                <Copy
+                                                    size={12}
+                                                    color={Colors.coralDark}
+                                                    style={{ marginRight: 3 }}
+                                                />
+                                                <Text
+                                                    style={styles.copyBtnText}
+                                                >
+                                                    {copiedCode === item.code
+                                                        ? 'Copied'
+                                                        : 'Copy'}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </View>
+
+                                        <View style={styles.termsInfo}>
+                                            <Text style={styles.termsText}>
+                                                Min spend:{' '}
+                                                {formatPaise(minSpend)}
+                                            </Text>
+                                            <Text style={styles.termsText}>
+                                                Valid till: {item.expires_at}
+                                            </Text>
+                                        </View>
+                                    </View>
                                 </View>
-                            </View>
-                        );
-                    }}
-                />
-            )}
-        </SafeAreaView>
+                            );
+                        }}
+                    />
+                )}
+            </SafeAreaView>
+        </RequireAuth>
     );
 }
 
@@ -270,16 +331,19 @@ const styles = StyleSheet.create({
     },
     filterBar: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         paddingHorizontal: Spacing.base,
         paddingVertical: Spacing.sm,
         backgroundColor: Colors.white,
         borderBottomWidth: 1,
         borderBottomColor: Colors.gray200,
-        gap: 6,
+        gap: 8,
     },
     filterPill: {
+        minHeight: 44,
+        justifyContent: 'center',
         paddingHorizontal: Spacing.md,
-        paddingVertical: 6,
+        paddingVertical: 8,
         borderRadius: BorderRadius.full,
         backgroundColor: Colors.gray100,
         borderWidth: 1,
@@ -397,19 +461,20 @@ const styles = StyleSheet.create({
         marginRight: Spacing.sm,
     },
     copyBtn: {
+        minHeight: 38,
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: Colors.white,
         paddingHorizontal: Spacing.sm,
-        paddingVertical: 4,
+        paddingVertical: 6,
         borderRadius: 4,
         borderWidth: 1,
         borderColor: Colors.gray300,
     },
     copyBtnText: {
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: '700',
-        color: Colors.coral,
+        color: Colors.coralDark,
     },
     termsInfo: {
         alignItems: 'flex-end',

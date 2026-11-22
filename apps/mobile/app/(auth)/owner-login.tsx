@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Alert,
     KeyboardAvoidingView,
@@ -10,9 +10,10 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { AlertCircle, X } from 'lucide-react-native';
+import { AlertCircle, ShieldCheck, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthContext';
+import { classifyCustomerLoginError } from '../../src/auth/payloads';
 import { PublicApi } from '../../src/api/public';
 import { BrandLogo } from '../../src/components/BrandLogo';
 import { Button } from '../../src/components/Button';
@@ -23,10 +24,12 @@ import { Typography } from '../../src/theme/typography';
 
 export default function OwnerLoginScreen() {
     const router = useRouter();
-    const { loginPartner } = useAuth();
+    const { loginPartner, authNotice, clearAuthNotice, consumePendingRedirect } =
+        useAuth();
 
     const [loginIdentifier, setLoginIdentifier] = useState('');
     const [password, setPassword] = useState('');
+    const [retryCountdownSeconds, setRetryCountdownSeconds] = useState(0);
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
@@ -35,7 +38,21 @@ export default function OwnerLoginScreen() {
     const [resetEmail, setResetEmail] = useState('');
     const [resetLoading, setResetLoading] = useState(false);
 
+    useEffect(() => {
+        if (retryCountdownSeconds <= 0) {
+            return;
+        }
+        const timer = setInterval(() => {
+            setRetryCountdownSeconds((prev) => (prev > 1 ? prev - 1 : 0));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [retryCountdownSeconds]);
+
     const handlePartnerLogin = async () => {
+        if (retryCountdownSeconds > 0) {
+            return;
+        }
+
         if (!loginIdentifier.trim() || !password) {
             setErrorMessage(
                 'Please enter your partner email or mobile phone and password.',
@@ -45,12 +62,22 @@ export default function OwnerLoginScreen() {
 
         setLoading(true);
         setErrorMessage('');
+        clearAuthNotice();
         try {
             await loginPartner(loginIdentifier.trim(), password);
-            router.replace('/(partner)/dashboard');
+            const pendingTarget = consumePendingRedirect();
+            router.replace((pendingTarget || '/(partner)/dashboard') as never);
         } catch (err: any) {
+            const classification = classifyCustomerLoginError(err);
+            if (
+                classification.kind === 'rate_limited' &&
+                classification.retryAfterSeconds &&
+                classification.retryAfterSeconds > 0
+            ) {
+                setRetryCountdownSeconds(classification.retryAfterSeconds);
+            }
             setErrorMessage(
-                err?.message ||
+                classification.message ||
                     'Partner sign in failed. Please verify your credentials.',
             );
         } finally {
@@ -89,12 +116,44 @@ export default function OwnerLoginScreen() {
 
     return (
         <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.keyboardView}
         >
-            <ScrollView contentContainerStyle={styles.container}>
+            <ScrollView
+                contentContainerStyle={styles.container}
+                keyboardShouldPersistTaps="handled"
+            >
                 <View style={styles.header}>
                     <BrandLogo size={138} tone="dark" />
+
+                    {/* Role Segmented Switch */}
+                    <View style={styles.segmentedContainer}>
+                        <TouchableOpacity
+                            style={styles.segmentTab}
+                            accessibilityRole="button"
+                            accessibilityLabel="Switch to Customer Sign In"
+                            onPress={() => {
+                                clearAuthNotice();
+                                router.replace('/(auth)/customer-login');
+                            }}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.segmentText}>Customer</Text>
+                        </TouchableOpacity>
+                        <View
+                            style={[styles.segmentTab, styles.segmentTabActive]}
+                        >
+                            <Text
+                                style={[
+                                    styles.segmentText,
+                                    styles.segmentTextActive,
+                                ]}
+                            >
+                                Partner Portal
+                            </Text>
+                        </View>
+                    </View>
+
                     <View style={styles.partnerBadge}>
                         <Text style={styles.partnerBadgeText}>
                             ACCOMMODATION PARTNER
@@ -107,14 +166,29 @@ export default function OwnerLoginScreen() {
                     </Text>
                 </View>
 
+                {authNotice && !errorMessage ? (
+                    <View style={styles.noticeBox}>
+                        <ShieldCheck
+                            size={16}
+                            color={Colors.deepPlum}
+                            style={{ marginRight: 6 }}
+                        />
+                        <Text style={styles.noticeText}>{authNotice}</Text>
+                    </View>
+                ) : null}
+
                 {errorMessage ? (
                     <View style={styles.errorBox}>
                         <AlertCircle
                             size={16}
-                            color={Colors.rose}
+                            color={Colors.danger}
                             style={{ marginRight: 6 }}
                         />
-                        <Text style={styles.errorText}>{errorMessage}</Text>
+                        <Text style={styles.errorText}>
+                            {retryCountdownSeconds > 0
+                                ? `${errorMessage} (Retry available in ${retryCountdownSeconds}s)`
+                                : errorMessage}
+                        </Text>
                     </View>
                 ) : null}
 
@@ -138,6 +212,8 @@ export default function OwnerLoginScreen() {
 
                     <View style={styles.forgotPasswordRow}>
                         <TouchableOpacity
+                            style={styles.textHitTarget}
+                            accessibilityRole="button"
                             onPress={() => setShowForgotModal(true)}
                             activeOpacity={0.7}
                         >
@@ -148,10 +224,15 @@ export default function OwnerLoginScreen() {
                     </View>
 
                     <Button
-                        title="Sign In as Partner"
+                        title={
+                            retryCountdownSeconds > 0
+                                ? `Try again in ${retryCountdownSeconds}s`
+                                : 'Sign In as Partner'
+                        }
                         variant="primary"
                         size="lg"
                         loading={loading}
+                        disabled={loading || retryCountdownSeconds > 0}
                         onPress={handlePartnerLogin}
                         style={styles.loginButton}
                     />
@@ -162,11 +243,23 @@ export default function OwnerLoginScreen() {
                         Want to list your property on TIJUM?{' '}
                     </Text>
                     <TouchableOpacity
+                        style={styles.textHitTarget}
+                        accessibilityRole="button"
                         onPress={() =>
                             router.push('/(auth)/owner-register' as any)
                         }
                     >
                         <Text style={styles.linkText}>Register as Partner</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.textHitTarget}
+                        accessibilityRole="button"
+                        onPress={() => router.replace('/(customer)/explore')}
+                    >
+                        <Text style={styles.guestExploreText}>
+                            Explore Verified Stays →
+                        </Text>
                     </TouchableOpacity>
                 </View>
 
@@ -184,15 +277,12 @@ export default function OwnerLoginScreen() {
                                     Partner Password Reset
                                 </Text>
                                 <TouchableOpacity
+                                    style={styles.modalCloseBtn}
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Close password reset dialog"
                                     onPress={() => setShowForgotModal(false)}
-                                    hitSlop={{
-                                        top: 10,
-                                        bottom: 10,
-                                        left: 10,
-                                        right: 10,
-                                    }}
                                 >
-                                    <X size={20} color={Colors.gray600} />
+                                    <X size={20} color={Colors.inkSecondary} />
                                 </TouchableOpacity>
                             </View>
                             <Text style={styles.modalSubtitle}>
@@ -237,7 +327,68 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     header: {
-        marginBottom: Spacing.xl,
+        marginBottom: Spacing.lg,
+    },
+    segmentedContainer: {
+        flexDirection: 'row',
+        backgroundColor: Colors.surfaceSubtle,
+        borderRadius: 14,
+        padding: 4,
+        marginTop: Spacing.md,
+        marginBottom: Spacing.md,
+        borderWidth: 1,
+        borderColor: Colors.borderSubtle,
+    },
+    segmentTab: {
+        flex: 1,
+        minHeight: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 10,
+    },
+    segmentTabActive: {
+        backgroundColor: Colors.white,
+    },
+    segmentText: {
+        fontFamily: Typography.fontFamily.bodyMedium,
+        fontSize: 14,
+        color: Colors.inkSecondary,
+    },
+    segmentTextActive: {
+        fontFamily: Typography.fontFamily.heading,
+        color: Colors.deepPlum,
+    },
+    noticeBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.peachCream,
+        padding: Spacing.md,
+        borderRadius: 10,
+        marginBottom: Spacing.base,
+        borderWidth: 1,
+        borderColor: Colors.softPeach,
+    },
+    noticeText: {
+        flex: 1,
+        color: Colors.deepPlum,
+        fontFamily: Typography.fontFamily.bodyMedium,
+        fontSize: Typography.fontSize.sm,
+    },
+    textHitTarget: {
+        minHeight: 44,
+        justifyContent: 'center',
+        paddingHorizontal: 6,
+    },
+    modalCloseBtn: {
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    guestExploreText: {
+        fontFamily: Typography.fontFamily.bodyBold,
+        fontSize: 13,
+        color: Colors.coralDark,
     },
     partnerBadge: {
         backgroundColor: Colors.softPeach,
@@ -293,9 +444,9 @@ const styles = StyleSheet.create({
         marginVertical: Spacing.xs,
     },
     forgotPasswordText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: Colors.coral,
+        fontFamily: Typography.fontFamily.bodyBold,
+        fontSize: 13,
+        color: Colors.coralDark,
     },
     loginButton: {
         marginTop: Spacing.xs,

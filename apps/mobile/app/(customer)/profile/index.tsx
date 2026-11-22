@@ -2,18 +2,24 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    SafeAreaView,
+    Linking,
+    Modal,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import {
     User,
     Calendar,
+    Gift,
     Heart,
     Star,
     Headset,
@@ -27,25 +33,40 @@ import {
     FileText,
     Lock,
     Repeat,
+    Trash2,
+    X,
 } from 'lucide-react-native';
 import { useAuth } from '../../../src/auth/AuthContext';
 import { CustomerApi } from '../../../src/api/customer';
 import { CustomerProfile } from '../../../src/api/types';
 import { ExceptionalState } from '../../../src/components/ExceptionalState';
+import { Button } from '../../../src/components/Button';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
 
 export default function CustomerProfileScreen() {
     const router = useRouter();
-    const { user, token, authState, logout } = useAuth();
+    const insets = useSafeAreaInsets();
+    const { user, token, authState, logout, sessionEpoch } = useAuth();
     const isFocused = useIsFocused();
     const [profile, setProfile] = useState<CustomerProfile | null>(null);
     const [wishlistCount, setWishlistCount] = useState(0);
+    const [unreadCount, setUnreadCount] = useState(0);
     const [loading, setLoading] = useState(false);
     const [resendingVerification, setResendingVerification] = useState(false);
+    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
     const isGuest =
-        !token || authState === 'guest' || authState === 'session_expired';
+        !token ||
+        authState === 'guest' ||
+        authState === 'session_expired' ||
+        authState === 'owner_authenticated';
+
+    useEffect(() => {
+        setProfile(null);
+        setWishlistCount(0);
+        setUnreadCount(0);
+    }, [sessionEpoch]);
 
     const loadProfile = useCallback(async () => {
         if (isGuest) {
@@ -54,9 +75,10 @@ export default function CustomerProfileScreen() {
 
         setLoading(true);
         try {
-            const [profileRes, wishlistRes] = await Promise.all([
+            const [profileRes, wishlistRes, unreadRes] = await Promise.all([
                 CustomerApi.getProfile(),
                 CustomerApi.getWishlist().catch(() => null),
+                CustomerApi.getUnreadCount().catch(() => null),
             ]);
 
             if (profileRes.data) {
@@ -64,6 +86,9 @@ export default function CustomerProfileScreen() {
             }
             if (Array.isArray(wishlistRes?.data)) {
                 setWishlistCount(wishlistRes.data.length);
+            }
+            if (typeof unreadRes?.data?.unread_count === 'number') {
+                setUnreadCount(unreadRes.data.unread_count);
             }
         } catch {
             // Keep the last known profile; the screen remains usable offline.
@@ -147,8 +172,13 @@ export default function CustomerProfileScreen() {
 
     if (isGuest) {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.plumHeader}>
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <View
+                    style={[
+                        styles.plumHeader,
+                        { paddingTop: Math.max(insets.top, Spacing.sm) },
+                    ]}
+                >
                     <Text style={styles.headerTitle}>Profile</Text>
                 </View>
                 <ExceptionalState
@@ -169,22 +199,37 @@ export default function CustomerProfileScreen() {
     const initial = displayName.trim().charAt(0).toUpperCase() || 'T';
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['bottom']}>
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
             >
-                <View style={styles.plumHeader}>
+                <View
+                    style={[
+                        styles.plumHeader,
+                        { paddingTop: Math.max(insets.top, Spacing.sm) },
+                    ]}
+                >
                     <View style={styles.headerTopRow}>
-                        <View style={{ width: 24 }} />
+                        <View style={{ width: 44 }} />
                         <Text style={styles.headerTitle}>My Profile</Text>
                         <TouchableOpacity
+                            style={styles.headerBellBtn}
                             onPress={() =>
                                 router.push('/(customer)/notifications')
                             }
                             activeOpacity={0.8}
+                            accessibilityRole="button"
+                            accessibilityLabel="Open notifications"
                         >
                             <Bell size={22} color={Colors.white} />
+                            {unreadCount > 0 ? (
+                                <View style={styles.bellBadge}>
+                                    <Text style={styles.bellBadgeText}>
+                                        {unreadCount > 99 ? '99+' : unreadCount}
+                                    </Text>
+                                </View>
+                            ) : null}
                         </TouchableOpacity>
                     </View>
 
@@ -197,9 +242,16 @@ export default function CustomerProfileScreen() {
                             </View>
                             <TouchableOpacity
                                 style={styles.editAvatarBadge}
+                                hitSlop={{
+                                    top: 10,
+                                    bottom: 10,
+                                    left: 10,
+                                    right: 10,
+                                }}
                                 onPress={() =>
                                     router.push('/(customer)/profile/edit')
                                 }
+                                accessibilityRole="button"
                                 accessibilityLabel="Edit profile"
                             >
                                 <Edit3 size={11} color={Colors.white} />
@@ -277,7 +329,13 @@ export default function CustomerProfileScreen() {
                     />
                     <Divider />
                     <MenuRow
-                        icon={<Heart size={18} color={Colors.coral} />}
+                        icon={<Gift size={18} color={Colors.coralDark} />}
+                        label="Rewards & Referrals"
+                        onPress={() => router.push('/(customer)/rewards')}
+                    />
+                    <Divider />
+                    <MenuRow
+                        icon={<Heart size={18} color={Colors.coralDark} />}
                         label="My Wishlist"
                         badge={wishlistCount}
                         onPress={() => router.push('/(customer)/wishlist')}
@@ -296,8 +354,9 @@ export default function CustomerProfileScreen() {
                     />
                     <Divider />
                     <MenuRow
-                        icon={<Bell size={18} color={Colors.coral} />}
+                        icon={<Bell size={18} color={Colors.coralDark} />}
                         label="Notification Settings"
+                        badge={unreadCount}
                         onPress={() => router.push('/(customer)/notifications')}
                     />
                     <Divider />
@@ -328,9 +387,15 @@ export default function CustomerProfileScreen() {
                     />
                     <Divider />
                     <MenuRow
-                        icon={<Repeat size={18} color={Colors.coral} />}
+                        icon={<Repeat size={18} color={Colors.coralDark} />}
                         label="Switch to Partner"
                         onPress={handleSwitchToPartner}
+                    />
+                    <Divider />
+                    <MenuRow
+                        icon={<Trash2 size={18} color={Colors.dangerText} />}
+                        label="Request Account Deletion"
+                        onPress={() => setDeleteModalVisible(true)}
                     />
                 </View>
 
@@ -338,14 +403,18 @@ export default function CustomerProfileScreen() {
                     style={styles.authActionButton}
                     onPress={handleSignOut}
                     activeOpacity={0.85}
+                    accessibilityRole="button"
                 >
                     <LogOut
                         size={18}
-                        color={Colors.coral}
+                        color={Colors.coralDark}
                         style={{ marginRight: 8 }}
                     />
                     <Text
-                        style={[styles.authActionText, { color: Colors.coral }]}
+                        style={[
+                            styles.authActionText,
+                            { color: Colors.coralDark },
+                        ]}
                     >
                         Sign Out
                     </Text>
@@ -355,6 +424,75 @@ export default function CustomerProfileScreen() {
                     © 2026 TIJUM. All rights reserved.
                 </Text>
             </ScrollView>
+
+            {/* Truthful Account Deletion Request Modal */}
+            <Modal
+                visible={deleteModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setDeleteModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View
+                        style={[
+                            styles.modalCard,
+                            {
+                                paddingBottom: Math.max(
+                                    insets.bottom,
+                                    Spacing.lg,
+                                ),
+                            },
+                        ]}
+                    >
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>
+                                Account Deletion Request
+                            </Text>
+                            <TouchableOpacity
+                                style={styles.modalCloseBtn}
+                                onPress={() => setDeleteModalVisible(false)}
+                                accessibilityRole="button"
+                                accessibilityLabel="Close account deletion dialog"
+                            >
+                                <X size={20} color={Colors.inkSecondary} />
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={styles.modalBody}>
+                            For statutory tax, GST invoice, and payment ledger
+                            compliance, TIJUM reviews customer account deletion
+                            requests through our privacy support desk once
+                            active reservations and refunds are settled.
+                        </Text>
+                        <Text style={styles.modalSubBody}>
+                            Personal profile data will be erased or anonymized
+                            in accordance with the TIJUM Privacy Policy, while
+                            regulated financial ledgers are retained where
+                            legally required.
+                        </Text>
+                        <Button
+                            title="Submit Request in Help Desk"
+                            onPress={() => {
+                                setDeleteModalVisible(false);
+                                router.push('/(customer)/support/tickets');
+                            }}
+                            style={{ marginTop: Spacing.md }}
+                        />
+                        <Button
+                            title="Email support@tijum.com"
+                            variant="outline"
+                            onPress={() => {
+                                setDeleteModalVisible(false);
+                                void Linking.openURL(
+                                    `mailto:support@tijum.com?subject=${encodeURIComponent(
+                                        `Account Deletion Request (${displayEmail})`,
+                                    )}`,
+                                );
+                            }}
+                            style={{ marginTop: Spacing.sm }}
+                        />
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -417,6 +555,30 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: Spacing.md,
+    },
+    headerBellBtn: {
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+    },
+    bellBadge: {
+        position: 'absolute',
+        top: 4,
+        right: 4,
+        minWidth: 18,
+        height: 18,
+        borderRadius: 9,
+        backgroundColor: Colors.coral,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 4,
+    },
+    bellBadgeText: {
+        color: Colors.deepPlum,
+        fontSize: 10,
+        fontWeight: '800',
     },
     headerTitle: {
         fontSize: 20,
@@ -555,7 +717,7 @@ const styles = StyleSheet.create({
         marginLeft: Spacing.md,
     },
     badgeCountPill: {
-        backgroundColor: Colors.coral,
+        backgroundColor: Colors.deepPlum,
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: BorderRadius.full,
@@ -564,6 +726,45 @@ const styles = StyleSheet.create({
         color: Colors.white,
         fontSize: 11,
         fontWeight: '800',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        padding: Spacing.lg,
+    },
+    modalCard: {
+        backgroundColor: Colors.white,
+        borderRadius: BorderRadius.xl,
+        padding: Spacing.lg,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: Spacing.sm,
+    },
+    modalTitle: {
+        fontSize: 17,
+        fontWeight: '800',
+        color: Colors.deepPlum,
+    },
+    modalCloseBtn: {
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modalBody: {
+        fontSize: 13,
+        lineHeight: 19,
+        color: Colors.inkPrimary,
+    },
+    modalSubBody: {
+        fontSize: 12,
+        lineHeight: 18,
+        color: Colors.inkSecondary,
+        marginTop: Spacing.sm,
     },
     menuDivider: {
         height: 1,

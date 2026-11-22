@@ -5,7 +5,6 @@ import {
     KeyboardAvoidingView,
     Platform,
     RefreshControl,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
@@ -13,15 +12,21 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { CustomerApi } from '../../../src/api/customer';
+import { AppHeader } from '../../../src/components/AppHeader';
 import { Badge } from '../../../src/components/Badge';
+import { Button } from '../../../src/components/Button';
+import { RequireAuth } from '../../../src/components/RequireAuth';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 import {
     AlertCircle,
-    ArrowLeft,
     CheckCircle2,
     Clock,
     MessageSquare,
@@ -31,18 +36,27 @@ import {
 } from 'lucide-react-native';
 
 export default function CustomerCaseDetailScreen() {
-    const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { reference } = useLocalSearchParams<{ reference: string }>();
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [caseData, setCaseData] = useState<any>(null);
     const [replyText, setReplyText] = useState('');
     const [sending, setSending] = useState(false);
 
-    const fetchCase = async () => {
-        if (!reference) return;
+    const fetchCase = async (options?: { silent?: boolean }) => {
+        if (!reference) {
+            setLoading(false);
+            setLoadError('Support case reference is missing.');
+            return;
+        }
         try {
+            if (!options?.silent) {
+                setLoading(true);
+            }
+            setLoadError(null);
             const res = await CustomerApi.getCase(reference);
             const data = (res.data as any)?.case || res.data;
             if (data) {
@@ -50,11 +64,11 @@ export default function CustomerCaseDetailScreen() {
                 return;
             }
             setCaseData(null);
+            setLoadError('Support case not found.');
         } catch (error: any) {
             setCaseData(null);
-            Alert.alert(
-                'Error',
-                error.message || 'Failed to load support case details.',
+            setLoadError(
+                error?.message || 'Failed to load support case details.',
             );
         } finally {
             setLoading(false);
@@ -63,12 +77,14 @@ export default function CustomerCaseDetailScreen() {
     };
 
     useEffect(() => {
+        setCaseData(null);
+        setLoadError(null);
         void fetchCase();
     }, [reference]);
 
     const onRefresh = () => {
         setRefreshing(true);
-        void fetchCase();
+        void fetchCase({ silent: true });
     };
 
     const handleSendMessage = async () => {
@@ -87,7 +103,7 @@ export default function CustomerCaseDetailScreen() {
         try {
             await CustomerApi.addCaseMessage(reference, text);
             setReplyText('');
-            void fetchCase();
+            void fetchCase({ silent: true });
         } catch (error: any) {
             Alert.alert(
                 'Send Failed',
@@ -148,65 +164,78 @@ export default function CustomerCaseDetailScreen() {
         caseData?.status === 'resolved' || caseData?.status === 'closed';
     const messages = caseData?.messages || [];
     const sla = getPrioritySlaTarget(caseData?.priority);
+    const resolutionText =
+        caseData?.resolution_summary || caseData?.resolution_notes || null;
 
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => router.back()}
-                    accessibilityLabel="Back to Support"
-                >
-                    <ArrowLeft size={22} color={Colors.deepPlum} />
-                </TouchableOpacity>
-                <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerTitle}>{reference}</Text>
-                    <Text style={styles.headerSubtitle}>
-                        {caseData?.category
-                            ? `Category: ${caseData.category}`
-                            : 'Protection Case'}
-                    </Text>
-                </View>
-                {caseData?.status && (
-                    <Badge
-                        label={caseData.status}
-                        variant={getStatusVariant(caseData.status)}
-                    />
-                )}
-            </View>
-
-            {loading ? (
-                <View style={styles.centered}>
-                    <ActivityIndicator size="large" color={Colors.coral} />
-                    <Text style={styles.loadingText}>
-                        Loading case details...
-                    </Text>
-                </View>
-            ) : !caseData ? (
-                <View style={styles.centered}>
-                    <AlertCircle size={40} color={Colors.gray400} />
-                    <Text style={styles.emptyTitle}>Case Not Found</Text>
-                    <Text style={styles.emptySubtitle}>
-                        Could not retrieve case details for reference{' '}
-                        {reference}.
-                    </Text>
-                </View>
-            ) : (
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                    style={{ flex: 1 }}
-                >
-                    <ScrollView
-                        contentContainerStyle={styles.scrollContent}
-                        refreshControl={
-                            <RefreshControl
-                                refreshing={refreshing}
-                                onRefresh={onRefresh}
-                                tintColor={Colors.coral}
+        <RequireAuth role="customer">
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <AppHeader
+                    title={reference || 'Case Details'}
+                    subtitle={
+                        caseData?.category_label ||
+                        (caseData?.category
+                            ? `Category: ${caseData.category.replace(/_/g, ' ')}`
+                            : 'Protection Case')
+                    }
+                    showBack
+                    fallbackRoute="/(customer)/support"
+                    rightAction={
+                        caseData?.status ? (
+                            <Badge
+                                label={
+                                    caseData.status_label ||
+                                    caseData.status.replace(/_/g, ' ')
+                                }
+                                variant={getStatusVariant(caseData.status)}
                             />
-                        }
+                        ) : undefined
+                    }
+                />
+
+                {loading && !caseData ? (
+                    <View style={styles.centered}>
+                        <ActivityIndicator
+                            size="large"
+                            color={Colors.deepPlum}
+                        />
+                        <Text style={styles.loadingText}>
+                            Loading case details...
+                        </Text>
+                    </View>
+                ) : !caseData ? (
+                    <View style={styles.centered}>
+                        <AlertCircle size={40} color={Colors.gray400} />
+                        <Text style={styles.emptyTitle}>
+                            {loadError ? 'Case Unavailable' : 'Case Not Found'}
+                        </Text>
+                        <Text style={styles.emptySubtitle}>
+                            {loadError ||
+                                `Could not retrieve case details for reference ${reference}.`}
+                        </Text>
+                        <Button
+                            title="Retry"
+                            onPress={() => void fetchCase()}
+                            style={{ marginTop: Spacing.md }}
+                        />
+                    </View>
+                ) : (
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={{ flex: 1 }}
                     >
+                        <ScrollView
+                            contentContainerStyle={styles.scrollContent}
+                            keyboardShouldPersistTaps="handled"
+                            refreshControl={
+                                <RefreshControl
+                                    refreshing={refreshing}
+                                    onRefresh={onRefresh}
+                                    colors={[Colors.deepPlum]}
+                                    tintColor={Colors.deepPlum}
+                                />
+                            }
+                        >
                         {/* Summary Card */}
                         <View style={styles.card}>
                             <View style={styles.cardHeaderRow}>
@@ -250,7 +279,7 @@ export default function CustomerCaseDetailScreen() {
                                 </Text>
                             </View>
 
-                            {caseData.resolution_notes ? (
+                            {resolutionText ? (
                                 <View style={styles.resolutionBox}>
                                     <CheckCircle2 size={16} color="#166534" />
                                     <View
@@ -260,10 +289,10 @@ export default function CustomerCaseDetailScreen() {
                                         }}
                                     >
                                         <Text style={styles.resolutionTitle}>
-                                            Resolution Notes:
+                                            Resolution Summary:
                                         </Text>
                                         <Text style={styles.resolutionText}>
-                                            {caseData.resolution_notes}
+                                            {resolutionText}
                                         </Text>
                                     </View>
                                 </View>
@@ -357,16 +386,22 @@ export default function CustomerCaseDetailScreen() {
                             </View>
                         ) : (
                             messages.map((msg: any) => {
+                                const senderTypeLower = String(
+                                    msg.sender_type || '',
+                                ).toLowerCase();
+                                const senderRoleLower = String(
+                                    msg.sender_role || '',
+                                ).toLowerCase();
                                 const isCustomer =
-                                    msg.sender_type === 'User' ||
-                                    msg.sender_role?.toLowerCase() === 'user' ||
-                                    msg.sender_role?.toLowerCase() ===
-                                        'customer';
+                                    senderTypeLower === 'customer' ||
+                                    senderTypeLower === 'user' ||
+                                    senderRoleLower === 'user' ||
+                                    senderRoleLower === 'customer';
                                 const isHost =
-                                    msg.sender_type === 'Owner' ||
-                                    msg.sender_role?.toLowerCase() ===
-                                        'owner' ||
-                                    msg.sender_role?.toLowerCase() === 'host';
+                                    senderTypeLower === 'owner' ||
+                                    senderTypeLower === 'partner' ||
+                                    senderRoleLower === 'owner' ||
+                                    senderRoleLower === 'host';
 
                                 return (
                                     <View
@@ -423,7 +458,17 @@ export default function CustomerCaseDetailScreen() {
                             </Text>
                         </View>
                     ) : (
-                        <View style={styles.replyBar}>
+                        <View
+                            style={[
+                                styles.replyBar,
+                                {
+                                    paddingBottom: Math.max(
+                                        insets.bottom,
+                                        Spacing.sm,
+                                    ),
+                                },
+                            ]}
+                        >
                             <TextInput
                                 style={styles.replyInput}
                                 placeholder="Type your message or update..."
@@ -442,6 +487,7 @@ export default function CustomerCaseDetailScreen() {
                                 onPress={handleSendMessage}
                                 disabled={!replyText.trim() || sending}
                                 accessibilityLabel="Send Message"
+                                accessibilityRole="button"
                             >
                                 {sending ? (
                                     <ActivityIndicator
@@ -456,7 +502,8 @@ export default function CustomerCaseDetailScreen() {
                     )}
                 </KeyboardAvoidingView>
             )}
-        </SafeAreaView>
+            </SafeAreaView>
+        </RequireAuth>
     );
 }
 
@@ -730,10 +777,10 @@ const styles = StyleSheet.create({
         borderColor: Colors.gray200,
     },
     sendButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: Colors.coral,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: Colors.deepPlum,
         justifyContent: 'center',
         alignItems: 'center',
     },

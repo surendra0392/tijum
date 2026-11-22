@@ -77,11 +77,11 @@ export default function RootLayout() {
                         />
                         <Stack.Screen
                             name="help"
-                            options={{ headerTitle: 'Help Centre' }}
+                            options={{ headerShown: false }}
                         />
                         <Stack.Screen
                             name="legal/[slug]"
-                            options={{ headerTitle: 'TIJUM' }}
+                            options={{ headerShown: false }}
                         />
                     </Stack>
                 </AuthProvider>

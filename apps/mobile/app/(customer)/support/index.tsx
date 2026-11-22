@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
     Linking,
     Modal,
-    SafeAreaView,
+    Platform,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
@@ -12,6 +14,11 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
     ShieldCheck,
@@ -26,6 +33,7 @@ import {
 } from 'lucide-react-native';
 import { CustomerApi } from '../../../src/api/customer';
 import { useAuth } from '../../../src/auth/AuthContext';
+import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
 import { CustomerCaseSummary } from '../../../src/api/types';
@@ -47,13 +55,16 @@ type SupportCategory = (typeof SUPPORT_CATEGORIES)[number]['id'];
 
 export default function CustomerSupportScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
+    const isFocused = useIsFocused();
     const { booking_reference } = useLocalSearchParams<{
         booking_reference?: string;
     }>();
-    const { token, authState } = useAuth();
+    const { token, authState, isLoading: authLoading, sessionEpoch } = useAuth();
 
     const [cases, setCases] = useState<CustomerCaseSummary[]>([]);
-    const [, setLoading] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
     const [slaModalVisible, setSlaModalVisible] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -66,33 +77,57 @@ export default function CustomerSupportScreen() {
     const [submitting, setSubmitting] = useState(false);
 
     const isGuest =
-        !token || authState === 'guest' || authState === 'session_expired';
+        !token ||
+        authState === 'guest' ||
+        authState === 'session_expired' ||
+        authState === 'owner_authenticated';
 
     useEffect(() => {
-        if (!isGuest) {
-            void loadCases();
-        }
-    }, [isGuest]);
+        setCases([]);
+        setErrorMessage(null);
+    }, [sessionEpoch]);
 
-    const loadCases = async () => {
-        try {
-            setLoading(true);
-            setErrorMessage(null);
-            const res = await CustomerApi.getCases();
-            if (res.data && res.data.length > 0) {
-                setCases(res.data);
-            } else {
-                setCases([]);
+    useEffect(() => {
+        if (booking_reference) {
+            setBookingRef(booking_reference);
+            if (!isGuest) {
+                setModalVisible(true);
             }
-        } catch {
-            setErrorMessage(
-                'Unable to load your support cases. Please try again.',
-            );
-            setCases([]);
-        } finally {
-            setLoading(false);
         }
-    };
+    }, [booking_reference, isGuest]);
+
+    const loadCases = useCallback(
+        async (isRefresh = false) => {
+            if (isGuest) {
+                return;
+            }
+            try {
+                if (isRefresh) {
+                    setRefreshing(true);
+                } else {
+                    setLoading(true);
+                }
+                setErrorMessage(null);
+                const res = await CustomerApi.getCases();
+                setCases(Array.isArray(res.data) ? res.data : []);
+            } catch {
+                setErrorMessage(
+                    'Unable to load your support cases. Please try again.',
+                );
+                setCases([]);
+            } finally {
+                setLoading(false);
+                setRefreshing(false);
+            }
+        },
+        [isGuest],
+    );
+
+    useEffect(() => {
+        if (!authLoading && !isGuest && isFocused) {
+            void loadCases(cases.length > 0);
+        }
+    }, [authLoading, isGuest, isFocused]);
 
     const handleCreateCase = async () => {
         if (!bookingRef.trim()) {
@@ -129,16 +164,46 @@ export default function CustomerSupportScreen() {
         }
     };
 
+    if (!authLoading && isGuest) {
+        return (
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <View
+                    style={[
+                        styles.plumHeader,
+                        { paddingTop: Math.max(insets.top, Spacing.base) },
+                    ]}
+                >
+                    <Text style={styles.headerTitle}>
+                        Support & Protection
+                    </Text>
+                    <Text style={styles.headerSubtitle}>
+                        Your safety, comfort, and satisfaction guaranteed
+                    </Text>
+                </View>
+                <ExceptionalState
+                    type="auth-required"
+                    title="Sign In for Stay Protection"
+                    description="Sign in to your customer account to file stay protection requests, track statutory grievances, or open support tickets."
+                    actionLabel="Sign In as Customer"
+                    onAction={() => router.push('/(auth)/customer-login')}
+                    secondaryActionLabel="Browse Help & FAQs"
+                    onSecondaryAction={() => router.push('/help')}
+                />
+            </SafeAreaView>
+        );
+    }
+
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['bottom']}>
             {errorMessage ? (
                 <View style={styles.errorContainer}>
-                    <AlertCircle size={48} color={Colors.coral} />
+                    <AlertCircle size={48} color={Colors.coralDark} />
                     <Text style={styles.errorTitle}>Unable to Load Cases</Text>
                     <Text style={styles.errorSubtitle}>{errorMessage}</Text>
                     <TouchableOpacity
                         style={styles.retryBtn}
-                        onPress={loadCases}
+                        onPress={() => void loadCases()}
+                        accessibilityRole="button"
                     >
                         <Text style={styles.retryBtnText}>Try Again</Text>
                     </TouchableOpacity>
@@ -147,9 +212,22 @@ export default function CustomerSupportScreen() {
                 <ScrollView
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.scrollContent}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={() => void loadCases(true)}
+                            colors={[Colors.deepPlum]}
+                            tintColor={Colors.deepPlum}
+                        />
+                    }
                 >
                     {/* Curved Plum Header */}
-                    <View style={styles.plumHeader}>
+                    <View
+                        style={[
+                            styles.plumHeader,
+                            { paddingTop: Math.max(insets.top, Spacing.base) },
+                        ]}
+                    >
                         <Text style={styles.headerTitle}>
                             Support & Protection
                         </Text>
@@ -223,20 +301,40 @@ export default function CustomerSupportScreen() {
                     {/* Your Cases Section */}
                     <View style={styles.sectionHeaderRow}>
                         <Text style={styles.sectionHeading}>Your Cases</Text>
-                        <TouchableOpacity
-                            onPress={() => {
-                                if (cases.length > 0) {
+                        {cases.length > 0 ? (
+                            <TouchableOpacity
+                                style={{ minHeight: 44, justifyContent: 'center' }}
+                                onPress={() =>
                                     router.push(
                                         `/(customer)/support/${cases[0].case_reference}`,
-                                    );
+                                    )
                                 }
-                            }}
-                        >
-                            <Text style={styles.seeAllText}>See All &gt;</Text>
-                        </TouchableOpacity>
+                            >
+                                <Text style={styles.seeAllText}>
+                                    Open Latest &gt;
+                                </Text>
+                            </TouchableOpacity>
+                        ) : null}
                     </View>
 
-                    {cases.map((c) => (
+                    {loading && cases.length === 0 ? (
+                        <ActivityIndicator
+                            size="small"
+                            color={Colors.deepPlum}
+                            style={{ marginVertical: Spacing.lg }}
+                        />
+                    ) : cases.length === 0 ? (
+                        <View style={styles.caseCard}>
+                            <Text style={styles.caseCategoryText}>
+                                No protection cases filed yet
+                            </Text>
+                            <Text style={styles.caseDateText}>
+                                Need help with a stay or promised meals? Tap
+                                "Raise a Request" above to open a protected case.
+                            </Text>
+                        </View>
+                    ) : (
+                        cases.map((c) => (
                         <TouchableOpacity
                             key={c.id}
                             style={styles.caseCard}
@@ -281,7 +379,8 @@ export default function CustomerSupportScreen() {
                                 </Text>
                             </View>
                         </TouchableOpacity>
-                    ))}
+                        ))
+                    )}
 
                     {/* Quick Navigation Links */}
                     <View style={styles.menuLinksCard}>
@@ -289,9 +388,10 @@ export default function CustomerSupportScreen() {
                             style={styles.menuLinkItem}
                             onPress={() => setSlaModalVisible(true)}
                             activeOpacity={0.7}
+                            accessibilityRole="button"
                         >
                             <View style={styles.menuLinkLeft}>
-                                <Clock size={18} color={Colors.coral} />
+                                <Clock size={18} color={Colors.coralDark} />
                                 <Text style={styles.menuLinkLabel}>
                                     Customer Protection SLAs
                                 </Text>
@@ -303,16 +403,15 @@ export default function CustomerSupportScreen() {
 
                         <TouchableOpacity
                             style={styles.menuLinkItem}
-                            onPress={() =>
-                                Alert.alert(
-                                    'Help & FAQs',
-                                    'Browse common questions and troubleshooting guides on tijum.com/faqs.',
-                                )
-                            }
+                            onPress={() => router.push('/help')}
                             activeOpacity={0.7}
+                            accessibilityRole="button"
                         >
                             <View style={styles.menuLinkLeft}>
-                                <HelpCircle size={18} color={Colors.coral} />
+                                <HelpCircle
+                                    size={18}
+                                    color={Colors.coralDark}
+                                />
                                 <Text style={styles.menuLinkLabel}>
                                     Help & FAQs
                                 </Text>
@@ -376,20 +475,39 @@ export default function CustomerSupportScreen() {
                 transparent={true}
                 onRequestClose={() => setModalVisible(false)}
             >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContainer}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
+                >
+                    <View
+                        style={[
+                            styles.modalContainer,
+                            {
+                                paddingBottom: Math.max(
+                                    insets.bottom,
+                                    Spacing.lg,
+                                ),
+                            },
+                        ]}
+                    >
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>
                                 Raise a Support Request
                             </Text>
                             <TouchableOpacity
+                                style={styles.modalCloseBtn}
                                 onPress={() => setModalVisible(false)}
+                                accessibilityRole="button"
+                                accessibilityLabel="Close request modal"
                             >
                                 <X size={20} color={Colors.gray600} />
                             </TouchableOpacity>
                         </View>
 
-                        <ScrollView style={styles.modalBody}>
+                        <ScrollView
+                            style={styles.modalBody}
+                            keyboardShouldPersistTaps="handled"
+                        >
                             <Text style={styles.inputLabel}>
                                 Booking Reference *
                             </Text>
@@ -453,7 +571,7 @@ export default function CustomerSupportScreen() {
                             </TouchableOpacity>
                         </ScrollView>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
 
             {/* SLA Policy Modal */}
@@ -850,14 +968,23 @@ const styles = StyleSheet.create({
         height: 80,
         textAlignVertical: 'top',
     },
+    modalCloseBtn: {
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     categoryRadioGroup: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: Spacing.xs,
         marginBottom: Spacing.sm,
     },
     categoryRadioBtn: {
-        flex: 1,
-        paddingVertical: 8,
+        minHeight: 44,
+        justifyContent: 'center',
+        paddingHorizontal: Spacing.md,
+        paddingVertical: 10,
         borderRadius: BorderRadius.pill,
         borderWidth: 1,
         borderColor: Colors.borderSubtle,

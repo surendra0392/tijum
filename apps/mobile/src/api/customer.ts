@@ -22,7 +22,7 @@ export const CustomerApi = {
         ApiClient.get<ApiResponse<CustomerProfile>>('customer/profile'),
     updateProfile: (data: {
         name: string;
-        phone?: string;
+        phone?: string | null;
         marketing_consent?: boolean;
     }) => ApiClient.put<ApiResponse<CustomerProfile>>('customer/profile', data),
     changePassword: (data: {
@@ -79,7 +79,7 @@ export const CustomerApi = {
         quantity: number;
         guest_count?: number;
         guest_gender: 'male' | 'female' | 'mixed';
-        guest_composition?: 'individuals';
+        guest_composition?: string;
         booking_for?: 'self' | 'other';
         contact_name?: string;
         contact_email?: string;

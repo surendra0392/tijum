@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -10,6 +11,8 @@ import {
 } from 'react-native';
 import { AlertCircle, Building2, Home, Users } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { PublicApi } from '../../src/api/public';
+import { City } from '../../src/api/types';
 import { useAuth } from '../../src/auth/AuthContext';
 import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
@@ -27,15 +30,6 @@ const GENDER_OPTIONS = [
     { value: 'female_only', label: 'Women Only' },
 ];
 
-const CITIES = [
-    'Hyderabad',
-    'Guntur',
-    'Vijayawada',
-    'Visakhapatnam',
-    'Bangalore',
-    'Chennai',
-];
-
 export default function OwnerRegisterScreen() {
     const router = useRouter();
     const { registerPartner } = useAuth();
@@ -49,13 +43,43 @@ export default function OwnerRegisterScreen() {
     const [propertyType, setPropertyType] =
         useState<CanonicalCategorySlug>('hostels-pg');
     const [availableFor, setAvailableFor] = useState('all_genders');
-    const [selectedCity, setSelectedCity] = useState('Hyderabad');
+    const [cities, setCities] = useState<City[]>([]);
+    const [citiesLoading, setCitiesLoading] = useState(true);
+    const [citiesError, setCitiesError] = useState<string | null>(null);
+    const [selectedCityId, setSelectedCityId] = useState<number | undefined>();
+    const [selectedCityName, setSelectedCityName] = useState('');
     const [locality, setLocality] = useState('');
     const [description, setDescription] = useState('');
     const [termsAccepted, setTermsAccepted] = useState(false);
 
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+
+    const loadCities = async () => {
+        setCitiesLoading(true);
+        setCitiesError(null);
+        try {
+            const res = await PublicApi.getCities();
+            const list = Array.isArray(res.data)
+                ? res.data.filter((c) => c.is_active !== false)
+                : [];
+            setCities(list);
+            if (list.length > 0) {
+                setSelectedCityId((prev) => prev ?? list[0].id);
+                setSelectedCityName((prev) => prev || list[0].name);
+            }
+        } catch (err: any) {
+            setCitiesError(
+                err?.message || 'Unable to load available cities right now.',
+            );
+        } finally {
+            setCitiesLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        void loadCities();
+    }, []);
 
     const handleRegister = async () => {
         if (!name.trim() || !email.trim() || !password) {
@@ -74,6 +98,11 @@ export default function OwnerRegisterScreen() {
             setErrorMessage(
                 'Please provide the name of your accommodation property.',
             );
+            return;
+        }
+
+        if (!selectedCityId && !selectedCityName.trim()) {
+            setErrorMessage('Please select your property city.');
             return;
         }
 
@@ -108,11 +137,12 @@ export default function OwnerRegisterScreen() {
                 property_name: propertyName.trim(),
                 property_type: propertyType,
                 available_for: availableFor,
-                location: selectedCity,
+                city_id: selectedCityId,
+                location: selectedCityName,
                 locality: locality.trim(),
                 description: description.trim() || undefined,
-                terms: true,
-                terms_accepted: true,
+                terms: termsAccepted,
+                terms_accepted: termsAccepted,
             });
 
             router.replace('/(partner)/dashboard');
@@ -139,10 +169,13 @@ export default function OwnerRegisterScreen() {
 
     return (
         <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.keyboardView}
         >
-            <ScrollView contentContainerStyle={styles.container}>
+            <ScrollView
+                contentContainerStyle={styles.container}
+                keyboardShouldPersistTaps="handled"
+            >
                 <View style={styles.header}>
                     <View style={styles.badge}>
                         <Text style={styles.badgeText}>PARTNER ONBOARDING</Text>
@@ -294,36 +327,68 @@ export default function OwnerRegisterScreen() {
                     >
                         Location City
                     </Text>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.cityRow}
-                    >
-                        {CITIES.map((city) => {
-                            const isSelected = selectedCity === city;
-                            return (
-                                <TouchableOpacity
-                                    key={city}
-                                    activeOpacity={0.8}
-                                    onPress={() => setSelectedCity(city)}
-                                    style={[
-                                        styles.cityPill,
-                                        isSelected && styles.cityPillActive,
-                                    ]}
-                                >
-                                    <Text
+                    {citiesLoading ? (
+                        <View style={styles.cityLoadingRow}>
+                            <ActivityIndicator
+                                size="small"
+                                color={Colors.deepPlum}
+                            />
+                            <Text style={styles.cityLoadingText}>
+                                Loading active cities…
+                            </Text>
+                        </View>
+                    ) : citiesError ? (
+                        <View style={styles.cityErrorRow}>
+                            <Text style={styles.cityErrorText}>
+                                {citiesError}
+                            </Text>
+                            <TouchableOpacity
+                                style={styles.cityRetryBtn}
+                                accessibilityRole="button"
+                                onPress={() => void loadCities()}
+                            >
+                                <Text style={styles.cityRetryText}>Retry</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.cityRow}
+                        >
+                            {cities.map((city) => {
+                                const isSelected = selectedCityId === city.id;
+                                return (
+                                    <TouchableOpacity
+                                        key={city.id}
+                                        activeOpacity={0.8}
+                                        accessibilityRole="button"
+                                        accessibilityState={{
+                                            selected: isSelected,
+                                        }}
+                                        onPress={() => {
+                                            setSelectedCityId(city.id);
+                                            setSelectedCityName(city.name);
+                                        }}
                                         style={[
-                                            styles.cityPillText,
-                                            isSelected &&
-                                                styles.cityPillTextActive,
+                                            styles.cityPill,
+                                            isSelected && styles.cityPillActive,
                                         ]}
                                     >
-                                        {city}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </ScrollView>
+                                        <Text
+                                            style={[
+                                                styles.cityPillText,
+                                                isSelected &&
+                                                    styles.cityPillTextActive,
+                                            ]}
+                                        >
+                                            {city.name}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+                    )}
 
                     <Input
                         label="Locality / Neighborhood"
@@ -342,29 +407,46 @@ export default function OwnerRegisterScreen() {
                     />
 
                     {/* Terms & Conditions Acceptance */}
-                    <TouchableOpacity
-                        style={styles.termsRow}
-                        activeOpacity={0.8}
-                        onPress={() => setTermsAccepted(!termsAccepted)}
-                    >
-                        <View
-                            style={[
-                                styles.checkbox,
-                                termsAccepted && styles.checkboxActive,
-                            ]}
+                    <View style={styles.termsRow}>
+                        <TouchableOpacity
+                            style={styles.checkboxHitTarget}
+                            activeOpacity={0.8}
+                            accessibilityRole="checkbox"
+                            accessibilityLabel="Accept Partner Terms & Conditions"
+                            accessibilityState={{ checked: termsAccepted }}
+                            onPress={() => setTermsAccepted(!termsAccepted)}
                         >
-                            {termsAccepted && (
-                                <Text style={styles.checkmark}>✓</Text>
-                            )}
-                        </View>
+                            <View
+                                style={[
+                                    styles.checkbox,
+                                    termsAccepted && styles.checkboxActive,
+                                ]}
+                            >
+                                {termsAccepted && (
+                                    <Text style={styles.checkmark}>✓</Text>
+                                )}
+                            </View>
+                        </TouchableOpacity>
                         <Text style={styles.termsText}>
-                            I accept the{' '}
-                            <Text style={styles.termsLink}>
+                            <Text
+                                onPress={() => setTermsAccepted(!termsAccepted)}
+                            >
+                                I accept the{' '}
+                            </Text>
+                            <Text
+                                style={styles.termsLink}
+                                onPress={() => router.push('/legal/terms')}
+                            >
                                 Partner Terms & Conditions
-                            </Text>{' '}
-                            and declare my property information is accurate.
+                            </Text>
+                            <Text
+                                onPress={() => setTermsAccepted(!termsAccepted)}
+                            >
+                                {' '}
+                                and declare my property information is accurate.
+                            </Text>
                         </Text>
-                    </TouchableOpacity>
+                    </View>
 
                     <Button
                         title="Submit Partner Application"
@@ -381,7 +463,9 @@ export default function OwnerRegisterScreen() {
                         Already registered as a partner?{' '}
                     </Text>
                     <TouchableOpacity
-                        onPress={() => router.push('/(auth)/owner-login')}
+                        style={styles.footerLinkBtn}
+                        accessibilityRole="button"
+                        onPress={() => router.replace('/(auth)/owner-login')}
                     >
                         <Text style={styles.linkText}>Partner Sign In</Text>
                     </TouchableOpacity>
@@ -473,6 +557,7 @@ const styles = StyleSheet.create({
     },
     categoryOption: {
         flex: 1,
+        minHeight: 44,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -503,8 +588,10 @@ const styles = StyleSheet.create({
         marginBottom: Spacing.sm,
     },
     radioPill: {
+        minHeight: 44,
+        justifyContent: 'center',
         paddingHorizontal: Spacing.md,
-        paddingVertical: 7,
+        paddingVertical: 8,
         borderRadius: BorderRadius.full,
         backgroundColor: Colors.gray100,
         borderWidth: 1,
@@ -522,14 +609,56 @@ const styles = StyleSheet.create({
     radioPillTextActive: {
         color: Colors.white,
     },
+    cityLoadingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingVertical: 12,
+        marginBottom: Spacing.sm,
+    },
+    cityLoadingText: {
+        fontFamily: Typography.fontFamily.body,
+        fontSize: 13,
+        color: Colors.inkSecondary,
+    },
+    cityErrorRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: Colors.roseLight,
+        padding: Spacing.sm,
+        borderRadius: 10,
+        marginBottom: Spacing.md,
+    },
+    cityErrorText: {
+        flex: 1,
+        fontFamily: Typography.fontFamily.bodyMedium,
+        fontSize: 12,
+        color: Colors.dangerText,
+        marginRight: 8,
+    },
+    cityRetryBtn: {
+        minHeight: 36,
+        paddingHorizontal: 12,
+        justifyContent: 'center',
+        borderRadius: BorderRadius.pill,
+        backgroundColor: Colors.deepPlum,
+    },
+    cityRetryText: {
+        fontFamily: Typography.fontFamily.bodyBold,
+        fontSize: 12,
+        color: Colors.white,
+    },
     cityRow: {
         flexDirection: 'row',
         gap: 8,
         marginBottom: Spacing.md,
     },
     cityPill: {
+        minHeight: 44,
+        justifyContent: 'center',
         paddingHorizontal: Spacing.md,
-        paddingVertical: 6,
+        paddingVertical: 8,
         borderRadius: BorderRadius.full,
         backgroundColor: Colors.gray100,
         borderWidth: 1,
@@ -549,20 +678,30 @@ const styles = StyleSheet.create({
     },
     termsRow: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginTop: Spacing.sm,
+        alignItems: 'center',
+        marginTop: Spacing.xs,
         marginBottom: Spacing.md,
     },
-    checkbox: {
-        width: 20,
-        height: 20,
-        borderWidth: 2,
-        borderColor: Colors.gray400,
-        borderRadius: 4,
-        marginRight: 10,
+    checkboxHitTarget: {
+        width: 44,
+        height: 44,
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 2,
+        marginLeft: -10,
+    },
+    checkbox: {
+        width: 22,
+        height: 22,
+        borderWidth: 2,
+        borderColor: Colors.gray400,
+        borderRadius: 5,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    footerLinkBtn: {
+        minHeight: 44,
+        justifyContent: 'center',
+        paddingHorizontal: 6,
     },
     checkboxActive: {
         backgroundColor: Colors.deepPlum,

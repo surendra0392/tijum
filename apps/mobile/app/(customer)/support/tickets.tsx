@@ -3,14 +3,18 @@ import {
     ActivityIndicator,
     Alert,
     FlatList,
+    KeyboardAvoidingView,
     Modal,
-    SafeAreaView,
+    Platform,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { Headphones, Plus, X } from 'lucide-react-native';
 import { CustomerApi } from '../../../src/api/customer';
@@ -23,6 +27,7 @@ import { AppHeader } from '../../../src/components/AppHeader';
 import { Button } from '../../../src/components/Button';
 import { ExceptionalState } from '../../../src/components/ExceptionalState';
 import { Input } from '../../../src/components/Input';
+import { RequireAuth } from '../../../src/components/RequireAuth';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 
@@ -35,9 +40,11 @@ const PRIORITIES = [
 
 export default function CustomerSupportTicketsScreen() {
     const router = useRouter();
+    const isFocused = useIsFocused();
     const { token, authState } = useAuth();
     const [data, setData] = useState<SupportTicketIndexData | null>(null);
     const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [formVisible, setFormVisible] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -49,13 +56,17 @@ export default function CustomerSupportTicketsScreen() {
     >('standard');
     const [bookingReference, setBookingReference] = useState('');
 
-    const loadTickets = async () => {
+    const loadTickets = async (isRefresh = false) => {
         if (!token || authState !== 'customer_authenticated') {
             return;
         }
 
         try {
-            setLoading(true);
+            if (isRefresh) {
+                setRefreshing(true);
+            } else {
+                setLoading(true);
+            }
             setErrorMessage(null);
             const response = await CustomerApi.getSupportTickets();
             setData(response.data);
@@ -67,12 +78,15 @@ export default function CustomerSupportTicketsScreen() {
             );
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     };
 
     useEffect(() => {
-        void loadTickets();
-    }, [authState, token]);
+        if (isFocused) {
+            void loadTickets(data !== null);
+        }
+    }, [authState, isFocused, token]);
 
     const resetForm = () => {
         setSubject('');
@@ -118,18 +132,6 @@ export default function CustomerSupportTicketsScreen() {
         }
     };
 
-    if (!token || authState !== 'customer_authenticated') {
-        return (
-            <ExceptionalState
-                type="auth-required"
-                title="Customer Sign-In Required"
-                description="Sign in to create and track helpdesk tickets."
-                actionLabel="Customer Sign In"
-                onAction={() => router.push('/(auth)/customer-login')}
-            />
-        );
-    }
-
     const renderTicket = ({ item }: { item: SupportTicketSummary }) => (
         <TouchableOpacity
             accessibilityLabel={`Open ticket ${item.ticket_reference}`}
@@ -163,80 +165,103 @@ export default function CustomerSupportTicketsScreen() {
     );
 
     return (
-        <SafeAreaView style={styles.container}>
-            <AppHeader
-                title="Helpdesk Tickets"
-                rightAction={
-                    <TouchableOpacity
-                        accessibilityLabel="Create helpdesk ticket"
-                        accessibilityRole="button"
-                        onPress={() => setFormVisible(true)}
-                        style={styles.headerAction}
-                    >
-                        <Plus size={22} color={Colors.deepPlum} />
-                    </TouchableOpacity>
-                }
-            />
-
-            {loading && !data ? (
-                <View style={styles.centered}>
-                    <ActivityIndicator size="large" color={Colors.deepPlum} />
-                </View>
-            ) : errorMessage && !data ? (
-                <ExceptionalState
-                    type="no-internet"
-                    title="Helpdesk Unavailable"
-                    description={errorMessage}
-                    actionLabel="Try Again"
-                    onAction={() => loadTickets()}
-                />
-            ) : (
-                <FlatList
-                    contentContainerStyle={styles.listContent}
-                    data={data?.tickets ?? []}
-                    keyExtractor={(item) => String(item.id)}
-                    ListEmptyComponent={
-                        <View style={styles.emptyState}>
-                            <Headphones size={40} color={Colors.gray400} />
-                            <Text style={styles.emptyTitle}>
-                                No helpdesk tickets
-                            </Text>
-                            <Text style={styles.emptyText}>
-                                Create a ticket for booking, payment, account,
-                                or general assistance.
-                            </Text>
-                            <Button
-                                title="Create Ticket"
-                                onPress={() => setFormVisible(true)}
-                            />
-                        </View>
+        <RequireAuth role="customer">
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <AppHeader
+                    title="Helpdesk Tickets"
+                    showBack
+                    fallbackRoute="/(customer)/support"
+                    rightAction={
+                        <TouchableOpacity
+                            accessibilityLabel="Create helpdesk ticket"
+                            accessibilityRole="button"
+                            onPress={() => setFormVisible(true)}
+                            style={styles.headerAction}
+                        >
+                            <Plus size={22} color={Colors.white} />
+                        </TouchableOpacity>
                     }
-                    renderItem={renderTicket}
                 />
-            )}
 
-            <Modal
-                animationType="slide"
-                onRequestClose={() => setFormVisible(false)}
-                transparent
-                visible={formVisible}
-            >
-                <View style={styles.modalBackdrop}>
-                    <SafeAreaView style={styles.modalSheet}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>
-                                Create Helpdesk Ticket
-                            </Text>
-                            <TouchableOpacity
-                                accessibilityLabel="Close ticket form"
-                                accessibilityRole="button"
-                                onPress={() => setFormVisible(false)}
-                                style={styles.closeButton}
+                {loading && !data ? (
+                    <View style={styles.centered}>
+                        <ActivityIndicator
+                            size="large"
+                            color={Colors.deepPlum}
+                        />
+                    </View>
+                ) : errorMessage && !data ? (
+                    <ExceptionalState
+                        type="no-internet"
+                        title="Helpdesk Unavailable"
+                        description={errorMessage}
+                        actionLabel="Try Again"
+                        onAction={() => loadTickets()}
+                    />
+                ) : (
+                    <FlatList
+                        contentContainerStyle={styles.listContent}
+                        data={data?.tickets ?? []}
+                        keyExtractor={(item) => String(item.id)}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={() => void loadTickets(true)}
+                                colors={[Colors.deepPlum]}
+                                tintColor={Colors.deepPlum}
+                            />
+                        }
+                        ListEmptyComponent={
+                            <View style={styles.emptyState}>
+                                <Headphones size={40} color={Colors.gray400} />
+                                <Text style={styles.emptyTitle}>
+                                    No helpdesk tickets
+                                </Text>
+                                <Text style={styles.emptyText}>
+                                    Create a ticket for booking, payment,
+                                    account, or general assistance.
+                                </Text>
+                                <Button
+                                    title="Create Ticket"
+                                    onPress={() => setFormVisible(true)}
+                                />
+                            </View>
+                        }
+                        renderItem={renderTicket}
+                    />
+                )}
+
+                <Modal
+                    animationType="slide"
+                    onRequestClose={() => setFormVisible(false)}
+                    transparent
+                    visible={formVisible}
+                >
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={styles.modalBackdrop}
+                    >
+                        <SafeAreaView
+                            style={styles.modalSheet}
+                            edges={['bottom']}
+                        >
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>
+                                    Create Helpdesk Ticket
+                                </Text>
+                                <TouchableOpacity
+                                    accessibilityLabel="Close ticket form"
+                                    accessibilityRole="button"
+                                    onPress={() => setFormVisible(false)}
+                                    style={styles.closeButton}
+                                >
+                                    <X size={22} color={Colors.deepPlum} />
+                                </TouchableOpacity>
+                            </View>
+                            <ScrollView
+                                contentContainerStyle={styles.formContent}
+                                keyboardShouldPersistTaps="handled"
                             >
-                                <X size={22} color={Colors.deepPlum} />
-                            </TouchableOpacity>
-                        </View>
-                        <ScrollView contentContainerStyle={styles.formContent}>
                             <Input
                                 label="Subject"
                                 maxLength={255}
@@ -348,10 +373,11 @@ export default function CustomerSupportTicketsScreen() {
                                 title="Submit Ticket"
                             />
                         </ScrollView>
-                    </SafeAreaView>
-                </View>
-            </Modal>
-        </SafeAreaView>
+                        </SafeAreaView>
+                    </KeyboardAvoidingView>
+                </Modal>
+            </SafeAreaView>
+        </RequireAuth>
     );
 }
 
