@@ -5,24 +5,25 @@ import {
     FlatList,
     Modal,
     RefreshControl,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { OwnerApi } from '../../../../src/api/owner';
 import { PhysicalRoom, RoomType } from '../../../../src/api/types';
 import { Badge } from '../../../../src/components/Badge';
 import { Button } from '../../../../src/components/Button';
 import { Input } from '../../../../src/components/Input';
+import { AppHeader } from '../../../../src/components/AppHeader';
+import { RequireAuth } from '../../../../src/components/RequireAuth';
 import { Colors } from '../../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../../src/theme/spacing';
 import { Typography } from '../../../../src/theme/typography';
 import {
-    ArrowLeft,
     CheckCircle2,
     DoorClosed,
     Edit2,
@@ -137,9 +138,15 @@ export default function PropertyRoomsScreen() {
         setEditingRoom(room);
         setRoomNumber(room.room_number);
         setSelectedRoomTypeId(room.property_room_type_id);
-        setFloorNumber(room.floor ? String(room.floor) : '');
-        setWingName('');
-        setBuildingName('');
+        setFloorNumber(
+            room.floor_number !== undefined && room.floor_number !== null
+                ? String(room.floor_number)
+                : room.floor
+                  ? String(room.floor)
+                  : '',
+        );
+        setWingName(room.wing_name || '');
+        setBuildingName(room.building_name || '');
         setModalVisible(true);
     };
 
@@ -191,8 +198,10 @@ export default function PropertyRoomsScreen() {
 
     const handleOpenStatusModal = (room: PhysicalRoom) => {
         setTargetRoom(room);
-        setTargetStatus(room.is_active ? 'maintenance' : 'active');
-        setStatusReason('');
+        const currentOp =
+            room.operational_status || (room.is_active ? 'active' : 'maintenance');
+        setTargetStatus(currentOp === 'active' ? 'maintenance' : 'active');
+        setStatusReason(room.internal_description || '');
         setStatusModalVisible(true);
     };
 
@@ -224,13 +233,19 @@ export default function PropertyRoomsScreen() {
     };
 
     const filteredRooms = rooms.filter((r) => {
+        const opStatus =
+            r.operational_status || (r.is_active ? 'active' : 'maintenance');
         if (statusFilter === 'all') return true;
-        if (statusFilter === 'active') return r.is_active;
-        if (statusFilter === 'maintenance') return !r.is_active;
+        if (statusFilter === 'active') return opStatus === 'active' && r.is_active;
+        if (statusFilter === 'maintenance')
+            return opStatus !== 'active' || !r.is_active;
         return true;
     });
 
     const renderRoomCard = ({ item }: { item: PhysicalRoom }) => {
+        const opStatus =
+            item.operational_status || (item.is_active ? 'active' : 'maintenance');
+        const floorText = item.floor_number ?? item.floor;
         return (
             <View style={styles.card}>
                 <View style={styles.cardHeader}>
@@ -241,8 +256,12 @@ export default function PropertyRoomsScreen() {
                         </Text>
                     </View>
                     <Badge
-                        label={item.is_active ? 'Active' : 'Maintenance'}
-                        variant={item.is_active ? 'accent' : 'secondary'}
+                        label={opStatus.toUpperCase()}
+                        variant={
+                            opStatus === 'active' && item.is_active
+                                ? 'accent'
+                                : 'secondary'
+                        }
                     />
                 </View>
 
@@ -252,9 +271,17 @@ export default function PropertyRoomsScreen() {
                         {item.room_type_name ||
                             `Type #${item.property_room_type_id}`}
                     </Text>
-                    {item.floor ? (
+                    {(floorText || item.wing_name || item.building_name) ? (
                         <Text style={styles.floorLabel}>
-                            Floor: {item.floor}
+                            {[
+                                floorText ? `Floor: ${floorText}` : null,
+                                item.wing_name ? `Wing: ${item.wing_name}` : null,
+                                item.building_name
+                                    ? `Building: ${item.building_name}`
+                                    : null,
+                            ]
+                                .filter(Boolean)
+                                .join(' • ')}
                         </Text>
                     ) : null}
 
@@ -309,31 +336,24 @@ export default function PropertyRoomsScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => router.back()}
-                    style={styles.backBtn}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                    <ArrowLeft size={22} color={Colors.deepPlum} />
-                </TouchableOpacity>
-                <View style={styles.headerTitleBox}>
-                    <Text style={styles.headerTitle}>Physical Rooms</Text>
-                    <Text style={styles.headerSubtitle}>
-                        Property #{propertyId} • {rooms.length} Units Registered
-                    </Text>
-                </View>
-                <TouchableOpacity
-                    style={styles.addBtn}
-                    onPress={handleOpenCreate}
-                    activeOpacity={0.8}
-                >
-                    <Plus size={16} color={Colors.white} />
-                    <Text style={styles.addBtnText}>Add Room</Text>
-                </TouchableOpacity>
-            </View>
+        <RequireAuth role="partner">
+            <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+                <AppHeader
+                    title="Physical Rooms"
+                    subtitle={`Property #${propertyId} • ${rooms.length} Units Registered`}
+                    showBack
+                    fallbackRoute={`/(partner)/properties/${propertyId}/edit`}
+                    rightElement={
+                        <TouchableOpacity
+                            style={styles.addBtn}
+                            onPress={handleOpenCreate}
+                            activeOpacity={0.8}
+                        >
+                            <Plus size={16} color={Colors.white} />
+                            <Text style={styles.addBtnText}>Add Room</Text>
+                        </TouchableOpacity>
+                    }
+                />
 
             {/* Filter Tabs */}
             <View style={styles.filterBar}>
@@ -488,6 +508,12 @@ export default function PropertyRoomsScreen() {
                                 value={wingName}
                                 onChangeText={setWingName}
                             />
+                            <Input
+                                label="Building Name (Optional)"
+                                placeholder="e.g. Main Tower, Annex"
+                                value={buildingName}
+                                onChangeText={setBuildingName}
+                            />
 
                             <View style={{ marginTop: Spacing.lg }}>
                                 <Button
@@ -584,6 +610,7 @@ export default function PropertyRoomsScreen() {
                 </View>
             </Modal>
         </SafeAreaView>
+        </RequireAuth>
     );
 }
 

@@ -2,22 +2,24 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     RefreshControl,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { OwnerApi } from '../../../src/api/owner';
 import { Badge } from '../../../src/components/Badge';
+import { AppHeader } from '../../../src/components/AppHeader';
+import { RequireAuth } from '../../../src/components/RequireAuth';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 import { SettlementDetail } from '../../../src/api/types';
 import {
-    ArrowLeft,
+    AlertCircle,
     Calendar,
     CheckCircle2,
     Clock,
@@ -76,30 +78,25 @@ export default function SettlementDetailScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => router.back()}
-                    accessibilityLabel="Back to Settlements"
-                >
-                    <ArrowLeft size={22} color={Colors.textPrimary} />
-                </TouchableOpacity>
-                <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerTitle}>Settlement Statement</Text>
-                    <Text style={styles.headerSubtitle}>{reference}</Text>
-                </View>
-                {statement?.status && (
-                    <Badge
-                        variant={getStatusVariant(statement.status)}
-                        size="sm"
-                    >
-                        {statement.status_label ||
-                            statement.status.toUpperCase()}
-                    </Badge>
-                )}
-            </View>
+        <RequireAuth role="partner">
+            <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+                <AppHeader
+                    title="Settlement Statement"
+                    subtitle={reference}
+                    showBack
+                    fallbackRoute="/(partner)/settlements"
+                    rightElement={
+                        statement?.status ? (
+                            <Badge
+                                variant={getStatusVariant(statement.status)}
+                                size="sm"
+                            >
+                                {statement.status_label ||
+                                    statement.status.toUpperCase()}
+                            </Badge>
+                        ) : undefined
+                    }
+                />
 
             {loading ? (
                 <View style={styles.centered}>
@@ -159,6 +156,9 @@ export default function SettlementDetailScreen() {
                                 <Text style={styles.utrText}>
                                     Transfer ID / UTR:{' '}
                                     {statement.provider_transfer_id}
+                                    {statement.provider_status
+                                        ? ` (${statement.provider_status})`
+                                        : ''}
                                 </Text>
                             </View>
                         ) : (
@@ -170,10 +170,30 @@ export default function SettlementDetailScreen() {
                                         { color: Colors.warning },
                                     ]}
                                 >
-                                    Transfer processing via Razorpay Route
+                                    {statement.provider_status
+                                        ? `Provider Status: ${statement.provider_status}`
+                                        : 'Transfer processing via Razorpay Route'}
                                 </Text>
                             </View>
                         )}
+                        {statement.failure_reason ? (
+                            <View
+                                style={[
+                                    styles.utrRow,
+                                    { marginTop: Spacing.xs },
+                                ]}
+                            >
+                                <AlertCircle size={14} color={Colors.error} />
+                                <Text
+                                    style={[
+                                        styles.utrText,
+                                        { color: Colors.error },
+                                    ]}
+                                >
+                                    Reason: {statement.failure_reason}
+                                </Text>
+                            </View>
+                        ) : null}
                     </View>
 
                     {/* Financial Computation Breakdown */}
@@ -260,6 +280,7 @@ export default function SettlementDetailScreen() {
                         </View>
 
                         {(statement.refund_adjustments_minor || 0) +
+                            (statement.relocation_adjustments_minor || 0) +
                             (statement.other_adjustments_minor || 0) >
                             0 && (
                             <View style={styles.calcRow}>
@@ -276,6 +297,8 @@ export default function SettlementDetailScreen() {
                                     {(
                                         ((statement.refund_adjustments_minor ||
                                             0) +
+                                            (statement.relocation_adjustments_minor ||
+                                                0) +
                                             (statement.other_adjustments_minor ||
                                                 0)) /
                                         100
@@ -320,7 +343,20 @@ export default function SettlementDetailScreen() {
                             </Text>
                         ) : (
                             statement.items.map((item) => (
-                                <View key={item.id} style={styles.itemRow}>
+                                <TouchableOpacity
+                                    key={item.id}
+                                    style={styles.itemRow}
+                                    activeOpacity={
+                                        item.booking_reference ? 0.75 : 1
+                                    }
+                                    onPress={() => {
+                                        if (item.booking_reference) {
+                                            router.push(
+                                                `/(partner)/reservations/${item.booking_reference}` as any,
+                                            );
+                                        }
+                                    }}
+                                >
                                     <View style={styles.itemTop}>
                                         <Text style={styles.itemRef}>
                                             {item.booking_reference ||
@@ -329,8 +365,9 @@ export default function SettlementDetailScreen() {
                                         <Text style={styles.itemNet}>
                                             ₹
                                             {(
-                                                (item.net_payable_minor || 0) /
-                                                100
+                                                (item.net_settlement_amount_minor ??
+                                                    item.net_payable_minor ??
+                                                    0) / 100
                                             ).toLocaleString('en-IN', {
                                                 minimumFractionDigits: 2,
                                             })}
@@ -353,8 +390,9 @@ export default function SettlementDetailScreen() {
                                         <Text style={styles.itemSubText}>
                                             Gross: ₹
                                             {(
-                                                (item.gross_amount_minor || 0) /
-                                                100
+                                                (item.gross_booking_value_minor ??
+                                                    item.gross_amount_minor ??
+                                                    0) / 100
                                             ).toLocaleString('en-IN')}
                                         </Text>
                                         <Text style={styles.itemSubText}>
@@ -367,18 +405,20 @@ export default function SettlementDetailScreen() {
                                         <Text style={styles.itemSubText}>
                                             TDS: ₹
                                             {(
-                                                (item.tax_deduction_minor ||
+                                                (item.statutory_deductions_minor ??
+                                                    item.tax_deduction_minor ??
                                                     0) / 100
                                             ).toLocaleString('en-IN')}
                                         </Text>
                                     </View>
-                                </View>
+                                </TouchableOpacity>
                             ))
                         )}
                     </View>
                 </ScrollView>
             )}
         </SafeAreaView>
+        </RequireAuth>
     );
 }
 

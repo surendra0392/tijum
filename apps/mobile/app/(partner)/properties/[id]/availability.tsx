@@ -3,16 +3,18 @@ import {
     ActivityIndicator,
     Alert,
     FlatList,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     RefreshControl,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { OwnerApi } from '../../../../src/api/owner';
 import {
     PhysicalRoom,
@@ -22,11 +24,12 @@ import {
 import { Badge } from '../../../../src/components/Badge';
 import { Button } from '../../../../src/components/Button';
 import { Input } from '../../../../src/components/Input';
+import { AppHeader } from '../../../../src/components/AppHeader';
+import { RequireAuth } from '../../../../src/components/RequireAuth';
 import { Colors } from '../../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../../src/theme/spacing';
 import { Typography } from '../../../../src/theme/typography';
 import {
-    ArrowLeft,
     Calendar,
     CalendarOff,
     Lock,
@@ -34,8 +37,21 @@ import {
     X,
 } from 'lucide-react-native';
 
+const isValidCalendarDate = (dateStr: string): boolean => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+    if (!match) return false;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const d = new Date(Date.UTC(year, month - 1, day));
+    return (
+        d.getUTCFullYear() === year &&
+        d.getUTCMonth() === month - 1 &&
+        d.getUTCDate() === day
+    );
+};
+
 export default function PropertyAvailabilityScreen() {
-    const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
     const propertyId = Number(id);
 
@@ -109,8 +125,9 @@ export default function PropertyAvailabilityScreen() {
     };
 
     const handleOpenCreate = () => {
-        const today = new Date().toISOString().split('T')[0];
-        const nextWeek = new Date(Date.now() + 7 * 86400000)
+        const istNow = new Date(Date.now() + 5.5 * 3600000);
+        const today = istNow.toISOString().split('T')[0];
+        const nextWeek = new Date(istNow.getTime() + 7 * 86400000)
             .toISOString()
             .split('T')[0];
         setStartDate(today);
@@ -123,12 +140,43 @@ export default function PropertyAvailabilityScreen() {
 
     const handleCreateBlock = async () => {
         if (
-            !startDate.match(/^\d{4}-\d{2}-\d{2}$/) ||
-            !endDate.match(/^\d{4}-\d{2}-\d{2}$/)
+            !isValidCalendarDate(startDate.trim()) ||
+            !isValidCalendarDate(endDate.trim())
         ) {
             Alert.alert(
                 'Date Format Error',
-                'Please enter dates in YYYY-MM-DD format.',
+                'Please enter valid calendar dates in YYYY-MM-DD format.',
+            );
+            return;
+        }
+        const todayIst = new Date(Date.now() + 5.5 * 3600000)
+            .toISOString()
+            .split('T')[0];
+        if (startDate.trim() < todayIst) {
+            Alert.alert(
+                'Invalid Start Date',
+                'Start date cannot be in the past.',
+            );
+            return;
+        }
+        if (startDate.trim() > endDate.trim()) {
+            Alert.alert(
+                'Invalid Date Range',
+                'End date must be on or after the start date.',
+            );
+            return;
+        }
+        if (scope === 'room_type' && !selectedRoomTypeId) {
+            Alert.alert(
+                'Selection Required',
+                'Please select a target room category for this block.',
+            );
+            return;
+        }
+        if (scope === 'room' && !selectedRoomId) {
+            Alert.alert(
+                'Selection Required',
+                'Please select a target physical room for this block.',
             );
             return;
         }
@@ -279,34 +327,24 @@ export default function PropertyAvailabilityScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => router.back()}
-                    style={styles.backBtn}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                    <ArrowLeft size={22} color={Colors.deepPlum} />
-                </TouchableOpacity>
-                <View style={styles.headerTitleBox}>
-                    <Text style={styles.headerTitle}>
-                        Availability & Blocks
-                    </Text>
-                    <Text style={styles.headerSubtitle}>
-                        Property #{propertyId} •{' '}
-                        {blocks.filter((b) => b.is_active).length} Active Blocks
-                    </Text>
-                </View>
-                <TouchableOpacity
-                    style={styles.addBtn}
-                    onPress={handleOpenCreate}
-                    activeOpacity={0.8}
-                >
-                    <Plus size={16} color={Colors.white} />
-                    <Text style={styles.addBtnText}>Block</Text>
-                </TouchableOpacity>
-            </View>
+        <RequireAuth role="partner">
+            <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+                <AppHeader
+                    title="Availability & Blocks"
+                    subtitle={`Property #${propertyId} • ${blocks.filter((b) => b.is_active).length} Active Blocks`}
+                    showBack
+                    fallbackRoute={`/(partner)/properties/${propertyId}/edit`}
+                    rightElement={
+                        <TouchableOpacity
+                            style={styles.addBtn}
+                            onPress={handleOpenCreate}
+                            activeOpacity={0.8}
+                        >
+                            <Plus size={16} color={Colors.white} />
+                            <Text style={styles.addBtnText}>Block</Text>
+                        </TouchableOpacity>
+                    }
+                />
 
             {loading && !refreshing ? (
                 <View style={styles.center}>
@@ -357,7 +395,10 @@ export default function PropertyAvailabilityScreen() {
                 transparent
                 onRequestClose={() => setModalVisible(false)}
             >
-                <View style={styles.modalOverlay}>
+                <KeyboardAvoidingView
+                    style={styles.modalOverlay}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                >
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>
@@ -578,9 +619,10 @@ export default function PropertyAvailabilityScreen() {
                             </View>
                         </ScrollView>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
         </SafeAreaView>
+        </RequireAuth>
     );
 }
 

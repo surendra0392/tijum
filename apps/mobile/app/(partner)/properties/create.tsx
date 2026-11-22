@@ -4,7 +4,6 @@ import {
     Alert,
     KeyboardAvoidingView,
     Platform,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Switch,
@@ -12,12 +11,16 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { OwnerApi } from '../../../src/api/owner';
 import { City, OwnerReferenceData } from '../../../src/api/types';
 import { Button } from '../../../src/components/Button';
 import { Input } from '../../../src/components/Input';
+import { AppHeader } from '../../../src/components/AppHeader';
+import { RequireAuth } from '../../../src/components/RequireAuth';
 import { ExceptionalState } from '../../../src/components/ExceptionalState';
+import { useAuth } from '../../../src/auth/AuthContext';
 import {
     CANONICAL_CATEGORIES,
     CanonicalCategorySlug,
@@ -26,7 +29,6 @@ import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 import {
-    ArrowLeft,
     Building2,
     CheckCircle2,
     MapPin,
@@ -34,6 +36,8 @@ import {
 
 export default function CreatePropertyScreen() {
     const router = useRouter();
+    const { owner } = useAuth();
+    const canPublishProperties = Boolean(owner?.is_verified);
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [loadingRefData, setLoadingRefData] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -74,11 +78,21 @@ export default function CreatePropertyScreen() {
             setLoadingRefData(true);
             setReferenceError(null);
             const res = await OwnerApi.getReferenceData();
-            if (res.data) {
-                setRefData(res.data);
-                if (res.data.cities.length > 0) {
-                    setSelectedCityId(res.data.cities[0].id);
-                }
+            const cities = res.data?.cities || [];
+            const categories = res.data?.categories || [];
+
+            if (cities.length === 0 && categories.length === 0) {
+                throw new Error('Unable to load the property catalogue.');
+            }
+
+            setRefData({
+                ...res.data,
+                cities,
+                categories,
+                amenities: res.data?.amenities || [],
+            });
+            if (cities.length > 0) {
+                setSelectedCityId(cities[0].id);
             }
         } catch (loadError: unknown) {
             setRefData(null);
@@ -196,9 +210,21 @@ export default function CreatePropertyScreen() {
                     }
                 }
 
+                // Reset draft state cleanly
+                const createdName = res.data.name;
+                setName('');
+                setDescription('');
+                setLocality('');
+                setAddressLine1('');
+                setAddressLine2('');
+                setLandmark('');
+                setPostalCode('');
+                setDeclarationAccepted(false);
+                setStep(1);
+
                 Alert.alert(
                     'Draft Created',
-                    `Your property "${res.data.name}" has been registered as a draft. You can now add room types and pricing.`,
+                    `Your property "${createdName}" has been registered as a draft. You can now add room types and pricing.`,
                     [
                         {
                             text: 'OK',
@@ -221,57 +247,81 @@ export default function CreatePropertyScreen() {
 
     if (loadingRefData) {
         return (
-            <SafeAreaView style={styles.center}>
-                <ActivityIndicator size="large" color={Colors.deepPlum} />
-                <Text style={styles.loadingText}>Loading setup catalog...</Text>
-            </SafeAreaView>
+            <RequireAuth role="partner">
+                <SafeAreaView style={styles.center}>
+                    <ActivityIndicator size="large" color={Colors.deepPlum} />
+                    <Text style={styles.loadingText}>Loading setup catalog...</Text>
+                </SafeAreaView>
+            </RequireAuth>
         );
     }
 
     if (referenceError || !refData) {
         return (
-            <SafeAreaView style={styles.container}>
-                <ExceptionalState
-                    type="no-internet"
-                    title="Property Catalogue Unavailable"
-                    description={
-                        referenceError ??
-                        'The property catalogue could not be loaded.'
-                    }
-                    actionLabel="Try Again"
-                    onAction={loadReferenceData}
-                />
-            </SafeAreaView>
+            <RequireAuth role="partner">
+                <SafeAreaView style={styles.container}>
+                    <AppHeader
+                        title="Add New Stay"
+                        showBack
+                        fallbackRoute="/(partner)/properties"
+                    />
+                    <ExceptionalState
+                        type="no-internet"
+                        title="Property Catalogue Unavailable"
+                        description={
+                            referenceError ??
+                            'The property catalogue could not be loaded.'
+                        }
+                        actionLabel="Try Again"
+                        onAction={loadReferenceData}
+                    />
+                </SafeAreaView>
+            </RequireAuth>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                style={{ flex: 1 }}
-            >
-                {/* Header with Steps */}
-                <View style={styles.header}>
-                    <TouchableOpacity
-                        onPress={handleBack}
-                        style={styles.backBtn}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                        <ArrowLeft size={22} color={Colors.deepPlum} />
-                    </TouchableOpacity>
-                    <View style={styles.headerTitleBox}>
-                        <Text style={styles.headerTitle}>Add New Stay</Text>
-                        <Text style={styles.headerSubtitle}>
-                            Step {step} of 3:{' '}
-                            {step === 1
+        <RequireAuth role="partner">
+            <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={{ flex: 1 }}
+                >
+                    <AppHeader
+                        title="Add New Stay"
+                        subtitle={`Step ${step} of 3: ${
+                            step === 1
                                 ? 'Basic Information'
                                 : step === 2
                                   ? 'Location & Address'
-                                  : 'Meals & Finalize'}
-                        </Text>
-                    </View>
-                </View>
+                                  : 'Meals & Finalize'
+                        }`}
+                        showBack
+                        onBack={handleBack}
+                        fallbackRoute="/(partner)/properties"
+                    />
+
+                    {!canPublishProperties && (
+                        <View
+                            style={{
+                                backgroundColor: Colors.peachCream,
+                                paddingHorizontal: Spacing.base,
+                                paddingVertical: Spacing.sm,
+                                borderBottomWidth: 1,
+                                borderBottomColor: Colors.border,
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    fontSize: Typography.fontSize.xs,
+                                    color: Colors.deepPlum,
+                                    fontWeight: '600',
+                                }}
+                            >
+                                Note: Your property will be saved as a draft. Complete partner KYC & verification before live publishing.
+                            </Text>
+                        </View>
+                    )}
 
                 {/* Step Progress Bar */}
                 <View style={styles.progressBar}>
@@ -658,6 +708,7 @@ export default function CreatePropertyScreen() {
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>
+        </RequireAuth>
     );
 }
 

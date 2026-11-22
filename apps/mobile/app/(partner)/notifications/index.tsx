@@ -6,11 +6,18 @@ import {
     TouchableOpacity,
     StyleSheet,
     ActivityIndicator,
+    Alert,
     RefreshControl,
-    SafeAreaView,
+    Switch,
 } from 'react-native';
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { OwnerApi } from '../../../src/api/owner';
 import { NotificationItem } from '../../../src/api/types';
+import { PushNotificationService } from '../../../src/notifications/PushNotificationService';
 import { Colors } from '../../../src/theme/colors';
 import { Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
@@ -23,12 +30,19 @@ import { resolveDeepLinkPath } from '../../../src/utils/deepLinkRouting';
 
 export default function PartnerNotificationsScreen() {
     const router = useRouter();
-    const { token, authState, isLoading: authLoading } = useAuth();
+    const insets = useSafeAreaInsets();
+    const isFocused = useIsFocused();
+    const { token, authState, isLoading: authLoading, sessionEpoch } = useAuth();
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [isUnauthenticated, setIsUnauthenticated] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [pushActive, setPushActive] = useState(true);
+
+    useEffect(() => {
+        setNotifications([]);
+    }, [sessionEpoch]);
 
     useEffect(() => {
         if (authLoading) return;
@@ -43,8 +57,55 @@ export default function PartnerNotificationsScreen() {
             return;
         }
         setIsUnauthenticated(false);
-        void loadNotifications();
-    }, [token, authState, authLoading]);
+        if (isFocused) {
+            void loadNotifications();
+            void loadPreferences();
+        }
+    }, [token, authState, authLoading, isFocused]);
+
+    const loadPreferences = async () => {
+        try {
+            const res = await OwnerApi.getNotificationPreferences();
+            const d = res?.data;
+            if (d) {
+                setPushActive(
+                    d.push_operational ?? d.channels?.push?.enabled ?? true,
+                );
+            }
+        } catch {
+            // Non-blocking
+        }
+    };
+
+    const handleTogglePush = async (val: boolean) => {
+        if (val) {
+            const granted =
+                await PushNotificationService.requestInitialPermissionsOnInstall();
+            if (!granted) {
+                Alert.alert(
+                    'Notifications Not Enabled',
+                    'Allow notifications in system settings before enabling partner push alerts.',
+                );
+                return;
+            }
+            await PushNotificationService.registerForPushNotifications(
+                'partner',
+            );
+        }
+        const prev = pushActive;
+        setPushActive(val);
+        try {
+            await OwnerApi.updateNotificationPreferences({
+                push_operational: val,
+            });
+        } catch {
+            setPushActive(prev);
+            Alert.alert(
+                'Preferences Not Saved',
+                'Could not update push notification setting.',
+            );
+        }
+    };
 
     const loadNotifications = async () => {
         if (
@@ -124,18 +185,25 @@ export default function PartnerNotificationsScreen() {
         item: NotificationItem,
     ): string | null => {
         const reference = item.related_reference;
-        if (reference && item.template_code.includes('reservation')) {
+        const code = (item.template_code || '').toLowerCase();
+        if (code.startsWith('customer.')) {
+            return null;
+        }
+        if (reference && code.includes('reservation')) {
             return `/(partner)/reservations/${reference}`;
         }
-        if (reference && item.template_code.includes('settlement')) {
+        if (reference && code.includes('settlement')) {
             return `/(partner)/settlements/${reference}`;
         }
-        if (reference && item.template_code.includes('case')) {
+        if (reference && code.includes('case')) {
             return `/(partner)/cases/${reference}`;
+        }
+        if (code.includes('review')) {
+            return '/(partner)/reviews';
         }
         if (item.action_url) {
             const target = resolveDeepLinkPath(item.action_url);
-            return target === '/' ? null : target;
+            return target.startsWith('/(partner)') ? target : null;
         }
 
         return null;
@@ -188,11 +256,13 @@ export default function PartnerNotificationsScreen() {
         (isUnauthenticated || !token || authState !== 'owner_authenticated')
     ) {
         return (
-            <SafeAreaView style={styles.container}>
+            <SafeAreaView style={styles.container} edges={['bottom']}>
                 <AppHeader
                     title="Partner Alerts"
                     subtitle="Operations, arrivals & settlement updates"
                     variant="plum"
+                    showBack
+                    fallbackRoute="/(partner)/dashboard"
                 />
                 <ExceptionalState
                     type="auth-required"
@@ -208,11 +278,13 @@ export default function PartnerNotificationsScreen() {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['bottom']}>
             <AppHeader
                 title="Partner Alerts"
                 subtitle="Operations, arrivals & settlement updates"
                 variant="plum"
+                showBack
+                fallbackRoute="/(partner)/dashboard"
                 rightAction={
                     <TouchableOpacity
                         accessibilityLabel="Mark all notifications as read"
@@ -273,6 +345,26 @@ export default function PartnerNotificationsScreen() {
                     }
                 />
             )}
+
+            <View
+                style={[
+                    styles.bottomBar,
+                    { paddingBottom: Math.max(insets.bottom, 14) },
+                ]}
+            >
+                <Text style={styles.bottomBarText}>
+                    Enable Partner Push Alerts
+                </Text>
+                <Switch
+                    value={pushActive}
+                    onValueChange={handleTogglePush}
+                    trackColor={{
+                        false: Colors.gray300,
+                        true: Colors.deepPlum,
+                    }}
+                    thumbColor={Colors.white}
+                />
+            </View>
         </SafeAreaView>
     );
 }
@@ -282,15 +374,32 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: Colors.warmOffWhite,
     },
+    bottomBar: {
+        backgroundColor: Colors.white,
+        paddingHorizontal: Spacing.lg,
+        paddingTop: 14,
+        borderTopWidth: 1,
+        borderTopColor: Colors.gray200,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    bottomBarText: {
+        ...Typography.labelMedium,
+        color: Colors.deepPlum,
+        fontWeight: '700',
+    },
     headerMarkReadBtn: {
-        paddingHorizontal: 10,
-        paddingVertical: 5,
+        minHeight: 44,
+        justifyContent: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
         backgroundColor: 'rgba(255, 255, 255, 0.15)',
         borderRadius: 20,
     },
     headerMarkReadText: {
         fontSize: 11,
-        color: Colors.coral,
+        color: Colors.softPeach,
         fontWeight: '700',
     },
     listContent: {

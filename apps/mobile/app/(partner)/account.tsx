@@ -1,14 +1,21 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
     Modal,
-    SafeAreaView,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import {
     Landmark,
@@ -24,23 +31,207 @@ import {
     X,
     User,
     Building2,
+    Lock,
+    Laptop,
+    ShieldAlert,
+    Star,
 } from 'lucide-react-native';
 import { useAuth } from '../../src/auth/AuthContext';
+import { OwnerApi } from '../../src/api/owner';
+import { MobileSessionToken, OwnerProfile } from '../../src/api/types';
+import { Button } from '../../src/components/Button';
 import { ExceptionalState } from '../../src/components/ExceptionalState';
+import { Input } from '../../src/components/Input';
 import { Colors } from '../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../src/theme/spacing';
 
 export default function PartnerAccountScreen() {
     const router = useRouter();
-    const { owner, token, authState, logout } = useAuth();
+    const insets = useSafeAreaInsets();
+    const isFocused = useIsFocused();
+    const { owner, token, authState, logout, refreshProfile, sessionEpoch } =
+        useAuth();
     const [roleModalVisible, setRoleModalVisible] = useState(false);
     const [selectedRole, setSelectedRole] = useState<'customer' | 'owner'>(
         'owner',
     );
+    const [profile, setProfile] = useState<OwnerProfile | null>(null);
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    // Edit Profile Modal
+    const [editProfileVisible, setEditProfileVisible] = useState(false);
+    const [editName, setEditName] = useState(owner?.name ?? '');
+    const [editPhone, setEditPhone] = useState(owner?.phone ?? '');
+    const [savingProfile, setSavingProfile] = useState(false);
+    const [profileError, setProfileError] = useState('');
+
+    // Change Password Modal
+    const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [savingPassword, setSavingPassword] = useState(false);
+    const [passwordError, setPasswordError] = useState('');
+
+    // Active Sessions Modal
+    const [sessionsModalVisible, setSessionsModalVisible] = useState(false);
+    const [tokens, setTokens] = useState<MobileSessionToken[]>([]);
+    const [tokensLoading, setTokensLoading] = useState(false);
+    const [revokingAll, setRevokingAll] = useState(false);
 
     const isGuest = !token || authState !== 'owner_authenticated';
-    const partnerName = isGuest ? 'Partner' : owner?.name || '—';
-    const partnerId = isGuest ? '—' : String(owner?.id ?? '—');
+
+    useEffect(() => {
+        setProfile(null);
+        setUnreadCount(0);
+        setTokens([]);
+    }, [sessionEpoch]);
+
+    const loadPartnerAccount = useCallback(async () => {
+        if (isGuest) return;
+        try {
+            const [profileRes, unreadRes] = await Promise.all([
+                OwnerApi.getProfile().catch(() => null),
+                OwnerApi.getUnreadCount().catch(() => null),
+            ]);
+            if (profileRes?.data) {
+                setProfile(profileRes.data);
+                setEditName(profileRes.data.name || '');
+                setEditPhone(profileRes.data.phone || '');
+            }
+            if (typeof unreadRes?.data?.unread_count === 'number') {
+                setUnreadCount(unreadRes.data.unread_count);
+            }
+        } catch {
+            // Keep cached profile
+        }
+    }, [isGuest]);
+
+    useEffect(() => {
+        if (isFocused && !isGuest) {
+            void loadPartnerAccount();
+        }
+    }, [isFocused, isGuest, loadPartnerAccount]);
+
+    const loadTokens = async () => {
+        try {
+            setTokensLoading(true);
+            const res = await OwnerApi.getTokens();
+            setTokens(Array.isArray(res.data) ? res.data : []);
+        } catch {
+            setTokens([]);
+        } finally {
+            setTokensLoading(false);
+        }
+    };
+
+    const handleOpenEditProfile = () => {
+        setEditName(profile?.name || owner?.name || '');
+        setEditPhone(profile?.phone || owner?.phone || '');
+        setProfileError('');
+        setEditProfileVisible(true);
+    };
+
+    const handleSaveProfile = async () => {
+        if (editName.trim().length < 2) {
+            setProfileError('Please enter your full name.');
+            return;
+        }
+        try {
+            setSavingProfile(true);
+            setProfileError('');
+            await OwnerApi.updateProfile({
+                name: editName.trim(),
+                phone: editPhone.trim() || undefined,
+            });
+            await refreshProfile().catch(() => {});
+            await loadPartnerAccount();
+            setEditProfileVisible(false);
+            Alert.alert('Profile Updated', 'Partner profile saved.');
+        } catch (err: any) {
+            setProfileError(
+                err?.message || 'Could not update partner profile.',
+            );
+        } finally {
+            setSavingProfile(false);
+        }
+    };
+
+    const handleSavePassword = async () => {
+        if (!currentPassword.trim()) {
+            setPasswordError('Please enter your current password.');
+            return;
+        }
+        if (newPassword.length < 8) {
+            setPasswordError('Your new password must be at least 8 characters.');
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            setPasswordError('The new passwords do not match.');
+            return;
+        }
+        try {
+            setSavingPassword(true);
+            setPasswordError('');
+            await OwnerApi.changePassword({
+                current_password: currentPassword,
+                password: newPassword,
+                password_confirmation: confirmPassword,
+            });
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+            setPasswordModalVisible(false);
+            Alert.alert(
+                'Password Updated',
+                'Your partner password has been updated. Other sessions have been signed out.',
+            );
+        } catch (err: any) {
+            setPasswordError(err?.message || 'Could not update password.');
+        } finally {
+            setSavingPassword(false);
+        }
+    };
+
+    const handleRevokeAllDevices = () => {
+        Alert.alert(
+            'Sign Out All Devices?',
+            'All active partner sessions (including this device) will be signed out immediately.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Sign Out All',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setRevokingAll(true);
+                            await OwnerApi.revokeAllTokens();
+                            setSessionsModalVisible(false);
+                            await logout();
+                            router.replace('/(auth)/owner-login');
+                        } catch (err: any) {
+                            Alert.alert(
+                                'Error',
+                                err?.message || 'Could not revoke sessions.',
+                            );
+                        } finally {
+                            setRevokingAll(false);
+                        }
+                    },
+                },
+            ],
+        );
+    };
+
+    const partnerName = isGuest
+        ? 'Partner'
+        : profile?.name || owner?.name || '—';
+    const partnerEmail = isGuest ? '' : profile?.email || owner?.email || '';
+    const partnerId = isGuest
+        ? '—'
+        : String(profile?.id ?? owner?.id ?? '—');
+    const partnerStatusLabel =
+        profile?.status_label || owner?.status_label || 'Active';
 
     const handleSwitchRole = async () => {
         setRoleModalVisible(false);
@@ -70,8 +261,13 @@ export default function PartnerAccountScreen() {
 
     if (!token || authState !== 'owner_authenticated') {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.plumHeader}>
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <View
+                    style={[
+                        styles.plumHeader,
+                        { paddingTop: Math.max(insets.top, Spacing.sm) },
+                    ]}
+                >
                     <Text style={styles.headerTitle}>Partner Account</Text>
                 </View>
                 <ExceptionalState
@@ -86,23 +282,63 @@ export default function PartnerAccountScreen() {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['bottom']}>
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
             >
                 {/* Curved Deep Plum Header */}
-                <View style={styles.plumHeader}>
+                <View
+                    style={[
+                        styles.plumHeader,
+                        { paddingTop: Math.max(insets.top, Spacing.sm) },
+                    ]}
+                >
                     <View style={styles.headerTopRow}>
-                        <View style={{ width: 24 }} />
+                        <View style={{ width: 44 }} />
                         <Text style={styles.headerTitle}>Profile</Text>
                         <TouchableOpacity
+                            style={{
+                                width: 44,
+                                height: 44,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                position: 'relative',
+                            }}
                             onPress={() =>
                                 router.push('/(partner)/notifications')
                             }
                             activeOpacity={0.8}
+                            accessibilityRole="button"
+                            accessibilityLabel="Open partner notifications"
                         >
                             <Bell size={22} color={Colors.white} />
+                            {unreadCount > 0 ? (
+                                <View
+                                    style={{
+                                        position: 'absolute',
+                                        top: 4,
+                                        right: 4,
+                                        minWidth: 18,
+                                        height: 18,
+                                        borderRadius: 9,
+                                        backgroundColor: Colors.coral,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        paddingHorizontal: 4,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            color: Colors.deepPlum,
+                                            fontSize: 10,
+                                            fontWeight: '800',
+                                        }}
+                                    >
+                                        {unreadCount > 99 ? '99+' : unreadCount}
+                                    </Text>
+                                </View>
+                            ) : null}
                         </TouchableOpacity>
                     </View>
 
@@ -112,20 +348,37 @@ export default function PartnerAccountScreen() {
                             <View style={styles.avatarImg}>
                                 <User size={38} color={Colors.deepPlum} />
                             </View>
-                            <View style={styles.editAvatarBadge}>
+                            <TouchableOpacity
+                                style={styles.editAvatarBadge}
+                                hitSlop={{
+                                    top: 10,
+                                    bottom: 10,
+                                    left: 10,
+                                    right: 10,
+                                }}
+                                onPress={handleOpenEditProfile}
+                                accessibilityRole="button"
+                                accessibilityLabel="Edit partner profile"
+                            >
                                 <Edit3 size={11} color={Colors.white} />
-                            </View>
+                            </TouchableOpacity>
                         </View>
 
                         <Text style={styles.userName}>{partnerName}</Text>
-                        <Text style={styles.partnerIdText}>
-                            Partner ID: {partnerId}
-                        </Text>
+                        {partnerEmail ? (
+                            <Text style={styles.partnerIdText}>
+                                {partnerEmail} • Partner ID: {partnerId}
+                            </Text>
+                        ) : (
+                            <Text style={styles.partnerIdText}>
+                                Partner ID: {partnerId}
+                            </Text>
+                        )}
 
                         {!isGuest && (
                             <View style={styles.guestNoticeBadge}>
                                 <Text style={styles.guestNoticeText}>
-                                    Active
+                                    {partnerStatusLabel}
                                 </Text>
                             </View>
                         )}
@@ -134,18 +387,16 @@ export default function PartnerAccountScreen() {
 
                 {/* Menu List */}
                 <View style={styles.menuCard}>
-                    {/* 1. Bank Details */}
                     <TouchableOpacity
                         style={styles.menuItem}
-                        onPress={() =>
-                            router.push('/(partner)/financial-profile')
-                        }
+                        onPress={handleOpenEditProfile}
                         activeOpacity={0.7}
+                        accessibilityRole="button"
                     >
                         <View style={styles.menuItemLeft}>
-                            <Landmark size={18} color={Colors.deepPlum} />
+                            <User size={18} color={Colors.deepPlum} />
                             <Text style={styles.menuItemLabel}>
-                                Bank Details
+                                Edit Partner Profile
                             </Text>
                         </View>
                         <ChevronRight size={16} color={Colors.gray400} />
@@ -153,7 +404,67 @@ export default function PartnerAccountScreen() {
 
                     <View style={styles.menuDivider} />
 
-                    {/* 2. Tax Information */}
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => {
+                            setPasswordError('');
+                            setPasswordModalVisible(true);
+                        }}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                    >
+                        <View style={styles.menuItemLeft}>
+                            <Lock size={18} color={Colors.deepPlum} />
+                            <Text style={styles.menuItemLabel}>
+                                Change Password
+                            </Text>
+                        </View>
+                        <ChevronRight size={16} color={Colors.gray400} />
+                    </TouchableOpacity>
+
+                    <View style={styles.menuDivider} />
+
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => {
+                            setSessionsModalVisible(true);
+                            void loadTokens();
+                        }}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                    >
+                        <View style={styles.menuItemLeft}>
+                            <Laptop size={18} color={Colors.deepPlum} />
+                            <Text style={styles.menuItemLabel}>
+                                Active Device Sessions
+                            </Text>
+                        </View>
+                        <ChevronRight size={16} color={Colors.gray400} />
+                    </TouchableOpacity>
+
+                    <View style={styles.menuDivider} />
+
+                    {/* 1. Bank Details & Tax Information */}
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() =>
+                            router.push('/(partner)/financial-profile')
+                        }
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                    >
+                        <View style={styles.menuItemLeft}>
+                            <Landmark size={18} color={Colors.deepPlum} />
+                            <Text style={styles.menuItemLabel}>
+                                Bank & Tax Information (KYC)
+                            </Text>
+                        </View>
+                        <ChevronRight size={16} color={Colors.gray400} />
+                    </TouchableOpacity>
+
+                    <View style={styles.menuDivider} />
+
+                    {/* 2. Commission Agreements */}
                     <TouchableOpacity
                         style={styles.menuItem}
                         onPress={() =>
@@ -162,11 +473,46 @@ export default function PartnerAccountScreen() {
                             )
                         }
                         activeOpacity={0.7}
+                        accessibilityRole="button"
                     >
                         <View style={styles.menuItemLeft}>
                             <FileText size={18} color={Colors.deepPlum} />
                             <Text style={styles.menuItemLabel}>
-                                Tax Information
+                                Commission Agreements
+                            </Text>
+                        </View>
+                        <ChevronRight size={16} color={Colors.gray400} />
+                    </TouchableOpacity>
+
+                    <View style={styles.menuDivider} />
+
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => router.push('/(partner)/cases')}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                    >
+                        <View style={styles.menuItemLeft}>
+                            <ShieldAlert size={18} color={Colors.coralDark} />
+                            <Text style={styles.menuItemLabel}>
+                                Support & Protection Cases
+                            </Text>
+                        </View>
+                        <ChevronRight size={16} color={Colors.gray400} />
+                    </TouchableOpacity>
+
+                    <View style={styles.menuDivider} />
+
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => router.push('/(partner)/reviews')}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                    >
+                        <View style={styles.menuItemLeft}>
+                            <Star size={18} color={Colors.amber} />
+                            <Text style={styles.menuItemLabel}>
+                                Guest Reviews
                             </Text>
                         </View>
                         <ChevronRight size={16} color={Colors.gray400} />
@@ -179,16 +525,23 @@ export default function PartnerAccountScreen() {
                         style={styles.menuItem}
                         onPress={() => router.push('/(partner)/notifications')}
                         activeOpacity={0.7}
+                        accessibilityRole="button"
                     >
                         <View style={styles.menuItemLeft}>
-                            <Bell size={18} color={Colors.coral} />
+                            <Bell size={18} color={Colors.coralDark} />
                             <Text style={styles.menuItemLabel}>
                                 Notifications
                             </Text>
                         </View>
-                        <View style={styles.badgeCountPill}>
-                            <Text style={styles.badgeCountText}>{0}</Text>
-                        </View>
+                        {unreadCount > 0 ? (
+                            <View style={styles.badgeCountPill}>
+                                <Text style={styles.badgeCountText}>
+                                    {unreadCount}
+                                </Text>
+                            </View>
+                        ) : (
+                            <ChevronRight size={16} color={Colors.gray400} />
+                        )}
                     </TouchableOpacity>
 
                     <View style={styles.menuDivider} />
@@ -401,6 +754,178 @@ export default function PartnerAccountScreen() {
                         <Text style={styles.roleFooterNote}>
                             You can switch roles anytime from your profile.
                         </Text>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Edit Partner Profile Modal */}
+            <Modal
+                visible={editProfileVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setEditProfileVisible(false)}
+            >
+                <KeyboardAvoidingView
+                    style={styles.modalOverlay}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                >
+                    <View style={styles.roleModalContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Edit Partner Profile</Text>
+                            <TouchableOpacity
+                                onPress={() => setEditProfileVisible(false)}
+                                accessibilityRole="button"
+                                accessibilityLabel="Close edit profile modal"
+                            >
+                                <X size={20} color={Colors.inkSecondary} />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            {profileError ? (
+                                <Text style={[styles.roleCardDesc, { color: Colors.coral, marginBottom: Spacing.sm }]}>
+                                    {profileError}
+                                </Text>
+                            ) : null}
+                            <Input
+                                label="Full Name *"
+                                value={editName}
+                                onChangeText={setEditName}
+                                placeholder="Owner / Authorized Signatory Name"
+                            />
+                            <Input
+                                label="Phone Number"
+                                value={editPhone}
+                                onChangeText={setEditPhone}
+                                keyboardType="phone-pad"
+                                placeholder="10-digit mobile number"
+                            />
+                            <Button
+                                title="Save Partner Profile"
+                                onPress={handleSaveProfile}
+                                loading={savingProfile}
+                                fullWidth
+                            />
+                        </ScrollView>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+
+            {/* Change Password Modal */}
+            <Modal
+                visible={passwordModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setPasswordModalVisible(false)}
+            >
+                <KeyboardAvoidingView
+                    style={styles.modalOverlay}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                >
+                    <View style={styles.roleModalContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Change Password</Text>
+                            <TouchableOpacity
+                                onPress={() => setPasswordModalVisible(false)}
+                                accessibilityRole="button"
+                                accessibilityLabel="Close change password modal"
+                            >
+                                <X size={20} color={Colors.inkSecondary} />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            {passwordError ? (
+                                <Text style={[styles.roleCardDesc, { color: Colors.coral, marginBottom: Spacing.sm }]}>
+                                    {passwordError}
+                                </Text>
+                            ) : null}
+                            <Input
+                                label="Current Password *"
+                                value={currentPassword}
+                                onChangeText={setCurrentPassword}
+                                secureTextEntry
+                                placeholder="Enter current password"
+                            />
+                            <Input
+                                label="New Password *"
+                                value={newPassword}
+                                onChangeText={setNewPassword}
+                                secureTextEntry
+                                placeholder="At least 8 characters"
+                            />
+                            <Input
+                                label="Confirm New Password *"
+                                value={confirmPassword}
+                                onChangeText={setConfirmPassword}
+                                secureTextEntry
+                                placeholder="Repeat new password"
+                            />
+                            <Button
+                                title="Update Password"
+                                onPress={handleSavePassword}
+                                loading={savingPassword}
+                                fullWidth
+                            />
+                        </ScrollView>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+
+            {/* Active Device Sessions Modal */}
+            <Modal
+                visible={sessionsModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setSessionsModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.roleModalContainer}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Active Device Sessions</Text>
+                            <TouchableOpacity
+                                onPress={() => setSessionsModalVisible(false)}
+                                accessibilityRole="button"
+                                accessibilityLabel="Close device sessions modal"
+                            >
+                                <X size={20} color={Colors.inkSecondary} />
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={[styles.roleCardDesc, { marginBottom: Spacing.md }]}>
+                            Manage mobile devices and active sessions authenticated on your partner account.
+                        </Text>
+                        <ScrollView style={{ maxHeight: 240 }} showsVerticalScrollIndicator={false}>
+                            {tokensLoading ? (
+                                <ActivityIndicator size="small" color={Colors.deepPlum} />
+                            ) : tokens.length === 0 ? (
+                                <Text style={[styles.roleCardDesc, { textAlign: 'center', paddingVertical: Spacing.md }]}>
+                                    No active device sessions found.
+                                </Text>
+                            ) : (
+                                tokens.map((tok: MobileSessionToken) => (
+                                    <View key={tok.id} style={styles.roleCard}>
+                                        <View style={styles.roleIconCircle}>
+                                            <Laptop size={18} color={Colors.deepPlum} />
+                                        </View>
+                                        <View style={{ flex: 1, marginLeft: 12 }}>
+                                            <Text style={styles.roleCardTitle}>
+                                                {tok.name || 'Partner Device Session'}
+                                            </Text>
+                                            <Text style={styles.roleCardDesc}>
+                                                {tok.is_current ? 'Current Session' : 'Other Device'}
+                                                {tok.last_used_at ? ` • ${tok.last_used_at}` : ''}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                ))
+                            )}
+                        </ScrollView>
+                        <Button
+                            title="Sign Out All Registered Devices"
+                            variant="outline"
+                            onPress={handleRevokeAllDevices}
+                            loading={revokingAll}
+                            fullWidth
+                            style={{ marginTop: Spacing.sm }}
+                        />
                     </View>
                 </View>
             </Modal>

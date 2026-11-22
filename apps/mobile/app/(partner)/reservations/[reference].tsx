@@ -2,14 +2,16 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
     Modal,
-    SafeAreaView,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { OwnerApi } from '../../../src/api/owner';
 import { PhysicalRoom, Reservation } from '../../../src/api/types';
@@ -21,6 +23,8 @@ import { StayTimingBadge } from '../../../src/components/StayTimingBadge';
 import { MealBadge } from '../../../src/components/MealBadge';
 import { Button } from '../../../src/components/Button';
 import { Input } from '../../../src/components/Input';
+import { AppHeader } from '../../../src/components/AppHeader';
+import { RequireAuth } from '../../../src/components/RequireAuth';
 import {
     AlertCircle,
     Check,
@@ -79,7 +83,7 @@ export default function PartnerReservationDetailScreen() {
         }
     };
 
-    const handleCheckIn = async () => {
+    const executeCheckIn = async () => {
         if (!reservation) return;
         try {
             setActionLoading(true);
@@ -107,7 +111,19 @@ export default function PartnerReservationDetailScreen() {
         }
     };
 
-    const handleCheckOut = async () => {
+    const handleCheckIn = () => {
+        if (!reservation) return;
+        Alert.alert(
+            'Confirm Guest Check-In',
+            `Record front-desk arrival and key handover for ${reservation.customer_name || 'Guest'}?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Confirm Check-In', onPress: () => void executeCheckIn() },
+            ],
+        );
+    };
+
+    const executeCheckOut = async () => {
         if (!reservation) return;
         try {
             setActionLoading(true);
@@ -135,10 +151,26 @@ export default function PartnerReservationDetailScreen() {
         }
     };
 
+    const handleCheckOut = () => {
+        if (!reservation) return;
+        Alert.alert(
+            'Confirm Guest Checkout',
+            `Finalize guest departure and release room for turnover?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Confirm Checkout', onPress: () => void executeCheckOut() },
+            ],
+        );
+    };
+
     const openAllocateModal = async () => {
         if (!reservation) return;
         setShowAllocateModal(true);
-        setSelectedRoomId(reservation.physical_room_id || null);
+        const existingRoomId =
+            reservation.physical_room_id ||
+            reservation.allocations?.[0]?.property_room_id ||
+            null;
+        setSelectedRoomId(existingRoomId);
         setAllocateError('');
 
         const propId =
@@ -157,9 +189,15 @@ export default function PartnerReservationDetailScreen() {
             setLoadingRooms(true);
             const res = await OwnerApi.getPropertyRooms(propId);
             if (res.data) {
-                // Prioritize active rooms matching the reservation room type
+                // Filter out inactive or maintenance rooms and prioritize matching room type
+                const activeRooms = res.data.filter(
+                    (r) =>
+                        r.is_active !== false &&
+                        r.operational_status !== 'maintenance' &&
+                        r.operational_status !== 'inactive',
+                );
                 const targetRoomTypeId = reservation.property_room_type_id;
-                const sorted = [...res.data].sort((a, b) => {
+                const sorted = [...activeRooms].sort((a, b) => {
                     if (targetRoomTypeId) {
                         const aMatch =
                             a.property_room_type_id === targetRoomTypeId
@@ -238,25 +276,29 @@ export default function PartnerReservationDetailScreen() {
 
     if (loading) {
         return (
-            <View style={styles.center}>
-                <ActivityIndicator size="large" color={Colors.deepPlum} />
-                <Text style={styles.loadingText}>Loading booking info...</Text>
-            </View>
+            <RequireAuth role="partner">
+                <SafeAreaView style={styles.center}>
+                    <ActivityIndicator size="large" color={Colors.deepPlum} />
+                    <Text style={styles.loadingText}>Loading booking info...</Text>
+                </SafeAreaView>
+            </RequireAuth>
         );
     }
 
     if (!reservation) {
         return (
-            <View style={styles.center}>
-                <Text style={styles.errorText}>
-                    Reservation record not found.
-                </Text>
-                <Button
-                    title="Go Back"
-                    onPress={() => router.back()}
-                    style={{ marginTop: Spacing.md }}
-                />
-            </View>
+            <RequireAuth role="partner">
+                <SafeAreaView style={styles.center}>
+                    <Text style={styles.errorText}>
+                        Reservation record not found.
+                    </Text>
+                    <Button
+                        title="Go Back"
+                        onPress={() => router.back()}
+                        style={{ marginTop: Spacing.md }}
+                    />
+                </SafeAreaView>
+            </RequireAuth>
         );
     }
 
@@ -267,10 +309,39 @@ export default function PartnerReservationDetailScreen() {
     const isCheckedOut = Boolean(
         reservation.is_checked_out || reservation.checked_out_at,
     );
+    const assignedRoomNum =
+        reservation.primary_room_number ||
+        reservation.allocated_room_number ||
+        reservation.allocations?.[0]?.room_number ||
+        reservation.physical_room?.room_number;
+    const assignedFloor =
+        reservation.allocated_floor ??
+        reservation.allocations?.[0]?.floor_number ??
+        reservation.physical_room?.floor_number ??
+        reservation.physical_room?.floor;
+    const isRoomAllocated = Boolean(
+        reservation.is_allocated ||
+            assignedRoomNum ||
+            reservation.physical_room ||
+            reservation.physical_room_id,
+    );
 
     return (
-        <SafeAreaView style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+        <RequireAuth role="partner">
+            <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+                <AppHeader
+                    title="Booking Review"
+                    subtitle={
+                        reservation.reference || reservation.booking_reference
+                    }
+                    showBack
+                    fallbackRoute="/(partner)/reservations"
+                />
+                <KeyboardAvoidingView
+                    style={{ flex: 1 }}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                >
+                    <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={styles.contentPadding}>
                     {/* Header */}
                     <View style={styles.rowBetween}>
@@ -395,8 +466,7 @@ export default function PartnerReservationDetailScreen() {
                                     </Text>
                                 </View>
                             ) : null}
-                            {reservation.allocated_room_number ||
-                            reservation.physical_room ? (
+                            {isRoomAllocated ? (
                                 <View style={styles.infoRow}>
                                     <Text style={styles.infoLabel}>
                                         Assigned Room:
@@ -410,15 +480,23 @@ export default function PartnerReservationDetailScreen() {
                                             },
                                         ]}
                                     >
-                                        Room #
-                                        {reservation.allocated_room_number ||
-                                            reservation.physical_room
-                                                ?.room_number}{' '}
-                                        (Floor{' '}
-                                        {reservation.allocated_floor ??
-                                            reservation.physical_room?.floor ??
-                                            'Main'}
-                                        )
+                                        Room #{assignedRoomNum}{' '}
+                                        (Floor {assignedFloor ?? 'Main'})
+                                    </Text>
+                                </View>
+                            ) : null}
+                            {reservation.cancellation_reason ? (
+                                <View style={styles.infoRow}>
+                                    <Text style={styles.infoLabel}>
+                                        Cancellation Reason:
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.infoValue,
+                                            { color: Colors.rose },
+                                        ]}
+                                    >
+                                        {reservation.cancellation_reason}
                                     </Text>
                                 </View>
                             ) : null}
@@ -440,10 +518,12 @@ export default function PartnerReservationDetailScreen() {
                         <View style={styles.mealBadgesContainer}>
                             <MealBadge
                                 meal="breakfast"
-                                included={
+                                included={Boolean(
                                     reservation.food_inclusions?.breakfast ??
-                                    true
-                                }
+                                        reservation.property
+                                            ?.breakfast_included ??
+                                        false,
+                                )}
                                 timing={
                                     reservation.food_inclusions
                                         ?.breakfast_timing
@@ -451,18 +531,22 @@ export default function PartnerReservationDetailScreen() {
                             />
                             <MealBadge
                                 meal="lunch"
-                                included={
-                                    reservation.food_inclusions?.lunch ?? false
-                                }
+                                included={Boolean(
+                                    reservation.food_inclusions?.lunch ??
+                                        reservation.property?.lunch_included ??
+                                        false,
+                                )}
                                 timing={
                                     reservation.food_inclusions?.lunch_timing
                                 }
                             />
                             <MealBadge
                                 meal="dinner"
-                                included={
-                                    reservation.food_inclusions?.dinner ?? true
-                                }
+                                included={Boolean(
+                                    reservation.food_inclusions?.dinner ??
+                                        reservation.property?.dinner_included ??
+                                        false,
+                                )}
                                 timing={
                                     reservation.food_inclusions?.dinner_timing
                                 }
@@ -520,12 +604,45 @@ export default function PartnerReservationDetailScreen() {
                                 <Text style={styles.totalValue}>
                                     ₹
                                     {(
-                                        (reservation.owner_payable_paise ?? 0) /
-                                            100 ||
-                                        reservation.total_amount_paise / 100
+                                        (reservation.owner_payable_paise ??
+                                            reservation.total_amount_paise) /
+                                        100
                                     ).toLocaleString('en-IN')}
                                 </Text>
                             </View>
+                            {reservation.refunds &&
+                            reservation.refunds.length > 0 ? (
+                                <View style={{ marginTop: Spacing.sm }}>
+                                    <Text style={styles.infoLabel}>
+                                        Processed Refunds:
+                                    </Text>
+                                    {reservation.refunds.map((refItem) => (
+                                        <View
+                                            key={refItem.id}
+                                            style={styles.infoRow}
+                                        >
+                                            <Text style={styles.infoLabel}>
+                                                {(refItem as any).refund_reference ||
+                                                    (refItem as any).reference ||
+                                                    `Refund #${refItem.id}`} (
+                                                {refItem.status})
+                                            </Text>
+                                            <Text
+                                                style={[
+                                                    styles.infoValue,
+                                                    { color: Colors.rose },
+                                                ]}
+                                            >
+                                                ₹
+                                                {(
+                                                    (refItem.amount_minor || 0) /
+                                                    100
+                                                ).toLocaleString('en-IN')}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            ) : null}
                         </View>
                     </View>
 
@@ -559,9 +676,7 @@ export default function PartnerReservationDetailScreen() {
                                 </Text>
                             </View>
 
-                            {reservation.allocated_room_number ||
-                            reservation.physical_room ||
-                            reservation.physical_room_id ? (
+                            {isRoomAllocated ? (
                                 <View style={styles.allocationCard}>
                                     <View style={styles.allocationHeader}>
                                         <View style={styles.allocatedBadge}>
@@ -605,9 +720,7 @@ export default function PartnerReservationDetailScreen() {
                                                 style={styles.allocationValue}
                                             >
                                                 Room #
-                                                {reservation.allocated_room_number ||
-                                                    reservation.physical_room
-                                                        ?.room_number ||
+                                                {assignedRoomNum ||
                                                     reservation.physical_room_id}
                                             </Text>
                                         </View>
@@ -621,9 +734,7 @@ export default function PartnerReservationDetailScreen() {
                                                 style={styles.allocationValue}
                                             >
                                                 Floor{' '}
-                                                {reservation.allocated_floor ??
-                                                    reservation.physical_room
-                                                        ?.floor ??
+                                                {assignedFloor ??
                                                     'Main / Ground'}
                                             </Text>
                                         </View>
@@ -755,6 +866,7 @@ export default function PartnerReservationDetailScreen() {
                     </View>
                 </View>
             </ScrollView>
+            </KeyboardAvoidingView>
 
             {/* Physical Room Allocation Modal */}
             <Modal
@@ -1002,6 +1114,7 @@ export default function PartnerReservationDetailScreen() {
                 </View>
             </Modal>
         </SafeAreaView>
+        </RequireAuth>
     );
 }
 

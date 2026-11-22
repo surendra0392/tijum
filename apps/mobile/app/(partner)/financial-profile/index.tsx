@@ -6,25 +6,27 @@ import {
     Modal,
     Platform,
     RefreshControl,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
+    Switch,
     Text,
     TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { OwnerApi } from '../../../src/api/owner';
 import { OwnerFinancialProfile } from '../../../src/api/types';
 import { Badge } from '../../../src/components/Badge';
 import { Button } from '../../../src/components/Button';
+import { AppHeader } from '../../../src/components/AppHeader';
+import { RequireAuth } from '../../../src/components/RequireAuth';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 import {
     AlertTriangle,
-    ArrowLeft,
     Building,
     Edit3,
     FileText,
@@ -38,7 +40,6 @@ const CONSTITUTION_OPTIONS = [
     { value: 'partnership', label: 'Partnership Firm' },
     { value: 'llp', label: 'Limited Liability Partnership (LLP)' },
     { value: 'private_limited', label: 'Private Limited Company' },
-    { value: 'public_limited', label: 'Public Limited Company' },
     { value: 'trust_society', label: 'Trust / Society' },
 ];
 
@@ -54,6 +55,7 @@ export default function FinancialProfileScreen() {
     const [legalName, setLegalName] = useState('');
     const [constitution, setConstitution] = useState('individual');
     const [pan, setPan] = useState('');
+    const [gstRegistered, setGstRegistered] = useState(false);
     const [gstin, setGstin] = useState('');
     const [bankAccountNumber, setBankAccountNumber] = useState('');
     const [bankIfsc, setBankIfsc] = useState('');
@@ -65,15 +67,24 @@ export default function FinancialProfileScreen() {
         try {
             const res = await OwnerApi.getFinancialProfile();
             if (res.data) {
-                setProfile(res.data);
-                // Pre-fill edit modal form
-                setLegalName(res.data.legal_business_name || '');
-                setConstitution(res.data.business_constitution || 'individual');
-                setPan(res.data.pan || '');
-                setGstin(res.data.gstin || '');
-                setBankIfsc(res.data.bank_ifsc || '');
-                setBankName(res.data.bank_name || '');
-                setHolderName(res.data.bank_account_holder_name || '');
+                const d = res.data;
+                setProfile(d);
+                setLegalName(
+                    d.legal_business_name || d.bank_beneficiary_name || '',
+                );
+                setConstitution(
+                    d.supplier_legal_classification ||
+                        d.business_constitution ||
+                        'individual',
+                );
+                setPan(d.pan_number || d.pan || '');
+                setGstRegistered(Boolean(d.gst_registered || d.gstin));
+                setGstin(d.gstin || '');
+                setBankIfsc(d.bank_ifsc || '');
+                setBankName(d.bank_name || '');
+                setHolderName(
+                    d.bank_beneficiary_name || d.bank_account_holder_name || '',
+                );
             }
         } catch (error: any) {
             Alert.alert(
@@ -96,32 +107,62 @@ export default function FinancialProfileScreen() {
     };
 
     const handleSave = async () => {
-        if (!legalName.trim()) {
-            Alert.alert('Validation Error', 'Legal business name is required.');
+        const cleanPan = pan.trim().toUpperCase();
+        const cleanIfsc = bankIfsc.trim().toUpperCase();
+        const cleanGstin = gstin.trim().toUpperCase();
+        const cleanBeneficiary = (holderName.trim() || legalName.trim());
+
+        if (!cleanBeneficiary) {
+            Alert.alert(
+                'Validation Error',
+                'Bank beneficiary / legal business name is required.',
+            );
             return;
         }
-        if (!pan.trim()) {
-            Alert.alert('Validation Error', 'Valid PAN number is required.');
+        if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(cleanPan)) {
+            Alert.alert(
+                'Invalid PAN',
+                'Please enter a valid 10-character Income Tax PAN (e.g. ABCDE1234F).',
+            );
+            return;
+        }
+        if (
+            gstRegistered &&
+            !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(
+                cleanGstin,
+            )
+        ) {
+            Alert.alert(
+                'Invalid GSTIN',
+                'Please enter a valid 15-character GSTIN or toggle GST Registration off.',
+            );
+            return;
+        }
+        if (cleanIfsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(cleanIfsc)) {
+            Alert.alert(
+                'Invalid IFSC',
+                'Please enter a valid 11-character bank IFSC code (e.g. HDFC0001234).',
+            );
             return;
         }
 
         setSaving(true);
         try {
             await OwnerApi.updateFinancialProfile({
-                legal_business_name: legalName.trim(),
+                legal_business_name: legalName.trim() || cleanBeneficiary,
+                supplier_legal_classification: constitution,
                 business_constitution: constitution,
-                pan: pan.trim().toUpperCase(),
-                gstin: gstin.trim() ? gstin.trim().toUpperCase() : undefined,
+                pan_number: cleanPan,
+                pan: cleanPan,
+                gst_registered: gstRegistered,
+                gstin: gstRegistered && cleanGstin ? cleanGstin : null,
                 bank_account_number: bankAccountNumber.trim()
                     ? bankAccountNumber.trim()
                     : undefined,
-                bank_ifsc: bankIfsc.trim()
-                    ? bankIfsc.trim().toUpperCase()
-                    : undefined,
+                bank_ifsc: cleanIfsc || undefined,
                 bank_name: bankName.trim() ? bankName.trim() : undefined,
-                bank_account_holder_name: holderName.trim()
-                    ? holderName.trim()
-                    : undefined,
+                bank_beneficiary_name: cleanBeneficiary,
+                bank_account_holder_name: cleanBeneficiary,
             });
 
             setIsEditModalOpen(false);
@@ -158,31 +199,44 @@ export default function FinancialProfileScreen() {
         }
     };
 
+    const resolvedStatus =
+        profile?.onboarding_status || profile?.verification_status || 'pending';
+    const isEligible = Boolean(
+        profile?.is_eligible ?? profile?.settlement_eligible,
+    );
+    const rejectionReasons: string[] = profile?.rejection_reason
+        ? [profile.rejection_reason]
+        : profile?.rejection_reasons || [];
+    const resolvedConstitution =
+        profile?.supplier_legal_classification ||
+        profile?.business_constitution;
+    const resolvedPan = profile?.pan_number || profile?.pan;
+    const resolvedMaskedAccount =
+        profile?.bank_account_number_masked || profile?.bank_account_masked;
+    const resolvedHolderName =
+        profile?.bank_beneficiary_name ||
+        profile?.bank_account_holder_name ||
+        profile?.legal_business_name;
+
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => router.back()}
-                    accessibilityLabel="Back"
-                >
-                    <ArrowLeft size={22} color={Colors.textPrimary} />
-                </TouchableOpacity>
-                <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerTitle}>Financial Profile</Text>
-                    <Text style={styles.headerSubtitle}>
-                        Banking, Tax & Settlement KYC
-                    </Text>
-                </View>
-                <TouchableOpacity
-                    style={styles.editButton}
-                    onPress={() => setIsEditModalOpen(true)}
-                    accessibilityLabel="Edit Financial Profile"
-                >
-                    <Edit3 size={18} color={Colors.primary} />
-                </TouchableOpacity>
-            </View>
+        <RequireAuth role="partner">
+            <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+                <AppHeader
+                    title="Financial Profile"
+                    subtitle="Banking, Tax & Settlement KYC"
+                    showBack
+                    fallbackRoute="/(partner)/account"
+                    rightElement={
+                        <TouchableOpacity
+                            style={styles.editButton}
+                            onPress={() => setIsEditModalOpen(true)}
+                            accessibilityRole="button"
+                            accessibilityLabel="Edit Financial Profile"
+                        >
+                            <Edit3 size={18} color={Colors.primary} />
+                        </TouchableOpacity>
+                    }
+                />
 
             {loading ? (
                 <View style={styles.centered}>
@@ -208,7 +262,7 @@ export default function FinancialProfileScreen() {
                                 <ShieldCheck
                                     size={20}
                                     color={
-                                        profile?.settlement_eligible
+                                        isEligible
                                             ? Colors.success
                                             : Colors.warning
                                     }
@@ -218,48 +272,41 @@ export default function FinancialProfileScreen() {
                                 </Text>
                             </View>
                             <Badge
-                                variant={getStatusVariant(
-                                    profile?.verification_status,
-                                )}
+                                variant={getStatusVariant(resolvedStatus)}
                                 size="sm"
                             >
-                                {(
-                                    profile?.verification_status || 'PENDING'
-                                ).toUpperCase()}
+                                {resolvedStatus.toUpperCase()}
                             </Badge>
                         </View>
                         <Text style={styles.bannerDesc}>
-                            {profile?.settlement_eligible
+                            {isEligible
                                 ? 'Your banking and tax profile is verified. Automatic settlement transfers are active.'
                                 : 'Financial KYC verification is pending. Please verify your legal and bank details to receive payouts.'}
                         </Text>
                     </View>
 
                     {/* Rejection Reasons if applicable */}
-                    {profile?.rejection_reasons &&
-                        profile.rejection_reasons.length > 0 && (
-                            <View style={styles.rejectionCard}>
-                                <View style={styles.rejectionHeader}>
-                                    <AlertTriangle
-                                        size={18}
-                                        color={Colors.error}
-                                    />
-                                    <Text style={styles.rejectionTitle}>
-                                        Action Required
-                                    </Text>
-                                </View>
-                                {profile.rejection_reasons.map(
-                                    (reason, idx) => (
-                                        <Text
-                                            key={idx}
-                                            style={styles.rejectionItem}
-                                        >
-                                            • {reason}
-                                        </Text>
-                                    ),
-                                )}
+                    {rejectionReasons.length > 0 && (
+                        <View style={styles.rejectionCard}>
+                            <View style={styles.rejectionHeader}>
+                                <AlertTriangle
+                                    size={18}
+                                    color={Colors.error}
+                                />
+                                <Text style={styles.rejectionTitle}>
+                                    Action Required
+                                </Text>
                             </View>
-                        )}
+                            {rejectionReasons.map((reason, idx) => (
+                                <Text
+                                    key={idx}
+                                    style={styles.rejectionItem}
+                                >
+                                    • {reason}
+                                </Text>
+                            ))}
+                        </View>
+                    )}
 
                     {/* Legal & Business Entity Card */}
                     <View style={styles.sectionCard}>
@@ -275,7 +322,9 @@ export default function FinancialProfileScreen() {
                                 Legal Entity Name
                             </Text>
                             <Text style={styles.fieldValue}>
-                                {profile?.legal_business_name || 'Not provided'}
+                                {profile?.legal_business_name ||
+                                    resolvedHolderName ||
+                                    'Not provided'}
                             </Text>
                         </View>
 
@@ -283,11 +332,9 @@ export default function FinancialProfileScreen() {
                             <Text style={styles.fieldLabel}>Constitution</Text>
                             <Text style={styles.fieldValue}>
                                 {CONSTITUTION_OPTIONS.find(
-                                    (c) =>
-                                        c.value ===
-                                        profile?.business_constitution,
+                                    (c) => c.value === resolvedConstitution,
                                 )?.label ||
-                                    profile?.business_constitution ||
+                                    resolvedConstitution ||
                                     'Individual'}
                             </Text>
                         </View>
@@ -297,7 +344,7 @@ export default function FinancialProfileScreen() {
                                 Income Tax PAN
                             </Text>
                             <Text style={styles.fieldValueBold}>
-                                {profile?.pan || 'Not provided'}
+                                {resolvedPan || 'Not provided'}
                             </Text>
                         </View>
 
@@ -330,9 +377,7 @@ export default function FinancialProfileScreen() {
                                 Account Holder Name
                             </Text>
                             <Text style={styles.fieldValue}>
-                                {profile?.bank_account_holder_name ||
-                                    profile?.legal_business_name ||
-                                    'Not specified'}
+                                {resolvedHolderName || 'Not specified'}
                             </Text>
                         </View>
 
@@ -341,8 +386,7 @@ export default function FinancialProfileScreen() {
                                 Account Number
                             </Text>
                             <Text style={styles.fieldValueBold}>
-                                {profile?.bank_account_masked ||
-                                    '•••• •••• ••••'}
+                                {resolvedMaskedAccount || '•••• •••• ••••'}
                             </Text>
                         </View>
 
@@ -390,7 +434,7 @@ export default function FinancialProfileScreen() {
                 onRequestClose={() => setIsEditModalOpen(false)}
             >
                 <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     style={styles.modalOverlay}
                 >
                     <View style={styles.modalContainer}>
@@ -459,18 +503,45 @@ export default function FinancialProfileScreen() {
                                 maxLength={10}
                             />
 
-                            <Text style={styles.inputLabel}>
-                                GSTIN (Optional)
-                            </Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="e.g. 29ABCDE1234F1Z5"
-                                placeholderTextColor={Colors.textTertiary}
-                                value={gstin}
-                                onChangeText={(t) => setGstin(t.toUpperCase())}
-                                autoCapitalize="characters"
-                                maxLength={15}
-                            />
+                            <View
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    marginTop: Spacing.md,
+                                }}
+                            >
+                                <Text style={[styles.inputLabel, { marginTop: 0 }]}>
+                                    GST Registered Entity
+                                </Text>
+                                <Switch
+                                    value={gstRegistered}
+                                    onValueChange={setGstRegistered}
+                                    trackColor={{
+                                        false: Colors.border,
+                                        true: Colors.primary,
+                                    }}
+                                />
+                            </View>
+
+                            {gstRegistered && (
+                                <>
+                                    <Text style={styles.inputLabel}>
+                                        GSTIN (15 characters) *
+                                    </Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="e.g. 29ABCDE1234F1Z5"
+                                        placeholderTextColor={Colors.textTertiary}
+                                        value={gstin}
+                                        onChangeText={(t) =>
+                                            setGstin(t.toUpperCase())
+                                        }
+                                        autoCapitalize="characters"
+                                        maxLength={15}
+                                    />
+                                </>
+                            )}
 
                             <Text
                                 style={[
@@ -550,6 +621,7 @@ export default function FinancialProfileScreen() {
                 </KeyboardAvoidingView>
             </Modal>
         </SafeAreaView>
+        </RequireAuth>
     );
 }
 

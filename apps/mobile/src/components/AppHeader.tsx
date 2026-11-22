@@ -20,6 +20,7 @@ interface AppHeaderProps {
     onBack?: () => void;
     fallbackRoute?: string;
     rightAction?: React.ReactNode;
+    rightElement?: React.ReactNode;
     style?: ViewStyle;
     variant?: 'plum' | 'white';
 }
@@ -31,9 +32,11 @@ export function AppHeader({
     onBack,
     fallbackRoute = '/(customer)/explore',
     rightAction,
+    rightElement,
     style,
     variant = 'plum',
 }: AppHeaderProps) {
+    const resolvedRight = rightAction ?? rightElement;
     const router = useRouter();
     const insets = useSafeAreaInsets();
 
@@ -106,9 +109,9 @@ export function AppHeader({
                     ) : null}
                 </View>
 
-                {rightAction ? (
+                {resolvedRight ? (
                     <View style={styles.rightActionContainer}>
-                        {rightAction}
+                        {resolvedRight}
                     </View>
                 ) : (
                     <View style={styles.spacer} />

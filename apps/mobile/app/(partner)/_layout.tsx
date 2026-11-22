@@ -97,7 +97,7 @@ export default function PartnerTabsLayout() {
                 name="reservations/[reference]"
                 options={{
                     href: null,
-                    headerTitle: 'Booking Review',
+                    headerShown: false,
                     tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />
@@ -105,7 +105,7 @@ export default function PartnerTabsLayout() {
                 name="reviews/index"
                 options={{
                     href: null,
-                    headerTitle: 'Guest Reviews',
+                    headerShown: false,
                     tabBarStyle: HIDDEN_TAB_STYLE,
                 }}
             />

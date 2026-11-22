@@ -4,7 +4,6 @@ import {
     Alert,
     KeyboardAvoidingView,
     Platform,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Switch,
@@ -12,18 +11,20 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { OwnerApi } from '../../../../src/api/owner';
 import { PropertyPricingData } from '../../../../src/api/types';
 import { Badge } from '../../../../src/components/Badge';
 import { Button } from '../../../../src/components/Button';
 import { Input } from '../../../../src/components/Input';
+import { AppHeader } from '../../../../src/components/AppHeader';
+import { RequireAuth } from '../../../../src/components/RequireAuth';
 import { Colors } from '../../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../../src/theme/spacing';
 import { Typography } from '../../../../src/theme/typography';
 import {
     AlertCircle,
-    ArrowLeft,
     CheckCircle2,
     Sparkles,
 } from 'lucide-react-native';
@@ -141,6 +142,19 @@ export default function PropertyPricingScreen() {
             return;
         }
 
+        for (const rt of pricingData?.room_types || []) {
+            const row = ratesMap[rt.id] || { daily: '', weekly: '', monthly: '' };
+            const dailyVal = row.daily ? Number(row.daily) : 0;
+            const monthlyVal = row.monthly ? Number(row.monthly) : 0;
+            if (dailyVal <= 0 && monthlyVal <= 0) {
+                Alert.alert(
+                    'Rate Validation Error',
+                    `Please enter a valid Daily or Monthly rate greater than ₹0 for "${rt.name}".`,
+                );
+                return;
+            }
+        }
+
         setSaving(true);
         try {
             const formattedRoomTypes = (pricingData?.room_types || []).map(
@@ -193,42 +207,35 @@ export default function PropertyPricingScreen() {
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.center}>
-                <ActivityIndicator size="large" color={Colors.deepPlum} />
-                <Text style={styles.loadingText}>
-                    Loading rate plans & inventory pricing...
-                </Text>
-            </SafeAreaView>
+            <RequireAuth role="partner">
+                <SafeAreaView style={styles.center}>
+                    <ActivityIndicator size="large" color={Colors.deepPlum} />
+                    <Text style={styles.loadingText}>
+                        Loading rate plans & inventory pricing...
+                    </Text>
+                </SafeAreaView>
+            </RequireAuth>
         );
     }
 
     const evaluation = pricingData?.evaluation;
 
     return (
-        <SafeAreaView style={styles.container}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                style={{ flex: 1 }}
-            >
-                {/* Header */}
-                <View style={styles.header}>
-                    <TouchableOpacity
-                        onPress={() => router.back()}
-                        style={styles.backBtn}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                        <ArrowLeft size={22} color={Colors.deepPlum} />
-                    </TouchableOpacity>
-                    <View style={styles.headerTitleBox}>
-                        <Text style={styles.headerTitle}>
-                            Pricing & Meal Settings
-                        </Text>
-                        <Text style={styles.headerSubtitle} numberOfLines={1}>
-                            {pricingData?.property_name ||
-                                `Property #${propertyId}`}
-                        </Text>
-                    </View>
-                </View>
+        <RequireAuth role="partner">
+            <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={{ flex: 1 }}
+                >
+                    <AppHeader
+                        title="Pricing & Meal Settings"
+                        subtitle={
+                            pricingData?.property_name ||
+                            `Property #${propertyId}`
+                        }
+                        showBack
+                        fallbackRoute={`/(partner)/properties/${propertyId}/edit`}
+                    />
 
                 <ScrollView
                     contentContainerStyle={styles.contentContainer}
@@ -498,6 +505,7 @@ export default function PropertyPricingScreen() {
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>
+        </RequireAuth>
     );
 }
 

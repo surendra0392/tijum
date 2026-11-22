@@ -955,6 +955,7 @@ export interface PropertyMediaItem {
     url: string;
     alt_text: string;
     category: string;
+    media_category?: string;
     category_label?: string;
     media_type?: string;
     is_cover: boolean;
@@ -962,8 +963,10 @@ export interface PropertyMediaItem {
     publication_status?: string;
     property_room_type_id?: number | null;
     room_type_name?: string | null;
+    room_type?: { id: number; name: string } | null;
     property_room_id?: number | null;
     room_number?: string | null;
+    physical_room?: { id: number; room_number: string } | null;
 }
 
 export interface OwnerPropertyAmenity {
@@ -975,6 +978,7 @@ export interface OwnerPropertyAmenity {
     icon_key?: string;
     availability: 'included' | 'not_available';
     status: string;
+    moderation_status?: string;
     is_current: boolean;
     is_customer_visible: boolean;
     details?: string | null;
@@ -999,6 +1003,7 @@ export interface PropertyVerificationDocumentItem {
     document_type_label?: string;
     original_filename: string;
     status: string;
+    verification_status?: string;
     status_label?: string;
     rejection_reason?: string | null;
     uploaded_at?: string | null;
@@ -1014,6 +1019,7 @@ export interface PropertyVerificationChecklistItem {
 export interface PropertyVerificationDocumentsResponse {
     documents: PropertyVerificationDocumentItem[];
     checklist: PropertyVerificationChecklistItem[];
+    required_types?: Array<string | { type: string; label: string }>;
 }
 
 export interface OwnerFinancialProfile {
@@ -1047,14 +1053,17 @@ export interface OwnerCommissionAgreement {
     commission_rate_percentage: number;
     base_type: string;
     commission_base_label?: string;
+    commission_type_label?: string;
     gst_treatment: string;
     commission_gst_label?: string;
+    gst_mode_label?: string;
     property_name?: string | null;
     terms_version: string;
     effective_from: string;
     effective_until?: string | null;
     effective_to?: string | null;
     status: string;
+    status_label?: string;
     is_pending_acceptance?: boolean;
     terms_hash?: string | null;
     accepted_by_owner_id?: number | null;
@@ -1067,6 +1076,10 @@ export interface FinancialSummaryData {
     on_hold_paise?: number;
     settled_count?: number;
     pending_count?: number;
+    settlements?: {
+        total_settled_amount_minor?: number;
+        pending_settlement_amount_minor?: number;
+    };
 }
 
 export interface SettlementLineItem {
@@ -1081,10 +1094,29 @@ export interface SettlementLineItem {
     commission_minor: number;
     net_minor: number;
     tax_deduction_minor?: number;
+    statutory_deductions_minor?: number;
     net_payable_minor?: number;
+    net_settlement_amount_minor?: number;
     gross_amount_minor?: number;
+    gross_booking_value_minor?: number;
     commission_amount_minor?: number;
     stay_dates?: string;
+}
+
+export type OwnerPropertySummary = PropertyDetail;
+export type OwnerVerificationDocument = PropertyVerificationDocumentItem;
+export type PropertyCategory = { id: number; name: string; slug: string };
+export type PropertyCategorySlug = CanonicalCategorySlug;
+export type OwnerPropertyMedia = PropertyMediaItem;
+export type OwnerRoomType = RoomType;
+export type OwnerPhysicalRoom = PhysicalRoom;
+export type OwnerFinancialSummary = FinancialSummaryData;
+export type PropertyMediaCategory = string;
+export interface OwnerPropertyMediaSummary {
+    total_count: number;
+    approved_count: number;
+    pending_count: number;
+    has_cover: boolean;
 }
 
 export interface SettlementDetail {

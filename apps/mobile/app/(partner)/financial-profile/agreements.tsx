@@ -3,24 +3,23 @@ import {
     ActivityIndicator,
     Alert,
     RefreshControl,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
-    TouchableOpacity,
     View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { OwnerApi } from '../../../src/api/owner';
 import { OwnerCommissionAgreement } from '../../../src/api/types';
 import { Badge } from '../../../src/components/Badge';
 import { Button } from '../../../src/components/Button';
+import { AppHeader } from '../../../src/components/AppHeader';
+import { RequireAuth } from '../../../src/components/RequireAuth';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 import {
     AlertCircle,
-    ArrowLeft,
     Calendar,
     CheckCircle2,
     FileCheck2,
@@ -29,8 +28,6 @@ import {
 } from 'lucide-react-native';
 
 export default function CommissionAgreementsScreen() {
-    const router = useRouter();
-
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [agreements, setAgreements] = useState<OwnerCommissionAgreement[]>(
@@ -117,25 +114,14 @@ export default function CommissionAgreementsScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => router.back()}
-                    accessibilityLabel="Back to Financial Profile"
-                >
-                    <ArrowLeft size={22} color={Colors.textPrimary} />
-                </TouchableOpacity>
-                <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerTitle}>
-                        Commission Agreements
-                    </Text>
-                    <Text style={styles.headerSubtitle}>
-                        Contractual Rates & Service Terms
-                    </Text>
-                </View>
-            </View>
+        <RequireAuth role="partner">
+            <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+                <AppHeader
+                    title="Commission Agreements"
+                    subtitle="Contractual Rates & Service Terms"
+                    showBack
+                    fallbackRoute="/(partner)/financial-profile"
+                />
 
             {loading ? (
                 <View style={styles.centered}>
@@ -201,7 +187,11 @@ export default function CommissionAgreementsScreen() {
                                             )}
                                             size="sm"
                                         >
-                                            {agreement.status.toUpperCase()}
+                                            {(
+                                                agreement.status_label ||
+                                                agreement.status ||
+                                                'PENDING'
+                                            ).toUpperCase()}
                                         </Badge>
                                     </View>
 
@@ -220,10 +210,12 @@ export default function CommissionAgreementsScreen() {
                                         </View>
                                         <Text style={styles.rateSubtext}>
                                             Base:{' '}
-                                            {agreement.base_type ||
+                                            {agreement.commission_type_label ||
+                                                agreement.base_type ||
                                                 'Gross Booking Value'}{' '}
                                             •{' '}
-                                            {agreement.gst_treatment ||
+                                            {agreement.gst_mode_label ||
+                                                agreement.gst_treatment ||
                                                 'Exclusive of GST'}
                                         </Text>
                                     </View>
@@ -356,6 +348,7 @@ export default function CommissionAgreementsScreen() {
                 </ScrollView>
             )}
         </SafeAreaView>
+        </RequireAuth>
     );
 }
 

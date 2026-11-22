@@ -3,15 +3,18 @@ import {
     ActivityIndicator,
     Alert,
     FlatList,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     RefreshControl,
-    SafeAreaView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import {
     AlertCircle,
     Calendar,
@@ -24,8 +27,10 @@ import {
 } from 'lucide-react-native';
 import { OwnerApi } from '../../../src/api/owner';
 import { OwnerReview } from '../../../src/api/types';
+import { AppHeader } from '../../../src/components/AppHeader';
 import { Button } from '../../../src/components/Button';
 import { ExceptionalState } from '../../../src/components/ExceptionalState';
+import { RequireAuth } from '../../../src/components/RequireAuth';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
@@ -33,6 +38,7 @@ import { Typography } from '../../../src/theme/typography';
 const MAX_RESPONSE_LENGTH = 2500;
 
 export default function PartnerReviewsScreen() {
+    const isFocused = useIsFocused();
     const [reviews, setReviews] = useState<OwnerReview[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -70,8 +76,10 @@ export default function PartnerReviewsScreen() {
     };
 
     useEffect(() => {
-        void loadReviews();
-    }, []);
+        if (isFocused) {
+            void loadReviews(reviews.length > 0);
+        }
+    }, [isFocused]);
 
     const handleOpenReplyModal = (review: OwnerReview) => {
         setSelectedReview(review);
@@ -136,166 +144,226 @@ export default function PartnerReviewsScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            {loading ? (
-                <View style={styles.center}>
-                    <ActivityIndicator size="large" color={Colors.deepPlum} />
-                    <Text style={styles.loadingText}>
-                        Loading property reviews...
-                    </Text>
-                </View>
-            ) : loadError && reviews.length === 0 ? (
-                <ExceptionalState
-                    type="no-internet"
-                    title="Reviews Unavailable"
-                    description={loadError}
-                    actionLabel="Try Again"
-                    onAction={() => loadReviews()}
+        <RequireAuth role="partner">
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <AppHeader
+                    title="Guest Reviews"
+                    showBack
+                    fallbackRoute="/(partner)/dashboard"
                 />
-            ) : (
-                <FlatList
-                    data={reviews}
-                    keyExtractor={(item: OwnerReview) => String(item.id)}
-                    contentContainerStyle={styles.listContent}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={() => loadReviews(true)}
-                            colors={[Colors.deepPlum]}
+                {loading && !refreshing ? (
+                    <View style={styles.center}>
+                        <ActivityIndicator
+                            size="large"
+                            color={Colors.deepPlum}
                         />
-                    }
-                    ListHeaderComponent={
-                        <View style={styles.header}>
-                            <Text style={styles.title}>Guest Reviews</Text>
-                            <Text style={styles.subtitle}>
-                                Monitor guest feedback, ratings across
-                                subcategories, and publish official responses.
-                            </Text>
-                        </View>
-                    }
-                    ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <View style={styles.emptyIconCircle}>
-                                <MessageSquare
-                                    size={36}
-                                    color={Colors.gray400}
-                                />
+                        <Text style={styles.loadingText}>
+                            Loading property reviews...
+                        </Text>
+                    </View>
+                ) : loadError && reviews.length === 0 ? (
+                    <ExceptionalState
+                        type="no-internet"
+                        title="Reviews Unavailable"
+                        description={loadError}
+                        actionLabel="Try Again"
+                        onAction={() => loadReviews()}
+                    />
+                ) : (
+                    <FlatList
+                        data={reviews}
+                        keyExtractor={(item: OwnerReview) => String(item.id)}
+                        contentContainerStyle={styles.listContent}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={() => loadReviews(true)}
+                                colors={[Colors.deepPlum]}
+                                tintColor={Colors.deepPlum}
+                            />
+                        }
+                        ListHeaderComponent={
+                            <View style={styles.header}>
+                                <Text style={styles.title}>Guest Reviews</Text>
+                                <Text style={styles.subtitle}>
+                                    Monitor verified guest feedback and publish
+                                    official responses.
+                                </Text>
                             </View>
-                            <Text style={styles.emptyTitle}>
-                                No guest reviews yet
-                            </Text>
-                            <Text style={styles.emptySubtitle}>
-                                When customers complete their stays at your
-                                properties, their ratings and feedback on
-                                cleanliness, food, and communication will appear
-                                here.
-                            </Text>
-                        </View>
-                    }
-                    renderItem={({ item }: { item: any }) => (
-                        <View style={styles.reviewCard}>
-                            {/* Card Top: Property & Rating */}
-                            <View style={styles.cardHeader}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.propertyName}>
-                                        {item.property_name}
-                                    </Text>
-                                    <View style={styles.guestInfoRow}>
-                                        <Text style={styles.guestName}>
-                                            {item.guest_name ||
-                                                item.customer_display_name ||
-                                                'Verified Guest'}
-                                        </Text>
-                                        {item.verified_booking !== false ? (
-                                            <View style={styles.verifiedTag}>
-                                                <CheckCircle2
-                                                    size={11}
-                                                    color="#059669"
-                                                    style={{ marginRight: 3 }}
-                                                />
-                                                <Text
-                                                    style={
-                                                        styles.verifiedTagText
-                                                    }
-                                                >
-                                                    Verified Stay
+                        }
+                        ListEmptyComponent={
+                            <View style={styles.emptyContainer}>
+                                <View style={styles.emptyIconCircle}>
+                                    <MessageSquare
+                                        size={36}
+                                        color={Colors.gray400}
+                                    />
+                                </View>
+                                <Text style={styles.emptyTitle}>
+                                    No guest reviews yet
+                                </Text>
+                                <Text style={styles.emptySubtitle}>
+                                    When customers complete their stays at your
+                                    properties, their ratings and feedback will
+                                    appear here.
+                                </Text>
+                            </View>
+                        }
+                        renderItem={({ item }: { item: any }) => {
+                            const hasSubRatings = Boolean(
+                                item.cleanliness_rating ||
+                                    item.food_quality_rating ||
+                                    item.communication_rating ||
+                                    item.value_rating,
+                            );
+                            return (
+                                <View style={styles.reviewCard}>
+                                    {/* Card Top: Property & Rating */}
+                                    <View style={styles.cardHeader}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.propertyName}>
+                                                {item.property_name}
+                                            </Text>
+                                            <View style={styles.guestInfoRow}>
+                                                <Text style={styles.guestName}>
+                                                    {item.guest_name ||
+                                                        item.customer_display_name ||
+                                                        'Verified Guest'}
                                                 </Text>
+                                                {item.verified_booking !==
+                                                false ? (
+                                                    <View
+                                                        style={
+                                                            styles.verifiedTag
+                                                        }
+                                                    >
+                                                        <CheckCircle2
+                                                            size={11}
+                                                            color="#059669"
+                                                            style={{
+                                                                marginRight: 3,
+                                                            }}
+                                                        />
+                                                        <Text
+                                                            style={
+                                                                styles.verifiedTagText
+                                                            }
+                                                        >
+                                                            Verified Stay
+                                                        </Text>
+                                                    </View>
+                                                ) : null}
                                             </View>
-                                        ) : null}
+                                        </View>
+                                        <View style={styles.ratingBadge}>
+                                            <Star
+                                                size={13}
+                                                color="#D97706"
+                                                fill="#D97706"
+                                                style={{ marginRight: 3 }}
+                                            />
+                                            <Text
+                                                style={styles.ratingBadgeText}
+                                            >
+                                                {(
+                                                    item.overall_rating ??
+                                                    item.rating ??
+                                                    0
+                                                ).toFixed(1)}
+                                            </Text>
+                                        </View>
                                     </View>
-                                </View>
-                                <View style={styles.ratingBadge}>
-                                    <Star
-                                        size={13}
-                                        color="#D97706"
-                                        fill="#D97706"
-                                        style={{ marginRight: 3 }}
-                                    />
-                                    <Text style={styles.ratingBadgeText}>
-                                        {item.overall_rating.toFixed(1)}
-                                    </Text>
-                                </View>
-                            </View>
 
-                            {/* Stay Dates */}
-                            {item.stay_dates ? (
-                                <View style={styles.stayDatesRow}>
-                                    <Calendar
-                                        size={12}
-                                        color={Colors.gray500}
-                                        style={{ marginRight: 4 }}
-                                    />
-                                    <Text style={styles.stayDatesText}>
-                                        Stay Dates:{' '}
-                                        {item.stay_dates.check_in_date} to{' '}
-                                        {item.stay_dates.checkout_date}
-                                    </Text>
-                                </View>
-                            ) : null}
+                                    {/* Stay Dates */}
+                                    {item.stay_dates ? (
+                                        <View style={styles.stayDatesRow}>
+                                            <Calendar
+                                                size={12}
+                                                color={Colors.gray500}
+                                                style={{ marginRight: 4 }}
+                                            />
+                                            <Text style={styles.stayDatesText}>
+                                                Stay Dates:{' '}
+                                                {item.stay_dates.check_in_date}{' '}
+                                                to{' '}
+                                                {item.stay_dates.checkout_date}
+                                            </Text>
+                                        </View>
+                                    ) : null}
 
-                            {/* Subcategory Ratings Breakdown */}
-                            <View style={styles.subRatingsGrid}>
-                                <View style={styles.subRatingItem}>
-                                    <Text style={styles.subRatingLabel}>
-                                        Cleanliness
-                                    </Text>
-                                    {renderStars(
-                                        item.cleanliness_rating ||
-                                            item.overall_rating,
-                                        11,
-                                    )}
-                                </View>
-                                <View style={styles.subRatingItem}>
-                                    <Text style={styles.subRatingLabel}>
-                                        Food & Dining
-                                    </Text>
-                                    {renderStars(
-                                        item.food_quality_rating ||
-                                            item.overall_rating,
-                                        11,
-                                    )}
-                                </View>
-                                <View style={styles.subRatingItem}>
-                                    <Text style={styles.subRatingLabel}>
-                                        Communication
-                                    </Text>
-                                    {renderStars(
-                                        item.communication_rating ||
-                                            item.overall_rating,
-                                        11,
-                                    )}
-                                </View>
-                                <View style={styles.subRatingItem}>
-                                    <Text style={styles.subRatingLabel}>
-                                        Value for Money
-                                    </Text>
-                                    {renderStars(
-                                        item.value_rating ||
-                                            item.overall_rating,
-                                        11,
-                                    )}
-                                </View>
-                            </View>
+                                    {/* Subcategory Ratings Breakdown (only when backend provides genuine subcategory ratings) */}
+                                    {hasSubRatings ? (
+                                        <View style={styles.subRatingsGrid}>
+                                            {item.cleanliness_rating ? (
+                                                <View
+                                                    style={styles.subRatingItem}
+                                                >
+                                                    <Text
+                                                        style={
+                                                            styles.subRatingLabel
+                                                        }
+                                                    >
+                                                        Cleanliness
+                                                    </Text>
+                                                    {renderStars(
+                                                        item.cleanliness_rating,
+                                                        11,
+                                                    )}
+                                                </View>
+                                            ) : null}
+                                            {item.food_quality_rating ? (
+                                                <View
+                                                    style={styles.subRatingItem}
+                                                >
+                                                    <Text
+                                                        style={
+                                                            styles.subRatingLabel
+                                                        }
+                                                    >
+                                                        Food & Dining
+                                                    </Text>
+                                                    {renderStars(
+                                                        item.food_quality_rating,
+                                                        11,
+                                                    )}
+                                                </View>
+                                            ) : null}
+                                            {item.communication_rating ? (
+                                                <View
+                                                    style={styles.subRatingItem}
+                                                >
+                                                    <Text
+                                                        style={
+                                                            styles.subRatingLabel
+                                                        }
+                                                    >
+                                                        Communication
+                                                    </Text>
+                                                    {renderStars(
+                                                        item.communication_rating,
+                                                        11,
+                                                    )}
+                                                </View>
+                                            ) : null}
+                                            {item.value_rating ? (
+                                                <View
+                                                    style={styles.subRatingItem}
+                                                >
+                                                    <Text
+                                                        style={
+                                                            styles.subRatingLabel
+                                                        }
+                                                    >
+                                                        Value for Money
+                                                    </Text>
+                                                    {renderStars(
+                                                        item.value_rating,
+                                                        11,
+                                                    )}
+                                                </View>
+                                            ) : null}
+                                        </View>
+                                    ) : null}
 
                             {/* Title & Review Content */}
                             {item.title ? (
@@ -377,7 +445,8 @@ export default function PartnerReviewsScreen() {
                                 </TouchableOpacity>
                             )}
                         </View>
-                    )}
+                        );
+                    }}
                 />
             )}
 
@@ -388,7 +457,10 @@ export default function PartnerReviewsScreen() {
                 animationType="slide"
                 onRequestClose={handleCloseReplyModal}
             >
-                <View style={styles.modalOverlay}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
+                >
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <View style={{ flex: 1 }}>
@@ -405,12 +477,14 @@ export default function PartnerReviewsScreen() {
                             </View>
                             <TouchableOpacity
                                 onPress={handleCloseReplyModal}
-                                hitSlop={{
-                                    top: 10,
-                                    bottom: 10,
-                                    left: 10,
-                                    right: 10,
+                                style={{
+                                    width: 44,
+                                    height: 44,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
                                 }}
+                                accessibilityRole="button"
+                                accessibilityLabel="Close response modal"
                             >
                                 <X size={20} color={Colors.gray600} />
                             </TouchableOpacity>
@@ -486,9 +560,10 @@ export default function PartnerReviewsScreen() {
                             style={{ marginTop: Spacing.sm }}
                         />
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
-        </SafeAreaView>
+            </SafeAreaView>
+        </RequireAuth>
     );
 }
 

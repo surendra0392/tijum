@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Image,
     KeyboardAvoidingView,
     Platform,
     RefreshControl,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
@@ -13,44 +13,71 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import { useLocalSearchParams } from 'expo-router';
 import { OwnerApi } from '../../../src/api/owner';
 import { OwnerCase } from '../../../src/api/types';
+import { AppHeader } from '../../../src/components/AppHeader';
 import { Badge } from '../../../src/components/Badge';
+import { Button } from '../../../src/components/Button';
+import { RequireAuth } from '../../../src/components/RequireAuth';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
 import {
     AlertCircle,
-    ArrowLeft,
     CheckCircle2,
     Clock,
+    ImagePlus,
     MessageSquare,
     Send,
     Shield,
+    X,
 } from 'lucide-react-native';
 
 export default function CaseDetailScreen() {
-    const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { reference } = useLocalSearchParams<{ reference: string }>();
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [caseDetail, setCaseDetail] = useState<OwnerCase | null>(null);
     const [replyText, setReplyText] = useState('');
+    const [selectedAttachment, setSelectedAttachment] = useState<{
+        uri: string;
+        name: string;
+        type: string;
+    } | null>(null);
     const [sending, setSending] = useState(false);
 
-    const fetchCase = async () => {
-        if (!reference) return;
+    const fetchCase = async (options?: { silent?: boolean }) => {
+        if (!reference) {
+            setLoading(false);
+            setLoadError('Case reference is missing.');
+            return;
+        }
         try {
-            const res = await OwnerApi.getCase(reference);
-            if (res.data) {
-                setCaseDetail(res.data);
+            if (!options?.silent) {
+                setLoading(true);
             }
+            setLoadError(null);
+            const res = await OwnerApi.getCase(reference);
+            const data = (res.data as any)?.case || res.data;
+            if (data) {
+                setCaseDetail(data);
+                return;
+            }
+            setCaseDetail(null);
+            setLoadError('Support case not found.');
         } catch (error: any) {
-            Alert.alert(
-                'Error',
-                error.message || 'Failed to load case details.',
+            setCaseDetail(null);
+            setLoadError(
+                error?.message || 'Failed to load case details.',
             );
         } finally {
             setLoading(false);
@@ -59,22 +86,84 @@ export default function CaseDetailScreen() {
     };
 
     useEffect(() => {
+        setCaseDetail(null);
+        setLoadError(null);
+        setSelectedAttachment(null);
         void fetchCase();
     }, [reference]);
 
     const onRefresh = () => {
         setRefreshing(true);
-        void fetchCase();
+        void fetchCase({ silent: true });
+    };
+
+    const handlePickAttachment = async () => {
+        try {
+            const perm =
+                await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!perm.granted) {
+                Alert.alert(
+                    'Permission Required',
+                    'Allow photo library access to attach evidence images.',
+                );
+                return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                quality: 0.85,
+            });
+            if (!result.canceled && result.assets?.[0]) {
+                const asset = result.assets[0];
+                const fileName =
+                    asset.fileName || `case-evidence-${Date.now()}.jpg`;
+                const mimeType = asset.mimeType || 'image/jpeg';
+                setSelectedAttachment({
+                    uri: asset.uri,
+                    name: fileName,
+                    type: mimeType,
+                });
+            }
+        } catch (err: any) {
+            Alert.alert(
+                'Image Selection Failed',
+                err?.message || 'Could not select image from library.',
+            );
+        }
     };
 
     const handleSendMessage = async () => {
-        if (!replyText.trim() || !reference) return;
+        if ((!replyText.trim() && !selectedAttachment) || !reference) return;
 
         setSending(true);
         try {
-            await OwnerApi.addCaseMessage(reference, replyText.trim());
+            if (selectedAttachment) {
+                const formData = new FormData();
+                formData.append(
+                    'message',
+                    replyText.trim() || 'Attached evidence photo.',
+                );
+                if (Platform.OS === 'web') {
+                    const blobRes = await fetch(selectedAttachment.uri);
+                    const blob = await blobRes.blob();
+                    formData.append(
+                        'attachment',
+                        blob,
+                        selectedAttachment.name,
+                    );
+                } else {
+                    formData.append('attachment', {
+                        uri: selectedAttachment.uri,
+                        name: selectedAttachment.name,
+                        type: selectedAttachment.type,
+                    } as any);
+                }
+                await OwnerApi.addCaseMessage(reference, formData);
+            } else {
+                await OwnerApi.addCaseMessage(reference, replyText.trim());
+            }
             setReplyText('');
-            void fetchCase();
+            setSelectedAttachment(null);
+            void fetchCase({ silent: true });
         } catch (error: any) {
             Alert.alert(
                 'Send Failed',
@@ -140,130 +229,178 @@ export default function CaseDetailScreen() {
 
     const messages = caseDetail?.messages || [];
     const sla = getPrioritySlaTarget(caseDetail?.priority);
+    const isClosed =
+        caseDetail?.status?.toLowerCase() === 'resolved' ||
+        caseDetail?.status?.toLowerCase() === 'closed';
+    const guestName = caseDetail?.customer_name || caseDetail?.guest_name;
+    const resolutionText =
+        caseDetail?.resolution_summary || caseDetail?.resolution;
 
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => router.back()}
-                    accessibilityLabel="Back to Cases"
-                >
-                    <ArrowLeft size={22} color={Colors.textPrimary} />
-                </TouchableOpacity>
-                <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerTitle}>{reference}</Text>
-                    <Text style={styles.headerSubtitle}>
-                        {caseDetail?.type || 'Customer Protection'}
-                    </Text>
-                </View>
-                {caseDetail?.status && (
-                    <Badge
-                        variant={getStatusVariant(caseDetail.status)}
-                        size="sm"
-                    >
-                        {caseDetail.status.replace('_', ' ').toUpperCase()}
-                    </Badge>
-                )}
-            </View>
-
-            {loading ? (
-                <View style={styles.centered}>
-                    <ActivityIndicator size="large" color={Colors.primary} />
-                    <Text style={styles.loadingText}>
-                        Loading case timeline...
-                    </Text>
-                </View>
-            ) : !caseDetail ? (
-                <View style={styles.centered}>
-                    <AlertCircle size={40} color={Colors.textTertiary} />
-                    <Text style={styles.emptyTitle}>Case Not Found</Text>
-                    <Text style={styles.emptySubtitle}>
-                        Could not retrieve details for {reference}.
-                    </Text>
-                </View>
-            ) : (
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                    style={{ flex: 1 }}
-                >
-                    <ScrollView
-                        contentContainerStyle={styles.scrollContent}
-                        refreshControl={
-                            <RefreshControl
-                                refreshing={refreshing}
-                                onRefresh={onRefresh}
+        <RequireAuth role="partner">
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <AppHeader
+                    title={reference || 'Case Details'}
+                    subtitle={
+                        caseDetail?.category_label ||
+                        caseDetail?.type ||
+                        'Customer Protection'
+                    }
+                    showBack
+                    fallbackRoute="/(partner)/cases"
+                    rightAction={
+                        caseDetail?.status ? (
+                            <Badge
+                                variant={getStatusVariant(caseDetail.status)}
+                                size="sm"
+                                label={(
+                                    caseDetail.status_label ||
+                                    caseDetail.status.replace(/_/g, ' ')
+                                ).toUpperCase()}
                             />
-                        }
+                        ) : undefined
+                    }
+                />
+
+                {loading && !caseDetail ? (
+                    <View style={styles.centered}>
+                        <ActivityIndicator size="large" color={Colors.primary} />
+                        <Text style={styles.loadingText}>
+                            Loading case timeline...
+                        </Text>
+                    </View>
+                ) : !caseDetail ? (
+                    <View style={styles.centered}>
+                        <AlertCircle size={40} color={Colors.textTertiary} />
+                        <Text style={styles.emptyTitle}>
+                            {loadError ? 'Case Unavailable' : 'Case Not Found'}
+                        </Text>
+                        <Text style={styles.emptySubtitle}>
+                            {loadError ||
+                                `Could not retrieve details for ${reference}.`}
+                        </Text>
+                        <Button
+                            title="Retry"
+                            onPress={() => void fetchCase()}
+                            style={{ marginTop: Spacing.md }}
+                        />
+                    </View>
+                ) : (
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={{ flex: 1 }}
                     >
-                        {/* Case Overview Card */}
-                        <View style={styles.overviewCard}>
-                            <Text style={styles.caseTitleText}>
-                                {caseDetail.title}
-                            </Text>
+                        <ScrollView
+                            contentContainerStyle={styles.scrollContent}
+                            keyboardShouldPersistTaps="handled"
+                            refreshControl={
+                                <RefreshControl
+                                    refreshing={refreshing}
+                                    onRefresh={onRefresh}
+                                    colors={[Colors.deepPlum]}
+                                    tintColor={Colors.deepPlum}
+                                />
+                            }
+                        >
+                            {/* Case Overview Card */}
+                            <View style={styles.overviewCard}>
+                                <Text style={styles.caseTitleText}>
+                                    {caseDetail.title ||
+                                        caseDetail.category_label ||
+                                        'Customer Protection Case'}
+                                </Text>
 
-                            {(caseDetail.booking_reference ||
-                                caseDetail.guest_name ||
-                                caseDetail.property_name) && (
-                                <View style={styles.contextGrid}>
-                                    {caseDetail.property_name ? (
-                                        <View style={styles.contextRow}>
-                                            <Text style={styles.contextLabel}>
-                                                Property:
-                                            </Text>
-                                            <Text style={styles.contextValue}>
-                                                {caseDetail.property_name}
-                                            </Text>
-                                        </View>
-                                    ) : null}
-                                    {caseDetail.booking_reference ? (
-                                        <View style={styles.contextRow}>
-                                            <Text style={styles.contextLabel}>
-                                                Booking Ref:
-                                            </Text>
-                                            <Text
-                                                style={styles.contextValueBold}
-                                            >
-                                                {caseDetail.booking_reference}
-                                            </Text>
-                                        </View>
-                                    ) : null}
-                                    {caseDetail.guest_name ? (
-                                        <View style={styles.contextRow}>
-                                            <Text style={styles.contextLabel}>
-                                                Guest Name:
-                                            </Text>
-                                            <Text style={styles.contextValue}>
-                                                {caseDetail.guest_name}
-                                            </Text>
-                                        </View>
-                                    ) : null}
-                                </View>
-                            )}
-
-                            {caseDetail.resolution ? (
-                                <View style={styles.resolutionBox}>
-                                    <CheckCircle2
-                                        size={16}
-                                        color={Colors.success}
-                                    />
-                                    <View
+                                {caseDetail.description ? (
+                                    <Text
                                         style={{
-                                            flex: 1,
-                                            marginLeft: Spacing.xs,
+                                            fontSize: 13,
+                                            color: Colors.textSecondary,
+                                            lineHeight: 19,
+                                            marginTop: 6,
+                                            marginBottom: 8,
                                         }}
                                     >
-                                        <Text style={styles.resolutionTitle}>
-                                            Resolution Note
-                                        </Text>
-                                        <Text style={styles.resolutionText}>
-                                            {caseDetail.resolution}
-                                        </Text>
+                                        {caseDetail.description}
+                                    </Text>
+                                ) : null}
+
+                                {(caseDetail.booking_reference ||
+                                    guestName ||
+                                    caseDetail.property_name) && (
+                                    <View style={styles.contextGrid}>
+                                        {caseDetail.property_name ? (
+                                            <View style={styles.contextRow}>
+                                                <Text
+                                                    style={styles.contextLabel}
+                                                >
+                                                    Property:
+                                                </Text>
+                                                <Text
+                                                    style={styles.contextValue}
+                                                >
+                                                    {caseDetail.property_name}
+                                                </Text>
+                                            </View>
+                                        ) : null}
+                                        {caseDetail.booking_reference ? (
+                                            <View style={styles.contextRow}>
+                                                <Text
+                                                    style={styles.contextLabel}
+                                                >
+                                                    Booking Ref:
+                                                </Text>
+                                                <Text
+                                                    style={
+                                                        styles.contextValueBold
+                                                    }
+                                                >
+                                                    {
+                                                        caseDetail.booking_reference
+                                                    }
+                                                </Text>
+                                            </View>
+                                        ) : null}
+                                        {guestName ? (
+                                            <View style={styles.contextRow}>
+                                                <Text
+                                                    style={styles.contextLabel}
+                                                >
+                                                    Guest Name:
+                                                </Text>
+                                                <Text
+                                                    style={styles.contextValue}
+                                                >
+                                                    {guestName}
+                                                </Text>
+                                            </View>
+                                        ) : null}
                                     </View>
-                                </View>
-                            ) : null}
-                        </View>
+                                )}
+
+                                {resolutionText ? (
+                                    <View style={styles.resolutionBox}>
+                                        <CheckCircle2
+                                            size={16}
+                                            color={Colors.success}
+                                        />
+                                        <View
+                                            style={{
+                                                flex: 1,
+                                                marginLeft: Spacing.xs,
+                                            }}
+                                        >
+                                            <Text
+                                                style={styles.resolutionTitle}
+                                            >
+                                                Resolution Summary
+                                            </Text>
+                                            <Text style={styles.resolutionText}>
+                                                {resolutionText}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                ) : null}
+                            </View>
 
                         {/* Customer Protection SLA Target Card */}
                         <View style={styles.slaCard}>
@@ -362,14 +499,20 @@ export default function CaseDetailScreen() {
                             </View>
                         ) : (
                             messages.map((msg) => {
+                                const senderTypeLower = String(
+                                    msg.sender_type || '',
+                                ).toLowerCase();
+                                const senderRoleLower = String(
+                                    msg.sender_role || '',
+                                ).toLowerCase();
                                 const isHost =
-                                    msg.is_owner ||
-                                    msg.sender_role?.toLowerCase() === 'owner';
+                                    Boolean(msg.is_owner) ||
+                                    senderTypeLower === 'owner' ||
+                                    senderRoleLower === 'owner';
                                 const isAdmin =
-                                    msg.sender_role?.toLowerCase() ===
-                                        'admin' ||
-                                    msg.sender_role?.toLowerCase() ===
-                                        'support';
+                                    senderTypeLower === 'admin' ||
+                                    senderRoleLower === 'admin' ||
+                                    senderRoleLower === 'support';
 
                                 return (
                                     <View
@@ -403,6 +546,21 @@ export default function CaseDetailScreen() {
                                         <Text style={styles.messageContent}>
                                             {msg.message}
                                         </Text>
+                                        {msg.attachment_url ? (
+                                            <Image
+                                                source={{
+                                                    uri: msg.attachment_url,
+                                                }}
+                                                style={{
+                                                    width: '100%',
+                                                    height: 160,
+                                                    borderRadius:
+                                                        BorderRadius.sm,
+                                                    marginTop: Spacing.xs,
+                                                }}
+                                                resizeMode="cover"
+                                            />
+                                        ) : null}
                                         <Text style={styles.messageTime}>
                                             {msg.created_at}
                                         </Text>
@@ -413,39 +571,147 @@ export default function CaseDetailScreen() {
                     </ScrollView>
 
                     {/* Reply Input Bar */}
-                    <View style={styles.replyBar}>
-                        <TextInput
-                            style={styles.replyInput}
-                            placeholder="Type response, evidence, or resolution..."
-                            placeholderTextColor={Colors.textTertiary}
-                            value={replyText}
-                            onChangeText={setReplyText}
-                            multiline
-                            maxLength={1000}
-                        />
-                        <TouchableOpacity
-                            style={[
-                                styles.sendButton,
-                                (!replyText.trim() || sending) &&
-                                    styles.sendButtonDisabled,
-                            ]}
-                            onPress={handleSendMessage}
-                            disabled={!replyText.trim() || sending}
-                            accessibilityLabel="Send Message"
+                    {isClosed ? (
+                        <View
+                            style={{
+                                padding: Spacing.md,
+                                paddingBottom: Math.max(
+                                    insets.bottom,
+                                    Spacing.md,
+                                ),
+                                backgroundColor: '#F0FDF4',
+                                borderTopWidth: 1,
+                                borderTopColor: '#BBF7D0',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                            }}
                         >
-                            {sending ? (
-                                <ActivityIndicator
-                                    size="small"
-                                    color={Colors.surface}
+                            <CheckCircle2 size={16} color="#166534" />
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    fontWeight: '700',
+                                    color: '#166534',
+                                }}
+                            >
+                                This case is marked{' '}
+                                {caseDetail.status_label || caseDetail.status}.
+                            </Text>
+                        </View>
+                    ) : (
+                        <View
+                            style={{
+                                backgroundColor: Colors.surface,
+                                borderTopWidth: 1,
+                                borderTopColor: Colors.border,
+                                paddingBottom: Math.max(insets.bottom, 0),
+                            }}
+                        >
+                            {selectedAttachment ? (
+                                <View
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        paddingHorizontal: Spacing.md,
+                                        paddingTop: Spacing.xs,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            fontSize: 12,
+                                            fontWeight: '600',
+                                            color: Colors.deepPlum,
+                                            flex: 1,
+                                        }}
+                                        numberOfLines={1}
+                                    >
+                                        Attached: {selectedAttachment.name}
+                                    </Text>
+                                    <TouchableOpacity
+                                        onPress={() =>
+                                            setSelectedAttachment(null)
+                                        }
+                                        style={{
+                                            width: 36,
+                                            height: 36,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}
+                                        accessibilityRole="button"
+                                        accessibilityLabel="Remove attachment"
+                                    >
+                                        <X
+                                            size={16}
+                                            color={Colors.textSecondary}
+                                        />
+                                    </TouchableOpacity>
+                                </View>
+                            ) : null}
+                            <View style={styles.replyBar}>
+                                <TouchableOpacity
+                                    style={{
+                                        width: 44,
+                                        height: 44,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                    onPress={() => void handlePickAttachment()}
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Attach evidence photo"
+                                >
+                                    <ImagePlus
+                                        size={20}
+                                        color={Colors.deepPlum}
+                                    />
+                                </TouchableOpacity>
+                                <TextInput
+                                    style={styles.replyInput}
+                                    placeholder="Type response, evidence, or resolution..."
+                                    placeholderTextColor={Colors.textTertiary}
+                                    value={replyText}
+                                    onChangeText={setReplyText}
+                                    multiline
+                                    maxLength={1000}
                                 />
-                            ) : (
-                                <Send size={18} color={Colors.surface} />
-                            )}
-                        </TouchableOpacity>
-                    </View>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.sendButton,
+                                        ((!replyText.trim() &&
+                                            !selectedAttachment) ||
+                                            sending) &&
+                                            styles.sendButtonDisabled,
+                                    ]}
+                                    onPress={() => void handleSendMessage()}
+                                    disabled={
+                                        (!replyText.trim() &&
+                                            !selectedAttachment) ||
+                                        sending
+                                    }
+                                    accessibilityLabel="Send Message"
+                                    accessibilityRole="button"
+                                >
+                                    {sending ? (
+                                        <ActivityIndicator
+                                            size="small"
+                                            color={Colors.surface}
+                                        />
+                                    ) : (
+                                        <Send
+                                            size={18}
+                                            color={Colors.surface}
+                                        />
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
                 </KeyboardAvoidingView>
             )}
-        </SafeAreaView>
+            </SafeAreaView>
+        </RequireAuth>
     );
 }
 

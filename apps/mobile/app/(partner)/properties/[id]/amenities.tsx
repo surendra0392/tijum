@@ -6,7 +6,6 @@ import {
     Modal,
     Platform,
     RefreshControl,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
@@ -14,7 +13,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { OwnerApi } from '../../../../src/api/owner';
 import {
     AmenityCatalogCategory,
@@ -23,11 +23,12 @@ import {
 } from '../../../../src/api/types';
 import { Badge } from '../../../../src/components/Badge';
 import { Button } from '../../../../src/components/Button';
+import { AppHeader } from '../../../../src/components/AppHeader';
+import { RequireAuth } from '../../../../src/components/RequireAuth';
 import { Colors } from '../../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../../src/theme/spacing';
 import { Typography } from '../../../../src/theme/typography';
 import {
-    ArrowLeft,
     Check,
     Plus,
     Search,
@@ -37,7 +38,6 @@ import {
 } from 'lucide-react-native';
 
 export default function PropertyAmenitiesScreen() {
-    const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
     const propertyId = Number(id);
 
@@ -210,42 +210,34 @@ export default function PropertyAmenitiesScreen() {
         }))
         .filter((cat) => cat.amenities.length > 0);
 
-    const approvedCount = assigned.filter(
-        (a) =>
-            a.status?.toLowerCase() === 'approved' ||
-            a.status?.toLowerCase() === 'verified',
-    ).length;
-    const pendingCount = assigned.filter(
-        (a) =>
-            a.status?.toLowerCase() === 'draft' ||
-            a.status?.toLowerCase() === 'under_review',
-    ).length;
+    const approvedCount = assigned.filter((a) => {
+        const st = (a.status || a.moderation_status || '').toLowerCase();
+        return st === 'approved' || st === 'verified';
+    }).length;
+    const pendingCount = assigned.filter((a) => {
+        const st = (a.status || a.moderation_status || 'pending').toLowerCase();
+        return st === 'draft' || st === 'under_review' || st === 'pending';
+    }).length;
 
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => router.back()}
-                    accessibilityLabel="Back to Property"
-                >
-                    <ArrowLeft size={22} color={Colors.textPrimary} />
-                </TouchableOpacity>
-                <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerTitle}>Amenities Management</Text>
-                    <Text style={styles.headerSubtitle}>
-                        Verified Facilities & Inclusions
-                    </Text>
-                </View>
-                <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={() => setIsAddModalOpen(true)}
-                    accessibilityLabel="Add Amenity"
-                >
-                    <Plus size={20} color={Colors.surface} />
-                </TouchableOpacity>
-            </View>
+        <RequireAuth role="partner">
+            <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+                <AppHeader
+                    title="Amenities Management"
+                    subtitle="Verified Facilities & Inclusions"
+                    showBack
+                    fallbackRoute={`/(partner)/properties/${propertyId}/edit`}
+                    rightElement={
+                        <TouchableOpacity
+                            style={styles.addButton}
+                            onPress={() => setIsAddModalOpen(true)}
+                            accessibilityRole="button"
+                            accessibilityLabel="Add Amenity"
+                        >
+                            <Plus size={20} color={Colors.surface} />
+                        </TouchableOpacity>
+                    }
+                />
 
             {loading ? (
                 <View style={styles.centered}>
@@ -412,11 +404,17 @@ export default function PropertyAmenitiesScreen() {
                                     <View style={styles.badgesArea}>
                                         <Badge
                                             variant={getStatusVariant(
-                                                item.status,
+                                                item.status ||
+                                                    item.moderation_status ||
+                                                    'pending',
                                             )}
                                             size="sm"
                                         >
-                                            {item.status.toUpperCase()}
+                                            {(
+                                                item.status ||
+                                                item.moderation_status ||
+                                                'pending'
+                                            ).toUpperCase()}
                                         </Badge>
                                     </View>
                                 </View>
@@ -465,7 +463,7 @@ export default function PropertyAmenitiesScreen() {
                 onRequestClose={() => setIsAddModalOpen(false)}
             >
                 <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     style={styles.modalOverlay}
                 >
                     <View style={styles.modalContainer}>
@@ -608,6 +606,7 @@ export default function PropertyAmenitiesScreen() {
                 </KeyboardAvoidingView>
             </Modal>
         </SafeAreaView>
+        </RequireAuth>
     );
 }
 

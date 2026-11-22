@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     RefreshControl,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
@@ -12,10 +10,15 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { OwnerApi } from '../../../src/api/owner';
 import { OwnerCase } from '../../../src/api/types';
+import { AppHeader } from '../../../src/components/AppHeader';
 import { Badge } from '../../../src/components/Badge';
+import { ExceptionalState } from '../../../src/components/ExceptionalState';
+import { RequireAuth } from '../../../src/components/RequireAuth';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
@@ -24,7 +27,6 @@ const STATUTORY_ACKNOWLEDGEMENT_COPY =
     'Statutory formal acknowledgement within 48h; formal resolution tracking up to 30 days.';
 import {
     AlertTriangle,
-    ArrowLeft,
     Clock,
     HelpCircle,
     MessageSquare,
@@ -41,31 +43,33 @@ const STATUS_TABS = [
 
 export default function PartnerCasesScreen() {
     const router = useRouter();
+    const isFocused = useIsFocused();
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [cases, setCases] = useState<OwnerCase[]>([]);
     const [selectedTab, setSelectedTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
 
-    const fetchCases = async () => {
+    const fetchCases = async (overrideSearch?: string) => {
         try {
+            setLoadError(null);
             const params: { status?: string; search?: string } = {};
             if (selectedTab !== 'all') {
                 params.status = selectedTab;
             }
-            if (searchQuery.trim()) {
-                params.search = searchQuery.trim();
+            const activeSearch =
+                overrideSearch !== undefined ? overrideSearch : searchQuery;
+            if (activeSearch.trim()) {
+                params.search = activeSearch.trim();
             }
 
             const res = await OwnerApi.getCases(params);
-            if (res.data) {
-                setCases(res.data);
-            }
+            setCases(Array.isArray(res.data) ? res.data : []);
         } catch (error: any) {
-            Alert.alert(
-                'Error',
-                error.message || 'Failed to load support cases.',
+            setLoadError(
+                error?.message || 'Failed to load support cases.',
             );
         } finally {
             setLoading(false);
@@ -74,9 +78,11 @@ export default function PartnerCasesScreen() {
     };
 
     useEffect(() => {
-        setLoading(true);
-        void fetchCases();
-    }, [selectedTab]);
+        if (isFocused) {
+            setLoading(true);
+            void fetchCases();
+        }
+    }, [selectedTab, isFocused]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -147,9 +153,12 @@ export default function PartnerCasesScreen() {
         }
     };
 
-    const actionRequiredCases = cases.filter(
-        (c) => c.status?.toLowerCase() === 'action_required',
-    );
+    const actionRequiredCases = cases.filter((c) => {
+        const s = c.status?.toLowerCase();
+        return (
+            s === 'action_required' || s === 'open' || s === 'awaiting_owner'
+        );
+    });
     const actionRequiredCount = actionRequiredCases.length;
 
     const getActionRequiredSlaBannerText = (actionCases: OwnerCase[]) => {
@@ -176,250 +185,307 @@ export default function PartnerCasesScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => router.back()}
-                    accessibilityLabel="Back to Account"
-                >
-                    <ArrowLeft size={22} color={Colors.textPrimary} />
-                </TouchableOpacity>
-                <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerTitle}>Support & Grievances</Text>
-                    <Text style={styles.headerSubtitle}>
-                        Customer Protection & Dispute Desk
-                    </Text>
-                </View>
-            </View>
-
-            {/* Search Input */}
-            <View style={styles.searchBarContainer}>
-                <View style={styles.searchBox}>
-                    <Search
-                        size={18}
-                        color={Colors.textTertiary}
-                        style={styles.searchIcon}
-                    />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search by case #, guest name, booking..."
-                        placeholderTextColor={Colors.textTertiary}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        onSubmitEditing={handleSearchSubmit}
-                        returnKeyType="search"
-                    />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity
-                            onPress={() => {
-                                setSearchQuery('');
-                                void fetchCases();
-                            }}
-                        >
-                            <X size={18} color={Colors.textTertiary} />
-                        </TouchableOpacity>
-                    )}
-                </View>
-            </View>
-
-            {/* Status Filter Tabs */}
-            <View style={styles.tabsContainer}>
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.tabsScroll}
-                >
-                    {STATUS_TABS.map((tab) => {
-                        const active = selectedTab === tab.key;
-                        return (
-                            <TouchableOpacity
-                                key={tab.key}
-                                style={[
-                                    styles.tabChip,
-                                    active && styles.tabChipActive,
-                                ]}
-                                onPress={() => setSelectedTab(tab.key)}
-                            >
-                                <Text
-                                    style={[
-                                        styles.tabChipText,
-                                        active && styles.tabChipTextActive,
-                                    ]}
-                                >
-                                    {tab.label}
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </ScrollView>
-            </View>
-
-            {loading ? (
-                <View style={styles.centered}>
-                    <ActivityIndicator size="large" color={Colors.primary} />
-                    <Text style={styles.loadingText}>
-                        Loading support cases...
-                    </Text>
-                </View>
-            ) : (
-                <FlatList
-                    data={cases}
-                    keyExtractor={(item: any) =>
-                        String(item.id || item.case_reference)
-                    }
-                    contentContainerStyle={styles.listContent}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={onRefresh}
-                        />
-                    }
-                    ListHeaderComponent={
-                        actionRequiredCount > 0 ? (
-                            <View style={styles.alertBanner}>
-                                <AlertTriangle
-                                    size={20}
-                                    color={Colors.warning}
-                                />
-                                <View style={styles.alertTextContainer}>
-                                    <Text style={styles.alertBannerText}>
-                                        {getActionRequiredSlaBannerText(
-                                            actionRequiredCases,
-                                        )}
-                                    </Text>
-                                    <Text style={styles.alertBannerSubtext}>
-                                        {STATUTORY_ACKNOWLEDGEMENT_COPY}
-                                    </Text>
-                                </View>
-                            </View>
-                        ) : null
-                    }
-                    ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <HelpCircle size={48} color={Colors.textTertiary} />
-                            <Text style={styles.emptyTitle}>
-                                No Cases Found
-                            </Text>
-                            <Text style={styles.emptySubtitle}>
-                                {searchQuery || selectedTab !== 'all'
-                                    ? 'No cases match your active filters.'
-                                    : 'There are no active customer protection or support cases for your properties.'}
-                            </Text>
-                        </View>
-                    }
-                    renderItem={({ item }: { item: any }) => (
-                        <TouchableOpacity
-                            style={styles.caseCard}
-                            onPress={() =>
-                                router.push(
-                                    `/(partner)/cases/${item.case_reference || item.id}`,
-                                )
-                            }
-                            activeOpacity={0.8}
-                        >
-                            <View style={styles.cardHeader}>
-                                <View style={styles.cardRefArea}>
-                                    <Text style={styles.caseRef}>
-                                        {item.case_reference}
-                                    </Text>
-                                    <Text style={styles.caseType}>
-                                        {item.type || 'Support Inquiry'}
-                                    </Text>
-                                </View>
-                                <View style={styles.cardBadges}>
-                                    {item.priority && (
-                                        <Badge
-                                            variant={getPriorityVariant(
-                                                item.priority,
-                                            )}
-                                            size="sm"
-                                        >
-                                            {item.priority.toUpperCase()}
-                                        </Badge>
-                                    )}
-                                    <Badge
-                                        variant={getStatusVariant(item.status)}
-                                        size="sm"
-                                    >
-                                        {(item.status || 'OPEN')
-                                            .replace('_', ' ')
-                                            .toUpperCase()}
-                                    </Badge>
-                                </View>
-                            </View>
-
-                            <Text style={styles.caseTitle} numberOfLines={2}>
-                                {item.title}
-                            </Text>
-
-                            {(item.booking_reference || item.guest_name) && (
-                                <View style={styles.metaRow}>
-                                    {item.booking_reference ? (
-                                        <Text style={styles.metaText}>
-                                            Ref: {item.booking_reference}
-                                        </Text>
-                                    ) : null}
-                                    {item.guest_name ? (
-                                        <Text style={styles.metaText}>
-                                            Guest: {item.guest_name}
-                                        </Text>
-                                    ) : null}
-                                </View>
-                            )}
-
-                            <View style={styles.slaRow}>
-                                <Clock
-                                    size={12}
-                                    color={
-                                        item.priority?.toLowerCase() ===
-                                            'urgent' ||
-                                        item.priority?.toLowerCase() === 'high'
-                                            ? Colors.error
-                                            : Colors.textSecondary
-                                    }
-                                />
-                                <Text
-                                    style={[
-                                        styles.slaText,
-                                        (item.priority?.toLowerCase() ===
-                                            'urgent' ||
-                                            item.priority?.toLowerCase() ===
-                                                'high') &&
-                                            styles.slaUrgentText,
-                                    ]}
-                                >
-                                    {getPrioritySlaTarget(item.priority).label}
-                                </Text>
-                            </View>
-
-                            <View style={styles.cardFooter}>
-                                <View style={styles.footerLeft}>
-                                    <Clock
-                                        size={12}
-                                        color={Colors.textTertiary}
-                                    />
-                                    <Text style={styles.footerDate}>
-                                        Updated:{' '}
-                                        {item.updated_at || item.created_at}
-                                    </Text>
-                                </View>
-                                <View style={styles.footerRight}>
-                                    <MessageSquare
-                                        size={14}
-                                        color={Colors.primary}
-                                    />
-                                    <Text style={styles.footerLink}>
-                                        View Timeline →
-                                    </Text>
-                                </View>
-                            </View>
-                        </TouchableOpacity>
-                    )}
+        <RequireAuth role="partner">
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <AppHeader
+                    title="Support & Grievances"
+                    subtitle="Customer Protection & Dispute Desk"
+                    showBack
+                    fallbackRoute="/(partner)/dashboard"
                 />
-            )}
-        </SafeAreaView>
+
+                {/* Search Input */}
+                <View style={styles.searchBarContainer}>
+                    <View style={styles.searchBox}>
+                        <Search
+                            size={18}
+                            color={Colors.textTertiary}
+                            style={styles.searchIcon}
+                        />
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Search by case #, guest name, booking..."
+                            placeholderTextColor={Colors.textTertiary}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            onSubmitEditing={handleSearchSubmit}
+                            returnKeyType="search"
+                        />
+                        {searchQuery.length > 0 && (
+                            <TouchableOpacity
+                                style={{
+                                    width: 44,
+                                    height: 44,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                                onPress={() => {
+                                    setSearchQuery('');
+                                    setLoading(true);
+                                    void fetchCases('');
+                                }}
+                                accessibilityRole="button"
+                                accessibilityLabel="Clear search"
+                            >
+                                <X size={18} color={Colors.textTertiary} />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                </View>
+
+                {/* Status Filter Tabs */}
+                <View style={styles.tabsContainer}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.tabsScroll}
+                    >
+                        {STATUS_TABS.map((tab) => {
+                            const active = selectedTab === tab.key;
+                            return (
+                                <TouchableOpacity
+                                    key={tab.key}
+                                    style={[
+                                        styles.tabChip,
+                                        active && styles.tabChipActive,
+                                    ]}
+                                    onPress={() => setSelectedTab(tab.key)}
+                                    accessibilityRole="tab"
+                                    accessibilityState={{ selected: active }}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.tabChipText,
+                                            active && styles.tabChipTextActive,
+                                        ]}
+                                    >
+                                        {tab.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+                </View>
+
+                {loading && !refreshing ? (
+                    <View style={styles.centered}>
+                        <ActivityIndicator size="large" color={Colors.primary} />
+                        <Text style={styles.loadingText}>
+                            Loading support cases...
+                        </Text>
+                    </View>
+                ) : loadError && cases.length === 0 ? (
+                    <ExceptionalState
+                        type="no-internet"
+                        title="Support Cases Unavailable"
+                        description={loadError}
+                        actionLabel="Try Again"
+                        onAction={() => {
+                            setLoading(true);
+                            void fetchCases();
+                        }}
+                    />
+                ) : (
+                    <FlatList
+                        data={cases}
+                        keyExtractor={(item: OwnerCase) =>
+                            String(item.id || item.case_reference)
+                        }
+                        contentContainerStyle={styles.listContent}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={onRefresh}
+                                colors={[Colors.deepPlum]}
+                                tintColor={Colors.deepPlum}
+                            />
+                        }
+                        ListHeaderComponent={
+                            actionRequiredCount > 0 ? (
+                                <View style={styles.alertBanner}>
+                                    <AlertTriangle
+                                        size={20}
+                                        color={Colors.warning}
+                                    />
+                                    <View style={styles.alertTextContainer}>
+                                        <Text style={styles.alertBannerText}>
+                                            {getActionRequiredSlaBannerText(
+                                                actionRequiredCases,
+                                            )}
+                                        </Text>
+                                        <Text style={styles.alertBannerSubtext}>
+                                            {STATUTORY_ACKNOWLEDGEMENT_COPY}
+                                        </Text>
+                                    </View>
+                                </View>
+                            ) : null
+                        }
+                        ListEmptyComponent={
+                            <View style={styles.emptyContainer}>
+                                <HelpCircle
+                                    size={48}
+                                    color={Colors.textTertiary}
+                                />
+                                <Text style={styles.emptyTitle}>
+                                    No Cases Found
+                                </Text>
+                                <Text style={styles.emptySubtitle}>
+                                    {searchQuery || selectedTab !== 'all'
+                                        ? 'No cases match your active filters.'
+                                        : 'There are no active customer protection or support cases for your properties.'}
+                                </Text>
+                            </View>
+                        }
+                        renderItem={({ item }: { item: OwnerCase }) => {
+                            const guestName =
+                                item.customer_name || item.guest_name || null;
+                            const categoryText =
+                                item.category_label ||
+                                item.type ||
+                                (item.category
+                                    ? item.category.replace(/_/g, ' ')
+                                    : 'Support Inquiry');
+                            const headlineText =
+                                item.title ||
+                                item.description ||
+                                categoryText;
+                            const slaLabel = item.first_action_target_hours
+                                ? `First Action Target: ${item.first_action_target_hours} Hours`
+                                : getPrioritySlaTarget(item.priority).label;
+
+                            return (
+                                <TouchableOpacity
+                                    style={styles.caseCard}
+                                    onPress={() =>
+                                        router.push(
+                                            `/(partner)/cases/${item.case_reference || item.id}`,
+                                        )
+                                    }
+                                    activeOpacity={0.8}
+                                    accessibilityRole="button"
+                                >
+                                    <View style={styles.cardHeader}>
+                                        <View style={styles.cardRefArea}>
+                                            <Text style={styles.caseRef}>
+                                                {item.case_reference}
+                                            </Text>
+                                            <Text style={styles.caseType}>
+                                                {categoryText}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.cardBadges}>
+                                            {item.priority && (
+                                                <Badge
+                                                    variant={getPriorityVariant(
+                                                        item.priority,
+                                                    )}
+                                                    size="sm"
+                                                    label={(
+                                                        item.priority_label ||
+                                                        item.priority
+                                                    ).toUpperCase()}
+                                                />
+                                            )}
+                                            <Badge
+                                                variant={getStatusVariant(
+                                                    item.status,
+                                                )}
+                                                size="sm"
+                                                label={(
+                                                    item.status_label ||
+                                                    (item.status || 'OPEN').replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )
+                                                ).toUpperCase()}
+                                            />
+                                        </View>
+                                    </View>
+
+                                    <Text
+                                        style={styles.caseTitle}
+                                        numberOfLines={2}
+                                    >
+                                        {headlineText}
+                                    </Text>
+
+                                    {(item.booking_reference ||
+                                        guestName ||
+                                        item.property_name) && (
+                                        <View style={styles.metaRow}>
+                                            {item.property_name ? (
+                                                <Text style={styles.metaText}>
+                                                    {item.property_name}
+                                                </Text>
+                                            ) : null}
+                                            {item.booking_reference ? (
+                                                <Text style={styles.metaText}>
+                                                    Ref: {item.booking_reference}
+                                                </Text>
+                                            ) : null}
+                                            {guestName ? (
+                                                <Text style={styles.metaText}>
+                                                    Guest: {guestName}
+                                                </Text>
+                                            ) : null}
+                                        </View>
+                                    )}
+
+                                    <View style={styles.slaRow}>
+                                        <Clock
+                                            size={12}
+                                            color={
+                                                item.priority?.toLowerCase() ===
+                                                    'urgent' ||
+                                                item.priority?.toLowerCase() ===
+                                                    'high'
+                                                    ? Colors.error
+                                                    : Colors.textSecondary
+                                            }
+                                        />
+                                        <Text
+                                            style={[
+                                                styles.slaText,
+                                                (item.priority?.toLowerCase() ===
+                                                    'urgent' ||
+                                                    item.priority?.toLowerCase() ===
+                                                        'high') &&
+                                                    styles.slaUrgentText,
+                                            ]}
+                                        >
+                                            {slaLabel}
+                                        </Text>
+                                    </View>
+
+                                    <View style={styles.cardFooter}>
+                                        <View style={styles.footerLeft}>
+                                            <Clock
+                                                size={12}
+                                                color={Colors.textTertiary}
+                                            />
+                                            <Text style={styles.footerDate}>
+                                                Updated:{' '}
+                                                {item.updated_at ||
+                                                    item.created_at}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.footerRight}>
+                                            <MessageSquare
+                                                size={14}
+                                                color={Colors.primary}
+                                            />
+                                            <Text style={styles.footerLink}>
+                                                View Timeline →
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        }}
+                    />
+                )}
+            </SafeAreaView>
+        </RequireAuth>
     );
 }
 

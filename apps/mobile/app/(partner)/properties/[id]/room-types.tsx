@@ -3,9 +3,10 @@ import {
     ActivityIndicator,
     Alert,
     FlatList,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     RefreshControl,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Switch,
@@ -13,17 +14,19 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { OwnerApi } from '../../../../src/api/owner';
 import { RoomType } from '../../../../src/api/types';
 import { Badge } from '../../../../src/components/Badge';
 import { Button } from '../../../../src/components/Button';
 import { Input } from '../../../../src/components/Input';
+import { AppHeader } from '../../../../src/components/AppHeader';
+import { RequireAuth } from '../../../../src/components/RequireAuth';
 import { Colors } from '../../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../../src/theme/spacing';
 import { Typography } from '../../../../src/theme/typography';
 import {
-    ArrowLeft,
     BedDouble,
     DoorClosed,
     Edit2,
@@ -108,8 +111,8 @@ export default function PropertyRoomTypesScreen() {
         setName(rt.name);
         setMode(rt.accommodation_mode);
         setSharingCapacity(
-            rt.sharing_capacity === 3 || rt.sharing_capacity === 4
-                ? rt.sharing_capacity
+            rt.sharing_capacity && rt.sharing_capacity >= 2
+                ? (Math.min(4, Math.max(2, rt.sharing_capacity)) as 2 | 3 | 4)
                 : 2,
         );
         setGenderPolicy(
@@ -126,7 +129,7 @@ export default function PropertyRoomTypesScreen() {
         );
         setIsAirConditioned(rt.is_air_conditioned);
         setEarlyCheckInEnabled(rt.early_check_in_enabled);
-        setDescription('');
+        setDescription((rt as { description?: string }).description || '');
         setModalVisible(true);
     };
 
@@ -200,11 +203,34 @@ export default function PropertyRoomTypesScreen() {
                     style: rt.is_active ? 'destructive' : 'default',
                     onPress: async () => {
                         try {
-                            await OwnerApi.deleteRoomType(
-                                propertyId,
-                                rt.id,
-                                true,
-                            );
+                            if (rt.is_active) {
+                                await OwnerApi.deleteRoomType(
+                                    propertyId,
+                                    rt.id,
+                                    true,
+                                );
+                            } else {
+                                await OwnerApi.updateRoomType(
+                                    propertyId,
+                                    rt.id,
+                                    {
+                                        name: rt.name,
+                                        accommodation_mode:
+                                            rt.accommodation_mode,
+                                        sharing_capacity: rt.sharing_capacity,
+                                        gender_policy: rt.gender_policy,
+                                        guest_composition_policy:
+                                            rt.guest_composition_policy || [
+                                                'individuals',
+                                            ],
+                                        is_air_conditioned:
+                                            rt.is_air_conditioned,
+                                        early_check_in_enabled:
+                                            rt.early_check_in_enabled,
+                                        is_active: true,
+                                    },
+                                );
+                            }
                             await loadRoomTypes();
                         } catch (e: any) {
                             Alert.alert('Error', e.message);
@@ -322,31 +348,24 @@ export default function PropertyRoomTypesScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => router.back()}
-                    style={styles.backBtn}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                    <ArrowLeft size={22} color={Colors.deepPlum} />
-                </TouchableOpacity>
-                <View style={styles.headerTitleBox}>
-                    <Text style={styles.headerTitle}>Room Categories</Text>
-                    <Text style={styles.headerSubtitle}>
-                        Property #{propertyId} • {roomTypes.length} Configured
-                    </Text>
-                </View>
-                <TouchableOpacity
-                    style={styles.addBtn}
-                    onPress={handleOpenCreate}
-                    activeOpacity={0.8}
-                >
-                    <Plus size={16} color={Colors.white} />
-                    <Text style={styles.addBtnText}>Add</Text>
-                </TouchableOpacity>
-            </View>
+        <RequireAuth role="partner">
+            <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+                <AppHeader
+                    title="Room Categories"
+                    subtitle={`Property #${propertyId} • ${roomTypes.length} Configured`}
+                    showBack
+                    fallbackRoute={`/(partner)/properties/${propertyId}/edit`}
+                    rightElement={
+                        <TouchableOpacity
+                            style={styles.addBtn}
+                            onPress={handleOpenCreate}
+                            activeOpacity={0.8}
+                        >
+                            <Plus size={16} color={Colors.white} />
+                            <Text style={styles.addBtnText}>Add</Text>
+                        </TouchableOpacity>
+                    }
+                />
 
             {loading && !refreshing ? (
                 <View style={styles.center}>
@@ -397,7 +416,10 @@ export default function PropertyRoomTypesScreen() {
                 transparent
                 onRequestClose={() => setModalVisible(false)}
             >
-                <View style={styles.modalOverlay}>
+                <KeyboardAvoidingView
+                    style={styles.modalOverlay}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                >
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>
@@ -635,6 +657,17 @@ export default function PropertyRoomTypesScreen() {
                                 />
                             </View>
 
+                            <View style={{ marginTop: Spacing.md }}>
+                                <Input
+                                    label="Category Description (Optional)"
+                                    placeholder="Describe room amenities, study desk, or balcony view"
+                                    value={description}
+                                    onChangeText={setDescription}
+                                    multiline
+                                    numberOfLines={2}
+                                />
+                            </View>
+
                             <View style={{ marginTop: Spacing.xl }}>
                                 <Button
                                     title={
@@ -649,9 +682,10 @@ export default function PropertyRoomTypesScreen() {
                             </View>
                         </ScrollView>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
         </SafeAreaView>
+        </RequireAuth>
     );
 }
 

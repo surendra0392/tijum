@@ -2,13 +2,17 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     RefreshControl,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import {
     Bell,
@@ -16,6 +20,7 @@ import {
     Calendar,
     BarChart3,
     ChevronRight,
+    ShieldAlert,
     Star,
 } from 'lucide-react-native';
 import { OwnerApi } from '../../src/api/owner';
@@ -23,13 +28,17 @@ import { useAuth } from '../../src/auth/AuthContext';
 import { Colors } from '../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../src/theme/spacing';
 import { ExceptionalState } from '../../src/components/ExceptionalState';
+import { ReservationStatusBadge } from '../../src/components/ReservationStatusBadge';
 import { PartnerDashboardData, Reservation } from '../../src/api/types';
 
 export default function PartnerDashboardScreen() {
     const router = useRouter();
-    const { owner, token, authState } = useAuth();
+    const insets = useSafeAreaInsets();
+    const isFocused = useIsFocused();
+    const { owner, token, authState, sessionEpoch } = useAuth();
     const [dashboardData, setDashboardData] =
         useState<PartnerDashboardData | null>(null);
+    const [unreadCount, setUnreadCount] = useState(0);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -37,21 +46,34 @@ export default function PartnerDashboardScreen() {
     const isGuest = !token || authState !== 'owner_authenticated';
 
     useEffect(() => {
-        if (!isGuest) {
-            void loadDashboard();
-        }
-    }, [isGuest]);
+        setDashboardData(null);
+        setUnreadCount(0);
+    }, [sessionEpoch]);
 
-    const loadDashboard = async () => {
+    useEffect(() => {
+        if (!isGuest && isFocused) {
+            void loadDashboard(dashboardData !== null);
+        }
+    }, [isGuest, isFocused]);
+
+    const loadDashboard = async (silent = false) => {
         try {
-            setLoading(true);
+            if (!silent) {
+                setLoading(true);
+            }
             setErrorMessage(null);
-            const res = await OwnerApi.getDashboard();
+            const [res, unreadRes] = await Promise.all([
+                OwnerApi.getDashboard(),
+                OwnerApi.getUnreadCount().catch(() => null),
+            ]);
             if (res.data) {
                 setDashboardData(res.data);
             } else {
                 setDashboardData(null);
                 setErrorMessage('Dashboard data is unavailable.');
+            }
+            if (typeof unreadRes?.data?.unread_count === 'number') {
+                setUnreadCount(unreadRes.data.unread_count);
             }
         } catch (loadError: unknown) {
             setErrorMessage(
@@ -76,34 +98,45 @@ export default function PartnerDashboardScreen() {
               {
                   label: 'Arrivals Today',
                   value: dashboardData.statistics.today_arrivals,
+                  route: '/(partner)/reservations',
               },
               {
                   label: 'Departures Today',
                   value: dashboardData.statistics.today_departures,
+                  route: '/(partner)/reservations',
               },
               {
                   label: 'In-House Guests',
                   value: dashboardData.statistics.in_house_guests,
+                  route: '/(partner)/reservations',
               },
               {
                   label: 'Active Stays',
                   value: dashboardData.statistics.active_reservations,
+                  route: '/(partner)/reservations',
               },
               {
                   label: 'Reviews to Reply',
                   value: dashboardData.statistics.pending_reviews,
+                  route: '/(partner)/reviews',
               },
               {
                   label: 'Open Cases',
                   value: dashboardData.statistics.open_complaints,
+                  route: '/(partner)/cases',
               },
           ]
         : [];
 
     if (!token || authState !== 'owner_authenticated') {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.plumHeader}>
+            <SafeAreaView style={styles.container} edges={['bottom']}>
+                <View
+                    style={[
+                        styles.plumHeader,
+                        { paddingTop: Math.max(insets.top, Spacing.base) },
+                    ]}
+                >
                     <Text style={styles.greetingText}>Partner Portal</Text>
                 </View>
                 <ExceptionalState
@@ -119,7 +152,10 @@ export default function PartnerDashboardScreen() {
 
     if (loading && !dashboardData) {
         return (
-            <SafeAreaView style={[styles.container, styles.centered]}>
+            <SafeAreaView
+                style={[styles.container, styles.centered]}
+                edges={['bottom']}
+            >
                 <ActivityIndicator size="large" color={Colors.deepPlum} />
             </SafeAreaView>
         );
@@ -127,20 +163,20 @@ export default function PartnerDashboardScreen() {
 
     if (errorMessage && !dashboardData) {
         return (
-            <SafeAreaView style={styles.container}>
+            <SafeAreaView style={styles.container} edges={['bottom']}>
                 <ExceptionalState
                     type="no-internet"
                     title="Dashboard Unavailable"
                     description={errorMessage}
                     actionLabel="Try Again"
-                    onAction={loadDashboard}
+                    onAction={() => void loadDashboard()}
                 />
             </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['bottom']}>
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
@@ -150,16 +186,23 @@ export default function PartnerDashboardScreen() {
                         onRefresh={() => {
                             if (!isGuest) {
                                 setRefreshing(true);
-                                void loadDashboard().then(() =>
+                                void loadDashboard(true).then(() =>
                                     setRefreshing(false),
                                 );
                             }
                         }}
+                        colors={[Colors.deepPlum]}
+                        tintColor={Colors.deepPlum}
                     />
                 }
             >
                 {/* Curved Deep Plum Header */}
-                <View style={styles.plumHeader}>
+                <View
+                    style={[
+                        styles.plumHeader,
+                        { paddingTop: Math.max(insets.top, Spacing.base) },
+                    ]}
+                >
                     <View style={styles.headerTopRow}>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.greetingText}>
@@ -180,6 +223,32 @@ export default function PartnerDashboardScreen() {
                             activeOpacity={0.8}
                         >
                             <Bell size={20} color={Colors.white} />
+                            {unreadCount > 0 ? (
+                                <View
+                                    style={{
+                                        position: 'absolute',
+                                        top: 2,
+                                        right: 2,
+                                        minWidth: 16,
+                                        height: 16,
+                                        borderRadius: 8,
+                                        backgroundColor: Colors.coral,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        paddingHorizontal: 3,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            color: Colors.deepPlum,
+                                            fontSize: 9,
+                                            fontWeight: '800',
+                                        }}
+                                    >
+                                        {unreadCount > 99 ? '99+' : unreadCount}
+                                    </Text>
+                                </View>
+                            ) : null}
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -187,24 +256,36 @@ export default function PartnerDashboardScreen() {
                 {/* 2 Primary Metric Cards */}
                 <View style={styles.metricsRow}>
                     {/* Total Bookings */}
-                    <View style={styles.metricCard}>
+                    <TouchableOpacity
+                        style={styles.metricCard}
+                        onPress={() => router.push('/(partner)/reservations')}
+                        activeOpacity={0.85}
+                        accessibilityRole="button"
+                    >
                         <View style={styles.metricHeaderRow}>
                             <Calendar size={18} color={Colors.deepPlum} />
+                            <ChevronRight size={14} color={Colors.gray400} />
                         </View>
                         <Text style={styles.metricLabel}>Confirmed Stays</Text>
                         <Text style={styles.metricValue}>{confirmedStays}</Text>
-                    </View>
+                    </TouchableOpacity>
 
                     {/* Total Revenue */}
-                    <View style={styles.metricCard}>
+                    <TouchableOpacity
+                        style={styles.metricCard}
+                        onPress={() => router.push('/(partner)/settlements')}
+                        activeOpacity={0.85}
+                        accessibilityRole="button"
+                    >
                         <View style={styles.metricHeaderRow}>
                             <Text style={styles.rupeeIcon}>₹</Text>
+                            <ChevronRight size={14} color={Colors.gray400} />
                         </View>
                         <Text style={styles.metricLabel}>Monthly Earnings</Text>
                         <Text style={styles.metricValue}>
                             ₹{monthlyEarnings.toLocaleString('en-IN')}
                         </Text>
-                    </View>
+                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.operationsSection}>
@@ -213,9 +294,14 @@ export default function PartnerDashboardScreen() {
                     </Text>
                     <View style={styles.operationsGrid}>
                         {operations.map((operation) => (
-                            <View
+                            <TouchableOpacity
                                 key={operation.label}
                                 style={styles.operationCard}
+                                onPress={() =>
+                                    router.push(operation.route as any)
+                                }
+                                activeOpacity={0.8}
+                                accessibilityRole="button"
                             >
                                 <Text style={styles.operationValue}>
                                     {operation.value}
@@ -223,16 +309,30 @@ export default function PartnerDashboardScreen() {
                                 <Text style={styles.operationLabel}>
                                     {operation.label}
                                 </Text>
-                            </View>
+                            </TouchableOpacity>
                         ))}
                     </View>
                 </View>
 
                 {dashboardData ? (
-                    <View style={styles.inventoryCard}>
-                        <Text style={styles.sectionHeading}>
-                            Property Inventory
-                        </Text>
+                    <TouchableOpacity
+                        style={styles.inventoryCard}
+                        onPress={() => router.push('/(partner)/properties')}
+                        activeOpacity={0.85}
+                        accessibilityRole="button"
+                    >
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                            }}
+                        >
+                            <Text style={styles.sectionHeading}>
+                                Property Inventory
+                            </Text>
+                            <ChevronRight size={16} color={Colors.gray400} />
+                        </View>
                         <View style={styles.inventoryRow}>
                             <Text style={styles.inventoryText}>
                                 {
@@ -260,27 +360,57 @@ export default function PartnerDashboardScreen() {
                                 rooms
                             </Text>
                         </View>
-                        <Text style={styles.payoutText}>
-                            Unsettled payout: ₹
-                            {(
-                                dashboardData.statistics
-                                    .unsettled_payout_paise / 100
-                            ).toLocaleString('en-IN')}
-                        </Text>
-                    </View>
+                        <TouchableOpacity
+                            onPress={() =>
+                                router.push('/(partner)/settlements')
+                            }
+                            style={{ marginTop: 4 }}
+                        >
+                            <Text style={styles.payoutText}>
+                                Unsettled payout: ₹
+                                {(
+                                    dashboardData.statistics
+                                        .unsettled_payout_paise / 100
+                                ).toLocaleString('en-IN')}{' '}
+                                →
+                            </Text>
+                        </TouchableOpacity>
+                    </TouchableOpacity>
                 ) : null}
 
                 {dashboardData &&
                 !dashboardData.onboarding.can_publish_properties ? (
-                    <View style={styles.onboardingCard}>
-                        <Text style={styles.onboardingTitle}>
-                            {dashboardData.onboarding.account_status_label}
-                        </Text>
+                    <TouchableOpacity
+                        style={styles.onboardingCard}
+                        onPress={() =>
+                            router.push('/(partner)/financial-profile')
+                        }
+                        activeOpacity={0.85}
+                        accessibilityRole="button"
+                    >
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                            }}
+                        >
+                            <Text style={styles.onboardingTitle}>
+                                {
+                                    dashboardData.onboarding
+                                        .account_status_label
+                                }
+                            </Text>
+                            <ChevronRight
+                                size={16}
+                                color={Colors.deepPlum}
+                            />
+                        </View>
                         <Text style={styles.onboardingText}>
-                            Complete partner verification before publishing
-                            properties.
+                            Complete partner KYC & financial verification before
+                            publishing properties. Tap to review.
                         </Text>
-                    </View>
+                    </TouchableOpacity>
                 ) : null}
 
                 {/* Quick Actions (3 Rounded Cards) */}
@@ -411,6 +541,64 @@ export default function PartnerDashboardScreen() {
                         </View>
                         <ChevronRight size={18} color={Colors.inkSecondary} />
                     </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[
+                            styles.actionCard,
+                            {
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginTop: Spacing.sm,
+                            },
+                        ]}
+                        onPress={() => router.push('/(partner)/cases')}
+                        activeOpacity={0.85}
+                        accessibilityRole="button"
+                    >
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                            }}
+                        >
+                            <View
+                                style={[
+                                    styles.actionIconCircle,
+                                    {
+                                        backgroundColor: '#FEE2E2',
+                                        marginBottom: 0,
+                                        marginRight: 12,
+                                    },
+                                ]}
+                            >
+                                <ShieldAlert
+                                    size={20}
+                                    color={Colors.coralDark}
+                                />
+                            </View>
+                            <View>
+                                <Text
+                                    style={{
+                                        fontSize: 13,
+                                        fontWeight: '700',
+                                        color: Colors.inkPrimary,
+                                    }}
+                                >
+                                    Support & Protection Cases
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 11,
+                                        color: Colors.inkMuted,
+                                    }}
+                                >
+                                    Respond to guest grievances within SLA
+                                </Text>
+                            </View>
+                        </View>
+                        <ChevronRight size={18} color={Colors.inkSecondary} />
+                    </TouchableOpacity>
                 </View>
 
                 {/* Recent Bookings Link */}
@@ -420,6 +608,7 @@ export default function PartnerDashboardScreen() {
                             Recent Bookings
                         </Text>
                         <TouchableOpacity
+                            style={{ minHeight: 44, justifyContent: 'center' }}
                             onPress={() =>
                                 router.push('/(partner)/reservations')
                             }
@@ -429,49 +618,51 @@ export default function PartnerDashboardScreen() {
                     </View>
 
                     {dashboardData?.recent_reservations.map(
-                        (res: Reservation) => (
-                            <TouchableOpacity
-                                key={res.id}
-                                style={styles.recentBookingCard}
-                                onPress={() =>
-                                router.push(
-                                    `/(partner)/reservations/${res.reference ?? res.booking_reference}`,
-                                )
-                                }
-                                activeOpacity={0.8}
-                            >
-                                <View style={{ flex: 1 }}>
-                                    <View style={styles.recentRefRow}>
-                                        <Text style={styles.recentRefText}>
-                                            #
-                                            {res.reference ??
-                                                res.booking_reference}
-                                        </Text>
-                                        <View style={styles.confirmedPill}>
-                                            <Text
-                                                style={styles.confirmedPillText}
-                                            >
-                                                {res.status_label}
+                        (res: Reservation) => {
+                            const roomLabel =
+                                res.primary_room_number ??
+                                res.allocated_room_number;
+                            return (
+                                <TouchableOpacity
+                                    key={res.id}
+                                    style={styles.recentBookingCard}
+                                    onPress={() =>
+                                        router.push(
+                                            `/(partner)/reservations/${res.reference ?? res.booking_reference}`,
+                                        )
+                                    }
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={{ flex: 1 }}>
+                                        <View style={styles.recentRefRow}>
+                                            <Text style={styles.recentRefText}>
+                                                #
+                                                {res.reference ??
+                                                    res.booking_reference}
                                             </Text>
+                                            <ReservationStatusBadge
+                                                status={res.status}
+                                                label={res.status_label}
+                                            />
                                         </View>
+                                        <Text style={styles.recentGuestName}>
+                                            {res.customer_name ?? 'Guest'}
+                                            {roomLabel
+                                                ? ` • Room ${roomLabel}`
+                                                : ''}
+                                        </Text>
+                                        <Text style={styles.recentDates}>
+                                            {res.check_in_date} -{' '}
+                                            {res.check_out_date}
+                                        </Text>
                                     </View>
-                                    <Text style={styles.recentGuestName}>
-                                        {res.customer_name ?? 'Guest'}
-                                        {res.allocated_room_number
-                                            ? ` • Room ${res.allocated_room_number}`
-                                            : ''}
-                                    </Text>
-                                    <Text style={styles.recentDates}>
-                                        {res.check_in_date} -{' '}
-                                        {res.check_out_date}
-                                    </Text>
-                                </View>
-                                <ChevronRight
-                                    size={18}
-                                    color={Colors.gray400}
-                                />
-                            </TouchableOpacity>
-                        ),
+                                    <ChevronRight
+                                        size={18}
+                                        color={Colors.gray400}
+                                    />
+                                </TouchableOpacity>
+                            );
+                        },
                     )}
                     {dashboardData?.recent_reservations.length === 0 ? (
                         <Text style={styles.emptyText}>

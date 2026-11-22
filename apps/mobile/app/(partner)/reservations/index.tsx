@@ -4,22 +4,23 @@ import {
     FlatList,
     Image,
     RefreshControl,
-    SafeAreaView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import {
     Calendar,
     AlertCircle,
     Building2,
-    CheckCircle2,
 } from 'lucide-react-native';
 import { OwnerApi } from '../../../src/api/owner';
 import { Reservation } from '../../../src/api/types';
 import { ExceptionalState } from '../../../src/components/ExceptionalState';
+import { ReservationStatusBadge } from '../../../src/components/ReservationStatusBadge';
 import { useAuth } from '../../../src/auth/AuthContext';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
@@ -32,39 +33,57 @@ const FILTER_TABS = [
 
 export default function PartnerReservationsScreen() {
     const router = useRouter();
-    const { token, authState } = useAuth();
+    const isFocused = useIsFocused();
+    const { token, authState, sessionEpoch } = useAuth();
     const [reservations, setReservations] = useState<Reservation[]>([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [lastPage, setLastPage] = useState(1);
     const [activeTab, setActiveTab] = useState('upcoming');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const isGuest = !token || authState !== 'owner_authenticated';
 
     useEffect(() => {
-        if (!isGuest) {
-            void loadReservations();
+        if (isGuest) {
+            setReservations([]);
+            setErrorMessage(null);
+            return;
         }
-    }, [activeTab, isGuest]);
+        if (isFocused) {
+            void loadReservations(1);
+        }
+    }, [activeTab, isGuest, isFocused, sessionEpoch]);
 
-    const loadReservations = async () => {
+    const loadReservations = async (page = 1) => {
         try {
-            setLoading(true);
+            if (page === 1) {
+                setLoading(true);
+            } else {
+                setLoadingMore(true);
+            }
             setErrorMessage(null);
             const res = await OwnerApi.getReservations(
                 activeTab as 'upcoming' | 'past' | 'cancelled',
+                page,
             );
-            if (res.data && res.data.length > 0) {
-                setReservations(res.data);
-            } else {
+            const items = res.data || [];
+            setReservations((prev) =>
+                page === 1 ? items : [...prev, ...items],
+            );
+            setCurrentPage(res.meta?.current_page ?? page);
+            setLastPage(res.meta?.last_page ?? 1);
+        } catch {
+            if (page === 1) {
+                setErrorMessage(
+                    'Unable to load your reservations. Please try again.',
+                );
                 setReservations([]);
             }
-        } catch {
-            setErrorMessage(
-                'Unable to load your reservations. Please try again.',
-            );
-            setReservations([]);
         } finally {
             setLoading(false);
+            setLoadingMore(false);
         }
     };
 
@@ -72,16 +91,22 @@ export default function PartnerReservationsScreen() {
         if (isGuest) return;
         setRefreshing(true);
         setErrorMessage(null);
-        await loadReservations();
+        await loadReservations(1);
         setRefreshing(false);
+    };
+
+    const handleLoadMore = () => {
+        if (!loading && !loadingMore && currentPage < lastPage) {
+            void loadReservations(currentPage + 1);
+        }
     };
 
     const renderBookingCard = ({ item }: { item: Reservation }) => {
         const reference = item.reference ?? item.booking_reference;
         const rawAmount =
-            (item.owner_payable_paise ?? item.total_amount_paise) / 100;
-        const photoUrl = item.property.cover_image_url;
-        const nights = item.total_stay_days ?? item.duration_quantity;
+            ((item.owner_payable_paise ?? item.total_amount_paise) || 0) / 100;
+        const photoUrl = item.property?.cover_image_url;
+        const nights = item.total_stay_days ?? item.duration_quantity ?? 1;
 
         return (
             <TouchableOpacity
@@ -111,20 +136,14 @@ export default function PartnerReservationsScreen() {
 
                     <View style={styles.cardInfo}>
                         <View style={styles.statusRow}>
-                            <View style={styles.confirmedBadge}>
-                                <CheckCircle2
-                                    size={11}
-                                    color={Colors.successText}
-                                    style={{ marginRight: 3 }}
-                                />
-                                <Text style={styles.confirmedBadgeText}>
-                                    {item.status_label}
-                                </Text>
-                            </View>
+                            <ReservationStatusBadge
+                                status={item.status}
+                                label={item.status_label}
+                            />
                         </View>
 
                         <Text style={styles.propertyName} numberOfLines={1}>
-                            {item.property_name ?? item.property.name}
+                            {item.property_name ?? item.property?.name ?? 'Property'}
                         </Text>
 
                         <View style={styles.metaRow}>
@@ -263,6 +282,19 @@ export default function PartnerReservationsScreen() {
                         String(item.id || item.reference)
                     }
                     contentContainerStyle={styles.listContainer}
+                    onEndReached={handleLoadMore}
+                    onEndReachedThreshold={0.4}
+                    ListEmptyComponent={
+                        <View style={styles.errorContainer}>
+                            <Calendar size={44} color={Colors.gray400} />
+                            <Text style={styles.errorTitle}>
+                                No {activeTab} bookings
+                            </Text>
+                            <Text style={styles.errorSubtitle}>
+                                When guests book your properties, their reservations will appear here.
+                            </Text>
+                        </View>
+                    }
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}

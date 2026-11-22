@@ -77,28 +77,42 @@ export const OwnerApi = {
             name: string;
             category_id: number;
             city_id: number;
-            description: string;
-            contact_person_name: string;
-            contact_phone: string;
+            description?: string;
+            short_description?: string;
+            contact_person_name?: string;
+            contact_phone?: string;
             contact_email?: string;
             address_line_1: string;
             address_line_2?: string;
             locality: string;
             landmark?: string;
-            postal_code: string;
+            postal_code?: string;
+            food_provided?: boolean;
+            breakfast_included?: boolean;
+            lunch_included?: boolean;
+            dinner_included?: boolean;
         },
     ) =>
         ApiClient.put<ApiResponse<PropertyDetail>>(
             `owner/properties/${id}`,
             data,
         ),
-    submitVerification: (id: number, declarationAccepted: boolean) =>
+    submitVerification: (id: number, declarationAccepted: boolean = true) =>
         ApiClient.post<ApiResponse<any>>(
             `owner/properties/${id}/submit-verification`,
             { declaration_accepted: declarationAccepted },
         ),
+    submitPropertyVerification: (id: number, _notes?: string) =>
+        ApiClient.post<ApiResponse<any>>(
+            `owner/properties/${id}/submit-verification`,
+            { declaration_accepted: true },
+        ),
     getVerificationStatus: (id: number) =>
         ApiClient.get<ApiResponse<PropertyVerificationEvaluation>>(
+            `owner/properties/${id}/verification-status`,
+        ),
+    getPropertyVerification: (id: number) =>
+        ApiClient.get<ApiResponse<any>>(
             `owner/properties/${id}/verification-status`,
         ),
     getPropertyDocuments: (propertyId: number) =>
@@ -278,6 +292,10 @@ export const OwnerApi = {
         ApiClient.get<ApiResponse<PropertyMediaItem[]>>(
             `owner/properties/${propertyId}/media`,
         ),
+    getPropertyMedia: (propertyId: number) =>
+        ApiClient.get<ApiResponse<PropertyMediaItem[]> & { meta?: any }>(
+            `owner/properties/${propertyId}/media`,
+        ),
     uploadMedia: (propertyId: number, formData: FormData) =>
         ApiClient.postFormData<ApiResponse<PropertyMediaItem>>(
             `owner/properties/${propertyId}/media`,
@@ -290,6 +308,7 @@ export const OwnerApi = {
             alt_text: string;
             category?: string;
             make_cover?: boolean;
+            is_cover?: boolean;
         },
     ) =>
         ApiClient.put<ApiResponse<PropertyMediaItem>>(
@@ -448,6 +467,15 @@ export const OwnerApi = {
         ApiClient.post<ApiResponse<null>>(`owner/notifications/${id}/read`),
     markAllRead: () =>
         ApiClient.post<ApiResponse<null>>('owner/notifications/mark-all-read'),
+    getNotificationPreferences: () =>
+        ApiClient.get<ApiResponse<any>>(
+            'owner/notification-preferences',
+        ),
+    updateNotificationPreferences: (prefs: Record<string, boolean>) =>
+        ApiClient.put<ApiResponse<any>>(
+            'owner/notification-preferences',
+            prefs,
+        ),
 
     // Push Device Registration
     registerDevice: (data: {

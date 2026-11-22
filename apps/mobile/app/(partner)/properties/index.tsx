@@ -5,14 +5,15 @@ import {
     Image,
     Modal,
     RefreshControl,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { OwnerApi } from '../../../src/api/owner';
 import { PhysicalRoom, PropertyDetail } from '../../../src/api/types';
 import { Badge } from '../../../src/components/Badge';
@@ -48,10 +49,12 @@ import {
 
 export default function PartnerPropertiesScreen() {
     const router = useRouter();
-    const { token, authState, isLoading: authLoading } = useAuth();
+    const isFocused = useIsFocused();
+    const { token, authState, isLoading: authLoading, sessionEpoch } = useAuth();
     const [properties, setProperties] = useState<PropertyDetail[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [activeCategoryFilter, setActiveCategoryFilter] = useState<
         'all' | CanonicalCategorySlug
     >('all');
@@ -92,12 +95,15 @@ export default function PartnerPropertiesScreen() {
         if (authLoading) return;
         if (!token || authState !== 'owner_authenticated') {
             setIsUnauthenticated(true);
+            setProperties([]);
+            setLoadError(null);
             setLoading(false);
             return;
         }
+        if (!isFocused) return;
         setIsUnauthenticated(false);
         void loadProperties();
-    }, [token, authState, authLoading]);
+    }, [token, authState, authLoading, isFocused, sessionEpoch]);
 
     const loadProperties = async () => {
         if (!token || authState !== 'owner_authenticated') {
@@ -109,14 +115,19 @@ export default function PartnerPropertiesScreen() {
         try {
             setLoading(true);
             setIsUnauthenticated(false);
+            setLoadError(null);
             const res = await OwnerApi.getProperties();
             if (res.data && res.data.length > 0) {
                 setProperties(res.data);
             } else {
                 setProperties([]);
             }
-        } catch {
-            setProperties([]);
+        } catch (err: unknown) {
+            setLoadError(
+                err instanceof Error
+                    ? err.message
+                    : 'Unable to load your property listings.',
+            );
         } finally {
             setLoading(false);
         }
@@ -506,6 +517,14 @@ export default function PartnerPropertiesScreen() {
                         Loading your properties...
                     </Text>
                 </View>
+            ) : loadError && properties.length === 0 ? (
+                <ExceptionalState
+                    type="no-internet"
+                    title="Unable to Load Properties"
+                    description={loadError}
+                    actionLabel="Retry"
+                    onAction={loadProperties}
+                />
             ) : (
                 <FlatList
                     data={filteredProperties}
@@ -533,9 +552,28 @@ export default function PartnerPropertiesScreen() {
                             </Text>
                             <Text style={styles.emptySubtitle}>
                                 {activeCategoryFilter !== 'all'
-                                    ? `You have not registered any ${getCategoryDisplayName(activeCategoryFilter)} properties. Switch categories or add new properties via the partner web dashboard.`
-                                    : 'Add properties through the TIJUM Partner web portal to manage them on mobile.'}
+                                    ? `You have not registered any ${getCategoryDisplayName(activeCategoryFilter)} properties. Switch categories or add a new property.`
+                                    : 'Create your first property draft to configure rooms, pricing, and submit for TIJUM verification.'}
                             </Text>
+                            <TouchableOpacity
+                                style={[
+                                    styles.viewRoomsBtn,
+                                    { marginTop: Spacing.md, paddingHorizontal: Spacing.lg },
+                                ]}
+                                onPress={() =>
+                                    router.push('/(partner)/properties/create')
+                                }
+                                accessibilityRole="button"
+                            >
+                                <Plus
+                                    size={15}
+                                    color={Colors.deepPlum}
+                                    style={{ marginRight: 6 }}
+                                />
+                                <Text style={styles.viewRoomsBtnText}>
+                                    Add New Property
+                                </Text>
+                            </TouchableOpacity>
                         </View>
                     }
                 />
