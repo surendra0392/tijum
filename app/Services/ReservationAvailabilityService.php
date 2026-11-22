@@ -69,6 +69,7 @@ class ReservationAvailabilityService
         string $checkInDate,
         string $checkoutDate,
         int $requestedQuantity,
+        ?int $excludingReservationId = null,
     ): array {
         $checkIn = CarbonImmutable::parse($checkInDate, $this->timing->timezone())->startOfDay();
         $checkout = CarbonImmutable::parse($checkoutDate, $this->timing->timezone())->startOfDay();
@@ -110,7 +111,8 @@ class ReservationAvailabilityService
             $roomType,
             $checkIn->toDateString(),
             $checkout->toDateString(),
-        )->get(['check_in_date', 'checkout_date', 'quantity']);
+        )->when($excludingReservationId !== null, fn (Builder $query) => $query->whereKeyNot($excludingReservationId))
+            ->get(['check_in_date', 'checkout_date', 'quantity']);
 
         $dates = [];
         $minimumRemaining = null;

@@ -16,18 +16,22 @@ import {
     AlertCircle,
     Building2,
     ChevronRight,
-    CheckCircle2,
 } from 'lucide-react-native';
 import { CustomerApi } from '../../../src/api/customer';
 import { Reservation } from '../../../src/api/types';
 import { ExceptionalState } from '../../../src/components/ExceptionalState';
+import { ReservationStatusBadge } from '../../../src/components/ReservationStatusBadge';
 import { useAuth } from '../../../src/auth/AuthContext';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
+import {
+    canPayReservation,
+    resolveReservationListActionRoute,
+} from '../../../src/utils/reservationState';
 
 const FILTER_TABS = [
     { label: 'Upcoming', value: 'upcoming' },
-    { label: 'Awaiting Action', value: 'awaiting_payment' },
+    { label: 'Awaiting Action', value: 'awaiting_action' },
     { label: 'Past', value: 'past' },
     { label: 'Cancelled', value: 'cancelled' },
 ];
@@ -116,14 +120,14 @@ export default function CustomerBookingsScreen() {
         const rawAmount = item.total_amount_paise / 100;
         const nights = item.total_stay_days ?? item.duration_quantity;
         const photoUrl = item.property.cover_image_url;
-        const isAwaitingPayment = item.status === 'awaiting_payment';
+        const isAwaitingPayment = canPayReservation(item);
 
         return (
             <TouchableOpacity
                 style={styles.card}
                 activeOpacity={0.88}
                 onPress={() =>
-                    router.push(`/(customer)/bookings/${reference}`)
+                    router.push(resolveReservationListActionRoute(reference))
                 }
             >
                 <View style={styles.cardRow}>
@@ -146,15 +150,18 @@ export default function CustomerBookingsScreen() {
 
                     <View style={styles.cardInfo}>
                         <View style={styles.statusRow}>
-                            <View style={styles.confirmedBadge}>
-                                <CheckCircle2
-                                    size={11}
-                                    color={Colors.successText}
-                                    style={{ marginRight: 3 }}
+                            <View style={styles.statusGroup}>
+                                <ReservationStatusBadge
+                                    status={item.status}
+                                    label={item.status_label}
                                 />
-                                <Text style={styles.confirmedBadgeText}>
-                                    {item.status_label}
-                                </Text>
+                                {item.requires_refund_review ? (
+                                    <View style={styles.refundReviewPill}>
+                                        <Text style={styles.refundReviewText}>
+                                            Refund Review
+                                        </Text>
+                                    </View>
+                                ) : null}
                             </View>
                             <ChevronRight size={16} color={Colors.coral} />
                         </View>
@@ -189,9 +196,7 @@ export default function CustomerBookingsScreen() {
                         style={styles.viewDetailsBtn}
                         onPress={() =>
                             router.push(
-                                isAwaitingPayment
-                                    ? `/(customer)/bookings/create?reference=${reference}`
-                                    : `/(customer)/bookings/${reference}`,
+                                resolveReservationListActionRoute(reference),
                             )
                         }
                     >
@@ -454,18 +459,23 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: 4,
     },
-    confirmedBadge: {
+    statusGroup: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: Colors.successLight,
+        flexWrap: 'wrap',
+        gap: 6,
+        flex: 1,
+    },
+    refundReviewPill: {
+        backgroundColor: '#FEF3C7',
         paddingHorizontal: 8,
         paddingVertical: 3,
         borderRadius: BorderRadius.full,
     },
-    confirmedBadgeText: {
-        fontSize: 11,
+    refundReviewText: {
+        fontSize: 10,
         fontWeight: '700',
-        color: Colors.successText,
+        color: '#92400E',
     },
     propertyName: {
         fontSize: 16,

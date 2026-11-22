@@ -5,16 +5,15 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Customer;
 
 use App\Actions\Protection\AddCaseMessage;
+use App\Actions\Protection\CreateProtectionCase;
 use App\Enums\CaseCategory;
-use App\Enums\CasePriority;
-use App\Enums\CaseStatus;
 use App\Http\Controllers\Api\V1\ApiController;
 use App\Models\CustomerProtectionCase;
 use App\Models\Reservation;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class CustomerProtectionController extends ApiController
@@ -73,13 +72,16 @@ class CustomerProtectionController extends ApiController
             'resolution_due_at' => $case->resolution_due_at->toIso8601String(),
             'sla_due_at' => $case->sla_due_at?->toIso8601String(),
             'created_at' => $case->created_at->toIso8601String(),
-            'messages' => $case->messages->map(fn ($m) => [
-                'id' => $m->id,
-                'sender_type' => $m->sender_type,
-                'sender_name' => $m->sender_name,
-                'message' => $m->message,
-                'created_at' => $m->created_at->toIso8601String(),
-            ]),
+            'messages' => $case->messages
+                ->where('is_internal_note', false)
+                ->map(fn ($m) => [
+                    'id' => $m->id,
+                    'sender_type' => $m->sender_type,
+                    'sender_name' => $m->sender_name,
+                    'message' => $m->message,
+                    'created_at' => $m->created_at->toIso8601String(),
+                ])
+                ->values(),
         ]);
     }
 
@@ -123,14 +125,14 @@ class CustomerProtectionController extends ApiController
         ], 'Response submitted successfully.', 201);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, CreateProtectionCase $action): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();
 
         $validated = $request->validate([
             'booking_reference' => ['required', 'string'],
-            'category' => ['required', 'string'],
+            'category' => ['required', 'string', Rule::enum(CaseCategory::class)],
             'description' => ['required', 'string', 'min:20', 'max:3000'],
         ]);
 
@@ -144,25 +146,23 @@ class CustomerProtectionController extends ApiController
             return $this->error('The specified reservation does not exist.', 'RESERVATION_NOT_FOUND', 404);
         }
 
-        $category = CaseCategory::tryFrom($validated['category']) ?? CaseCategory::FoodNotProvided;
-        $caseReference = 'CASE-'.strtoupper(Str::random(8));
+        $category = CaseCategory::from($validated['category']);
 
-        $case = CustomerProtectionCase::query()->create([
-            'case_reference' => $caseReference,
-            'reservation_id' => $reservation->id,
-            'user_id' => $user->id,
-            'property_id' => $reservation->property_id,
-            'owner_id' => $reservation->property->owner_id,
-            'category' => $category,
-            'status' => CaseStatus::Open,
-            'priority' => CasePriority::Standard,
-            'description' => $validated['description'],
-        ]);
+        try {
+            $case = $action->execute($reservation, $user, [
+                'category' => $category->value,
+                'description' => $validated['description'],
+            ]);
+        } catch (ValidationException $e) {
+            return $this->error($e->getMessage(), 'VALIDATION_ERROR', 422, $e->errors());
+        }
 
         return $this->success([
+            'id' => $case->id,
             'case_reference' => $case->case_reference,
             'status' => $case->status->value,
             'category' => $case->category->value,
+            'priority' => $case->priority->value,
         ], 'Customer protection case submitted. Our operations team will respond promptly.', 201);
     }
 }

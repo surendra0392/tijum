@@ -74,6 +74,10 @@ class ProcessRelocationDecision
                     'customer_decision_at' => $now,
                 ])->save();
 
+                $source->forceFill([
+                    'requires_refund_review' => true,
+                ])->save();
+
                 if ($lockedRelocation->case !== null) {
                     $lockedRelocation->case->forceFill(['status' => CaseStatus::RefundReview])->save();
                 }
@@ -184,7 +188,7 @@ class ProcessRelocationDecision
                                 $systemAdmin,
                                 (int) $lockedRelocation->price_difference_minor,
                                 "Relocation price difference refund for {$source->booking_reference}",
-                                null,
+                                'relocation-'.$lockedRelocation->id,
                                 $lockedRelocation->customer_protection_case_id,
                             );
                             $lockedRelocation->forceFill(['difference_refund_id' => $refund->id])->save();

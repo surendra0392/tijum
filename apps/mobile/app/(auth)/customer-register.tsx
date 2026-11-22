@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -63,7 +64,16 @@ export default function CustomerRegisterScreen() {
                 terms_accepted: true,
                 marketing_consent: false,
             });
-            router.replace('/(customer)/explore');
+            Alert.alert(
+                'Account Created',
+                'Welcome to TIJUM! Please verify your email address using the link we sent to your inbox.',
+                [
+                    {
+                        text: 'Continue',
+                        onPress: () => router.replace('/(customer)/explore'),
+                    },
+                ],
+            );
         } catch (err: any) {
             setErrorMessage(
                 err?.message || 'Registration failed. Please check the form.',
@@ -132,31 +142,48 @@ export default function CustomerRegisterScreen() {
                     />
 
                     {/* Terms & Conditions Acceptance */}
-                    <TouchableOpacity
-                        style={styles.termsRow}
-                        activeOpacity={0.8}
-                        onPress={() => setTermsAccepted(!termsAccepted)}
-                    >
-                        <View
+                    <View style={styles.termsRow}>
+                        <TouchableOpacity
                             style={[
                                 styles.checkbox,
                                 termsAccepted && styles.checkboxActive,
                             ]}
+                            activeOpacity={0.8}
+                            accessibilityRole="checkbox"
+                            accessibilityState={{ checked: termsAccepted }}
+                            onPress={() => setTermsAccepted(!termsAccepted)}
                         >
                             {termsAccepted && (
                                 <Text style={styles.checkmark}>✓</Text>
                             )}
-                        </View>
+                        </TouchableOpacity>
                         <Text style={styles.termsText}>
-                            I accept the{' '}
-                            <Text style={styles.termsLink}>
+                            <Text
+                                onPress={() => setTermsAccepted(!termsAccepted)}
+                            >
+                                I accept the{' '}
+                            </Text>
+                            <Text
+                                style={styles.termsLink}
+                                onPress={() => router.push('/legal/terms')}
+                            >
                                 Terms & Conditions
-                            </Text>{' '}
-                            and{' '}
-                            <Text style={styles.termsLink}>Privacy Policy</Text>
+                            </Text>
+                            <Text
+                                onPress={() => setTermsAccepted(!termsAccepted)}
+                            >
+                                {' '}
+                                and{' '}
+                            </Text>
+                            <Text
+                                style={styles.termsLink}
+                                onPress={() => router.push('/legal/privacy')}
+                            >
+                                Privacy Policy
+                            </Text>
                             .
                         </Text>
-                    </TouchableOpacity>
+                    </View>
 
                     <Button
                         title="Create Customer Account"

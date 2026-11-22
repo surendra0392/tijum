@@ -9,11 +9,13 @@ import {
     TouchableOpacity,
     SafeAreaView,
     Modal,
+    Linking,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
     Building2,
     MapPin,
+    ExternalLink,
     UtensilsCrossed,
     BedDouble,
     Users,
@@ -196,6 +198,32 @@ export default function PropertyDetailScreen() {
                                 : property.city?.name || ''}
                         </Text>
                     </View>
+                    {property.has_coordinates && property.google_maps_url ? (
+                        <TouchableOpacity
+                            style={styles.mapPinLink}
+                            onPress={() => {
+                                if (property.google_maps_url) {
+                                    void Linking.openURL(
+                                        property.google_maps_url,
+                                    );
+                                }
+                            }}
+                        >
+                            <ExternalLink
+                                size={14}
+                                color={Colors.coral}
+                                style={{ marginRight: 6 }}
+                            />
+                            <Text style={styles.mapPinLinkText}>
+                                Open Exact Pin in Google Maps
+                            </Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <Text style={styles.mapPinUnavailableText}>
+                            Exact map pin unavailable — address and locality
+                            shown above.
+                        </Text>
+                    )}
 
                     {/* Canonical Category Architecture Card */}
                     {(() => {
@@ -1112,5 +1140,22 @@ const styles = StyleSheet.create({
     galleryThumbImg: {
         width: '100%',
         height: '100%',
+    },
+    mapPinLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        marginBottom: Spacing.sm,
+        paddingVertical: 4,
+    },
+    mapPinLinkText: {
+        ...Typography.bodySmall,
+        color: Colors.coral,
+        fontWeight: '700',
+    },
+    mapPinUnavailableText: {
+        ...Typography.bodySmall,
+        color: Colors.gray500,
+        marginBottom: Spacing.sm,
     },
 });

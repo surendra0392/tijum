@@ -22,7 +22,8 @@ class RazorpayWebhookController extends Controller
         }
 
         try {
-            $result = $action->execute($rawPayload, $signature);
+            $eventId = $request->header('X-Razorpay-Event-Id');
+            $result = $action->execute($rawPayload, $signature, eventId: is_string($eventId) && strlen($eventId) <= 120 ? $eventId : null);
         } catch (\RuntimeException $e) {
             throw new BadRequestHttpException($e->getMessage());
         }

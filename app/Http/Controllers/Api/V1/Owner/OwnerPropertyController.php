@@ -23,6 +23,7 @@ use App\Models\PropertyCategory;
 use App\Services\PropertyVerificationChecklist;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class OwnerPropertyController extends ApiController
@@ -81,25 +82,15 @@ class OwnerPropertyController extends ApiController
         /** @var Owner $owner */
         $owner = $request->user();
 
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:150'],
-            'category_id' => ['nullable'],
-            'category' => ['nullable'],
-            'property_category_id' => ['nullable'],
-            'city_id' => ['required', 'integer'],
-            'description' => ['required', 'string', 'max:5000'],
-            'contact_person_name' => ['required', 'string', 'max:100'],
-            'contact_phone' => ['required', 'string', 'regex:/^[6-9]\d{9}$/'],
-            'contact_email' => ['nullable', 'email', 'max:150'],
-            'address_line_1' => ['required', 'string', 'max:255'],
-            'address_line_2' => ['nullable', 'string', 'max:255'],
-            'locality' => ['required', 'string', 'max:100'],
-            'landmark' => ['nullable', 'string', 'max:150'],
-            'postal_code' => ['required', 'string', 'regex:/^[1-9][0-9]{5}$/'],
-            'ownership_arrangement' => ['nullable', 'string'],
-            'latitude' => ['nullable', 'numeric'],
-            'longitude' => ['nullable', 'numeric'],
-        ]);
+        if (! $owner->canPublishProperties()) {
+            return $this->error(
+                'Your partner account must be verified and active with a confirmed email address to register properties.',
+                'FORBIDDEN',
+                403,
+            );
+        }
+
+        $validated = $this->validatedPropertyAttributes($request);
 
         try {
             $property = $createProperty->execute($owner, $validated);
@@ -130,25 +121,15 @@ class OwnerPropertyController extends ApiController
             return $this->error('Property not found or unauthorized.', 'NOT_FOUND', 404);
         }
 
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:150'],
-            'category_id' => ['nullable'],
-            'category' => ['nullable'],
-            'property_category_id' => ['nullable'],
-            'city_id' => ['required', 'integer'],
-            'description' => ['required', 'string', 'max:5000'],
-            'contact_person_name' => ['required', 'string', 'max:100'],
-            'contact_phone' => ['required', 'string', 'regex:/^[6-9]\d{9}$/'],
-            'contact_email' => ['nullable', 'email', 'max:150'],
-            'address_line_1' => ['required', 'string', 'max:255'],
-            'address_line_2' => ['nullable', 'string', 'max:255'],
-            'locality' => ['required', 'string', 'max:100'],
-            'landmark' => ['nullable', 'string', 'max:150'],
-            'postal_code' => ['required', 'string', 'regex:/^[1-9][0-9]{5}$/'],
-            'ownership_arrangement' => ['nullable', 'string'],
-            'latitude' => ['nullable', 'numeric'],
-            'longitude' => ['nullable', 'numeric'],
-        ]);
+        if (! $owner->canPublishProperties()) {
+            return $this->error(
+                'Your partner account must be verified and active with a confirmed email address to update properties.',
+                'FORBIDDEN',
+                403,
+            );
+        }
+
+        $validated = $this->validatedPropertyAttributes($request);
 
         try {
             $property = $updateProperty->execute($owner, $property, $validated);
@@ -179,6 +160,14 @@ class OwnerPropertyController extends ApiController
 
         if ($property === null) {
             return $this->error('Property not found or unauthorized.', 'NOT_FOUND', 404);
+        }
+
+        if (! $owner->canPublishProperties()) {
+            return $this->error(
+                'Your partner account must be verified and active with a confirmed email address to update properties.',
+                'FORBIDDEN',
+                403,
+            );
         }
 
         $validated = $request->validate([
@@ -285,5 +274,50 @@ class OwnerPropertyController extends ApiController
                 'icon_key' => $a->icon_key,
             ]),
         ], 'Owner reference data retrieved.');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function validatedPropertyAttributes(Request $request): array
+    {
+        $input = $request->all();
+
+        foreach (['latitude', 'longitude'] as $coordField) {
+            if (array_key_exists($coordField, $input) && is_string($input[$coordField]) && trim($input[$coordField]) === '') {
+                $input[$coordField] = null;
+            }
+        }
+
+        $validator = Validator::make($input, [
+            'name' => ['required', 'string', 'max:150'],
+            'category_id' => ['nullable'],
+            'category' => ['nullable'],
+            'property_category_id' => ['nullable'],
+            'city_id' => ['required', 'integer'],
+            'description' => ['required', 'string', 'max:5000'],
+            'contact_person_name' => ['required', 'string', 'max:100'],
+            'contact_phone' => ['required', 'string', 'regex:/^[6-9]\d{9}$/'],
+            'contact_email' => ['nullable', 'email', 'max:150'],
+            'address_line_1' => ['required', 'string', 'max:255'],
+            'address_line_2' => ['nullable', 'string', 'max:255'],
+            'locality' => ['required', 'string', 'max:100'],
+            'landmark' => ['nullable', 'string', 'max:150'],
+            'postal_code' => ['required', 'string', 'regex:/^[1-9][0-9]{5}$/'],
+            'ownership_arrangement' => ['nullable', 'string'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_with:longitude'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_with:latitude'],
+        ]);
+
+        $validator->after(static function (\Illuminate\Validation\Validator $v) use ($input): void {
+            $lat = $input['latitude'] ?? null;
+            $lng = $input['longitude'] ?? null;
+
+            if (is_numeric($lat) && is_numeric($lng) && ! Property::areValidCoordinates($lat, $lng)) {
+                $v->errors()->add('latitude', 'Provide valid non-zero GPS coordinates or leave both latitude and longitude blank.');
+            }
+        });
+
+        return $validator->validate();
     }
 }

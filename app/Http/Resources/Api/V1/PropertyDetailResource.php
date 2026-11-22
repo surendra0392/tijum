@@ -92,8 +92,9 @@ class PropertyDetailResource extends JsonResource
         }
 
         $timingPolicy = app(StayTimingPolicy::class)->timingSummary();
-        $lat = $this->latitude !== null ? (float) $this->latitude : null;
-        $lng = $this->longitude !== null ? (float) $this->longitude : null;
+        $coords = $this->resolvedCoordinates();
+        $lat = $coords['latitude'] ?? null;
+        $lng = $coords['longitude'] ?? null;
 
         $operationalStatus = $this->status->value;
         $operationalStatusLabel = $this->status->label();
@@ -141,7 +142,9 @@ class PropertyDetailResource extends JsonResource
             'pincode' => $this->postal_code,
             'latitude' => $lat,
             'longitude' => $lng,
-            'google_maps_url' => ($lat !== null && $lng !== null) ? "https://www.google.com/maps/search/?api=1&query={$lat},{$lng}" : null,
+            'has_coordinates' => $coords !== null,
+            'location_precision' => $coords !== null ? 'exact' : 'area_only',
+            'google_maps_url' => $coords !== null ? "https://www.google.com/maps/search/?api=1&query={$lat},{$lng}" : null,
             'gender_eligibility' => $this->relationLoaded('roomTypes') ? $this->gender_eligibility : 'All Genders',
             'starting_price_daily_paise' => $minDailyPrice !== null ? (int) $minDailyPrice : null,
             'starting_price_weekly_paise' => $minWeeklyPrice !== null ? (int) $minWeeklyPrice : null,

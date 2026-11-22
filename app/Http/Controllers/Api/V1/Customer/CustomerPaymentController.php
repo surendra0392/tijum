@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1\Customer;
 
 use App\Actions\Payments\InitiatePaymentOrder;
 use App\Actions\Payments\VerifyCheckoutPayment;
+use App\Enums\ReservationStatus;
 use App\Http\Controllers\Api\V1\ApiController;
 use App\Http\Requests\Payments\VerifyPaymentRequest;
 use App\Http\Resources\Api\V1\ReservationResource;
@@ -43,7 +44,9 @@ class CustomerPaymentController extends ApiController
         }
 
         try {
-            $orderPayload = $action->execute($reservation, $user);
+            $rawKey = $request->header('Idempotency-Key') ?? $request->input('idempotency_key');
+            $idempotencyKey = is_string($rawKey) && trim($rawKey) !== '' ? trim($rawKey) : null;
+            $orderPayload = $action->execute($reservation, $user, $idempotencyKey);
 
             return $this->success($orderPayload, 'Payment order initiated successfully.');
         } catch (Throwable $e) {
@@ -71,7 +74,7 @@ class CustomerPaymentController extends ApiController
         $validated = $request->validated();
 
         try {
-            $action->execute(
+            $reservation = $action->execute(
                 $reservation,
                 $user,
                 (string) $validated['razorpay_order_id'],
@@ -79,12 +82,13 @@ class CustomerPaymentController extends ApiController
                 (string) $validated['razorpay_signature'],
             );
 
-            $reservation->refresh();
-            $reservation->loadMissing(['property.city', 'roomType', 'payments']);
+            $reservation->loadMissing(['property.city', 'property.media', 'roomType', 'payments', 'refunds', 'review', 'user']);
 
             return $this->success(
                 new ReservationResource($reservation),
-                'Payment verified successfully. Reservation is confirmed.'
+                $reservation->requires_refund_review || $reservation->status !== ReservationStatus::Confirmed
+                    ? 'Payment received. Your reservation requires manual review.'
+                    : 'Payment verified successfully. Reservation is confirmed.'
             );
         } catch (Throwable $e) {
             return $this->error($e->getMessage(), 'PAYMENT_VERIFICATION_FAILED', 422);
@@ -107,20 +111,29 @@ class CustomerPaymentController extends ApiController
         }
 
         $latestPayment = $reservation->payments()->latest('id')->first();
+        $hasCapturedPayment = $reservation->successfulPayment()->exists();
 
         return $this->success([
             'booking_reference' => $reservation->booking_reference,
             'status' => $reservation->status->value,
-            'is_confirmed' => $reservation->status->value === 'confirmed',
+            'status_label' => $reservation->status->label(),
+            'can_pay' => $reservation->canAcceptPayment(),
+            'is_confirmed' => $reservation->status === ReservationStatus::Confirmed,
+            'requires_refund_review' => (bool) $reservation->requires_refund_review,
+            'has_captured_payment' => $hasCapturedPayment,
             'payment_deadline_at' => $reservation->payment_deadline_at?->toIso8601String(),
-            'is_deadline_expired' => $reservation->payment_deadline_at !== null && $reservation->payment_deadline_at->isPast(),
+            'is_deadline_expired' => $reservation->isPaymentDeadlineExpired(),
             'latest_payment' => $latestPayment ? [
                 'id' => $latestPayment->id,
                 'gateway' => $latestPayment->gateway,
-                'status' => $latestPayment->status,
-                'amount_minor' => $latestPayment->amount_minor,
-                'amount_paise' => $latestPayment->amount_minor,
+                'status' => $latestPayment->status->value,
+                'status_label' => $latestPayment->status->label(),
+                'amount_minor' => (int) $latestPayment->amount_minor,
+                'amount_paise' => (int) $latestPayment->amount_minor,
+                'refunded_amount_minor' => (int) $latestPayment->refunded_amount_minor,
+                'failure_reason' => $latestPayment->failure_reason,
                 'captured_at' => $latestPayment->captured_at?->toIso8601String(),
+                'failed_at' => $latestPayment->failed_at?->toIso8601String(),
             ] : null,
         ]);
     }

@@ -20,9 +20,13 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Laravel\Fortify\Contracts\PasskeyUser;
+use Laravel\Fortify\Events\RecoveryCodeReplaced;
+use Laravel\Fortify\Fortify;
 use Laravel\Fortify\PasskeyAuthenticatable;
+use Laravel\Fortify\RecoveryCode;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
+use Throwable;
 
 /**
  * @property int $id
@@ -240,5 +244,97 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function sendPasswordResetNotification($token): void
     {
         $this->notify(new ResetPasswordNotification($token));
+    }
+
+    /**
+     * Atomically verify and consume a single two-factor recovery code under a row lock.
+     */
+    public function consumeTwoFactorRecoveryCode(string $candidate): bool
+    {
+        $candidate = trim($candidate);
+
+        if ($candidate === '' || ! $this->exists) {
+            return false;
+        }
+
+        /** @var string|null $consumedCode */
+        $consumedCode = $this->getConnection()->transaction(function () use ($candidate): ?string {
+            /** @var self|null $lockedUser */
+            $lockedUser = $this->newQuery()
+                ->whereKey($this->getKey())
+                ->lockForUpdate()
+                ->first();
+
+            if ($lockedUser === null
+                || ! $lockedUser->hasEnabledTwoFactorAuthentication()
+                || ! is_string($lockedUser->two_factor_recovery_codes)
+                || $lockedUser->two_factor_recovery_codes === '') {
+                return null;
+            }
+
+            try {
+                $decrypted = Fortify::currentEncrypter()->decrypt($lockedUser->two_factor_recovery_codes);
+            } catch (Throwable) {
+                return null;
+            }
+
+            if (! is_string($decrypted)) {
+                return null;
+            }
+
+            $codes = json_decode($decrypted, true);
+            if (! is_array($codes)) {
+                return null;
+            }
+
+            $matchedIndex = null;
+            $matchedCode = null;
+
+            foreach ($codes as $index => $storedCode) {
+                if (! is_string($storedCode) || $storedCode === '') {
+                    continue;
+                }
+
+                if (hash_equals($storedCode, $candidate)) {
+                    $matchedIndex = $index;
+                    $matchedCode = $storedCode;
+                    break;
+                }
+            }
+
+            if ($matchedIndex === null || $matchedCode === null) {
+                return null;
+            }
+
+            $codes[$matchedIndex] = RecoveryCode::generate();
+
+            $encrypted = Fortify::currentEncrypter()->encrypt(
+                json_encode(array_values($codes), JSON_THROW_ON_ERROR),
+            );
+
+            $updated = $this->newQuery()
+                ->whereKey($lockedUser->getKey())
+                ->where('two_factor_recovery_codes', $lockedUser->two_factor_recovery_codes)
+                ->update([
+                    'two_factor_recovery_codes' => $encrypted,
+                    'updated_at' => now(),
+                ]);
+
+            if ($updated !== 1) {
+                return null;
+            }
+
+            $this->two_factor_recovery_codes = $encrypted;
+
+            return $matchedCode;
+        }, 3);
+
+        if ($consumedCode === null) {
+            return false;
+        }
+
+        RecoveryCodeReplaced::dispatch($this, $consumedCode);
+
+        return true;
     }
 }

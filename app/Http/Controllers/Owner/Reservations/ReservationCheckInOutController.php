@@ -35,6 +35,7 @@ class ReservationCheckInOutController extends Controller
         $res = $this->ownedReservation($owner, $reservation);
 
         abort_unless($res->status === ReservationStatus::Confirmed, 422, 'Only confirmed reservations can be checked out.');
+        abort_unless($res->checked_in_at !== null, 422, 'Guest must be checked in before marking check-out.');
 
         $validated = $request->validate([
             'notes' => ['nullable', 'string', 'max:1000'],

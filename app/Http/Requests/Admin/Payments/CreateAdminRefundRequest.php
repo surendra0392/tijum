@@ -13,6 +13,17 @@ class CreateAdminRefundRequest extends FormRequest
         return $this->user('admin') !== null;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $headerKey = $this->header('Idempotency-Key');
+
+        if (! $this->has('idempotency_key') && is_string($headerKey)) {
+            $this->merge([
+                'idempotency_key' => trim($headerKey),
+            ]);
+        }
+    }
+
     /**
      * @return array<string, list<string>>
      */
@@ -21,6 +32,7 @@ class CreateAdminRefundRequest extends FormRequest
         return [
             'amount_minor' => ['required', 'integer', 'min:100'],
             'reason' => ['required', 'string', 'min:3', 'max:500'],
+            'idempotency_key' => ['required', 'string', 'min:1', 'max:64'],
         ];
     }
 }

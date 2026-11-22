@@ -6,7 +6,6 @@ namespace App\Services\Rewards;
 
 use App\Enums\PointsTransactionType;
 use App\Enums\ReferralStatus;
-use App\Enums\ReservationStatus;
 use App\Models\CustomerReferral;
 use App\Models\CustomerReferralProfile;
 use App\Models\Reservation;
@@ -73,12 +72,14 @@ class ReferralService
             return null;
         }
 
-        // Anti-Fraud Safeguard 2: Matching phone or email
-        if ($referrer->email === $referredUser->email) {
+        // Anti-Fraud Safeguard 2: Matching phone or email (case-insensitive & format-normalized)
+        if (strtolower(trim((string) $referrer->email)) === strtolower(trim((string) $referredUser->email))) {
             return null;
         }
 
-        if ($referrer->phone && $referredUser->phone && $referrer->phone === $referredUser->phone) {
+        $referrerPhone = $this->normalizePhone($referrer->phone);
+        $referredPhone = $this->normalizePhone($referredUser->phone);
+        if ($referrerPhone !== '' && $referredPhone !== '' && $referrerPhone === $referredPhone) {
             return null;
         }
 
@@ -91,7 +92,18 @@ class ReferralService
             return null;
         }
 
-        $referral = DB::transaction(function () use ($referrer, $referredUser, $normalizedCode, $ip, $userAgent, $deviceFingerprint, $profile): CustomerReferral {
+        $referral = DB::transaction(function () use ($referrer, $referredUser, $normalizedCode, $ip, $userAgent, $deviceFingerprint, $profile): ?CustomerReferral {
+            User::query()->whereKey($referredUser->id)->lockForUpdate()->first();
+            $lockedProfile = CustomerReferralProfile::query()->whereKey($profile->id)->lockForUpdate()->first();
+
+            if ($lockedProfile === null || $lockedProfile->is_blocked) {
+                return null;
+            }
+
+            if (CustomerReferral::query()->where('referred_user_id', $referredUser->id)->lockForUpdate()->exists()) {
+                return null;
+            }
+
             $referrerReward = (int) RewardsSetting::get('referral_referrer_reward_points', 500);
             $referredReward = (int) RewardsSetting::get('referral_referred_reward_points', 250);
 
@@ -111,7 +123,7 @@ class ReferralService
             $referredUser->update(['referred_by_user_id' => $referrer->id]);
 
             // Increment profile stats
-            $profile->increment('total_referrals_count');
+            $lockedProfile->increment('total_referrals_count');
 
             // Credit Referee welcome bonus points immediately upon registration with valid referral code
             if ($referredReward > 0) {
@@ -128,6 +140,10 @@ class ReferralService
 
             return $referral;
         });
+
+        if ($referral === null) {
+            return null;
+        }
 
         try {
             $firstName = Str::before(trim($referredUser->name), ' ');
@@ -159,17 +175,23 @@ class ReferralService
      */
     public function qualifyReferralOnCompletedStay(Reservation $reservation): ?CustomerReferral
     {
-        if ($reservation->status !== ReservationStatus::Confirmed || $reservation->checkout_date->startOfDay()->isFuture()) {
+        if (! $this->pointsService->isReservationEligibleForCompletionRewards($reservation)) {
             return null;
         }
 
         $pointsCredited = 0;
 
         $referral = DB::transaction(function () use ($reservation, &$pointsCredited): ?CustomerReferral {
+            $lockedReservation = Reservation::query()->whereKey($reservation->id)->lockForUpdate()->first();
+            if ($lockedReservation === null
+                || ! $this->pointsService->isReservationEligibleForCompletionRewards($lockedReservation)) {
+                return null;
+            }
+
             /** @var CustomerReferral|null $referral */
             $referral = CustomerReferral::query()
                 ->lockForUpdate()
-                ->where('referred_user_id', $reservation->user_id)
+                ->where('referred_user_id', $lockedReservation->user_id)
                 ->where('status', ReferralStatus::Registered)
                 ->first();
 
@@ -177,9 +199,10 @@ class ReferralService
                 return null;
             }
 
-            // Minimum booking value for referral qualification (default ₹1,000 = 100,000 minor)
+            // Minimum net paid booking value for referral qualification (default ₹1,000 = 100,000 minor)
             $minBooking = (int) RewardsSetting::get('referral_min_booking_value_minor', 100000);
-            if ($reservation->total_amount_minor < $minBooking) {
+            $netPaidMinor = $this->pointsService->netSettledPaidAmountMinor($lockedReservation);
+            if ($lockedReservation->total_amount_minor < $minBooking || $netPaidMinor < $minBooking) {
                 return null;
             }
 
@@ -188,11 +211,27 @@ class ReferralService
             /** @var User $referred */
             $referred = User::query()->findOrFail($referral->referred_user_id);
 
-            // Check max referral earning cap (default max 5 successful referrals)
+            /** @var CustomerReferralProfile $referrerProfile */
+            $referrerProfile = CustomerReferralProfile::query()
+                ->lockForUpdate()
+                ->firstOrCreate(
+                    ['user_id' => $referrer->id],
+                    [
+                        'referral_code' => $this->generateUniqueReferralCode($referrer),
+                        'total_referrals_count' => 0,
+                        'successful_referrals_count' => 0,
+                        'total_points_earned' => 0,
+                        'is_blocked' => false,
+                    ],
+                );
+
+            if ($referrerProfile->is_blocked) {
+                return null;
+            }
+
+            // Check max referral earning cap (default max 5 successful referrals) under row lock
             $maxReferrals = (int) RewardsSetting::get('referral_max_successful_referrals', 5);
-            $currentSuccessful = (int) CustomerReferralProfile::query()
-                ->where('user_id', $referrer->id)
-                ->value('successful_referrals_count');
+            $currentSuccessful = (int) $referrerProfile->successful_referrals_count;
 
             // 1. Credit Referrer Points strictly if under max referral earnings cap
             if ($currentSuccessful < $maxReferrals) {
@@ -201,28 +240,24 @@ class ReferralService
                     points: $referral->referrer_reward_points,
                     type: PointsTransactionType::ReferralBonusReferrer,
                     referenceType: Reservation::class,
-                    referenceId: $reservation->id,
-                    idempotencyKey: 'REF-RFR-'.$reservation->id.'-'.$referrer->id,
-                    notes: "Referral reward: {$referred->name} completed stay #{$reservation->booking_reference}",
+                    referenceId: $lockedReservation->id,
+                    idempotencyKey: 'REF-RFR-'.$referral->id.'-'.$referrer->id,
+                    notes: "Referral reward: {$referred->name} completed stay #{$lockedReservation->booking_reference}",
                 );
                 $pointsCredited = $referral->referrer_reward_points;
             }
 
             $referral->update([
                 'status' => ReferralStatus::RewardCredited,
-                'qualifying_reservation_id' => $reservation->id,
+                'qualifying_reservation_id' => $lockedReservation->id,
                 'reward_points_credited_at' => CarbonImmutable::now(),
             ]);
 
             // Update referrer profile stats
-            CustomerReferralProfile::query()
-                ->where('user_id', $referrer->id)
-                ->increment('successful_referrals_count');
+            $referrerProfile->increment('successful_referrals_count');
 
             if ($pointsCredited > 0) {
-                CustomerReferralProfile::query()
-                    ->where('user_id', $referrer->id)
-                    ->increment('total_points_earned', $pointsCredited);
+                $referrerProfile->increment('total_points_earned', $pointsCredited);
             }
 
             return $referral;
@@ -255,6 +290,20 @@ class ReferralService
         }
 
         return $referral;
+    }
+
+    private function normalizePhone(?string $phone): string
+    {
+        if ($phone === null) {
+            return '';
+        }
+
+        $digits = (string) preg_replace('/[^0-9]/', '', $phone);
+        if (strlen($digits) === 12 && str_starts_with($digits, '91')) {
+            $digits = substr($digits, 2);
+        }
+
+        return $digits;
     }
 
     private function generateUniqueReferralCode(User $user): string

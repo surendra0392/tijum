@@ -120,6 +120,7 @@ class AdminCommissionAgreementController extends Controller
     ): RedirectResponse {
         /** @var Admin $admin */
         $admin = $request->user('admin');
+        abort_unless($admin->hasPermission('commissions.manage'), 403);
 
         $agreement->forceFill([
             'status' => CommissionAgreementStatus::Active,

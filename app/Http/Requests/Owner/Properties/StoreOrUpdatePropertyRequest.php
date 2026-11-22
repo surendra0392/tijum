@@ -7,10 +7,12 @@ namespace App\Http\Requests\Owner\Properties;
 use App\Enums\AccommodationCategory;
 use App\Enums\PropertyOwnershipArrangement;
 use App\Models\Owner;
+use App\Models\Property;
 use App\Models\PropertyCategory;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreOrUpdatePropertyRequest extends FormRequest
 {
@@ -85,9 +87,26 @@ class StoreOrUpdatePropertyRequest extends FormRequest
             'locality' => ['required', 'string', 'max:120'],
             'landmark' => ['nullable', 'string', 'max:160'],
             'postal_code' => ['required', 'string', 'max:20', 'regex:/^[A-Za-z0-9\s\-]{3,16}$/'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_with:longitude'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_with:latitude'],
             'ownership_arrangement' => ['required', Rule::enum(PropertyOwnershipArrangement::class)],
+        ];
+    }
+
+    /**
+     * @return list<callable(Validator): void>
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                $latitude = $this->input('latitude');
+                $longitude = $this->input('longitude');
+
+                if (is_numeric($latitude) && is_numeric($longitude) && ! Property::areValidCoordinates($latitude, $longitude)) {
+                    $validator->errors()->add('latitude', 'Provide valid non-zero GPS coordinates or leave both latitude and longitude blank.');
+                }
+            },
         ];
     }
 }

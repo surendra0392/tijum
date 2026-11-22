@@ -108,7 +108,7 @@ describe('End-to-End Booking & Payment Lifecycle Specification', () => {
     });
 
     describe('Booking Recovery & State Discovery on App Relaunch', () => {
-        it('verifies bookings index screen supports awaiting_payment filter tab for in-progress bookings', () => {
+        it('verifies bookings index screen supports awaiting_action filter tab for in-progress bookings', () => {
             const indexPath = path.resolve(
                 __dirname,
                 '../app/(customer)/bookings/index.tsx',
@@ -116,12 +116,16 @@ describe('End-to-End Booking & Payment Lifecycle Specification', () => {
             const source = fs.readFileSync(indexPath, 'utf8');
 
             assert.ok(
-                source.includes("value: 'awaiting_payment'"),
-                'Filter tabs must include awaiting_payment tab',
+                source.includes("value: 'awaiting_action'"),
+                'Filter tabs must include awaiting_action tab',
             );
             assert.ok(
-                source.includes("item.status === 'awaiting_payment'"),
-                'Must identify awaiting_payment items for prominent CTA',
+                source.includes('canPayReservation(item)'),
+                'Must use authoritative canPayReservation helper for prominent CTA',
+            );
+            assert.ok(
+                source.includes('resolveReservationListActionRoute(reference)'),
+                'Must route Pay Now and View Details via resolveReservationListActionRoute',
             );
             assert.ok(
                 source.includes("isAwaitingPayment ? 'Pay Now' : 'View Details'"),

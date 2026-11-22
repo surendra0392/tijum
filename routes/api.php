@@ -103,6 +103,9 @@ Route::prefix('v1')->group(function (): void {
         Route::get('profile', [CustomerProfileController::class, 'show'])->name('api.v1.customer.profile.show');
         Route::put('profile', [CustomerProfileController::class, 'update'])->name('api.v1.customer.profile.update');
         Route::put('password', [CustomerProfileController::class, 'updatePassword'])->name('api.v1.customer.password.update');
+        Route::post('email/verification-notification', [CustomerProfileController::class, 'resendVerification'])
+            ->middleware('throttle:6,1')
+            ->name('api.v1.customer.verification.send');
 
         // Reservations
         Route::get('reservations', [CustomerReservationController::class, 'index'])->name('api.v1.customer.reservations.index');

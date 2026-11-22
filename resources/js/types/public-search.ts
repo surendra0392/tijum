@@ -136,6 +136,8 @@ export type SearchResultCard = {
     locality: string;
     latitude?: number | null;
     longitude?: number | null;
+    has_coordinates?: boolean;
+    location_precision?: 'exact' | 'area_only';
     gender_eligibility: string;
     cover_image: {
         url?: string | null;
@@ -236,6 +238,11 @@ export type PropertyDetailPayload = {
     locality: string;
     address_line_1?: string | null;
     landmark?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    has_coordinates?: boolean;
+    location_precision?: 'exact' | 'area_only';
+    google_maps_url?: string | null;
     gender_eligibility: string;
     food: {
         food_provided: boolean;

@@ -102,6 +102,7 @@ class CommissionCalculationService
         $baseAmount = ($reservation->original_amount_minor !== null && $reservation->original_amount_minor > 0)
             ? max(0, $reservation->original_amount_minor - ($reservation->coupon_property_share_minor ?? 0))
             : $reservation->total_amount_minor;
+        $currency = strtoupper(trim((string) ($reservation->currency_code ?: 'INR')));
 
         if ($agreement === null) {
             $reservation->forceFill([
@@ -114,7 +115,7 @@ class CommissionCalculationService
                 'commission_amount_minor' => null,
                 'commission_tax_amount_minor' => null,
                 'net_partner_payable_minor' => $baseAmount,
-                'commission_currency' => 'INR',
+                'commission_currency' => $currency,
             ])->save();
 
             return $reservation;
@@ -132,7 +133,7 @@ class CommissionCalculationService
             'commission_amount_minor' => $calc['commission_amount_minor'],
             'commission_tax_amount_minor' => $calc['commission_tax_amount_minor'],
             'net_partner_payable_minor' => $calc['net_partner_payable_minor'],
-            'commission_currency' => 'INR',
+            'commission_currency' => $currency,
             'commission_status' => CommissionSnapshotStatus::Snapshotted,
         ])->save();
 

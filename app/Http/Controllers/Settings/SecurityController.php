@@ -76,6 +76,8 @@ class SecurityController extends Controller
             'password' => $request->password,
         ]);
 
+        $user->tokens()->delete();
+
         try {
             app(NotificationDispatcher::class)->dispatch(
                 eventType: 'auth.security_alert',

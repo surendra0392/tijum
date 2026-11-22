@@ -320,6 +320,8 @@ class PhaseM10C2FinancialAndSlaTest extends TestCase
      */
     public function test_public_property_date_validation_returns_422_on_invalid_ranges(): void
     {
+        $this->travelTo(CarbonImmutable::parse('2026-11-20 12:00:00', 'Asia/Kolkata'));
+
         // 1. Only check_in provided -> 422
         $res1 = $this->getJson('/api/v1/public/properties?check_in_date=2026-12-01');
         $res1->assertStatus(422);
@@ -355,6 +357,8 @@ class PhaseM10C2FinancialAndSlaTest extends TestCase
      */
     public function test_property_search_excludes_properties_with_fully_booked_inventory(): void
     {
+        $this->travelTo(CarbonImmutable::parse('2026-11-20 12:00:00', 'Asia/Kolkata'));
+
         $owner = $this->createActiveOwner(['email' => 'search_avail_test@example.com']);
         $user = User::factory()->create();
 

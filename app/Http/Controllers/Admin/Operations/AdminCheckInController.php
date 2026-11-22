@@ -136,18 +136,24 @@ class AdminCheckInController extends Controller
 
     public function markCheckIn(Request $request, Reservation $reservation): RedirectResponse
     {
+        $admin = $request->user('admin');
+        abort_unless($admin !== null && ($admin->hasPermission('operations.manage') || $admin->hasPermission('bookings.manage')), 403);
+        abort_unless($reservation->status === ReservationStatus::Confirmed, 422, 'Only confirmed reservations can be checked in.');
+
         $validated = $request->validate([
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $admin = $request->user('admin');
-        $reservation->markCheckedIn('admin', $admin ? $admin->id : 1, $validated['notes'] ?? null);
+        $reservation->markCheckedIn('admin', $admin->id, $validated['notes'] ?? null);
 
         return back()->with('status', "Guest for {$reservation->booking_reference} marked as checked in.");
     }
 
-    public function undoCheckIn(Reservation $reservation): RedirectResponse
+    public function undoCheckIn(Request $request, Reservation $reservation): RedirectResponse
     {
+        $admin = $request->user('admin');
+        abort_unless($admin !== null && ($admin->hasPermission('operations.manage') || $admin->hasPermission('bookings.manage')), 403);
+
         $reservation->undoCheckIn();
 
         return back()->with('status', "Check-in for {$reservation->booking_reference} reversed.");

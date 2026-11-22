@@ -117,6 +117,8 @@ class AdminFinancialProfileController extends Controller
     {
         /** @var Admin $admin */
         $admin = $request->user('admin');
+        abort_unless($admin->hasPermission('partners.financial.manage'), 403);
+
         $profile = $owner->financialProfile;
 
         if ($profile === null) {
@@ -138,6 +140,10 @@ class AdminFinancialProfileController extends Controller
 
     public function reject(Owner $owner, Request $request): RedirectResponse
     {
+        /** @var Admin $admin */
+        $admin = $request->user('admin');
+        abort_unless($admin->hasPermission('partners.financial.manage'), 403);
+
         $validated = $request->validate([
             'rejection_reason' => ['required', 'string', 'max:500'],
         ]);

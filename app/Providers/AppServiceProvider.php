@@ -59,14 +59,12 @@ class AppServiceProvider extends ServiceProvider
             $keyId = (string) PlatformSetting::get('integrations.razorpay_key_id') ?: (string) config('tijum.payments.razorpay.key_id', '');
             $keySecret = (string) PlatformSetting::get('integrations.razorpay_key_secret') ?: (string) config('tijum.payments.razorpay.key_secret', '');
             $webhookSecret = (string) PlatformSetting::get('integrations.razorpay_webhook_secret') ?: (string) config('tijum.payments.razorpay.webhook_secret', '');
-            $adminMode = PlatformSetting::get('integrations.razorpay_mode');
-            $isLive = $adminMode !== null ? ($adminMode === 'live') : (bool) config('tijum.payments.live_enabled', false);
 
             return new RazorpayGateway(
                 keyId: $keyId,
                 keySecret: $keySecret,
                 webhookSecret: $webhookSecret,
-                liveEnabled: $isLive,
+                liveEnabled: $this->razorpayLiveEnabled(),
             );
         });
 
@@ -78,8 +76,16 @@ class AppServiceProvider extends ServiceProvider
                 keyId: $keyId,
                 keySecret: $keySecret,
                 routeEnabled: (bool) config('tijum.settlements.route_enabled', false),
+                liveEnabled: $this->razorpayLiveEnabled(),
             );
         });
+    }
+
+    private function razorpayLiveEnabled(): bool
+    {
+        $adminMode = PlatformSetting::get('integrations.razorpay_mode');
+
+        return $adminMode !== null ? $adminMode === 'live' : (bool) config('tijum.payments.live_enabled', false);
     }
 
     /**

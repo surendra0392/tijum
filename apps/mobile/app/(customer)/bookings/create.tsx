@@ -374,15 +374,25 @@ export default function CreateReservationScreen() {
             });
 
             if (res.data) {
+                const targetReference =
+                    res.data.reference ?? res.data.booking_reference;
+                const isConfirmed = res.data.status === 'confirmed';
+
                 Alert.alert(
-                    'Reservation Created!',
-                    'Your room inventory is held for 15 minutes. Please complete payment to confirm your stay.',
+                    isConfirmed
+                        ? 'Reservation Confirmed!'
+                        : 'Reservation Created!',
+                    isConfirmed
+                        ? 'Your reservation has been confirmed. You can review your booking details anytime.'
+                        : 'Your room inventory is held for 15 minutes. Please complete payment to confirm your stay.',
                     [
                         {
-                            text: 'Proceed to Payment',
+                            text: isConfirmed
+                                ? 'View Booking'
+                                : 'Proceed to Payment',
                             onPress: () =>
                                 router.replace(
-                                    `/(customer)/bookings/${res.data.reference}`,
+                                    `/(customer)/bookings/${targetReference}`,
                                 ),
                         },
                     ],

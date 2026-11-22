@@ -126,6 +126,13 @@ export default function EditPropertyScreen() {
             );
             return;
         }
+        if (!/^[1-9][0-9]{5}$/.test(postalCode.trim())) {
+            Alert.alert(
+                'Validation Error',
+                'Enter a valid 6-digit Indian PIN code.',
+            );
+            return;
+        }
 
         const matchedCategory = refData?.categories.find(
             (c) => c.slug === selectedCategorySlug,
@@ -146,7 +153,7 @@ export default function EditPropertyScreen() {
                 address_line_2: addressLine2.trim() || undefined,
                 locality: locality.trim(),
                 landmark: landmark.trim() || undefined,
-                postal_code: postalCode.trim() || '500081',
+                postal_code: postalCode.trim(),
             };
 
             await OwnerApi.updateProperty(propertyId, payload);

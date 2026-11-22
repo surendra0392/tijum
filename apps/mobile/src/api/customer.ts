@@ -29,6 +29,10 @@ export const CustomerApi = {
         password: string;
         password_confirmation: string;
     }) => ApiClient.put<ApiResponse<null>>('customer/password', data),
+    resendEmailVerification: () =>
+        ApiClient.post<ApiResponse<{ email_verified: boolean }>>(
+            'customer/email/verification-notification',
+        ),
 
     // Reservations
     getReservations: (

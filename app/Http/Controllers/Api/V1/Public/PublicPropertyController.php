@@ -304,12 +304,13 @@ class PublicPropertyController extends ApiController
         // Annotate each property with distance & locality match
         $properties->each(function (Property $property) use ($refCoords, $searchedLocality, $searchService): void {
             $distKm = null;
-            if ($refCoords !== null && $property->latitude !== null && $property->longitude !== null) {
+            $coords = $property->resolvedCoordinates();
+            if ($refCoords !== null && $coords !== null) {
                 $distKm = $searchService->calculateDistanceKm(
                     $refCoords['lat'],
                     $refCoords['lng'],
-                    (float) $property->latitude,
-                    (float) $property->longitude,
+                    $coords['latitude'],
+                    $coords['longitude'],
                 );
             }
 

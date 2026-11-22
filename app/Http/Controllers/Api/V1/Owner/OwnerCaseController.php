@@ -87,7 +87,7 @@ class OwnerCaseController extends ApiController
             'booking_reference' => $case->reservation->booking_reference,
             'customer_name' => $case->reservation->user->name,
             'description' => $case->description,
-            'messages_count' => $case->messages->count(),
+            'messages_count' => $case->messages->where('is_internal_note', false)->count(),
             'first_action_due_at' => $case->first_action_due_at->toIso8601String(),
             'first_action_target_hours' => $case->first_action_target_hours,
             'acknowledgement_due_at' => $case->acknowledgement_due_at->toIso8601String(),
@@ -139,14 +139,16 @@ class OwnerCaseController extends ApiController
             return $this->error("Support case '{$reference}' not found or unauthorized.", 'NOT_FOUND', 404);
         }
 
-        $messages = $case->messages->map(static fn (CustomerProtectionCaseMessage $m): array => [
-            'id' => $m->id,
-            'sender_type' => $m->sender_type,
-            'sender_name' => $m->sender_name,
-            'message' => $m->message,
-            'attachment_url' => $m->attachment_path ? url('storage/'.$m->attachment_path) : null,
-            'created_at' => $m->created_at->toIso8601String(),
-        ])->values()->all();
+        $messages = $case->messages
+            ->where('is_internal_note', false)
+            ->map(static fn (CustomerProtectionCaseMessage $m): array => [
+                'id' => $m->id,
+                'sender_type' => $m->sender_type,
+                'sender_name' => $m->sender_name,
+                'message' => $m->message,
+                'attachment_url' => $m->attachment_path ? url('storage/'.$m->attachment_path) : null,
+                'created_at' => $m->created_at->toIso8601String(),
+            ])->values()->all();
 
         return $this->success([
             'id' => $case->id,

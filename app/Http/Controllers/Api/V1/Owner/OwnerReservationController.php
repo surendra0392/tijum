@@ -130,6 +130,10 @@ class OwnerReservationController extends ApiController
             return $this->error('Only confirmed reservations can be checked out.', 'INVALID_STATUS', 422);
         }
 
+        if ($reservation->checked_in_at === null) {
+            return $this->error('Guest must be checked in before marking check-out.', 'NOT_CHECKED_IN', 422);
+        }
+
         $validated = $request->validate([
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);

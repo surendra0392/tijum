@@ -67,6 +67,8 @@ class ProfileController extends Controller
             'password' => $request->string('password')->toString(),
         ]);
 
+        $owner->tokens()->delete();
+
         return redirect()
             ->route('owner.profile.edit')
             ->with('status', 'password-updated');

@@ -72,7 +72,12 @@ class CreateProperty
             (string) ($attributes['ownership_arrangement'] ?? PropertyOwnershipArrangement::OwnerOperator->value),
         ) ?? PropertyOwnershipArrangement::OwnerOperator;
 
-        return DB::transaction(function () use ($owner, $category, $city, $attributes, $arrangement): Property {
+        [$latitude, $longitude] = $this->resolveCoordinatePair(
+            $attributes['latitude'] ?? null,
+            $attributes['longitude'] ?? null,
+        );
+
+        return DB::transaction(function () use ($owner, $category, $city, $attributes, $arrangement, $latitude, $longitude): Property {
             $name = trim((string) $attributes['name']);
             $tmpUlid = Str::ulid()->toString();
 
@@ -95,8 +100,8 @@ class CreateProperty
                 'postal_code' => trim((string) $attributes['postal_code']),
                 'state' => $city->state,
                 'country_code' => $city->country_code,
-                'latitude' => $attributes['latitude'] ?? null,
-                'longitude' => $attributes['longitude'] ?? null,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
                 'status' => PropertyOperationalStatus::Draft,
                 'is_verified' => false,
                 'booking_eligible' => false,
@@ -136,6 +141,27 @@ class CreateProperty
 
             return $property->fresh(['category', 'city', 'activeVerificationApplication']) ?? $property;
         });
+    }
+
+    /**
+     * @return array{0: float|null, 1: float|null}
+     */
+    private function resolveCoordinatePair(mixed $rawLatitude, mixed $rawLongitude): array
+    {
+        $latEmpty = $rawLatitude === null || (is_string($rawLatitude) && trim($rawLatitude) === '');
+        $lngEmpty = $rawLongitude === null || (is_string($rawLongitude) && trim($rawLongitude) === '');
+
+        if ($latEmpty && $lngEmpty) {
+            return [null, null];
+        }
+
+        if ($latEmpty || $lngEmpty || ! Property::areValidCoordinates($rawLatitude, $rawLongitude)) {
+            throw ValidationException::withMessages([
+                'latitude' => 'Provide valid paired latitude and longitude coordinates, or leave both blank.',
+            ]);
+        }
+
+        return [(float) $rawLatitude, (float) $rawLongitude];
     }
 
     private function nullableTrimmed(mixed $value): ?string

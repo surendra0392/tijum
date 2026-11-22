@@ -21,6 +21,7 @@ class AdminFinancialReconciliationController extends Controller
     public function index(FinancialReconciliationService $reconciliationService): Response
     {
         $exceptions = $reconciliationService->getUnreconciledExceptions();
+        $ledgerAudit = $reconciliationService->getLedgerAuditSummary();
 
         $allSettlements = PartnerSettlement::all();
         $totalSettled = (int) $allSettlements->where('status', SettlementStatus::Settled)->sum('net_settlement_amount_minor');
@@ -35,6 +36,7 @@ class AdminFinancialReconciliationController extends Controller
                 'total_tax_deductions_minor' => $totalTaxDeductions,
                 'unreconciled_count' => $exceptions->count(),
             ],
+            'ledger_audit' => $ledgerAudit,
         ]);
     }
 
@@ -42,6 +44,8 @@ class AdminFinancialReconciliationController extends Controller
     {
         /** @var Admin $admin */
         $admin = $request->user('admin');
+        abort_unless($admin->hasPermission('financial.reconciliation'), 403);
+
         $validated = $request->validate([
             'notes' => ['required', 'string', 'max:1000'],
         ]);
