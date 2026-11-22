@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
+use Laravel\Fortify\Fortify;
+use Throwable;
 
 class CustomerAuthController extends ApiController
 {
@@ -156,10 +158,7 @@ class CustomerAuthController extends ApiController
             }
 
             if ($recoveryCode !== '') {
-                $validRecoveryCode = collect($user->recoveryCodes())
-                    ->first(static fn (string $code): bool => hash_equals($code, $recoveryCode));
-
-                if (! is_string($validRecoveryCode)) {
+                if (! $user->consumeTwoFactorRecoveryCode($recoveryCode)) {
                     RateLimiter::hit($throttleKey, 60);
 
                     return $this->error(
@@ -169,13 +168,14 @@ class CustomerAuthController extends ApiController
                         ['recovery_code' => ['The provided two-factor recovery code was invalid.']],
                     );
                 }
-
-                $user->replaceRecoveryCode($validRecoveryCode);
             } else {
-                $verified = app(TwoFactorAuthenticationProvider::class)->verify(
-                    decrypt((string) $user->two_factor_secret),
-                    $totpCode,
-                );
+                try {
+                    $decryptedSecret = Fortify::currentEncrypter()->decrypt((string) $user->two_factor_secret);
+                    $verified = is_string($decryptedSecret)
+                        && app(TwoFactorAuthenticationProvider::class)->verify($decryptedSecret, $totpCode);
+                } catch (Throwable) {
+                    $verified = false;
+                }
 
                 if (! $verified) {
                     RateLimiter::hit($throttleKey, 60);

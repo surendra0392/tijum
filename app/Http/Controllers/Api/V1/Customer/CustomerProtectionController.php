@@ -13,8 +13,8 @@ use App\Models\Reservation;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Throwable;
 
 class CustomerProtectionController extends ApiController
 {
@@ -132,7 +132,7 @@ class CustomerProtectionController extends ApiController
 
         $validated = $request->validate([
             'booking_reference' => ['required', 'string'],
-            'category' => ['required', 'string'],
+            'category' => ['required', 'string', Rule::enum(CaseCategory::class)],
             'description' => ['required', 'string', 'min:20', 'max:3000'],
         ]);
 
@@ -146,15 +146,15 @@ class CustomerProtectionController extends ApiController
             return $this->error('The specified reservation does not exist.', 'RESERVATION_NOT_FOUND', 404);
         }
 
-        $category = CaseCategory::tryFrom($validated['category']) ?? CaseCategory::FoodNotProvided;
+        $category = CaseCategory::from($validated['category']);
 
         try {
             $case = $action->execute($reservation, $user, [
                 'category' => $category->value,
                 'description' => $validated['description'],
             ]);
-        } catch (Throwable $e) {
-            return $this->error($e->getMessage(), 'CASE_CREATION_FAILED', 422);
+        } catch (ValidationException $e) {
+            return $this->error($e->getMessage(), 'VALIDATION_ERROR', 422, $e->errors());
         }
 
         return $this->success([

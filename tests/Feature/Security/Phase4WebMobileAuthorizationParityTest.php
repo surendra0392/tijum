@@ -7,6 +7,7 @@ namespace Tests\Feature\Security;
 use App\Actions\Protection\CreateProtectionCase;
 use App\Enums\AdminRole;
 use App\Enums\CaseCategory;
+use App\Enums\CasePriority;
 use App\Enums\CommissionBaseType;
 use App\Enums\CommissionGstType;
 use App\Enums\FinancialOnboardingStatus;
@@ -15,6 +16,7 @@ use App\Enums\OwnerStatus;
 use App\Enums\RelocationSubsidyStatus;
 use App\Models\Admin;
 use App\Models\City;
+use App\Models\CustomerProtectionCase;
 use App\Models\CustomerProtectionCaseMessage;
 use App\Models\OwnerFinancialProfile;
 use App\Models\PlatformRelocationSubsidy;
@@ -25,6 +27,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
+use PragmaRX\Google2FA\Google2FA;
 use Tests\Support\ReservationTestHelpers;
 use Tests\TestCase;
 
@@ -378,5 +381,164 @@ class Phase4WebMobileAuthorizationParityTest extends TestCase
         $this->actingAs($supportAdmin, 'admin')
             ->post(route('admin.operations.check-outs.mark', $res1))
             ->assertForbidden();
+    }
+
+    public function test_mobile_customer_login_preserves_totp_rate_limits_and_handles_missing_recovery_codes_safely(): void
+    {
+        $provider = app(TwoFactorAuthenticationProvider::class);
+        $secret = $provider->generateSecretKey();
+
+        $user = User::factory()->create([
+            'email' => 'totp.rate.customer@example.test',
+            'password' => Hash::make('SecurePass123!'),
+            'two_factor_secret' => encrypt($secret),
+            'two_factor_recovery_codes' => encrypt(json_encode(['REC-SEQ-1111', 'REC-SEQ-2222'], JSON_THROW_ON_ERROR)),
+            'two_factor_confirmed_at' => now(),
+        ]);
+
+        // 1. Valid TOTP code succeeds and issues a token
+        $validOtp = (new Google2FA)->getCurrentOtp($secret);
+        $this->postJson('/api/v1/auth/customer/login', [
+            'email' => $user->email,
+            'password' => 'SecurePass123!',
+            'code' => $validOtp,
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+        $this->assertNotEmpty($user->tokens()->get());
+
+        // 2. Sequential consumption of distinct recovery codes works once each
+        $this->postJson('/api/v1/auth/customer/login', [
+            'email' => $user->email,
+            'password' => 'SecurePass123!',
+            'recovery_code' => 'REC-SEQ-1111',
+        ])->assertOk();
+
+        $this->postJson('/api/v1/auth/customer/login', [
+            'email' => $user->email,
+            'password' => 'SecurePass123!',
+            'recovery_code' => 'REC-SEQ-1111',
+        ])->assertStatus(422);
+
+        $this->postJson('/api/v1/auth/customer/login', [
+            'email' => $user->email,
+            'password' => 'SecurePass123!',
+            'recovery_code' => 'REC-SEQ-2222',
+        ])->assertOk();
+
+        // 3. Submitting a recovery code when two_factor_recovery_codes is null returns 422 cleanly
+        $userNoRecovery = User::factory()->create([
+            'email' => 'totp.nullcodes@example.test',
+            'password' => Hash::make('SecurePass123!'),
+            'two_factor_secret' => encrypt($secret),
+            'two_factor_recovery_codes' => null,
+            'two_factor_confirmed_at' => now(),
+        ]);
+
+        $this->postJson('/api/v1/auth/customer/login', [
+            'email' => $userNoRecovery->email,
+            'password' => 'SecurePass123!',
+            'recovery_code' => 'ANY-CODE',
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('error_code', 'INVALID_TWO_FACTOR_CODE');
+        $this->assertSame(0, $userNoRecovery->tokens()->count());
+
+        // 4. Rate limit kicks in after 5 failed 2FA attempts -> 429 RATE_LIMITED on 6th attempt
+        for ($i = 0; $i < 4; $i++) {
+            $this->postJson('/api/v1/auth/customer/login', [
+                'email' => $userNoRecovery->email,
+                'password' => 'SecurePass123!',
+                'code' => '000000',
+            ])->assertStatus(422);
+        }
+
+        $this->postJson('/api/v1/auth/customer/login', [
+            'email' => $userNoRecovery->email,
+            'password' => 'SecurePass123!',
+            'code' => $validOtp,
+        ])
+            ->assertStatus(429)
+            ->assertJsonPath('error_code', 'RATE_LIMITED');
+        $this->assertSame(0, $userNoRecovery->tokens()->count());
+    }
+
+    public function test_mobile_and_web_customer_protection_endpoints_reject_invalid_category_with_422_and_preserve_valid_categories(): void
+    {
+        $owner = $this->createActiveOwner();
+        $property = $this->createBookableProperty($owner);
+        $roomType = $this->createBookableRoomType($property, dailyRate: 100000);
+        $this->createActiveRoom($property, $roomType);
+        $customer = $this->createCustomerUser();
+
+        $reservation = Reservation::factory()->confirmed()->create([
+            'property_id' => $property->id,
+            'property_room_type_id' => $roomType->id,
+            'user_id' => $customer->id,
+            'requires_refund_review' => false,
+            'check_in_date' => now()->toDateString(),
+            'checkout_date' => now()->addDays(2)->toDateString(),
+        ]);
+
+        $customerToken = $customer->createToken('customer_mobile')->plainTextToken;
+
+        // 1. Mobile API V1 must reject invalid category strings with 422 and create NO case
+        foreach (['nonexistent_category', 'food'] as $invalidCategory) {
+            $this->withHeader('Authorization', 'Bearer '.$customerToken)
+                ->postJson('/api/v1/customer/cases', [
+                    'booking_reference' => $reservation->booking_reference,
+                    'category' => $invalidCategory,
+                    'description' => 'Testing that invalid categories do not silently coerce to food_not_provided.',
+                ])
+                ->assertStatus(422)
+                ->assertJsonValidationErrors('category');
+        }
+
+        $this->assertSame(0, CustomerProtectionCase::query()->count());
+        $this->assertFalse($reservation->fresh()->requires_refund_review);
+
+        // 2. Web endpoint must consistently reject invalid category strings with validation errors (422 JSON / session error)
+        $this->actingAs($customer, 'web')
+            ->postJson(route('reservations.report-problem', $reservation), [
+                'category' => 'nonexistent_category',
+                'description' => 'Web JSON request with invalid category must return 422.',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('category');
+
+        $this->actingAs($customer, 'web')
+            ->post(route('reservations.report-problem', $reservation), [
+                'category' => 'nonexistent_category',
+                'description' => 'Web Inertia request with invalid category must set session validation error.',
+            ])
+            ->assertSessionHasErrors('category');
+
+        $this->assertSame(0, CustomerProtectionCase::query()->count());
+        $this->assertFalse($reservation->fresh()->requires_refund_review);
+
+        // 3. Valid mobile categories continue to work with Urgent priority and reservation refund review flagging
+        $safetyRes = $this->withHeader('Authorization', 'Bearer '.$customerToken)
+            ->postJson('/api/v1/customer/cases', [
+                'booking_reference' => $reservation->booking_reference,
+                'category' => CaseCategory::SafetyConcern->value,
+                'description' => 'Broken door lock creates an urgent safety concern in the room.',
+            ]);
+
+        $safetyRes->assertCreated()
+            ->assertJsonPath('data.category', CaseCategory::SafetyConcern->value)
+            ->assertJsonPath('data.priority', CasePriority::Urgent->value);
+
+        $unavailRes = $this->withHeader('Authorization', 'Bearer '.$customerToken)
+            ->postJson('/api/v1/customer/cases', [
+                'booking_reference' => $reservation->booking_reference,
+                'category' => CaseCategory::PropertyUnavailable->value,
+                'description' => 'Property turned me away at check-in citing no beds available.',
+            ]);
+
+        $unavailRes->assertCreated()
+            ->assertJsonPath('data.category', CaseCategory::PropertyUnavailable->value);
+
+        $this->assertTrue($reservation->fresh()->requires_refund_review);
+        $this->assertSame(2, CustomerProtectionCase::query()->count());
     }
 }

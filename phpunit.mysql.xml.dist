@@ -9,6 +9,7 @@
             <file>tests/Feature/Payments/MySqlPaymentConcurrencyTest.php</file>
             <file>tests/Feature/Financial/MySqlSettlementConcurrencyTest.php</file>
             <file>tests/Feature/Financial/MySqlFinancialLedgerConcurrencyTest.php</file>
+            <file>tests/Feature/Security/MySqlCustomerRecoveryCodeConcurrencyTest.php</file>
         </testsuite>
     </testsuites>
     <php>

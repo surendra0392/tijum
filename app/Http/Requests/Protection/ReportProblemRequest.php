@@ -21,7 +21,7 @@ class ReportProblemRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'category' => ['required', 'string', Rule::in(CaseCategory::values())],
+            'category' => ['required', 'string', Rule::enum(CaseCategory::class)],
             'description' => ['required', 'string', 'min:10', 'max:3000'],
             'priority' => ['nullable', 'string', Rule::in(['standard', 'high', 'urgent'])],
             'attachment' => ['nullable', 'file', 'max:5120', 'mimes:jpeg,jpg,png,webp,pdf'],
