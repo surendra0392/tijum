@@ -4,17 +4,26 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Payments;
 
+use App\Actions\Payments\InitiateAdminRefund;
 use App\Actions\Payments\InitiatePaymentOrder;
 use App\Actions\Payments\ProcessWebhookEvent;
+use App\Actions\Payments\ReconcileExpiredReservations;
 use App\Actions\Payments\VerifyCheckoutPayment;
+use App\Actions\Reservations\CreateReservation;
 use App\Contracts\PaymentGateway;
+use App\Enums\AdminRole;
 use App\Enums\PaymentStatus;
+use App\Enums\RefundStatus;
 use App\Enums\ReservationStatus;
+use App\Models\Admin;
 use App\Models\Reservation;
 use App\Models\ReservationPayment;
+use App\Models\ReservationRefund;
+use App\Services\Financial\SettlementCalculationService;
 use App\Services\Payments\RazorpayGateway;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -107,13 +116,23 @@ class MySqlPaymentConcurrencyTest extends TestCase
         $orderId = 'order_concur_ord_'.$uniq;
 
         // Fake Razorpay order creation
+        $gatewayOrder = [];
         Http::fake([
-            'https://api.razorpay.com/v1/orders' => Http::response([
-                'id' => $orderId,
-                'amount' => $reservation->total_amount_minor,
-                'currency' => 'INR',
-                'status' => 'created',
-            ], 200),
+            'https://api.razorpay.com/v1/orders' => function (Request $request) use ($orderId, &$gatewayOrder) {
+                $gatewayOrder = [
+                    'id' => $orderId,
+                    'amount' => $request['amount'],
+                    'amount_paid' => 0,
+                    'currency' => $request['currency'],
+                    'receipt' => $request['receipt'],
+                    'status' => 'created',
+                ];
+
+                return Http::response($gatewayOrder);
+            },
+            'https://api.razorpay.com/v1/orders/'.$orderId => function () use (&$gatewayOrder) {
+                return Http::response($gatewayOrder);
+            },
         ]);
 
         // After lock release, initiation succeeds
@@ -124,6 +143,55 @@ class MySqlPaymentConcurrencyTest extends TestCase
         $retryData = app(InitiatePaymentOrder::class)->execute($reservation, $user);
         $this->assertSame($orderData['order_id'], $retryData['order_id']);
         $this->assertSame(1, ReservationPayment::query()->where('reservation_id', $reservation->id)->count());
+        $this->assertCount(1, Http::recorded(fn (Request $request): bool => $request->method() === 'POST'));
+    }
+
+    public function test_two_connections_cannot_reserve_the_same_last_room(): void
+    {
+        $owner = $this->createActiveOwner();
+        $property = $this->createBookableProperty($owner);
+        $roomType = $this->createBookableRoomType($property, maxGuests: 1);
+        $this->createActiveRoom($property, $roomType);
+        $firstCustomer = $this->createCustomerUser();
+        $secondCustomer = $this->createCustomerUser();
+        $firstPayload = $this->validReservationPayload($property, $roomType);
+        $secondPayload = $this->validReservationPayload($property, $roomType, $firstPayload['check_in_date']);
+
+        $default = DB::getDefaultConnection();
+        $otherName = 'mysql_last_room_'.uniqid();
+        Config::set('database.connections.'.$otherName, Config::get('database.connections.'.$default));
+        $other = DB::connection($otherName);
+        $other->beginTransaction();
+        DB::setDefaultConnection($otherName);
+
+        try {
+            $winner = app(CreateReservation::class)->execute($firstCustomer, $firstPayload);
+            $this->assertSame(ReservationStatus::AwaitingPayment, $winner->status);
+            DB::setDefaultConnection($default);
+            DB::statement('SET SESSION innodb_lock_wait_timeout = 1');
+
+            try {
+                app(CreateReservation::class)->execute($secondCustomer, $secondPayload);
+                $this->fail('A second connection must wait for the last-room hold.');
+            } catch (QueryException $exception) {
+                $this->assertSame(1205, (int) ($exception->errorInfo[1] ?? 0));
+            }
+
+            $other->commit();
+        } finally {
+            DB::setDefaultConnection($default);
+            DB::statement('SET SESSION innodb_lock_wait_timeout = 50');
+            DB::purge($otherName);
+        }
+
+        try {
+            app(CreateReservation::class)->execute($secondCustomer, $secondPayload);
+            $this->fail('The committed last-room hold must prevent another booking.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('reservation', $exception->errors());
+        }
+
+        $this->assertSame(1, Reservation::query()->where('property_id', $property->id)->count());
     }
 
     /**
@@ -429,5 +497,243 @@ class MySqlPaymentConcurrencyTest extends TestCase
 
         $this->assertSame(ReservationStatus::Confirmed, $reservation->fresh()->status);
         $this->assertSame(1, ReservationPayment::query()->where('reservation_id', $reservation->id)->count());
+    }
+
+    public function test_concurrent_admin_refund_requests_serialize_and_cannot_over_refund(): void
+    {
+        $uniq = bin2hex(random_bytes(5));
+        $owner = $this->createActiveOwner(['email' => "concur_owner_ref_{$uniq}@example.com"]);
+        $property = $this->createBookableProperty($owner);
+        $roomType = $this->createBookableRoomType($property, dailyRate: 50000);
+        $this->createActiveRoom($property, $roomType);
+        $user = $this->createCustomerUser(['email' => "concur_user_ref_{$uniq}@example.com"]);
+        $admin = Admin::factory()->create([
+            'email' => "concur_admin_ref_{$uniq}@tijum.test",
+            'role' => AdminRole::Finance,
+            'is_active' => true,
+            'two_factor_confirmed_at' => now(),
+            'two_factor_secret' => 'test-secret',
+        ]);
+
+        $payload = $this->validReservationPayload($property, $roomType);
+        $this->submitReservation($user, $payload)->assertRedirect();
+        $reservation = Reservation::query()->where('submission_token', $payload['submission_token'])->firstOrFail();
+
+        $payment = ReservationPayment::query()->create([
+            'reservation_id' => $reservation->id,
+            'user_id' => $user->id,
+            'gateway' => 'razorpay',
+            'gateway_order_id' => 'order_concur_rfnd_'.$uniq,
+            'gateway_payment_id' => 'pay_concur_rfnd_'.$uniq,
+            'idempotency_key' => 'idemp_concur_rfnd_'.$uniq,
+            'amount_minor' => 50000,
+            'currency' => 'INR',
+            'status' => PaymentStatus::Captured,
+            'captured_at' => CarbonImmutable::now(),
+        ]);
+
+        // 1. InnoDB row-lock serialization on the payment row
+        $lockConnName = 'mysql_refund_lock_'.$uniq;
+        $defaultConnection = DB::getDefaultConnection();
+        Config::set('database.connections.'.$lockConnName, Config::get('database.connections.'.$defaultConnection));
+        $lockConnection = DB::connection($lockConnName);
+        $lockConnection->beginTransaction();
+        $lockConnection->table('reservation_payments')->where('id', $payment->id)->lockForUpdate()->first();
+
+        DB::statement('SET SESSION innodb_lock_wait_timeout = 1');
+        $timedOut = false;
+        try {
+            app(InitiateAdminRefund::class)->execute($payment, $admin, 30000, 'Row lock wait test', 'ref-lock-'.$uniq);
+        } catch (QueryException $e) {
+            $timedOut = (int) ($e->errorInfo[1] ?? 0) === 1205;
+        } finally {
+            $lockConnection->rollBack();
+            DB::purge($lockConnName);
+            DB::statement('SET SESSION innodb_lock_wait_timeout = 50');
+        }
+        $this->assertTrue($timedOut, 'Expected concurrent admin refund to wait on the payment InnoDB row lock.');
+
+        // 2. In-flight overlap protection without holding a transaction open during HTTP dispatch
+        $overlapConnName = 'mysql_refund_overlap_'.$uniq;
+        Config::set('database.connections.'.$overlapConnName, Config::get('database.connections.'.$defaultConnection));
+
+        Http::fake([
+            'https://api.razorpay.com/v1/payments/'.$payment->gateway_payment_id.'/refund' => function (Request $request) use ($payment, $admin, $defaultConnection, $overlapConnName, $uniq) {
+                $this->assertSame(0, DB::transactionLevel());
+
+                DB::setDefaultConnection($overlapConnName);
+                try {
+                    $this->assertSame('uncertain', DB::table('reservation_refunds')
+                        ->where('reservation_payment_id', $payment->id)
+                        ->value('status'));
+
+                    $overlapRejected = false;
+                    try {
+                        app(InitiateAdminRefund::class)->execute(
+                            $payment->fresh(),
+                            $admin,
+                            30000,
+                            'Overlapping second refund',
+                            'ref-overlap-'.$uniq,
+                        );
+                    } catch (ValidationException $e) {
+                        $overlapRejected = array_key_exists('amount', $e->errors());
+                    }
+
+                    $this->assertTrue($overlapRejected, 'Overlapping refund must be blocked while prior refund is uncertain.');
+                } finally {
+                    DB::setDefaultConnection($defaultConnection);
+                    DB::purge($overlapConnName);
+                }
+
+                return Http::response([
+                    'id' => 'rfnd_concur_'.$uniq.'_1',
+                    'payment_id' => $payment->gateway_payment_id,
+                    'currency' => 'INR',
+                    'amount' => $request['amount'],
+                    'receipt' => $request['receipt'],
+                    'status' => 'processed',
+                ]);
+            },
+        ]);
+
+        $first = app(InitiateAdminRefund::class)->execute($payment, $admin, 30000, 'Verified partial refund', 'ref-primary-'.$uniq);
+        $this->assertSame(RefundStatus::Processed, $first->status);
+        $this->assertSame(20000, $payment->fresh()->remainingRefundableAmount());
+        $this->assertSame(1, ReservationRefund::query()->where('reservation_payment_id', $payment->id)->count());
+        Http::assertSentCount(1);
+
+        // Over-refund must be rejected; remaining balance of 20000 cannot be exceeded
+        $overRefundRejected = false;
+        try {
+            app(InitiateAdminRefund::class)->execute($payment->fresh(), $admin, 25000, 'Excess refund', 'ref-excess-'.$uniq);
+        } catch (ValidationException $e) {
+            $overRefundRejected = array_key_exists('amount', $e->errors());
+        }
+        $this->assertTrue($overRefundRejected);
+        Http::assertSentCount(1);
+    }
+
+    public function test_late_capture_after_hold_expiry_cannot_overbook_last_room_under_mysql(): void
+    {
+        $uniq = bin2hex(random_bytes(5));
+        $owner = $this->createActiveOwner(['email' => "concur_owner_late_{$uniq}@example.com"]);
+        $property = $this->createBookableProperty($owner);
+        $roomType = $this->createBookableRoomType($property, maxGuests: 2, dailyRate: 50000);
+        $this->createActiveRoom($property, $roomType);
+        $userA = $this->createCustomerUser(['email' => "concur_user_late_a_{$uniq}@example.com"]);
+        $userB = $this->createCustomerUser(['email' => "concur_user_late_b_{$uniq}@example.com"]);
+
+        $checkIn = CarbonImmutable::now('Asia/Kolkata')->addDays(8)->toDateString();
+
+        // Customer A holds the last available room
+        $payloadA = $this->validReservationPayload($property, $roomType, $checkIn, quantity: 1);
+        $this->submitReservation($userA, $payloadA)->assertRedirect();
+        $reservationA = Reservation::query()->where('submission_token', $payloadA['submission_token'])->firstOrFail();
+
+        $paymentA = ReservationPayment::query()->create([
+            'reservation_id' => $reservationA->id,
+            'user_id' => $userA->id,
+            'gateway' => 'razorpay',
+            'gateway_order_id' => 'order_late_a_'.$uniq,
+            'idempotency_key' => 'idemp_late_a_'.$uniq,
+            'amount_minor' => $reservationA->total_amount_minor,
+            'currency' => 'INR',
+            'status' => PaymentStatus::Created,
+        ]);
+
+        // Hold expires and expiry reconciliation releases inventory
+        $reservationA->forceFill([
+            'status' => ReservationStatus::AwaitingPayment,
+            'payment_deadline_at' => CarbonImmutable::now()->subMinutes(5),
+        ])->save();
+
+        Http::fake([
+            'https://api.razorpay.com/v1/orders/order_late_a_'.$uniq => Http::response([
+                'id' => 'order_late_a_'.$uniq,
+                'amount' => $paymentA->amount_minor,
+                'currency' => 'INR',
+                'status' => 'created',
+                'attempts' => 0,
+            ]),
+        ]);
+
+        app(ReconcileExpiredReservations::class)->execute();
+        $this->assertSame(ReservationStatus::Expired, $reservationA->fresh()->status);
+        $this->assertSame(PaymentStatus::Cancelled, $paymentA->fresh()->status);
+
+        // Customer B immediately reserves and confirms the released last room
+        $payloadB = $this->validReservationPayload($property, $roomType, $checkIn, quantity: 1);
+        $this->submitReservation($userB, $payloadB)->assertRedirect();
+        $reservationB = Reservation::query()->where('submission_token', $payloadB['submission_token'])->firstOrFail();
+        $reservationB->forceFill([
+            'status' => ReservationStatus::AwaitingPayment,
+            'payment_deadline_at' => CarbonImmutable::now()->addMinutes(15),
+        ])->save();
+
+        $orderB = 'order_late_b_'.$uniq;
+        $payB = 'pay_late_b_'.$uniq;
+        ReservationPayment::query()->create([
+            'reservation_id' => $reservationB->id,
+            'user_id' => $userB->id,
+            'gateway' => 'razorpay',
+            'gateway_order_id' => $orderB,
+            'idempotency_key' => 'idemp_late_b_'.$uniq,
+            'amount_minor' => $reservationB->total_amount_minor,
+            'currency' => 'INR',
+            'status' => PaymentStatus::Created,
+        ]);
+
+        $keySecret = (string) config('tijum.payments.razorpay.key_secret', 'test-checkout-secret');
+        $sigB = hash_hmac('sha256', $orderB.'|'.$payB, $keySecret);
+        $webhookSecret = 'whsec_late_'.$uniq;
+        Config::set('tijum.payments.razorpay.webhook_secret', $webhookSecret);
+        $this->app->singleton(PaymentGateway::class, fn () => new RazorpayGateway('rzp_test_checkout', $keySecret, $webhookSecret));
+
+        Http::fake([
+            'https://api.razorpay.com/v1/payments/'.$payB => Http::response([
+                'id' => $payB,
+                'order_id' => $orderB,
+                'amount' => $reservationB->total_amount_minor,
+                'currency' => 'INR',
+                'status' => 'captured',
+                'method' => 'upi',
+            ]),
+        ]);
+
+        $confirmedB = app(VerifyCheckoutPayment::class)->execute($reservationB, $userB, $orderB, $payB, $sigB);
+        $this->assertSame(ReservationStatus::Confirmed, $confirmedB->status);
+
+        // Late capture webhook arrives for Customer A's expired order
+        $lateWebhook = [
+            'id' => 'evt_late_a_'.$uniq,
+            'event' => 'payment.captured',
+            'payload' => ['payment' => ['entity' => [
+                'id' => 'pay_late_a_'.$uniq,
+                'order_id' => 'order_late_a_'.$uniq,
+                'amount' => $paymentA->amount_minor,
+                'currency' => 'INR',
+                'status' => 'captured',
+                'method' => 'card',
+            ]]],
+        ];
+        $lateRaw = json_encode($lateWebhook, JSON_THROW_ON_ERROR);
+        $lateSig = hash_hmac('sha256', $lateRaw, $webhookSecret);
+
+        app(ProcessWebhookEvent::class)->execute($lateRaw, $lateSig, $lateWebhook, 'evt_late_a_'.$uniq);
+
+        $reservationA->refresh();
+        $this->assertSame(ReservationStatus::Expired, $reservationA->status);
+        $this->assertTrue((bool) $reservationA->requires_refund_review);
+        $this->assertSame(PaymentStatus::Captured, $paymentA->fresh()->status);
+        $this->assertSame(ReservationStatus::Confirmed, $reservationB->fresh()->status);
+
+        $confirmedCount = Reservation::query()
+            ->where('property_id', $property->id)
+            ->whereDate('check_in_date', $checkIn)
+            ->where('status', ReservationStatus::Confirmed->value)
+            ->count();
+        $this->assertSame(1, $confirmedCount);
+        $this->assertNotContains($reservationA->id, app(SettlementCalculationService::class)->getEligibleReservations($owner)->pluck('id')->all());
     }
 }

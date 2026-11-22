@@ -6,22 +6,24 @@ namespace App\Actions\Payments;
 
 use App\Contracts\PaymentGateway;
 use App\Enums\PaymentStatus;
+use App\Enums\ProviderTransferStatus;
 use App\Enums\RefundStatus;
 use App\Models\Admin;
+use App\Models\CustomerProtectionCase;
+use App\Models\ProviderTransfer;
 use App\Models\ReservationPayment;
 use App\Models\ReservationRefund;
-use App\Services\Financial\FinancialLedgerService;
-use App\Services\Notifications\NotificationDispatcher;
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use RuntimeException;
+use Throwable;
 
 class InitiateAdminRefund
 {
-    public function __construct(private readonly PaymentGateway $gateway) {}
+    public function __construct(
+        private readonly PaymentGateway $gateway,
+        private readonly ReconcilePaymentRefund $reconciliation,
+    ) {}
 
     public function execute(
         ReservationPayment $payment,
@@ -32,202 +34,126 @@ class InitiateAdminRefund
         ?int $caseId = null,
     ): ReservationRefund {
         if (! $admin->isActive() || (! $admin->hasPermission('bookings.manage') && ! $admin->hasPermission('refunds.manage'))) {
-            throw ValidationException::withMessages([
-                'admin' => 'You are not authorised to initiate refunds.',
-            ]);
+            throw ValidationException::withMessages(['admin' => 'You are not authorised to initiate refunds.']);
         }
 
-        if ($amountMinor <= 0) {
-            throw ValidationException::withMessages([
-                'amount' => 'Refund amount must be greater than zero.',
-            ]);
+        $reason = trim($reason);
+        if ($amountMinor <= 0 || $reason === '') {
+            throw ValidationException::withMessages(['amount' => 'A positive refund amount and reason are required.']);
         }
 
-        $idempotency = $idempotencyKey ?: (string) Str::uuid();
+        $normalizedKey = $idempotencyKey !== null && trim($idempotencyKey) !== ''
+            ? trim($idempotencyKey)
+            : null;
 
-        // Phase 1: Create pending refund in DB transaction
-        /** @var ReservationRefund $refund */
-        $refund = DB::transaction(function () use ($admin, $payment, $amountMinor, $reason, $idempotency, $caseId): ReservationRefund {
+        $idempotency = hash('sha256', json_encode(
+            ['refund', $payment->id, $normalizedKey ?? [$amountMinor, $reason, $caseId]],
+            JSON_THROW_ON_ERROR,
+        ));
+
+        [$refund, $shouldSend] = DB::transaction(function () use ($admin, $payment, $amountMinor, $reason, $idempotency, $caseId): array {
             $lockedPayment = ReservationPayment::query()->whereKey($payment->id)->lockForUpdate()->firstOrFail();
+            $existing = $lockedPayment->refunds()->where('idempotency_key', $idempotency)->lockForUpdate()->first();
 
-            if (! $lockedPayment->isCaptured()) {
-                throw ValidationException::withMessages([
-                    'payment' => 'Only captured payments can be refunded.',
-                ]);
+            if ($existing !== null) {
+                if ($existing->amount_minor !== $amountMinor || $existing->reason !== $reason || $existing->customer_protection_case_id !== $caseId) {
+                    throw ValidationException::withMessages(['idempotency_key' => 'This request key was used for a different refund.']);
+                }
+
+                return [$existing, false];
             }
 
-            $refundable = $lockedPayment->remainingRefundableAmount();
+            $mode = $this->reconciliation->gatewayMode();
+            if (! $lockedPayment->isCaptured() || $lockedPayment->gateway !== 'razorpay'
+                || ! ReconcilePaymentRefund::isPaymentId($lockedPayment->gateway_payment_id)) {
+                throw ValidationException::withMessages(['payment' => 'Only captured Razorpay payments with a valid provider reference can be refunded.']);
+            }
+
+            if ($mode === null) {
+                throw ValidationException::withMessages(['payment' => 'Razorpay is unavailable for refunds in the current mode.']);
+            }
+
+            if ($caseId !== null && ! CustomerProtectionCase::query()->whereKey($caseId)->where('reservation_id', $lockedPayment->reservation_id)->exists()) {
+                throw ValidationException::withMessages(['case' => 'The protection case does not belong to this reservation.']);
+            }
+
+            // Old failures without a gateway ID can also represent an accepted refund with a lost response.
+            $unresolved = $lockedPayment->refunds()->whereNull('gateway_refund_id')
+                ->whereIn('status', [RefundStatus::Pending, RefundStatus::Processing, RefundStatus::Uncertain, RefundStatus::Failed])
+                ->lockForUpdate()->first();
+            if ($unresolved !== null) {
+                throw ValidationException::withMessages(['amount' => 'Reconcile the earlier refund with Razorpay before requesting another refund.']);
+            }
+
+            $transferAmount = ProviderTransfer::query()->where('reservation_payment_id', $lockedPayment->id)
+                ->whereIn('status', [ProviderTransferStatus::Processed, ProviderTransferStatus::Pending, ProviderTransferStatus::Uncertain])
+                ->lockForUpdate()->pluck('amount_minor')->sum();
+            $reservedRefundAmount = $lockedPayment->refunds()
+                ->whereIn('status', [RefundStatus::Approved, RefundStatus::Pending, RefundStatus::Uncertain, RefundStatus::Processing, RefundStatus::Processed])
+                ->lockForUpdate()->pluck('amount_minor')->sum();
+            $refundable = max(0, $lockedPayment->amount_minor - $reservedRefundAmount - $transferAmount);
             if ($amountMinor > $refundable) {
                 $maxFormatted = number_format($refundable / 100, 2);
-                throw ValidationException::withMessages([
-                    'amount' => "Refund amount exceeds maximum refundable balance of ₹{$maxFormatted}.",
-                ]);
+                throw ValidationException::withMessages(['amount' => "Refund amount exceeds the available balance of ₹{$maxFormatted}."]);
             }
 
-            return ReservationRefund::create([
-                'reservation_payment_id' => $lockedPayment->id,
+            $refund = $lockedPayment->refunds()->create([
                 'reservation_id' => $lockedPayment->reservation_id,
                 'customer_protection_case_id' => $caseId,
                 'initiated_by_admin_id' => $admin->id,
                 'idempotency_key' => $idempotency,
                 'amount_minor' => $amountMinor,
                 'currency' => $lockedPayment->currency,
-                'status' => RefundStatus::Pending->value,
-                'reason' => trim($reason),
-            ]);
-        });
-
-        // Phase 2: External Gateway Call
-        try {
-            $gatewayRefund = $this->gateway->createRefund(
-                $payment,
-                $amountMinor,
-                $reason,
-                $idempotency,
-            );
-
-            $gatewayRefundId = (string) ($gatewayRefund['id'] ?? '');
-            $gatewayStatus = (string) ($gatewayRefund['status'] ?? 'processing');
-
-            $finalStatus = match ($gatewayStatus) {
-                'failed' => RefundStatus::Failed->value,
-                'processed' => RefundStatus::Processed->value,
-                default => RefundStatus::Processing->value,
-            };
-
-            // Phase 3: Update local records
-            DB::transaction(function () use ($refund, $payment, $gatewayRefundId, $finalStatus, $gatewayRefund): void {
-                $lockedRefund = ReservationRefund::query()->whereKey($refund->id)->lockForUpdate()->firstOrFail();
-                $lockedPayment = ReservationPayment::query()->whereKey($payment->id)->lockForUpdate()->firstOrFail();
-
-                $lockedRefund->forceFill([
-                    'gateway_refund_id' => $gatewayRefundId,
-                    'status' => $finalStatus,
-                    'gateway_processed_at' => $finalStatus === RefundStatus::Processed->value ? CarbonImmutable::now() : null,
-                    'metadata' => $gatewayRefund,
-                ])->save();
-
-                $totalRefunded = (int) $lockedPayment->refunds()
-                    ->where('status', RefundStatus::Processed->value)
-                    ->sum('amount_minor');
-
-                if ($totalRefunded > 0) {
-                    $newPaymentStatus = $totalRefunded >= $lockedPayment->amount_minor
-                        ? PaymentStatus::Refunded
-                        : PaymentStatus::PartiallyRefunded;
-
-                    $lockedPayment->forceFill(['status' => $newPaymentStatus->value])->save();
-                } elseif ($finalStatus === RefundStatus::Processing->value) {
-                    $lockedPayment->forceFill(['status' => PaymentStatus::RefundPending->value])->save();
-                }
-
-                if ($finalStatus === RefundStatus::Processed->value) {
-                    try {
-                        app(FinancialLedgerService::class)->recordRefundCompleted($lockedRefund);
-                    } catch (\Throwable $ledgerError) {
-                        Log::error('Failed to record refund in financial ledger: '.$ledgerError->getMessage(), [
-                            'refund_id' => $lockedRefund->id,
-                        ]);
-                    }
-                }
-            });
-
-            try {
-                $updatedRefund = $refund->fresh(['payment.reservation.user']);
-                $reservation = $updatedRefund?->payment?->reservation;
-                $dispatcher = app(NotificationDispatcher::class);
-
-                if ($updatedRefund !== null && $reservation !== null && $reservation->user !== null) {
-                    $refundRef = $updatedRefund->gateway_refund_id ?: ('REF-'.$updatedRefund->id);
-                    $formattedAmount = '₹'.number_format($updatedRefund->amount_minor / 100, 2);
-
-                    if ($finalStatus === RefundStatus::Processing->value) {
-                        $dispatcher->dispatch(
-                            eventType: 'refund.initiated',
-                            recipients: $reservation->user,
-                            variables: [
-                                'customer_name' => $reservation->user->name,
-                                'booking_reference' => $reservation->booking_reference,
-                                'amount' => $formattedAmount,
-                                'refund_reference' => $refundRef,
-                                'initiated_at' => now()->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
-                                'action_url' => url("/reservations/{$reservation->id}"),
-                            ],
-                            related: $reservation,
-                            relatedReference: $reservation->booking_reference,
-                            idempotencySeed: 'refund_initiated_'.$updatedRefund->id
-                        );
-                    } elseif ($finalStatus === RefundStatus::Processed->value) {
-                        $dispatcher->dispatch(
-                            eventType: 'refund.completed',
-                            recipients: $reservation->user,
-                            variables: [
-                                'customer_name' => $reservation->user->name,
-                                'booking_reference' => $reservation->booking_reference,
-                                'amount' => $formattedAmount,
-                                'refund_reference' => $refundRef,
-                                'completed_at' => ($updatedRefund->gateway_processed_at ?? now())->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
-                                'action_url' => url("/reservations/{$reservation->id}"),
-                            ],
-                            related: $reservation,
-                            relatedReference: $reservation->booking_reference,
-                            idempotencySeed: 'refund_complete_'.$updatedRefund->id
-                        );
-                    } elseif ($finalStatus === RefundStatus::Failed->value) {
-                        $dispatcher->dispatchToAdmins(
-                            eventType: 'admin.refund_exception',
-                            variables: [
-                                'booking_reference' => $reservation->booking_reference,
-                                'refund_reference' => $refundRef,
-                                'amount' => $formattedAmount,
-                                'error_description' => 'Gateway immediately marked refund as failed.',
-                                'created_at' => now()->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
-                                'action_url' => url("/admin/reservations/{$reservation->id}"),
-                            ],
-                            related: $updatedRefund,
-                            relatedReference: $refundRef,
-                            idempotencySeed: 'refund_failed_'.$updatedRefund->id
-                        );
-                    }
-                }
-            } catch (\Throwable $notifyError) {
-                Log::warning('Failed to dispatch refund notification: '.$notifyError->getMessage());
-            }
-        } catch (\Throwable $e) {
-            $refund->forceFill([
-                'status' => RefundStatus::Failed->value,
-                'failure_reason' => $e->getMessage(),
-            ])->save();
-
-            Log::error('Refund gateway dispatch failed: '.$e->getMessage(), [
-                'refund_id' => $refund->id,
-                'payment_id' => $payment->id,
+                'status' => RefundStatus::Uncertain,
+                'reason' => $reason,
+                'metadata' => [
+                    'request_receipt' => ReservationRefund::receiptFor($idempotency),
+                    'request_payment_id' => $lockedPayment->gateway_payment_id,
+                    'request_mode' => $mode,
+                ],
             ]);
 
-            try {
-                $payment->loadMissing('reservation');
-                $reservation = $payment->reservation;
-                app(NotificationDispatcher::class)->dispatchToAdmins(
-                    eventType: 'admin.refund_exception',
-                    variables: [
-                        'booking_reference' => $reservation->booking_reference,
-                        'refund_reference' => $refund->gateway_refund_id ?: ('REF-'.$refund->id),
-                        'amount' => '₹'.number_format($amountMinor / 100, 2),
-                        'error_description' => Str::limit($e->getMessage(), 200),
-                        'created_at' => now()->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
-                        'action_url' => url("/admin/reservations/{$reservation->id}"),
-                    ],
-                    related: $refund,
-                    relatedReference: $reservation->booking_reference,
-                    idempotencySeed: 'refund_failed_'.$refund->id
-                );
-            } catch (\Throwable) {
-                // Never mask gateway failure exception
+            if ($lockedPayment->status === PaymentStatus::Captured) {
+                $lockedPayment->update(['status' => PaymentStatus::RefundPending]);
             }
 
-            throw new RuntimeException("Refund processing failed: {$e->getMessage()}", 0, $e);
+            return [$refund->setRelation('payment', $lockedPayment), true];
+        }, 3);
+
+        if (! $shouldSend) {
+            return $refund;
         }
 
-        return $refund->fresh() ?? $refund;
+        if (DB::transactionLevel() !== 0) {
+            DB::afterCommit(fn () => $this->dispatch($refund));
+
+            return $refund;
+        }
+
+        return $this->dispatch($refund);
+    }
+
+    private function dispatch(ReservationRefund $refund): ReservationRefund
+    {
+        if (DB::transactionLevel() !== 0) {
+            return $refund;
+        }
+
+        try {
+            $response = $this->gateway->createRefund($refund->payment, $refund->amount_minor, $refund->reason, $refund->idempotency_key);
+
+            return $this->reconciliation->apply($refund, $response);
+        } catch (Throwable $exception) {
+            ReservationRefund::query()->whereKey($refund->id)->where('status', RefundStatus::Uncertain)
+                ->update(['failure_reason' => 'Awaiting authoritative Razorpay reconciliation.']);
+
+            Log::warning('Refund dispatch or local confirmation requires reconciliation.', [
+                'refund_id' => $refund->id,
+                'payment_id' => $refund->reservation_payment_id,
+                'exception_type' => $exception::class,
+            ]);
+
+            return $refund->refresh();
+        }
     }
 }

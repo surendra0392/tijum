@@ -41,6 +41,7 @@ function formatPrice(minor: number, currency = 'INR'): string {
 }
 
 type PaymentDetailProps = {
+    refund_request_key: string;
     payment: {
         id: number;
         gateway: string;
@@ -57,6 +58,7 @@ type PaymentDetailProps = {
         captured_at: string | null;
         failed_at: string | null;
         created_at: string;
+        has_unresolved_refund: boolean;
         can_refund: boolean;
     };
     reservation: {
@@ -116,11 +118,14 @@ export default function AdminPaymentShow({
     reservation,
     customer,
     refunds,
+    refund_request_key,
     status,
 }: PaymentDetailProps) {
     const [refundRupees, setRefundRupees] = useState<string>(
         String(payment.refundable_balance_minor / 100),
     );
+    const [refundRequestKey, setRefundRequestKey] =
+        useState(refund_request_key);
 
     return (
         <div className="space-y-6">
@@ -455,9 +460,38 @@ export default function AdminPaymentShow({
                                     action={`/admin/payments/${payment.id}/refunds`}
                                     method="post"
                                     className="space-y-4"
+                                    resetOnSuccess={['reason']}
+                                    onSuccess={(page) => {
+                                        const key =
+                                            page.props.refund_request_key;
+                                        if (typeof key === 'string') {
+                                            setRefundRequestKey(key);
+                                        }
+                                        const updatedPayment = page.props
+                                            .payment as
+                                            | PaymentDetailProps['payment']
+                                            | undefined;
+                                        if (
+                                            updatedPayment &&
+                                            typeof updatedPayment.refundable_balance_minor ===
+                                                'number'
+                                        ) {
+                                            setRefundRupees(
+                                                String(
+                                                    updatedPayment.refundable_balance_minor /
+                                                        100,
+                                                ),
+                                            );
+                                        }
+                                    }}
                                 >
                                     {({ processing, errors }) => (
                                         <>
+                                            <input
+                                                type="hidden"
+                                                name="idempotency_key"
+                                                value={refundRequestKey}
+                                            />
                                             <div className="space-y-2">
                                                 <Label htmlFor="refund_amount">
                                                     Refund Amount (₹ INR)
@@ -504,7 +538,10 @@ export default function AdminPaymentShow({
                                                 </p>
                                                 <InputError
                                                     message={
-                                                        errors.amount_minor
+                                                        errors.amount_minor ||
+                                                        errors.amount ||
+                                                        errors.payment ||
+                                                        errors.idempotency_key
                                                     }
                                                 />
                                             </div>
@@ -552,9 +589,12 @@ export default function AdminPaymentShow({
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="text-sm text-tijum-plum-muted dark:text-muted-foreground">
-                                {payment.status !== 'captured'
-                                    ? `This transaction is in '${payment.status_label}' state and cannot be refunded.`
-                                    : 'The full amount of this transaction has already been refunded.'}
+                                {payment.has_unresolved_refund
+                                    ? 'An earlier refund attempt requires Razorpay reconciliation before another refund can be initiated.'
+                                    : payment.status !== 'captured' &&
+                                        payment.status !== 'partially_refunded'
+                                      ? `This transaction is in '${payment.status_label}' state and cannot be refunded.`
+                                      : 'The remaining refundable balance for this transaction is zero or reserved by settlements and pending refunds.'}
                             </CardContent>
                         </Card>
                     )}

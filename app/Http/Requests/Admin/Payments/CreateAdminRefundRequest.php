@@ -21,6 +21,7 @@ class CreateAdminRefundRequest extends FormRequest
         return [
             'amount_minor' => ['required', 'integer', 'min:100'],
             'reason' => ['required', 'string', 'min:3', 'max:500'],
+            'idempotency_key' => ['nullable', 'string', 'max:64'],
         ];
     }
 }

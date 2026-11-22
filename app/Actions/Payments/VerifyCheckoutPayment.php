@@ -4,21 +4,18 @@ declare(strict_types=1);
 
 namespace App\Actions\Payments;
 
-use App\Actions\Reservations\ReservationLifecycle;
 use App\Contracts\PaymentGateway;
 use App\Enums\PaymentStatus;
 use App\Models\Reservation;
 use App\Models\ReservationPayment;
 use App\Models\User;
-use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class VerifyCheckoutPayment
 {
     public function __construct(
         private readonly PaymentGateway $gateway,
-        private readonly ReservationLifecycle $lifecycle,
+        private readonly RecordCapturedPayment $capture,
     ) {}
 
     public function execute(
@@ -34,6 +31,10 @@ class VerifyCheckoutPayment
             ]);
         }
 
+        if (! preg_match('/^order_[A-Za-z0-9_]+$/D', $orderId)) {
+            throw ValidationException::withMessages(['order_id' => 'Invalid payment order reference format.']);
+        }
+
         // 1. Verify checkout signature
         $validSignature = $this->gateway->verifyCheckoutSignature($orderId, $paymentId, $signature);
         if (! $validSignature) {
@@ -42,68 +43,21 @@ class VerifyCheckoutPayment
             ]);
         }
 
-        return DB::transaction(function () use ($reservation, $orderId, $paymentId): Reservation {
-            $locked = Reservation::query()->whereKey($reservation->id)->lockForUpdate()->firstOrFail();
+        /** @var ReservationPayment|null $payment */
+        $payment = $reservation->payments()->where('gateway', 'razorpay')->where('gateway_order_id', $orderId)->first();
+        if ($payment === null) {
+            throw ValidationException::withMessages(['order_id' => 'Invalid payment order reference for this reservation.']);
+        }
 
-            /** @var ReservationPayment|null $payment */
-            $payment = $locked->payments()
-                ->where('gateway_order_id', $orderId)
-                ->lockForUpdate()
-                ->first();
+        if (! preg_match('/^pay_[A-Za-z0-9_]+$/D', $paymentId)) {
+            throw ValidationException::withMessages(['payment' => 'Invalid gateway payment reference.']);
+        }
 
-            if ($payment === null) {
-                throw ValidationException::withMessages([
-                    'order_id' => 'Invalid payment order reference for this reservation.',
-                ]);
-            }
+        if ($payment->isCaptured() && $payment->gateway_payment_id === $paymentId
+            && ($payment->status !== PaymentStatus::Captured || ! $reservation->isAwaitingPayment())) {
+            return $reservation->fresh() ?? $reservation;
+        }
 
-            // 2. Fetch authoritative payment status from gateway
-            $gatewayPayment = $this->gateway->fetchPayment($paymentId);
-
-            $gatewayAmount = (int) ($gatewayPayment['amount'] ?? 0);
-            $gatewayCurrency = (string) ($gatewayPayment['currency'] ?? '');
-            $gatewayStatus = (string) ($gatewayPayment['status'] ?? '');
-            $gatewayOrderId = (string) ($gatewayPayment['order_id'] ?? '');
-
-            if ($gatewayOrderId !== $orderId) {
-                throw ValidationException::withMessages([
-                    'payment' => 'Gateway order reference does not match checkout attempt.',
-                ]);
-            }
-
-            if ($gatewayAmount !== $payment->amount_minor) {
-                throw ValidationException::withMessages([
-                    'amount' => 'Payment amount mismatch between gateway and reservation.',
-                ]);
-            }
-
-            if (strtoupper($gatewayCurrency) !== strtoupper($payment->currency)) {
-                throw ValidationException::withMessages([
-                    'currency' => 'Payment currency mismatch.',
-                ]);
-            }
-
-            if ($gatewayStatus !== 'captured') {
-                throw ValidationException::withMessages([
-                    'status' => "Payment is in '{$gatewayStatus}' state and has not been captured yet.",
-                ]);
-            }
-
-            // Update payment record
-            $payment->forceFill([
-                'gateway_payment_id' => $paymentId,
-                'status' => PaymentStatus::Captured->value,
-                'captured_at' => $payment->captured_at ?: CarbonImmutable::now(),
-                'metadata' => array_merge((array) $payment->metadata, [
-                    'gateway_payment' => $gatewayPayment,
-                    'method' => $gatewayPayment['method'] ?? null,
-                ]),
-            ])->save();
-
-            // Transition reservation to Confirmed
-            $updated = $this->lifecycle->confirmPaid($locked, $payment);
-
-            return $updated->fresh() ?? $updated;
-        }, 3);
+        return $this->capture->execute($payment, $this->gateway->fetchPayment($paymentId), $paymentId);
     }
 }

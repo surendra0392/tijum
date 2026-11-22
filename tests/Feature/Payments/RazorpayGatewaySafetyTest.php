@@ -8,6 +8,7 @@ use App\Contracts\PaymentGateway;
 use App\Models\PlatformSetting;
 use App\Services\Payments\RazorpayGateway;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -111,5 +112,28 @@ class RazorpayGatewaySafetyTest extends TestCase
         $this->assertFalse($gateway->verifyWebhookSignature((string) $rawPayload, 'tampered_signature'));
         $this->assertFalse($gateway->verifyWebhookSignature('', $expectedSignature));
         $this->assertFalse($gateway->verifyWebhookSignature((string) $rawPayload, ''));
+    }
+
+    public function test_checkout_signature_rejects_an_empty_gateway_secret(): void
+    {
+        $gateway = new RazorpayGateway('rzp_test_checkout', '', 'test-webhook-signature');
+        $signature = hash_hmac('sha256', 'order_checkout|pay_checkout', '');
+
+        $this->assertFalse($gateway->verifyCheckoutSignature('order_checkout', 'pay_checkout', $signature));
+    }
+
+    public function test_fetch_order_payments_throws_on_gateway_server_error(): void
+    {
+        Http::fake([
+            'https://api.razorpay.com/v1/orders/order_fail_500/payments' => Http::response([
+                'error' => ['description' => 'Upstream gateway timeout'],
+            ], 500),
+        ]);
+
+        $gateway = new RazorpayGateway('rzp_test_123', 'sec_123', 'wh_123');
+
+        $this->expectException(RuntimeException::class);
+
+        $gateway->fetchOrderPayments('order_fail_500');
     }
 }

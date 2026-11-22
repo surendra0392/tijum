@@ -29,6 +29,11 @@ interface PaymentGateway
     public function fetchOrder(string $orderId): array;
 
     /**
+     * @return array<string, mixed>|null
+     */
+    public function fetchOrderByReceipt(string $receipt): ?array;
+
+    /**
      * @return list<array<string, mixed>>
      */
     public function fetchOrderPayments(string $orderId): array;
@@ -47,6 +52,9 @@ interface PaymentGateway
      * @return array<string, mixed>
      */
     public function fetchRefund(string $refundId): array;
+
+    /** @return array<string, mixed>|null */
+    public function fetchRefundByReceipt(string $paymentId, string $receipt): ?array;
 
     public function getPublicKey(): string;
 }

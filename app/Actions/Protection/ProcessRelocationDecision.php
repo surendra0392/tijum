@@ -184,7 +184,7 @@ class ProcessRelocationDecision
                                 $systemAdmin,
                                 (int) $lockedRelocation->price_difference_minor,
                                 "Relocation price difference refund for {$source->booking_reference}",
-                                null,
+                                'relocation-'.$lockedRelocation->id,
                                 $lockedRelocation->customer_protection_case_id,
                             );
                             $lockedRelocation->forceFill(['difference_refund_id' => $refund->id])->save();

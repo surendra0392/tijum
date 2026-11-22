@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Customer;
 
 use App\Actions\Payments\InitiatePaymentOrder;
 use App\Actions\Payments\VerifyCheckoutPayment;
+use App\Enums\ReservationStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Payments\VerifyPaymentRequest;
 use App\Models\Reservation;
@@ -43,7 +44,9 @@ class CustomerPaymentController extends Controller
         }
 
         try {
-            $orderPayload = $action->execute($reservation, $user);
+            $rawKey = $request->header('Idempotency-Key') ?? $request->input('idempotency_key');
+            $idempotencyKey = is_string($rawKey) && trim($rawKey) !== '' ? trim($rawKey) : null;
+            $orderPayload = $action->execute($reservation, $user, $idempotencyKey);
 
             return response()->json($orderPayload);
         } catch (InvalidArgumentException $e) {
@@ -71,7 +74,7 @@ class CustomerPaymentController extends Controller
 
         $validated = $request->validated();
 
-        $action->execute(
+        $verified = $action->execute(
             $reservation,
             $user,
             (string) $validated['razorpay_order_id'],
@@ -81,7 +84,9 @@ class CustomerPaymentController extends Controller
 
         return redirect()
             ->route('reservations.show', $reservation)
-            ->with('status', 'Payment successful! Your stay reservation is confirmed.');
+            ->with('status', $verified->requires_refund_review || $verified->status !== ReservationStatus::Confirmed
+                ? 'Payment received. Your reservation requires manual review.'
+                : 'Payment successful! Your stay reservation is confirmed.');
     }
 
     public function receipt(

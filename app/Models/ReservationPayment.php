@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\PaymentStatus;
+use App\Enums\ProviderTransferStatus;
 use App\Enums\RefundStatus;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
@@ -127,15 +128,38 @@ class ReservationPayment extends Model
         return (int) $this->refunds()
             ->whereIn('status', [
                 RefundStatus::Pending->value,
+                RefundStatus::Uncertain->value,
                 RefundStatus::Processing->value,
                 RefundStatus::Approved->value,
             ])
             ->sum('amount_minor');
     }
 
+    public function hasUnresolvedRefund(): bool
+    {
+        return $this->refunds()
+            ->whereNull('gateway_refund_id')
+            ->whereIn('status', [
+                RefundStatus::Pending->value,
+                RefundStatus::Processing->value,
+                RefundStatus::Uncertain->value,
+                RefundStatus::Failed->value,
+            ])
+            ->exists();
+    }
+
     public function remainingRefundableAmount(): int
     {
-        $nonRefundable = $this->totalRefundedAmount() + $this->pendingRefundAmount();
+        $transferAmount = (int) ProviderTransfer::query()
+            ->where('reservation_payment_id', $this->id)
+            ->whereIn('status', [
+                ProviderTransferStatus::Processed->value,
+                ProviderTransferStatus::Pending->value,
+                ProviderTransferStatus::Uncertain->value,
+            ])
+            ->sum('amount_minor');
+
+        $nonRefundable = $this->totalRefundedAmount() + $this->pendingRefundAmount() + $transferAmount;
 
         return max(0, $this->amount_minor - $nonRefundable);
     }

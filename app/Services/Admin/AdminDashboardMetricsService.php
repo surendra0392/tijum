@@ -288,7 +288,13 @@ class AdminDashboardMetricsService
             });
 
         $pendingRefunds = (clone $refundsQuery)
-            ->whereIn('status', [RefundStatus::Requested, RefundStatus::Approved, RefundStatus::Processing]);
+            ->whereIn('status', [
+                RefundStatus::Requested,
+                RefundStatus::Approved,
+                RefundStatus::Pending,
+                RefundStatus::Uncertain,
+                RefundStatus::Processing,
+            ]);
 
         $failedRefunds = (clone $refundsQuery)
             ->where('status', RefundStatus::Failed);

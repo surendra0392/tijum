@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1\Customer;
 
 use App\Actions\Payments\InitiatePaymentOrder;
 use App\Actions\Payments\VerifyCheckoutPayment;
+use App\Enums\ReservationStatus;
 use App\Http\Controllers\Api\V1\ApiController;
 use App\Http\Requests\Payments\VerifyPaymentRequest;
 use App\Http\Resources\Api\V1\ReservationResource;
@@ -43,7 +44,9 @@ class CustomerPaymentController extends ApiController
         }
 
         try {
-            $orderPayload = $action->execute($reservation, $user);
+            $rawKey = $request->header('Idempotency-Key') ?? $request->input('idempotency_key');
+            $idempotencyKey = is_string($rawKey) && trim($rawKey) !== '' ? trim($rawKey) : null;
+            $orderPayload = $action->execute($reservation, $user, $idempotencyKey);
 
             return $this->success($orderPayload, 'Payment order initiated successfully.');
         } catch (Throwable $e) {
@@ -71,7 +74,7 @@ class CustomerPaymentController extends ApiController
         $validated = $request->validated();
 
         try {
-            $action->execute(
+            $reservation = $action->execute(
                 $reservation,
                 $user,
                 (string) $validated['razorpay_order_id'],
@@ -79,12 +82,13 @@ class CustomerPaymentController extends ApiController
                 (string) $validated['razorpay_signature'],
             );
 
-            $reservation->refresh();
             $reservation->loadMissing(['property.city', 'roomType', 'payments']);
 
             return $this->success(
                 new ReservationResource($reservation),
-                'Payment verified successfully. Reservation is confirmed.'
+                $reservation->requires_refund_review || $reservation->status !== ReservationStatus::Confirmed
+                    ? 'Payment received. Your reservation requires manual review.'
+                    : 'Payment verified successfully. Reservation is confirmed.'
             );
         } catch (Throwable $e) {
             return $this->error($e->getMessage(), 'PAYMENT_VERIFICATION_FAILED', 422);

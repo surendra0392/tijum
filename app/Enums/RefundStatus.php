@@ -9,6 +9,7 @@ enum RefundStatus: string
     case Requested = 'requested';
     case Approved = 'approved';
     case Pending = 'pending';
+    case Uncertain = 'uncertain';
     case Processing = 'processing';
     case Processed = 'processed';
     case Failed = 'failed';
@@ -19,6 +20,7 @@ enum RefundStatus: string
             self::Requested => 'Refund Requested',
             self::Approved => 'Refund Approved',
             self::Pending => 'Gateway Request Pending',
+            self::Uncertain => 'Gateway Outcome Uncertain',
             self::Processing => 'Gateway Processing',
             self::Processed => 'Refund Processed',
             self::Failed => 'Refund Failed',
@@ -28,7 +30,7 @@ enum RefundStatus: string
     public function semantic(): string
     {
         return match ($this) {
-            self::Requested, self::Approved, self::Pending, self::Processing => 'pending',
+            self::Requested, self::Approved, self::Pending, self::Uncertain, self::Processing => 'pending',
             self::Processed => 'verified',
             self::Failed => 'rejected',
         };

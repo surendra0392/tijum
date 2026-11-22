@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Admin\Payments;
 
 use App\Actions\Payments\InitiateAdminRefund;
 use App\Enums\PaymentStatus;
+use App\Enums\RefundStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Payments\CreateAdminRefundRequest;
 use App\Models\Admin;
@@ -13,6 +14,7 @@ use App\Models\ReservationPayment;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -87,7 +89,11 @@ class AdminPaymentController extends Controller
             'refunds.initiatedByAdmin',
         ]);
 
+        $refundableBalance = $payment->refundableBalanceMinor();
+        $hasUnresolvedRefund = $payment->hasUnresolvedRefund();
+
         return Inertia::render('admin/payments/show', [
+            'refund_request_key' => (string) Str::uuid(),
             'payment' => [
                 'id' => $payment->id,
                 'gateway' => $payment->gateway,
@@ -95,7 +101,7 @@ class AdminPaymentController extends Controller
                 'gateway_payment_id' => $payment->gateway_payment_id,
                 'amount_minor' => $payment->amount_minor,
                 'refunded_amount_minor' => $payment->refunded_amount_minor,
-                'refundable_balance_minor' => $payment->refundableBalanceMinor(),
+                'refundable_balance_minor' => $refundableBalance,
                 'currency_code' => $payment->currency,
                 'status' => $payment->status->value,
                 'status_label' => $payment->status->label(),
@@ -104,7 +110,8 @@ class AdminPaymentController extends Controller
                 'captured_at' => $payment->captured_at?->toISOString(),
                 'failed_at' => $payment->failed_at?->toISOString(),
                 'created_at' => $payment->created_at?->toISOString(),
-                'can_refund' => $payment->refundableBalanceMinor() > 0 && $payment->status === PaymentStatus::Captured,
+                'has_unresolved_refund' => $hasUnresolvedRefund,
+                'can_refund' => $refundableBalance > 0 && $payment->isCaptured() && ! $hasUnresolvedRefund,
             ],
             'reservation' => [
                 'id' => $payment->reservation->id,
@@ -156,8 +163,13 @@ class AdminPaymentController extends Controller
         $amountMinor = (int) $validated['amount_minor'];
         $reason = (string) $validated['reason'];
 
-        $action->execute($payment, $admin, $amountMinor, $reason);
+        $refund = $action->execute($payment, $admin, $amountMinor, $reason, $validated['idempotency_key'] ?? null);
 
-        return back()->with('status', 'Refund initiated successfully with payment gateway.');
+        return back()->with('status', match ($refund->status) {
+            RefundStatus::Uncertain => 'Razorpay has not confirmed this refund. Reconcile the existing refund before trying again.',
+            RefundStatus::Failed => 'Razorpay reported that the refund failed.',
+            RefundStatus::Processed => 'Razorpay confirmed that the refund was processed.',
+            default => 'Razorpay is processing the refund.',
+        });
     }
 }

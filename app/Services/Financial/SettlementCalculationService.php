@@ -45,6 +45,7 @@ class SettlementCalculationService
         $reservations = Reservation::query()
             ->whereIn('property_id', $propertyIds)
             ->where('status', ReservationStatus::Confirmed)
+            ->where('requires_refund_review', false)
             ->whereHas('payments', function (Builder $query): void {
                 $query->whereIn('status', [
                     PaymentStatus::Captured,
@@ -57,13 +58,20 @@ class SettlementCalculationService
                     $subQuery->whereNotIn('status', [SettlementStatus::Cancelled, SettlementStatus::Failed]);
                 });
             })
-            // Exclude reservations with pending refunds
+            // Exclude reservations with pending or unresolved refunds
             ->whereDoesntHave('refunds', function (Builder $query): void {
-                $query->whereIn('status', [
-                    RefundStatus::Requested,
-                    RefundStatus::Approved,
-                    RefundStatus::Processing,
-                ]);
+                $query->where(function (Builder $refundQuery): void {
+                    $refundQuery->whereIn('status', [
+                        RefundStatus::Requested,
+                        RefundStatus::Approved,
+                        RefundStatus::Pending,
+                        RefundStatus::Uncertain,
+                        RefundStatus::Processing,
+                    ])->orWhere(function (Builder $legacyFailed): void {
+                        $legacyFailed->where('status', RefundStatus::Failed)
+                            ->whereNull('gateway_refund_id');
+                    });
+                });
             })
             // Exclude reservations with open customer protection cases
             ->whereDoesntHave('cases', function (Builder $query): void {

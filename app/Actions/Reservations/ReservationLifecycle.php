@@ -7,15 +7,18 @@ namespace App\Actions\Reservations;
 use App\Enums\CaseCategory;
 use App\Enums\CasePriority;
 use App\Enums\CaseStatus;
+use App\Enums\LedgerEntryCategory;
 use App\Enums\PaymentStatus;
 use App\Enums\ReservationStatus;
 use App\Models\CouponHold;
 use App\Models\CouponRedemption;
 use App\Models\CustomerProtectionCase;
 use App\Models\CustomerProtectionCaseMessage;
+use App\Models\FinancialLedgerEntry;
 use App\Models\Owner;
 use App\Models\PointsReservationHold;
 use App\Models\Property;
+use App\Models\PropertyRoomType;
 use App\Models\Reservation;
 use App\Models\ReservationPayment;
 use App\Models\User;
@@ -23,6 +26,7 @@ use App\Policies\ReservationPolicy;
 use App\Services\Financial\FinancialLedgerService;
 use App\Services\Notifications\NotificationDispatcher;
 use App\Services\Promotions\CouponRedemptionService;
+use App\Services\ReservationAvailabilityService;
 use App\Services\Rewards\LoyaltyPointsService;
 use App\Services\StayTimingPolicy;
 use Carbon\CarbonImmutable;
@@ -41,40 +45,56 @@ class ReservationLifecycle
     public function confirmPaid(Reservation $reservation, ?ReservationPayment $payment = null): Reservation
     {
         return DB::transaction(function () use ($reservation, $payment): Reservation {
+            // Booking creation serializes capacity decisions on the same property row.
+            Property::query()->whereKey($reservation->property_id)->lockForUpdate()->firstOrFail();
             $locked = Reservation::query()->whereKey($reservation->id)->lockForUpdate()->firstOrFail();
+            $resolvedPayment = $payment !== null
+                ? $locked->payments()->whereKey($payment->id)->lockForUpdate()->firstOrFail()
+                : $locked->payments()->where('status', PaymentStatus::Captured)->latest('id')->lockForUpdate()->first();
+
+            if ($resolvedPayment === null || $resolvedPayment->status !== PaymentStatus::Captured
+                || $resolvedPayment->gateway_payment_id === null || $resolvedPayment->user_id !== $locked->user_id
+                || $resolvedPayment->amount_minor !== $locked->total_amount_minor
+                || strtoupper($resolvedPayment->currency) !== strtoupper($locked->currency_code)) {
+                throw ValidationException::withMessages(['payment' => 'A matching captured payment is required to confirm this reservation.']);
+            }
+
+            $recorded = FinancialLedgerEntry::query()
+                ->where('entity_type', ReservationPayment::class)
+                ->where('entity_id', $resolvedPayment->id)
+                ->where('entry_category', LedgerEntryCategory::PaymentCaptured)
+                ->exists();
+            if (! $recorded) {
+                app(FinancialLedgerService::class)->recordPaymentCaptured($resolvedPayment);
+            }
 
             if ($locked->status === ReservationStatus::Confirmed) {
+                if ($locked->payments()->whereKeyNot($resolvedPayment->id)
+                    ->whereIn('status', [PaymentStatus::Captured, PaymentStatus::RefundPending, PaymentStatus::PartiallyRefunded, PaymentStatus::Refunded])->exists()) {
+                    return $this->flagPaymentForReview($locked, $resolvedPayment, 'A second capture was received for a confirmed reservation.');
+                }
+
                 return $locked;
             }
 
             if ($locked->status !== ReservationStatus::AwaitingPayment) {
-                // If payment captured after cancellation or expiry, do not reconfirm. Flag for refund review.
-                $locked->forceFill([
-                    'requires_refund_review' => true,
-                ])->save();
+                return $this->flagPaymentForReview($locked, $resolvedPayment, 'Payment arrived after the reservation became '.$locked->status->value.'.');
+            }
 
-                try {
-                    app(NotificationDispatcher::class)->dispatchToAdmins(
-                        eventType: 'admin.payment_exception',
-                        variables: [
-                            'booking_reference' => $locked->booking_reference,
-                            'payment_reference' => $payment !== null ? ($payment->gateway_payment_id ?? $payment->gateway_order_id) : 'N/A',
-                            'exception_type' => 'Late Payment After '.Str::headline($locked->status->value),
-                            'error_description' => 'Payment captured after reservation status transitioned to '.$locked->status->value.'. Manual refund review required.',
-                            'created_at' => now()->setTimezone($this->timing->timezone())->format('d M Y, H:i T'),
-                            'action_url' => url("/admin/reservations/{$locked->id}"),
-                        ],
-                        related: $locked,
-                        relatedReference: $locked->booking_reference,
-                        idempotencySeed: 'late_payment_exception_'.$locked->id.'_'.($payment !== null ? $payment->id : 'none'),
-                    );
-                } catch (\Throwable $e) {
-                    Log::warning('Failed to dispatch admin.payment_exception: '.$e->getMessage(), [
-                        'reservation_id' => $locked->id,
-                    ]);
-                }
-
-                return $locked->fresh() ?? $locked;
+            $roomType = PropertyRoomType::query()->whereKey($locked->property_room_type_id)
+                ->where('property_id', $locked->property_id)->lockForUpdate()->first();
+            if ($roomType === null || ! $roomType->is_active || ! app(ReservationAvailabilityService::class)->stayCapacity(
+                $roomType,
+                $locked->check_in_date->toDateString(),
+                $locked->checkout_date->toDateString(),
+                $locked->quantity,
+                excludingReservationId: $locked->id,
+            )['available']) {
+                return $this->flagPaymentForReview(
+                    $this->expire($locked, notify: false),
+                    $resolvedPayment,
+                    'Payment was captured but there is insufficient inventory to fulfil the reservation.',
+                );
             }
 
             $now = CarbonImmutable::now($this->timing->timezone());
@@ -85,21 +105,9 @@ class ReservationLifecycle
             ])->save();
 
             $pointsHold = null;
-
-            $pointsHold = null;
             $pointsCommitted = false;
 
             try {
-                $resolvedPayment = $payment ?? $locked->payments()
-                    ->where('status', PaymentStatus::Captured->value)
-                    ->latest('id')
-                    ->first();
-
-                if ($resolvedPayment !== null) {
-                    app(FinancialLedgerService::class)
-                        ->recordPaymentCaptured($resolvedPayment);
-                }
-
                 // Commit promotional holds and register pending points
                 /** @var CouponHold|null $couponHold */
                 $couponHold = CouponHold::query()->where('reservation_id', $locked->id)->where('status', 'active')->first();
@@ -130,7 +138,7 @@ class ReservationLifecycle
 
             $saved = $locked->fresh() ?? $locked;
             $savedId = $saved->id;
-            $paymentId = $payment?->id;
+            $paymentId = $resolvedPayment->id;
             $pointsHeldAmount = $pointsCommitted && $pointsHold !== null ? (int) $pointsHold->points_held : 0;
             $pointsDiscountAmount = $pointsCommitted && $pointsHold !== null ? (int) $pointsHold->inr_discount_minor : 0;
 
@@ -149,9 +157,8 @@ class ReservationLifecycle
                     $checkoutDateFormatted = $confirmed->checkout_date->format('d M Y');
                     $checkInTime = $this->timing->getStandardCheckInTime().' IST';
                     $checkoutTime = $this->timing->getStandardCheckOutTime().' IST';
-                    $capturedPayment = $paymentId !== null
-                        ? ReservationPayment::query()->find($paymentId)
-                        : $confirmed->payments->where('status', PaymentStatus::Captured)->sortByDesc('id')->first();
+                    $capturedPayment = ReservationPayment::query()->find($paymentId)
+                        ?? $confirmed->payments->where('status', PaymentStatus::Captured)->sortByDesc('id')->first();
                     $paymentReference = $capturedPayment !== null
                         ? ($capturedPayment->gateway_payment_id ?: $capturedPayment->gateway_order_id)
                         : 'PAY-'.$confirmed->booking_reference;
@@ -265,9 +272,37 @@ class ReservationLifecycle
         }, 3);
     }
 
-    public function expire(Reservation $reservation): Reservation
+    private function flagPaymentForReview(Reservation $reservation, ReservationPayment $payment, string $reason): Reservation
     {
-        return DB::transaction(function () use ($reservation): Reservation {
+        $reservation->forceFill(['requires_refund_review' => true])->save();
+
+        DB::afterCommit(function () use ($reservation, $payment, $reason): void {
+            try {
+                app(NotificationDispatcher::class)->dispatchToAdmins(
+                    eventType: 'admin.payment_exception',
+                    variables: [
+                        'booking_reference' => $reservation->booking_reference,
+                        'payment_reference' => $payment->gateway_payment_id ?? $payment->gateway_order_id,
+                        'exception_type' => 'Captured Payment Requires Review',
+                        'error_description' => $reason.' Manual refund review required.',
+                        'created_at' => now()->setTimezone($this->timing->timezone())->format('d M Y, H:i T'),
+                        'action_url' => url("/admin/reservations/{$reservation->id}"),
+                    ],
+                    related: $reservation,
+                    relatedReference: $reservation->booking_reference,
+                    idempotencySeed: 'late_payment_exception_'.$reservation->id.'_'.$payment->id,
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Failed to dispatch admin.payment_exception.', ['reservation_id' => $reservation->id, 'exception' => $e]);
+            }
+        });
+
+        return $reservation;
+    }
+
+    public function expire(Reservation $reservation, bool $notify = true): Reservation
+    {
+        return DB::transaction(function () use ($reservation, $notify): Reservation {
             $locked = Reservation::query()->whereKey($reservation->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->status !== ReservationStatus::AwaitingPayment) {
@@ -282,7 +317,7 @@ class ReservationLifecycle
             ])->save();
 
             $locked->payments()
-                ->whereIn('status', [PaymentStatus::Created->value, PaymentStatus::Authorized->value])
+                ->whereIn('status', [PaymentStatus::Created->value, PaymentStatus::Pending->value, PaymentStatus::Authorized->value])
                 ->update(['status' => PaymentStatus::Cancelled->value]);
 
             // Release promotions holds
@@ -303,6 +338,10 @@ class ReservationLifecycle
             }
 
             $saved = $locked->fresh() ?? $locked;
+
+            if (! $notify) {
+                return $saved;
+            }
 
             try {
                 $saved->loadMissing(['user', 'property']);
@@ -379,7 +418,7 @@ class ReservationLifecycle
             // Cancel any pending payment orders if cancelled before payment capture
             if (! $hasCapturedPayment) {
                 $locked->payments()
-                    ->whereIn('status', [PaymentStatus::Created->value, PaymentStatus::Authorized->value])
+                    ->whereIn('status', [PaymentStatus::Created->value, PaymentStatus::Pending->value, PaymentStatus::Authorized->value])
                     ->update(['status' => PaymentStatus::Cancelled->value]);
             } else {
                 // Auto-create customer protection case for paid reservation cancellations

@@ -25,18 +25,6 @@ parameters:
 			path: app/Actions/Owner/Properties/UpdatePropertyDetails.php
 
 		-
-			message: '#^Using nullsafe property access on non\-nullable type Carbon\\CarbonImmutable\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Actions/Payments/ProcessWebhookEvent.php
-
-		-
-			message: '#^Variable \$payment on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.variable
-			count: 1
-			path: app/Actions/Payments/ReconcileExpiredReservations.php
-
-		-
 			message: '#^Offset ''message'' on array\{message\: string, attachment\?\: Illuminate\\Http\\UploadedFile\|null, is_internal_note\?\: bool, status\?\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1

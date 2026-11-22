@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property int $reservation_payment_id
  * @property int $reservation_id
+ * @property int|null $customer_protection_case_id
  * @property int $initiated_by_admin_id
  * @property string|null $gateway_refund_id
  * @property string $idempotency_key
@@ -32,6 +33,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ReservationRefund extends Model
 {
     protected $guarded = [];
+
+    public static function receiptFor(string $idempotencyKey): string
+    {
+        return 'rfnd_'.substr(hash('sha256', $idempotencyKey), 0, 32);
+    }
 
     /**
      * @return array{
