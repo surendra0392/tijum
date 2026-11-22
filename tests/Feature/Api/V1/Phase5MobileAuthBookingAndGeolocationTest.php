@@ -327,6 +327,171 @@ class Phase5MobileAuthBookingAndGeolocationTest extends TestCase
             ->assertJsonPath('data.review_eligibility.is_eligible', false);
     }
 
+    public function test_confirmed_paid_reservation_past_scheduled_checkout_is_eligible_without_host_checkin_or_checkout_timestamps_per_review_policy(): void
+    {
+        $owner = $this->createActiveOwner();
+        $property = $this->createBookableProperty($owner);
+        $roomType = $this->createBookableRoomType($property, dailyRate: 100000);
+        $this->createActiveRoom($property, $roomType);
+        $customer = $this->createCustomerUser();
+        $otherCustomer = $this->createCustomerUser();
+        $admin = Admin::factory()->create();
+
+        // Confirmed, paid stay past scheduled checkout with NULL checked_in_at & checked_out_at
+        // Aligns with TIJUM-POL-REV-2026.1 (no host review gating; scheduled checkout elapsed)
+        $untrackedPastStay = Reservation::factory()->confirmed()->create([
+            'user_id' => $customer->id,
+            'property_id' => $property->id,
+            'property_room_type_id' => $roomType->id,
+            'check_in_date' => now()->subDays(4)->toDateString(),
+            'checkout_date' => now()->subDays(2)->toDateString(),
+            'checked_in_at' => null,
+            'checked_out_at' => null,
+            'total_amount_minor' => 200000,
+        ]);
+
+        ReservationPayment::forceCreate([
+            'reservation_id' => $untrackedPastStay->id,
+            'user_id' => $customer->id,
+            'gateway' => 'razorpay',
+            'gateway_order_id' => 'order_policy_ok',
+            'gateway_payment_id' => 'pay_policy_ok',
+            'idempotency_key' => (string) Str::uuid(),
+            'amount_minor' => 200000,
+            'currency' => 'INR',
+            'status' => PaymentStatus::Captured,
+            'captured_at' => now()->subDays(4),
+        ]);
+
+        // Blocked past stays: unpaid, cancelled, expired, and fully refunded
+        $unpaidPast = Reservation::factory()->confirmed()->create([
+            'user_id' => $customer->id,
+            'property_id' => $property->id,
+            'property_room_type_id' => $roomType->id,
+            'check_in_date' => now()->subDays(4)->toDateString(),
+            'checkout_date' => now()->subDays(2)->toDateString(),
+            'checked_in_at' => null,
+            'checked_out_at' => null,
+            'total_amount_minor' => 200000,
+        ]);
+
+        $cancelledPast = Reservation::factory()->create([
+            'user_id' => $customer->id,
+            'property_id' => $property->id,
+            'property_room_type_id' => $roomType->id,
+            'status' => ReservationStatus::Cancelled,
+            'check_in_date' => now()->subDays(4)->toDateString(),
+            'checkout_date' => now()->subDays(2)->toDateString(),
+            'checked_in_at' => null,
+            'checked_out_at' => null,
+            'cancelled_at' => now()->subDays(3),
+            'total_amount_minor' => 200000,
+        ]);
+
+        $expiredPast = Reservation::factory()->create([
+            'user_id' => $customer->id,
+            'property_id' => $property->id,
+            'property_room_type_id' => $roomType->id,
+            'status' => ReservationStatus::Expired,
+            'check_in_date' => now()->subDays(4)->toDateString(),
+            'checkout_date' => now()->subDays(2)->toDateString(),
+            'checked_in_at' => null,
+            'checked_out_at' => null,
+            'expired_at' => now()->subDays(4),
+            'total_amount_minor' => 200000,
+        ]);
+
+        $refundedPast = Reservation::factory()->confirmed()->create([
+            'user_id' => $customer->id,
+            'property_id' => $property->id,
+            'property_room_type_id' => $roomType->id,
+            'check_in_date' => now()->subDays(4)->toDateString(),
+            'checkout_date' => now()->subDays(2)->toDateString(),
+            'checked_in_at' => null,
+            'checked_out_at' => null,
+            'total_amount_minor' => 200000,
+        ]);
+
+        $refundedPastPayment = ReservationPayment::forceCreate([
+            'reservation_id' => $refundedPast->id,
+            'user_id' => $customer->id,
+            'gateway' => 'razorpay',
+            'gateway_order_id' => 'order_policy_refunded',
+            'gateway_payment_id' => 'pay_policy_refunded',
+            'idempotency_key' => (string) Str::uuid(),
+            'amount_minor' => 200000,
+            'currency' => 'INR',
+            'status' => PaymentStatus::Refunded,
+            'captured_at' => now()->subDays(4),
+        ]);
+
+        ReservationRefund::forceCreate([
+            'reservation_payment_id' => $refundedPastPayment->id,
+            'reservation_id' => $refundedPast->id,
+            'initiated_by_admin_id' => $admin->id,
+            'gateway_refund_id' => 'rfnd_policy_1',
+            'idempotency_key' => (string) Str::uuid(),
+            'amount_minor' => 200000,
+            'currency' => 'INR',
+            'status' => RefundStatus::Processed,
+            'reason' => 'Full refund verification',
+            'gateway_processed_at' => now()->subDays(2),
+        ]);
+
+        $token = $customer->createToken('customer_review_policy')->plainTextToken;
+        $otherToken = $otherCustomer->createToken('other_customer')->plainTextToken;
+
+        // Different user cannot view or review the reservation
+        $this->withHeader('Authorization', 'Bearer '.$otherToken)
+            ->getJson("/api/v1/customer/reservations/{$untrackedPastStay->booking_reference}")
+            ->assertStatus(404);
+
+        $this->withHeader('Authorization', 'Bearer '.$otherToken)
+            ->postJson("/api/v1/customer/reviews/{$untrackedPastStay->booking_reference}", [
+                'overall_rating' => 5,
+                'title' => 'Unauthorized',
+                'content' => 'Another customer must not review this stay.',
+            ])
+            ->assertStatus(404);
+
+        $this->app['auth']->forgetGuards();
+
+        // Unpaid, cancelled, expired, and fully refunded remain ineligible & rejected
+        foreach ([$unpaidPast, $cancelledPast, $expiredPast, $refundedPast] as $blockedStay) {
+            $this->withHeader('Authorization', 'Bearer '.$token)
+                ->getJson("/api/v1/customer/reservations/{$blockedStay->booking_reference}")
+                ->assertOk()
+                ->assertJsonPath('data.review_eligibility.is_eligible', false);
+
+            $this->withHeader('Authorization', 'Bearer '.$token)
+                ->postJson("/api/v1/customer/reviews/{$blockedStay->booking_reference}", [
+                    'overall_rating' => 4,
+                    'content' => 'Blocked booking review attempt.',
+                ])
+                ->assertStatus(422);
+        }
+
+        // Confirmed + captured + past scheduled checkout IS eligible even with null check-in/out
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson("/api/v1/customer/reservations/{$untrackedPastStay->booking_reference}")
+            ->assertOk()
+            ->assertJsonPath('data.is_checked_in', false)
+            ->assertJsonPath('data.is_checked_out', false)
+            ->assertJsonPath('data.review_eligibility.is_eligible', true);
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson("/api/v1/customer/reviews/{$untrackedPastStay->booking_reference}", [
+                'overall_rating' => 5,
+                'cleanliness_rating' => 5,
+                'food_quality_rating' => 5,
+                'communication_rating' => 4,
+                'value_rating' => 5,
+                'title' => 'Honest stay feedback',
+                'content' => 'Stay completed cleanly regardless of manual front-desk stamp.',
+            ])
+            ->assertCreated();
+    }
+
     public function test_check_out_requires_prior_check_in_across_owner_api_owner_web_and_admin_web(): void
     {
         $owner = $this->createActiveOwner();

@@ -8,6 +8,7 @@ import {
     classifyCustomerLoginError,
 } from '../src/auth/payloads.ts';
 import {
+    ApiClient,
     ApiError,
     resolveApiBaseUrl,
     resolveApiOrigin,
@@ -391,6 +392,80 @@ describe('Phase 5 Mobile Auth, Booking Consistency & Geolocation Readiness', () 
                 'utf8',
             );
             assert.equal(searchMapSource.includes('DEMO_OFFSETS'), false);
+        });
+    });
+
+    describe('5. ApiClient Non-JSON 5xx, 204 & Envelope Parsing Safety', () => {
+        it('normalizes HTML 500 responses into SERVER_ERROR ApiError', async () => {
+            const originalFetch = globalThis.fetch;
+            globalThis.fetch = (async () =>
+                ({
+                    status: 500,
+                    statusText: 'Internal Server Error',
+                    ok: false,
+                    text: async () => '<html><body>500</body></html>',
+                    headers: new Headers(),
+                }) as unknown as Response) as typeof fetch;
+
+            try {
+                await assert.rejects(
+                    () => ApiClient.get('/test-500'),
+                    (err: unknown) =>
+                        err instanceof ApiError &&
+                        err.status === 500 &&
+                        err.errorCode === 'SERVER_ERROR',
+                );
+            } finally {
+                globalThis.fetch = originalFetch;
+            }
+        });
+
+        it('returns empty object cleanly on HTTP 204 No Content', async () => {
+            const originalFetch = globalThis.fetch;
+            globalThis.fetch = (async () =>
+                ({
+                    status: 204,
+                    statusText: 'No Content',
+                    ok: true,
+                    text: async () => '',
+                    headers: new Headers(),
+                }) as unknown as Response) as typeof fetch;
+
+            try {
+                const res = await ApiClient.delete('/test-204');
+                assert.deepEqual(res, {});
+            } finally {
+                globalThis.fetch = originalFetch;
+            }
+        });
+
+        it('rejects HTTP 200 envelope payloads with success: false', async () => {
+            const originalFetch = globalThis.fetch;
+            globalThis.fetch = (async () =>
+                ({
+                    status: 200,
+                    statusText: 'OK',
+                    ok: true,
+                    text: async () =>
+                        JSON.stringify({
+                            success: false,
+                            message: 'Action rejected by policy',
+                            error_code: 'POLICY_DENIED',
+                        }),
+                    headers: new Headers(),
+                }) as unknown as Response) as typeof fetch;
+
+            try {
+                await assert.rejects(
+                    () => ApiClient.get('/test-envelope-fail'),
+                    (err: unknown) =>
+                        err instanceof ApiError &&
+                        err.errorCode === 'POLICY_DENIED' &&
+                        err.message === 'Action rejected by policy',
+                );
+            } finally {
+                globalThis.fetch = originalFetch;
+            }
         });
     });
 });

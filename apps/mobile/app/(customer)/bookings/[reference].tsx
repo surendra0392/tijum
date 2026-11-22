@@ -981,7 +981,7 @@ export default function ReservationDetailScreen() {
                                     <Text style={styles.refundNoticeText}>
                                         {reservation.review_eligibility
                                             ?.reason ||
-                                            'Verified reviews open after check-in for confirmed active stays.'}
+                                            'Verified Booking reviews open after scheduled checkout for confirmed paid stays.'}
                                     </Text>
                                 </View>
                             )}
