@@ -60,7 +60,9 @@ class PropertyDetailResource extends JsonResource
         $amenities = [];
         if ($this->relationLoaded('currentAmenityAssignments')) {
             $amenities = $this->currentAmenityAssignments
-                ->filter(fn (PropertyAmenity $a): bool => (bool) ($a->is_operational ?? true))
+                ->filter(fn (PropertyAmenity $a): bool => $a->isApprovedCurrent()
+                    && $a->is_customer_visible
+                    && $a->availability->isCustomerPresentable())
                 ->map(fn (PropertyAmenity $a): array => [
                     'id' => $a->amenity?->id,
                     'name' => $a->amenity?->name,
@@ -88,6 +90,12 @@ class PropertyDetailResource extends JsonResource
                     'content' => $r->content,
                     'verified_booking' => (bool) $r->verified_booking,
                     'published_at' => $r->published_at?->toIso8601String(),
+                    'owner_reply' => ($r->relationLoaded('response') && $r->response?->isPublished())
+                        ? $r->response->response_text
+                        : null,
+                    'owner_reply_at' => ($r->relationLoaded('response') && $r->response?->isPublished())
+                        ? $r->response->published_at?->toIso8601String()
+                        : null,
                 ])->values()->all();
         }
 

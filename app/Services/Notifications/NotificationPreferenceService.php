@@ -39,24 +39,19 @@ class NotificationPreferenceService
             return false;
         }
 
-        // 4. In-App and Push are enabled for essential & operational by default
-        if ($channel === NotificationChannel::InApp || $channel === NotificationChannel::Push) {
-            return true;
-        }
-
-        // 5. WhatsApp requires explicit prior opt-in
+        // 4. WhatsApp requires explicit prior opt-in
         if ($channel === NotificationChannel::WhatsApp) {
             if (! $this->hasWhatsAppOptIn($recipient)) {
                 return false;
             }
         }
 
-        // 6. Essential transactional notices on Email & SMS cannot be opted out of
+        // 5. Essential transactional notices on In-App, Push, Email & SMS cannot be opted out of
         if ($category === NotificationCategory::EssentialTransactional) {
             return true;
         }
 
-        // 7. Check user-defined preference table for operational updates
+        // 6. Check user-defined preference table for operational updates (defaults to enabled)
         /** @var NotificationPreference|null $pref */
         $pref = NotificationPreference::query()
             ->where('notifiable_type', $recipient->getMorphClass())

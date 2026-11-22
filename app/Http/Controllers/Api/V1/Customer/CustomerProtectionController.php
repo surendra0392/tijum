@@ -79,6 +79,7 @@ class CustomerProtectionController extends ApiController
                     'sender_type' => $m->sender_type,
                     'sender_name' => $m->sender_name,
                     'message' => $m->message,
+                    'attachment_url' => $m->attachment_path ? url('storage/'.$m->attachment_path) : null,
                     'created_at' => $m->created_at->toIso8601String(),
                 ])
                 ->values(),

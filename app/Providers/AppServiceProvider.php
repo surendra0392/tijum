@@ -83,9 +83,13 @@ class AppServiceProvider extends ServiceProvider
 
     private function razorpayLiveEnabled(): bool
     {
+        if (! (bool) config('tijum.payments.live_enabled', false)) {
+            return false;
+        }
+
         $adminMode = PlatformSetting::get('integrations.razorpay_mode');
 
-        return $adminMode !== null ? $adminMode === 'live' : (bool) config('tijum.payments.live_enabled', false);
+        return $adminMode !== null ? $adminMode === 'live' : true;
     }
 
     /**

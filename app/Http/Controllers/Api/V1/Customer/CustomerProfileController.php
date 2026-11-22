@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
@@ -27,6 +28,10 @@ class CustomerProfileController extends ApiController
     {
         /** @var User $user */
         $user = $request->user();
+
+        if ($request->has('email') && is_string($request->input('email'))) {
+            $request->merge(['email' => Str::lower(trim((string) $request->input('email')))]);
+        }
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],

@@ -49,7 +49,7 @@ class OwnerReviewController extends ApiController
             $query->where('status', (string) $request->query('status'));
         }
 
-        $perPage = min((int) ($request->query('per_page', 15)), 50);
+        $perPage = max(1, min((int) ($request->query('per_page', 15)), 50));
         $paginated = $query->paginate($perPage);
 
         $items = $paginated->getCollection()->map(static fn (PropertyReview $review): array => [

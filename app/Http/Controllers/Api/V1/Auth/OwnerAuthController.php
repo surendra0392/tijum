@@ -62,13 +62,28 @@ class OwnerAuthController extends ApiController
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
 
-            return $this->error("Too many partner login attempts. Please try again in {$seconds} seconds.", 'RATE_LIMITED', 429);
+            return $this->error(
+                "Too many partner login attempts. Please try again in {$seconds} seconds.",
+                'RATE_LIMITED',
+                429,
+                ['retry_after' => $seconds],
+            )->header('Retry-After', (string) $seconds);
+        }
+
+        $phoneDigits = (string) preg_replace('/[^0-9]/', '', $login);
+        if (strlen($phoneDigits) === 12 && str_starts_with($phoneDigits, '91')) {
+            $phoneDigits = substr($phoneDigits, 2);
         }
 
         /** @var Owner|null $owner */
         $owner = Owner::query()
             ->where('email', strtolower($login))
-            ->orWhere('phone', $login)
+            ->orWhere(function ($query) use ($login, $phoneDigits): void {
+                $query->where('phone', $login);
+                if ($phoneDigits !== '') {
+                    $query->orWhere('phone', $phoneDigits);
+                }
+            })
             ->first();
 
         if ($owner === null || ! Hash::check($validated['password'], $owner->password)) {

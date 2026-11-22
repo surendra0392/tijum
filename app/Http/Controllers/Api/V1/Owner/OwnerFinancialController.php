@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\V1\Owner;
 use App\Actions\Owner\AcceptCommissionAgreement;
 use App\Actions\Owner\UpdateFinancialProfile;
 use App\Enums\CommissionAgreementStatus;
+use App\Enums\SettlementStatus;
 use App\Http\Controllers\Api\V1\ApiController;
 use App\Models\Owner;
 use App\Models\PartnerCommissionAgreement;
@@ -29,12 +30,16 @@ class OwnerFinancialController extends ApiController
 
         $totalSettled = PartnerSettlement::query()
             ->where('owner_id', $owner->id)
-            ->where('status', 'settled')
+            ->where('status', SettlementStatus::Settled->value)
             ->sum('net_settlement_amount_minor');
 
         $pendingSettlements = PartnerSettlement::query()
             ->where('owner_id', $owner->id)
-            ->whereIn('status', ['pending_approval', 'approved', 'transfer_initiated'])
+            ->whereIn('status', [
+                SettlementStatus::PendingApproval->value,
+                SettlementStatus::Approved->value,
+                SettlementStatus::TransferPending->value,
+            ])
             ->sum('net_settlement_amount_minor');
 
         $statementsCount = PartnerSettlement::query()

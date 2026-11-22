@@ -186,6 +186,9 @@ Route::prefix('v1')->group(function (): void {
         Route::put('properties/{id}', [OwnerPropertyController::class, 'update'])->name('api.v1.owner.properties.update');
         Route::post('properties/{id}/submit-verification', [OwnerPropertyController::class, 'submitVerification'])->name('api.v1.owner.properties.submit-verification');
         Route::get('properties/{id}/verification-status', [OwnerPropertyController::class, 'verificationStatus'])->name('api.v1.owner.properties.verification-status');
+        Route::get('properties/{id}/documents', [OwnerPropertyController::class, 'documents'])->name('api.v1.owner.properties.documents.index');
+        Route::post('properties/{id}/documents', [OwnerPropertyController::class, 'uploadDocument'])->name('api.v1.owner.properties.documents.store');
+        Route::delete('properties/{id}/documents/{documentId}', [OwnerPropertyController::class, 'deleteDocument'])->name('api.v1.owner.properties.documents.destroy');
 
         // Property Room Types
         Route::get('properties/{id}/room-types', [OwnerRoomTypeController::class, 'index'])->name('api.v1.owner.properties.room-types.index');

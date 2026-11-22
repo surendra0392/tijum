@@ -36,7 +36,7 @@ class CustomerReservationController extends ApiController
 
         $query = Reservation::query()
             ->where('user_id', $user->id)
-            ->with(['property.city', 'property.media', 'roomType', 'payments', 'refunds', 'review', 'user'])
+            ->with(['property.city', 'property.media', 'roomType', 'payments', 'refunds', 'review', 'user', 'allocations.room'])
             ->latest('created_at');
 
         $validated = $request->validate([
@@ -59,7 +59,7 @@ class CustomerReservationController extends ApiController
             $query->where('status', (string) $request->query('status'));
         }
 
-        $perPage = min((int) ($request->query('per_page', 10)), 30);
+        $perPage = max(1, min((int) ($request->query('per_page', 10)), 30));
         $paginated = $query->paginate($perPage);
 
         return $this->success(
@@ -122,7 +122,7 @@ class CustomerReservationController extends ApiController
                 $request->validated()
             );
 
-            $reservation->loadMissing(['property.city', 'property.media', 'roomType', 'payments', 'refunds', 'review', 'user']);
+            $reservation->loadMissing(['property.city', 'property.media', 'roomType', 'payments', 'refunds', 'review', 'user', 'allocations.room']);
 
             return $this->success(
                 new ReservationResource($reservation),
@@ -146,7 +146,7 @@ class CustomerReservationController extends ApiController
         $reservation = Reservation::query()
             ->where('booking_reference', $reference)
             ->where('user_id', $user->id)
-            ->with(['property.city', 'property.media', 'roomType', 'payments', 'refunds', 'review', 'user'])
+            ->with(['property.city', 'property.media', 'roomType', 'payments', 'refunds', 'review', 'user', 'allocations.room'])
             ->first();
 
         if ($reservation === null) {

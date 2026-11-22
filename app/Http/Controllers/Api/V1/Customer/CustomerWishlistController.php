@@ -19,10 +19,12 @@ class CustomerWishlistController extends Controller
         /** @var User $user */
         $user = $request->user();
 
+        $perPage = max(1, min((int) $request->input('per_page', 15), 50));
+
         $properties = $user->wishlistedProperties()
             ->with(['city', 'category', 'roomTypes', 'media', 'ratingSummary'])
             ->latest('customer_wishlists.created_at')
-            ->paginate((int) $request->input('per_page', 15));
+            ->paginate($perPage);
 
         $paginationMeta = [
             'current_page' => $properties->currentPage(),

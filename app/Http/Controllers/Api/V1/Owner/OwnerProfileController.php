@@ -30,6 +30,10 @@ class OwnerProfileController extends ApiController
         /** @var Owner $owner */
         $owner = $request->user();
 
+        if ($request->has('email') && is_string($request->input('email'))) {
+            $request->merge(['email' => Str::lower(trim((string) $request->input('email')))]);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => [

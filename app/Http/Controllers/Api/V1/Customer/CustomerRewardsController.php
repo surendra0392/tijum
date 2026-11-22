@@ -11,6 +11,7 @@ use App\Models\CustomerPointsWallet;
 use App\Models\CustomerReferral;
 use App\Models\CustomerReferralProfile;
 use App\Models\Property;
+use App\Models\PropertyCategory;
 use App\Models\RewardsSetting;
 use App\Models\User;
 use App\Services\Promotions\CentralPromotionEngine;
@@ -143,17 +144,49 @@ class CustomerRewardsController extends ApiController
      */
     public function coupons(Request $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $request->user();
+        $propertyId = $request->filled('property_id') ? (int) $request->query('property_id') : null;
+        $property = $propertyId !== null ? Property::query()->find($propertyId) : null;
+        $categorySlug = $request->filled('category') ? trim((string) $request->query('category')) : null;
+        $categoryId = $categorySlug !== null
+            ? PropertyCategory::query()->where('slug', $categorySlug)->value('id')
+            : null;
 
         $coupons = CouponCode::query()
             ->active()
             ->with('campaign')
             ->latest('id')
-            ->get();
+            ->get()
+            ->filter(static function (CouponCode $coupon) use ($property, $propertyId, $categoryId, $categorySlug): bool {
+                if (! $coupon->isAvailable()) {
+                    return false;
+                }
+
+                if ($propertyId !== null) {
+                    if ($property === null) {
+                        return false;
+                    }
+                    if (! empty($coupon->applies_to_property_ids) && ! in_array($property->id, $coupon->applies_to_property_ids, true)) {
+                        return false;
+                    }
+                    if (! empty($coupon->applies_to_city_ids) && ! in_array($property->city_id, $coupon->applies_to_city_ids, true)) {
+                        return false;
+                    }
+                    if (! empty($coupon->applies_to_category_ids) && ! in_array($property->property_category_id, $coupon->applies_to_category_ids, true)) {
+                        return false;
+                    }
+                }
+
+                if ($categorySlug !== null && $categoryId !== null && ! empty($coupon->applies_to_category_ids)) {
+                    if (! in_array((int) $categoryId, $coupon->applies_to_category_ids, true)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
 
         return $this->success(
-            $coupons->map(fn (CouponCode $c) => $this->formatCoupon($c))->all()
+            $coupons->map(fn (CouponCode $c) => $this->formatCoupon($c))->values()->all()
         );
     }
 
@@ -171,12 +204,12 @@ class CustomerRewardsController extends ApiController
             'property_id' => ['nullable', 'integer'],
         ]);
 
-        $property = isset($validated['property_id'])
-            ? Property::query()->find($validated['property_id'])
-            : Property::query()->first();
-
-        if (! $property instanceof Property) {
-            return $this->error('Property not found for coupon validation.', 'PROPERTY_NOT_FOUND', 404);
+        $property = null;
+        if (isset($validated['property_id'])) {
+            $property = Property::query()->find($validated['property_id']);
+            if (! $property instanceof Property) {
+                return $this->error('Property not found for coupon validation.', 'PROPERTY_NOT_FOUND', 404);
+            }
         }
 
         $result = $this->couponValidation->validate(
@@ -241,7 +274,8 @@ class CustomerRewardsController extends ApiController
             'subtotal_paise' => $subtotal,
             'coupon_applied' => $calc['coupon_applied'] ? [
                 'code' => (string) $calc['coupon_code'],
-                'offer_type' => $calc['coupon_funding_source'] ?? 'standard',
+                'offer_type' => $calc['coupon_offer_type'] ?? 'fixed_amount',
+                'funding_source' => $calc['coupon_funding_source'] ?? 'platform',
                 'discount_amount_paise' => $calc['coupon_discount_minor'],
                 'points_awarded' => $calc['coupon_bonus_points'],
             ] : null,
@@ -262,6 +296,9 @@ class CustomerRewardsController extends ApiController
      */
     private function formatWallet(CustomerPointsWallet $wallet): array
     {
+        $ratePaise = max(1, (int) RewardsSetting::get('points_redemption_rate_paise', 100));
+        $pointToInrRate = $ratePaise / 100;
+
         return [
             'available_points' => $wallet->available_points,
             'pending_points' => $wallet->pending_points,
@@ -269,8 +306,8 @@ class CustomerRewardsController extends ApiController
             'redeemed_points' => $wallet->redeemed_points,
             'expired_points' => $wallet->expired_points,
             'total_earned_points' => $wallet->total_points_earned,
-            'point_to_inr_rate' => 1.0,
-            'estimated_inr_value' => $wallet->available_points * 1.0,
+            'point_to_inr_rate' => $pointToInrRate,
+            'estimated_inr_value' => $wallet->available_points * $pointToInrRate,
         ];
     }
 
@@ -280,17 +317,19 @@ class CustomerRewardsController extends ApiController
     private function formatReferralProfile(CustomerReferralProfile $profile): array
     {
         $code = $profile->referral_code;
+        $referrerPoints = (int) RewardsSetting::get('referral_referrer_reward_points', 500);
+        $pendingCount = max(0, $profile->total_referrals_count - $profile->successful_referrals_count);
 
         return [
             'referral_code' => $code,
             'referral_link' => url("/r/{$code}"),
-            'referrer_reward_points' => (int) RewardsSetting::get('referral_referrer_reward_points', 500),
+            'referrer_reward_points' => $referrerPoints,
             'referee_reward_points' => (int) RewardsSetting::get('referral_referred_reward_points', 250),
             'total_referrals_count' => $profile->total_referrals_count,
             'completed_referrals_count' => $profile->successful_referrals_count,
-            'pending_referrals_count' => max(0, $profile->total_referrals_count - $profile->successful_referrals_count),
+            'pending_referrals_count' => $pendingCount,
             'total_points_earned' => $profile->total_points_earned,
-            'pending_points_expected' => max(0, $profile->total_referrals_count - $profile->successful_referrals_count) * 500,
+            'pending_points_expected' => $pendingCount * $referrerPoints,
         ];
     }
 

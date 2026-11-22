@@ -102,7 +102,13 @@ class OwnerDashboardController extends ApiController
             ->whereNotIn('status', [CaseStatus::Resolved, CaseStatus::Closed])
             ->count();
         $unsettledPayoutPaisa = (int) $owner->settlements()
-            ->whereIn('status', [SettlementStatus::Draft, SettlementStatus::PendingApproval, SettlementStatus::Approved])
+            ->whereIn('status', [
+                SettlementStatus::Draft,
+                SettlementStatus::PendingApproval,
+                SettlementStatus::Approved,
+                SettlementStatus::TransferPending,
+                SettlementStatus::OnHold,
+            ])
             ->sum('net_settlement_amount_minor');
         $monthlyEarningsPaisa = (int) $owner->settlements()
             ->where('status', SettlementStatus::Settled)
@@ -111,7 +117,7 @@ class OwnerDashboardController extends ApiController
 
         $recentReservations = Reservation::query()
             ->whereIn('property_id', $propertyIds)
-            ->with(['property.city', 'property.media', 'roomType'])
+            ->with(['property.city', 'property.media', 'roomType', 'allocations.room'])
             ->latest('created_at')
             ->take(5)
             ->get();

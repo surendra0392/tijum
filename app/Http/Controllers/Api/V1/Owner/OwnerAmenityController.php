@@ -141,6 +141,14 @@ class OwnerAmenityController extends ApiController
         /** @var Owner $owner */
         $owner = $request->user();
 
+        if (! $owner->canPublishProperties()) {
+            return $this->error(
+                'Your partner account must be verified and active with a confirmed email address to modify property amenities.',
+                'FORBIDDEN',
+                403,
+            );
+        }
+
         $property = Property::query()
             ->where('owner_id', $owner->id)
             ->where(function ($query) use ($id): void {

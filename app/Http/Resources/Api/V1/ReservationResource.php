@@ -6,6 +6,7 @@ namespace App\Http\Resources\Api\V1;
 
 use App\Enums\PropertyGuestComposition;
 use App\Enums\ReservationStatus;
+use App\Models\Owner;
 use App\Models\Reservation;
 use App\Models\ReservationPayment;
 use App\Models\ReservationRefund;
@@ -83,8 +84,9 @@ class ReservationResource extends JsonResource
         }
 
         $propertyCoords = $this->property?->resolvedCoordinates();
+        $isOwner = $request->user() instanceof Owner;
 
-        return [
+        return array_merge([
             'id' => $this->id,
             'reference' => $this->booking_reference,
             'booking_reference' => $this->booking_reference,
@@ -145,7 +147,7 @@ class ReservationResource extends JsonResource
                 ? $this->allocations->isNotEmpty()
                 : $this->allocatedQuantity() > 0,
             'primary_room_number' => $this->relationLoaded('allocations')
-                ? $this->allocations->first()?->room->room_number
+                ? $this->allocations->first()?->room?->room_number
                 : null,
             'allocations' => $this->relationLoaded('allocations')
                 ? $this->allocations->map(static fn ($a): array => [
@@ -218,6 +220,10 @@ class ReservationResource extends JsonResource
             ] : null,
             'review_eligibility' => $reviewEligibility,
             'timing' => $timing,
-        ];
+        ], $isOwner ? [
+            'commission_amount_paise' => (int) ($this->commission_amount_minor ?? 0),
+            'commission_tax_paise' => (int) ($this->commission_tax_amount_minor ?? 0),
+            'owner_payable_paise' => (int) ($this->net_partner_payable_minor ?? 0),
+        ] : []);
     }
 }

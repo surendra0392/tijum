@@ -13,7 +13,7 @@ class UploadPropertyVerificationDocumentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        $owner = $this->user('owner');
+        $owner = $this->user('owner') ?? $this->user();
 
         return $owner instanceof Owner && $owner->canPublishProperties();
     }

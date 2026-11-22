@@ -5,24 +5,30 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Owner;
 
 use App\Actions\Owner\Properties\CreateProperty;
+use App\Actions\Owner\Properties\DeletePropertyVerificationDocument;
 use App\Actions\Owner\Properties\SubmitPropertyVerificationApplication;
 use App\Actions\Owner\Properties\UpdatePropertyDetails;
+use App\Actions\Owner\Properties\UploadPropertyVerificationDocument;
 use App\Enums\PropertyAvailabilityBlockScope;
 use App\Enums\PropertyAvailabilityBlockType;
 use App\Enums\PropertyGenderPolicy;
 use App\Enums\PropertyGuestComposition;
 use App\Enums\PropertyRoomStatus;
 use App\Enums\PropertyRoomTypeMode;
+use App\Enums\PropertyVerificationDocumentType;
 use App\Http\Controllers\Api\V1\ApiController;
+use App\Http\Requests\Owner\Properties\UploadPropertyVerificationDocumentRequest;
 use App\Http\Resources\Api\V1\PropertyDetailResource;
 use App\Models\Amenity;
 use App\Models\City;
 use App\Models\Owner;
 use App\Models\Property;
 use App\Models\PropertyCategory;
+use App\Models\PropertyVerificationDocument;
 use App\Services\PropertyVerificationChecklist;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -197,7 +203,15 @@ class OwnerPropertyController extends ApiController
         $property = Property::query()
             ->where('id', $id)
             ->where('owner_id', $owner->id)
-            ->with(['city', 'category', 'roomTypes', 'rooms', 'media', 'activeVerificationApplication'])
+            ->with([
+                'city',
+                'category',
+                'roomTypes',
+                'rooms',
+                'media',
+                'activeVerificationApplication.documents',
+                'latestVerificationApplication.documents',
+            ])
             ->first();
 
         if ($property === null) {
@@ -226,6 +240,124 @@ class OwnerPropertyController extends ApiController
             ] : null,
             'evaluation' => $evaluation,
         ], 'Property verification evaluation retrieved.');
+    }
+
+    public function documents(Request $request, int $id, PropertyVerificationChecklist $checklist): JsonResponse
+    {
+        /** @var Owner $owner */
+        $owner = $request->user();
+
+        $property = Property::query()
+            ->where('id', $id)
+            ->where('owner_id', $owner->id)
+            ->with([
+                'city',
+                'category',
+                'roomTypes',
+                'rooms',
+                'media',
+                'activeVerificationApplication.documents',
+                'latestVerificationApplication.documents',
+            ])
+            ->first();
+
+        if ($property === null) {
+            return $this->error('Property not found or unauthorized.', 'NOT_FOUND', 404);
+        }
+
+        $application = $property->activeVerificationApplication ?? $property->latestVerificationApplication;
+        $evaluation = $checklist->evaluate($property, $application);
+
+        return $this->success([
+            'property_id' => $property->id,
+            'documents_complete' => (bool) ($evaluation['documents_complete'] ?? false),
+            'checklist' => $evaluation['checklist'] ?? [],
+        ], 'Property verification documents retrieved.');
+    }
+
+    public function uploadDocument(
+        UploadPropertyVerificationDocumentRequest $request,
+        int $id,
+        UploadPropertyVerificationDocument $uploadAction,
+    ): JsonResponse {
+        /** @var Owner $owner */
+        $owner = $request->user();
+
+        $property = Property::query()
+            ->where('id', $id)
+            ->where('owner_id', $owner->id)
+            ->first();
+
+        if ($property === null) {
+            return $this->error('Property not found or unauthorized.', 'NOT_FOUND', 404);
+        }
+
+        if (! $owner->canPublishProperties()) {
+            return $this->error(
+                'Your partner account must be verified and active with a confirmed email address to upload verification documents.',
+                'FORBIDDEN',
+                403,
+            );
+        }
+
+        $file = $request->file('document');
+        if ($file === null) {
+            return $this->error('A verification document file is required.', 'VALIDATION_ERROR', 422);
+        }
+
+        $docType = PropertyVerificationDocumentType::from($request->string('document_type')->toString());
+
+        try {
+            $document = $uploadAction->execute($owner, $property, $docType, $file);
+        } catch (ValidationException $e) {
+            return $this->error($e->getMessage(), 'VALIDATION_ERROR', 422, $e->errors());
+        }
+
+        return $this->success(
+            $document->toOwnerArray($property->id),
+            sprintf('%s uploaded securely.', $docType->label()),
+            201,
+        );
+    }
+
+    public function deleteDocument(
+        Request $request,
+        int $id,
+        int $documentId,
+        DeletePropertyVerificationDocument $deleteAction,
+    ): JsonResponse {
+        /** @var Owner $owner */
+        $owner = $request->user();
+
+        $property = Property::query()
+            ->where('id', $id)
+            ->where('owner_id', $owner->id)
+            ->first();
+
+        if ($property === null) {
+            return $this->error('Property not found or unauthorized.', 'NOT_FOUND', 404);
+        }
+
+        $document = PropertyVerificationDocument::query()
+            ->whereKey($documentId)
+            ->whereHas('application', static fn ($q) => $q->where('property_id', $property->id))
+            ->first();
+
+        if ($document === null) {
+            return $this->error('Verification document not found.', 'NOT_FOUND', 404);
+        }
+
+        if (! Gate::forUser($owner)->allows('deleteByOwner', $document)) {
+            return $this->error('You are not authorised to delete this verification document.', 'FORBIDDEN', 403);
+        }
+
+        try {
+            $deleteAction->execute($owner, $property, $document);
+        } catch (ValidationException $e) {
+            return $this->error($e->getMessage(), 'VALIDATION_ERROR', 422, $e->errors());
+        }
+
+        return $this->success(null, 'Verification document deleted.');
     }
 
     public function referenceData(Request $request): JsonResponse

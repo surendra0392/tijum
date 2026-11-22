@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Public;
 
 use App\Enums\AccommodationCategory;
+use App\Enums\AmenityAvailability;
 use App\Enums\AmenityVerificationStatus;
 use App\Enums\PropertyAvailabilityBlockScope;
 use App\Enums\PropertyAvailabilityBlockStatus;
 use App\Enums\PropertyGenderPolicy;
 use App\Enums\PropertyOperationalStatus;
 use App\Enums\PropertyRoomStatus;
+use App\Enums\ReviewResponseStatus;
 use App\Enums\ReviewStatus;
 use App\Http\Controllers\Api\V1\ApiController;
 use App\Http\Requests\Reservations\QuoteReservationRequest;
@@ -237,7 +239,9 @@ class PublicPropertyController extends ApiController
         foreach ($amenityIds as $amenityId) {
             $query->whereHas('currentAmenityAssignments', static function ($q) use ($amenityId): void {
                 $q->where('amenity_id', $amenityId)
-                    ->where('verification_status', AmenityVerificationStatus::Approved->value);
+                    ->where('status', AmenityVerificationStatus::Approved->value)
+                    ->where('is_customer_visible', true)
+                    ->where('availability', '!=', AmenityAvailability::NotAvailable->value);
             });
         }
 
@@ -247,7 +251,7 @@ class PublicPropertyController extends ApiController
                 $query->whereHas('roomTypes', static fn ($q) => $q->where('is_active', true)->where('gender_policy', PropertyGenderPolicy::MaleOnly));
             } elseif ($gender === 'female' || $gender === 'female_only') {
                 $query->whereHas('roomTypes', static fn ($q) => $q->where('is_active', true)->where('gender_policy', PropertyGenderPolicy::FemaleOnly));
-            } elseif ($gender === 'both') {
+            } elseif (in_array($gender, ['both', 'all_genders', 'mixed'], true)) {
                 $query->whereHas('roomTypes', static fn ($q) => $q->where('is_active', true)->where('gender_policy', PropertyGenderPolicy::AllGenders));
             }
         }
@@ -399,7 +403,10 @@ class PublicPropertyController extends ApiController
                 'media',
                 'ratingSummary',
                 'currentAmenityAssignments.amenity.category',
-                'reviews' => static fn ($q) => $q->where('status', ReviewStatus::Published->value)->latest('published_at')->limit(10),
+                'reviews' => static fn ($q) => $q->where('status', ReviewStatus::Published->value)
+                    ->with(['response' => static fn ($rq) => $rq->where('status', ReviewResponseStatus::Published->value)])
+                    ->latest('published_at')
+                    ->limit(10),
             ])
             ->first();
 
@@ -473,7 +480,10 @@ class PublicPropertyController extends ApiController
         $paginated = PropertyReview::query()
             ->where('property_id', $property->id)
             ->where('status', ReviewStatus::Published->value)
-            ->with(['roomType:id,name'])
+            ->with([
+                'roomType:id,name',
+                'response' => static fn ($rq) => $rq->where('status', ReviewResponseStatus::Published->value),
+            ])
             ->latest('published_at')
             ->paginate($perPage);
 
@@ -490,6 +500,8 @@ class PublicPropertyController extends ApiController
             'room_type_name' => $r->roomType?->name,
             'verified_booking' => (bool) $r->verified_booking,
             'published_at' => $r->published_at?->toIso8601String(),
+            'owner_reply' => $r->response?->isPublished() ? $r->response->response_text : null,
+            'owner_reply_at' => $r->response?->isPublished() ? $r->response->published_at?->toIso8601String() : null,
         ])->all();
 
         return $this->success(

@@ -123,9 +123,17 @@ class OwnerAvailabilityBlockController extends ApiController
             'block_type' => $block->block_type->value,
             'block_type_label' => $block->block_type->label(),
             'status' => $block->status->value,
+            'status_label' => $block->status->label(),
+            'is_active' => $block->status === PropertyAvailabilityBlockStatus::Active,
             'start_date' => $block->start_date->toDateString(),
             'end_date' => $block->end_date->toDateString(),
+            'property_room_type_id' => $block->property_room_type_id,
+            'room_type_name' => $block->roomType?->name,
+            'property_room_id' => $block->property_room_id,
+            'room_number' => $block->room?->room_number,
             'reason' => $block->reason,
+            'is_admin_restriction' => (bool) $block->is_admin_restriction,
+            'created_at' => $block->created_at?->toIso8601String(),
         ], 'Availability block created successfully.', 201);
     }
 

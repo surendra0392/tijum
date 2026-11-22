@@ -31,7 +31,7 @@ class CouponValidationService
     public function validate(
         string $code,
         User $user,
-        Property $property,
+        ?Property $property,
         int $bookingSubtotalMinor,
         int $stayDays = 1,
         ?Reservation $reservation = null,
@@ -116,24 +116,34 @@ class CouponValidationService
             }
         }
 
-        // Property category restrictions
-        if (! empty($coupon->applies_to_category_ids)) {
-            if (! in_array($property->property_category_id, $coupon->applies_to_category_ids, true)) {
-                return $this->invalid('This coupon is not valid for the selected accommodation category.');
-            }
+        $hasScopeRestrictions = ! empty($coupon->applies_to_category_ids)
+            || ! empty($coupon->applies_to_city_ids)
+            || ! empty($coupon->applies_to_property_ids);
+
+        if ($hasScopeRestrictions && ! $property instanceof Property) {
+            return $this->invalid('Select a property to check eligibility for this property-specific coupon.');
         }
 
-        // City restrictions
-        if (! empty($coupon->applies_to_city_ids)) {
-            if (! in_array($property->city_id, $coupon->applies_to_city_ids, true)) {
-                return $this->invalid('This coupon is not applicable in this city.');
+        if ($property instanceof Property) {
+            // Property category restrictions
+            if (! empty($coupon->applies_to_category_ids)) {
+                if (! in_array($property->property_category_id, $coupon->applies_to_category_ids, true)) {
+                    return $this->invalid('This coupon is not valid for the selected accommodation category.');
+                }
             }
-        }
 
-        // Property restrictions
-        if (! empty($coupon->applies_to_property_ids)) {
-            if (! in_array($property->id, $coupon->applies_to_property_ids, true)) {
-                return $this->invalid('This coupon is not valid for this specific property.');
+            // City restrictions
+            if (! empty($coupon->applies_to_city_ids)) {
+                if (! in_array($property->city_id, $coupon->applies_to_city_ids, true)) {
+                    return $this->invalid('This coupon is not applicable in this city.');
+                }
+            }
+
+            // Property restrictions
+            if (! empty($coupon->applies_to_property_ids)) {
+                if (! in_array($property->id, $coupon->applies_to_property_ids, true)) {
+                    return $this->invalid('This coupon is not valid for this specific property.');
+                }
             }
         }
 

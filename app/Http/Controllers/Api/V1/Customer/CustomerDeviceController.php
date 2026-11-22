@@ -28,6 +28,24 @@ class CustomerDeviceController extends ApiController
         $pushToken = $validated['push_token'] ?? null;
         $pushTokenHash = $pushToken ? hash('sha256', $pushToken) : null;
 
+        // Deactivate any active registration for the same physical installation or push token on other accounts.
+        MobileDevice::query()
+            ->where('is_active', true)
+            ->where(function ($query) use ($validated, $pushTokenHash): void {
+                $query->where('device_installation_id', $validated['device_installation_id']);
+                if ($pushTokenHash !== null) {
+                    $query->orWhere('push_token_hash', $pushTokenHash);
+                }
+            })
+            ->where(function ($query) use ($user): void {
+                $query->where('notifiable_type', '!=', $user->getMorphClass())
+                    ->orWhere('notifiable_id', '!=', $user->id);
+            })
+            ->update([
+                'is_active' => false,
+                'revoked_at' => now(),
+            ]);
+
         $device = MobileDevice::query()->updateOrCreate(
             [
                 'device_installation_id' => $validated['device_installation_id'],
