@@ -568,6 +568,7 @@ export default function ExploreScreen() {
                             style={styles.searchIcon}
                         />
                         <TextInput
+                            testID="explore-search-input"
                             placeholder="Search locality, landmark or stay..."
                             placeholderTextColor={Colors.inkMuted}
                             accessibilityLabel="Search properties by locality or name"
@@ -579,6 +580,7 @@ export default function ExploreScreen() {
                         />
                         {searchQuery ? (
                             <TouchableOpacity
+                                testID="explore-search-clear-btn"
                                 accessibilityRole="button"
                                 accessibilityLabel="Clear search query"
                                 onPress={() => {
@@ -593,6 +595,7 @@ export default function ExploreScreen() {
                             </TouchableOpacity>
                         ) : null}
                         <TouchableOpacity
+                            testID="explore-filter-button"
                             accessibilityRole="button"
                             accessibilityLabel="Open stay filters"
                             onPress={openAdvancedModal}
@@ -626,6 +629,9 @@ export default function ExploreScreen() {
                         return (
                             <TouchableOpacity
                                 key={tab.key}
+                                testID={`category-tab-${tab.key}`}
+                                accessibilityRole="tab"
+                                accessibilityLabel={tab.label}
                                 activeOpacity={0.8}
                                 onPress={() => setSelectedCategory(tab.key)}
                                 style={[

@@ -1,9 +1,88 @@
 appId: com.tijum.app
-name: "03 - Partner Authentication, Dashboard, Properties, KYC & Settlements"
+name: "03 - Partner Authentication, Dashboard, Physical Rooms, Reservations & KYC"
+tags:
+  - e2e
+  - partner
+  - operations
+  - kyc
 ---
-- launchApp
+- launchApp:
+    clearState: false
+
+# 1. Partner Authentication & Onboarding Verification
 - openLink: "tijum://(auth)/owner-login"
-- assertVisible: "Partner Sign In"
-- tapOn: "Apply as Accommodation Partner"
-- assertVisible: "Become a TIJUM Partner"
-- navigateBack
+- assertVisible: "Welcome Back, Partner"
+- assertVisible:
+    id: "partner-login-identifier-input"
+- assertVisible:
+    id: "partner-login-password-input"
+- assertVisible:
+    id: "partner-login-submit-button"
+
+# Verify Partner Registration / Onboarding Link
+- tapOn:
+    id: "partner-register-link"
+- assertVisible: "List Your Property"
+- assertVisible: "PARTNER ONBOARDING"
+- back
+
+# Enter Partner Test Credentials
+- tapOn:
+    id: "partner-login-identifier-input"
+- inputText: "partner.test@tijum.internal"
+- tapOn:
+    id: "partner-login-password-input"
+- inputText: "PartnerSecret123!"
+- tapOn:
+    id: "partner-login-submit-button"
+
+# 2. Partner Dashboard Operations
+- assertVisible: "Here's your business overview"
+- assertVisible: "Arrivals Today"
+
+# 3. Property Management & Physical Rooms Inspection
+- tapOn:
+    text: "Properties"
+- assertVisible: "My Properties"
+- assertVisible:
+    id: "partner-add-property-btn"
+
+# Inspect Physical Rooms modal
+- runFlow:
+    when:
+      visible:
+        id: "partner-inspect-rooms-btn"
+    commands:
+      - tapOn:
+          id: "partner-inspect-rooms-btn"
+      - assertVisible: "Physical Rooms"
+      - tapOn: "Close"
+
+# 4. Front-Desk Reservations & Check-In Verification
+- tapOn:
+    text: "Bookings"
+- assertVisible: "Upcoming"
+- assertVisible: "Past"
+- assertVisible: "Cancelled"
+
+# Tap Upcoming reservation if available
+- runFlow:
+    when:
+      visible: "View Details"
+    commands:
+      - tapOn: "View Details"
+      - assertVisible: "Stay Schedule"
+      - back
+
+# 5. Partner Account, KYC & Financial Profile
+- tapOn:
+    text: "Profile"
+- assertVisible: "Partner ID"
+- assertVisible: "Bank & Tax Information (KYC)"
+- assertVisible: "Commission Agreements"
+
+# Inspect KYC & Banking Profile
+- tapOn: "Bank & Tax Information (KYC)"
+- assertVisible: "Financial Profile"
+- assertVisible: "Tax & Identity (KYC)"
+- back

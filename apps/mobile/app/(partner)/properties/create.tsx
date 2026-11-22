@@ -351,7 +351,7 @@ export default function CreatePropertyScreen() {
                                 1. Canonical Category
                             </Text>
                             <Text style={styles.helperText}>
-                                Select one of TIJUM's three verified
+                                Select one of TIJUM&apos;s three verified
                                 accommodation formats:
                             </Text>
                             <View style={styles.categoryPills}>

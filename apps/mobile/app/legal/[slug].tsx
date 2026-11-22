@@ -223,8 +223,8 @@ export default function LegalScreen() {
                             Document Not Found
                         </Text>
                         <Text style={styles.sectionIntro}>
-                            The requested document ("{slug}") could not be found.
-                            Choose one of TIJUM's published legal policies below:
+                            The requested document (&ldquo;{slug}&rdquo;) could not be found.
+                            Choose one of TIJUM&apos;s published legal policies below:
                         </Text>
                         <Button
                             title="View Terms & Conditions"

@@ -209,7 +209,7 @@ export default function PartnerDashboardScreen() {
                                 Hello, {partnerName}
                             </Text>
                             <Text style={styles.greetingSubtext}>
-                                Here's your business overview
+                                Here&apos;s your business overview
                             </Text>
                         </View>
 
@@ -290,7 +290,7 @@ export default function PartnerDashboardScreen() {
 
                 <View style={styles.operationsSection}>
                     <Text style={styles.sectionHeading}>
-                        Today's Operations
+                        Today&apos;s Operations
                     </Text>
                     <View style={styles.operationsGrid}>
                         {operations.map((operation) => (

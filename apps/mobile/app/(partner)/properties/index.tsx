@@ -297,6 +297,7 @@ export default function PartnerPropertiesScreen() {
 
                 {/* Physical Rooms Viewer Trigger */}
                 <TouchableOpacity
+                    testID="partner-inspect-rooms-btn"
                     style={styles.viewRoomsBtn}
                     onPress={() => handleOpenRooms(item)}
                     activeOpacity={0.75}
@@ -439,6 +440,7 @@ export default function PartnerPropertiesScreen() {
                 variant="plum"
                 rightAction={
                     <TouchableOpacity
+                        testID="partner-add-property-btn"
                         style={styles.addPropertyBtn}
                         onPress={() =>
                             router.push('/(partner)/properties/create')

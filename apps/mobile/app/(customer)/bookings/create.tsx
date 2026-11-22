@@ -1102,6 +1102,7 @@ export default function CreateReservationScreen() {
                     ) : null}
 
                     <Button
+                        testID="booking-submit-button"
                         title={
                             authState === 'customer_authenticated'
                                 ? 'Request Reservation'

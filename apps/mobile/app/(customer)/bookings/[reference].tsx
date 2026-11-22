@@ -1132,7 +1132,7 @@ export default function ReservationDetailScreen() {
                                     ) : null}
                                     {reservation.review?.content ? (
                                         <Text style={styles.reviewedContent}>
-                                            "{reservation.review.content}"
+                                            &ldquo;{reservation.review.content}&rdquo;
                                         </Text>
                                     ) : null}
                                     <Text style={styles.reviewedDate}>
@@ -1183,6 +1183,7 @@ export default function ReservationDetailScreen() {
                     {canCancelReservation(reservation) ? (
                         <View style={styles.section}>
                             <Button
+                                testID="booking-cancel-btn"
                                 title="Cancel Reservation"
                                 variant="outline"
                                 size="sm"
@@ -1239,6 +1240,7 @@ export default function ReservationDetailScreen() {
                             )}
                         </TouchableOpacity>
                         <Button
+                            testID="booking-pay-btn"
                             title="Pay with Razorpay"
                             loading={paying}
                             onPress={handlePayWithRazorpay}

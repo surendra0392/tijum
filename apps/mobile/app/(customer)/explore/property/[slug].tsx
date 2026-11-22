@@ -857,6 +857,7 @@ export default function PropertyDetailScreen() {
                     </Text>
                 </View>
                 <Button
+                    testID="property-book-stay-btn"
                     title="Book Stay"
                     onPress={() =>
                         router.push({

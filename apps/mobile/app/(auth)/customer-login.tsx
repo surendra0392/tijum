@@ -252,6 +252,7 @@ export default function CustomerLoginScreen() {
                     {/* Form Fields */}
                     <View style={styles.form}>
                         <Input
+                            testID="login-identifier-input"
                             label="Email Address or Mobile"
                             placeholder="name@example.com or 9876543210"
                             keyboardType="default"
@@ -266,6 +267,7 @@ export default function CustomerLoginScreen() {
                         />
 
                         <Input
+                            testID="login-password-input"
                             label="Password"
                             placeholder="••••••••"
                             secureTextEntry
@@ -367,6 +369,7 @@ export default function CustomerLoginScreen() {
 
                         {/* Main Log In Button */}
                         <Button
+                            testID="login-submit-button"
                             title={
                                 retryCountdownSeconds > 0
                                     ? `Try again in ${retryCountdownSeconds}s`

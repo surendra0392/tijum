@@ -194,6 +194,7 @@ export default function OwnerLoginScreen() {
 
                 <View style={styles.form}>
                     <Input
+                        testID="partner-login-identifier-input"
                         label="Partner Email or Mobile Phone"
                         placeholder="partner@hostel.com or 9876543210"
                         keyboardType="default"
@@ -203,6 +204,7 @@ export default function OwnerLoginScreen() {
                     />
 
                     <Input
+                        testID="partner-login-password-input"
                         label="Password"
                         placeholder="••••••••"
                         secureTextEntry
@@ -224,6 +226,7 @@ export default function OwnerLoginScreen() {
                     </View>
 
                     <Button
+                        testID="partner-login-submit-button"
                         title={
                             retryCountdownSeconds > 0
                                 ? `Try again in ${retryCountdownSeconds}s`
@@ -243,6 +246,7 @@ export default function OwnerLoginScreen() {
                         Want to list your property on TIJUM?{' '}
                     </Text>
                     <TouchableOpacity
+                        testID="partner-register-link"
                         style={styles.textHitTarget}
                         accessibilityRole="button"
                         onPress={() =>

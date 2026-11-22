@@ -117,6 +117,7 @@ export default function CustomerRegisterScreen() {
 
                 <View style={styles.form}>
                     <Input
+                        testID="register-name-input"
                         label="Full Name"
                         placeholder="Aditya Varma"
                         value={name}
@@ -124,6 +125,7 @@ export default function CustomerRegisterScreen() {
                     />
 
                     <Input
+                        testID="register-email-input"
                         label="Email Address"
                         placeholder="aditya@example.com"
                         keyboardType="email-address"
@@ -133,6 +135,7 @@ export default function CustomerRegisterScreen() {
                     />
 
                     <Input
+                        testID="register-phone-input"
                         label="Mobile Phone (Required)"
                         placeholder="+91 98765 43210"
                         keyboardType="phone-pad"
@@ -141,6 +144,7 @@ export default function CustomerRegisterScreen() {
                     />
 
                     <Input
+                        testID="register-password-input"
                         label="Password (min 8 characters)"
                         placeholder="••••••••"
                         secureTextEntry
@@ -149,6 +153,7 @@ export default function CustomerRegisterScreen() {
                     />
 
                     <Input
+                        testID="register-referral-input"
                         label="Referral Code (Optional)"
                         placeholder="e.g. TIJUMFRIEND"
                         autoCapitalize="characters"
@@ -160,6 +165,7 @@ export default function CustomerRegisterScreen() {
                     {/* Terms & Conditions Acceptance */}
                     <View style={styles.termsRow}>
                         <TouchableOpacity
+                            testID="register-terms-checkbox"
                             style={styles.checkboxHitTarget}
                             activeOpacity={0.8}
                             accessibilityRole="checkbox"
@@ -207,6 +213,7 @@ export default function CustomerRegisterScreen() {
                     </View>
 
                     <Button
+                        testID="register-submit-button"
                         title="Create Customer Account"
                         variant="primary"
                         size="lg"

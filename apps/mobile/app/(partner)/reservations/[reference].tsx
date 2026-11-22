@@ -656,8 +656,8 @@ export default function PartnerReservationDetailScreen() {
                             />
                             <Text style={styles.actionNote}>
                                 Confirmed Booking: Payment verified online.
-                                Please prepare room category "
-                                {reservation.room_type_name}" for guest arrival.
+                                Please prepare room category &ldquo;
+                                {reservation.room_type_name}&rdquo; for guest arrival.
                             </Text>
                         </View>
                     ) : null}

@@ -126,7 +126,7 @@ export default function ReferralsScreen() {
                 </Text>
                 <Text style={styles.heroDesc}>
                     Give friends {refereePointsLabel} for their first stay.
-                    You'll receive {referrerPointsLabel} when their check-out is
+                    You&apos;ll receive {referrerPointsLabel} when their check-out is
                     completed!
                 </Text>
 
@@ -311,7 +311,7 @@ export default function ReferralsScreen() {
                                     No referrals yet
                                 </Text>
                                 <Text style={styles.emptySubtitle}>
-                                    Tap "Share Referral Link" above to send
+                                    Tap &ldquo;Share Referral Link&rdquo; above to send
                                     invitations to friends and start earning
                                     points!
                                 </Text>

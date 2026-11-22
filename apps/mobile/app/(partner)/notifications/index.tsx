@@ -338,7 +338,7 @@ export default function PartnerNotificationsScreen() {
                                 No notifications
                             </Text>
                             <Text style={styles.emptySubtitle}>
-                                You're all caught up! Booking requests, guest
+                                You&apos;re all caught up! Booking requests, guest
                                 updates, and payout alerts will appear here.
                             </Text>
                         </View>

@@ -57,6 +57,9 @@ export function PropertyCard({
             activeOpacity={0.9}
             onPress={onPress}
             style={styles.container}
+            testID={`property-card-${property.id}`}
+            accessibilityLabel={`View property ${property.name}`}
+            accessibilityRole="button"
         >
             <View style={styles.imageContainer}>
                 {imageUri ? (

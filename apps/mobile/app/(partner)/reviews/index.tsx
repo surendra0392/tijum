@@ -373,7 +373,7 @@ export default function PartnerReviewsScreen() {
                             ) : null}
                             {item.content ? (
                                 <Text style={styles.reviewContent}>
-                                    "{item.content}"
+                                    &ldquo;{item.content}&rdquo;
                                 </Text>
                             ) : null}
 
@@ -510,11 +510,11 @@ export default function PartnerReviewsScreen() {
                                 5.0
                             </Text>
                             <Text style={styles.quoteText} numberOfLines={2}>
-                                "
+                                &ldquo;
                                 {selectedReview?.content ||
                                     selectedReview?.title ||
                                     'Rating left by verified guest'}
-                                "
+                                &rdquo;
                             </Text>
                         </View>
 

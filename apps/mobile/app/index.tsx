@@ -236,6 +236,7 @@ export default function WelcomeScreen() {
                         {!isPermissionSlide && (
                             <TouchableOpacity
                                 style={styles.skipBtn}
+                                testID="onboarding-skip-btn"
                                 accessibilityLabel="Skip onboarding"
                                 accessibilityRole="button"
                                 onPress={() =>
@@ -342,6 +343,7 @@ export default function WelcomeScreen() {
                     {/* Primary Action Button */}
                     <TouchableOpacity
                         style={styles.primaryButton}
+                        testID="onboarding-primary-btn"
                         accessibilityRole="button"
                         accessibilityLabel={
                             isPermissionSlide
@@ -366,6 +368,7 @@ export default function WelcomeScreen() {
                     {isPermissionSlide ? (
                         <TouchableOpacity
                             style={styles.secondaryTextBtn}
+                            testID="onboarding-skip-permission-btn"
                             accessibilityRole="button"
                             accessibilityLabel="Continue without enabling notifications"
                             onPress={handleSkip}

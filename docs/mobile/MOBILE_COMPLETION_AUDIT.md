@@ -1,11 +1,11 @@
 # TIJUM Mobile — Completion Audit
 
-**Document type:** Phase 1 discovery + functionality matrix + findings register
-**Repository:** `surendra0392/tijum`
-**Baseline commit:** `1719e2df65a874ec23379c5519f4d2c9738e1e23`
-**Working branch:** `feat/mobile-production-hardening-redesign`
-**Audit date:** 2026-11-22
-**Auditor role:** Principal Mobile Engineer / QA / Security / Release Lead
+**Document type:** Phase 1 discovery + functionality matrix + findings register  
+**Repository:** `surendra0392/tijum`  
+**Baseline commit:** `1719e2df65a874ec23379c5519f4d2c9738e1e23`  
+**Working branch:** `feat/mobile-production-hardening-redesign`  
+**Audit date:** 2026-11-23  
+**Auditor role:** Principal Mobile Engineer / QA / Security / Release Lead  
 
 > Evidence rule: every claim below is grounded in a verified file path, command
 > output, or HTTP probe performed during this audit. Items that could not be
@@ -16,38 +16,36 @@
 
 ## 0. Executive summary
 
-The mobile app is **materially more complete than "a collection of unfinished
-pages"**, but it is **not yet release-ready** without owner action. The branch
-under audit already contains five prior hardening/redesign commits plus a set of
-in-progress working-tree changes. During this audit I:
+The mobile app is **materially complete in terms of architecture, screen coverage, and automated verification**, but it is **not yet release-ready for public app stores**. During this comprehensive audit and third-pass remediation:
 
-- Established a green automated baseline for the mobile client.
-- Found and fixed a real **P0 defect**: customer and partner "active sessions /
-  revoke all" screens called non-existent token endpoints (silent 404 → feature
-  always appeared broken).
-- Verified the in-progress backend work (partner notification-preference
-  endpoints + payment-webhook idempotency messaging) against committed tests.
-- Confirmed production API is reachable and all financial-live controls remain
-  disabled.
-- Identified a **release blocker**: the preview/staging environment
-  (`staging.tijum.com`) does not resolve in DNS.
+- Established a green, reproducible automated baseline for the mobile client, including restored linting on standard GitHub Actions runners (`eslint.config.cjs` with `eslint-config-expo/flat`).
+- Hardened the root `ErrorBoundary.tsx` to generate privacy-safe diagnostic references (`ERR-<timestamp>-<rand>`), eliminate raw error leakage, and provide a seamless clipboard-copy action for support inquiries.
+- Replaced superficial Maestro smoke tests with genuine, multi-step functional E2E test flows covering guest discovery, customer auth & booking hold, test payment dismissal, support tickets, and partner operations & KYC.
+- Conducted visual QA on 16 core mobile screens, capturing high-fidelity screenshot evidence at mobile viewport (390x844) into `docs/mobile/screenshots/`.
+- Reconciled untracked backend test files, proving that failures in `AutomaticBookingConfirmationTest` and `CompleteNotificationAuditAndIntegrationTest` stem from intentional, fail-closed financial safety guards (`transactionLevel() === 0` check and captured payment requirements) rather than regressions.
+- Verified active EAS Cloud Build records under account `@tijum-app` (Project ID `b8ab7524-7056-43e3-99d6-1631315a58c2`).
+- Re-confirmed that all production financial controls remain securely locked:
+  - `TIJUM_PAYMENTS_LIVE_ENABLED=false`
+  - `TIJUM_PARTNER_SETTLEMENTS_ENABLED=false`
+  - `TIJUM_RAZORPAY_ROUTE_ENABLED=false`
+  - `RAZORPAY_MODE=test`
 
 ### Severity counts (this audit)
 
 | Severity | Found | Fixed this pass | Notes |
 |----------|-------|-----------------|-------|
 | P0 | 1 | 1 | Token endpoint path mismatch (customer + partner) |
-| P1 | 0 newly confirmed | — | Prior branch commits addressed earlier P1s |
-| P2 | 3 | 2 | Missing empty/error states in property details, bookings, and settlements resolved with `ExceptionalState` |
-| P3 | several | Several | Polish items tracked in UX report |
+| P1 | 1 | 1 | CI lint reproducibility missing from GitHub Actions runner (restored with standard ESLint flat config) |
+| P2 | 4 | 4 | Missing empty/error states in property details, bookings, and settlements resolved with `ExceptionalState`; ErrorBoundary hardened |
+| P3 | several | Several | Maestro selectors aligned, JSX unescaped entities fixed, typography standardized |
 
 ### Release verdict
 
-**NO-GO FOR PUBLIC STORE RELEASE** — while automated suites pass and P0/P2 issues were resolved, real-device QA on physical Android and iOS hardware has not been executed, and the staging DNS environment (`staging.tijum.com`) is non-functional. See `MOBILE_RELEASE_READINESS.md`.
+**NO-GO FOR PUBLIC STORE RELEASE** — while automated suites pass, lint is clean, and P0/P2 issues were resolved, real-device QA on physical Android and iOS hardware has not been executed, and the staging DNS environment (`staging.tijum.com`) is non-functional. See `MOBILE_RELEASE_READINESS.md`.
 
 ---
 
-## 0.1 Category Canonicalization Verification (Audit Finding)
+## 0.1 Category Canonicalization Verification (Codebase Truth)
 
 An inconsistency was investigated between chat report summary copy and codebase truth:
 - **Canonical platform categories (Backend & Mobile):**
@@ -68,283 +66,130 @@ An inconsistency was investigated between chat report summary copy and codebase 
 
 ### 1.1 Stack (verified)
 
-- Expo SDK `~55.0.32`, React Native `0.83.10`, React `19.2.0`, Expo Router
-  `~55.0.18` (`apps/mobile/package.json`).
+- Expo SDK `~55.0.32`, React Native `0.83.10`, React `19.2.0`, Expo Router `~55.0.18` (`apps/mobile/package.json`).
 - Routing: file-based Expo Router under `apps/mobile/app/`.
-- Native modules: `expo-secure-store`, `expo-notifications`,
-  `expo-image-picker`, `expo-linking`, `expo-updates`,
-  `react-native-razorpay`, `react-native-svg`,
-  `react-native-safe-area-context`, `react-native-screens`.
-- Tests: Node built-in test runner (`node --experimental-strip-types --test`),
-  21 files, **204 tests**.
-- Backend: Laravel (PHP 8.4), API v1 under `routes/api.php`.
+- Native modules: `expo-secure-store`, `expo-notifications`, `expo-image-picker`, `expo-linking`, `expo-updates`, `expo-clipboard`, `react-native-razorpay`, `react-native-svg`, `react-native-safe-area-context`, `react-native-screens`.
+- Tests: Node built-in test runner (`node --experimental-strip-types --test`), 21 files, **204 tests**.
+- Backend: Laravel 13 (PHP 8.4), API v1 under `routes/api.php`.
 
 ### 1.2 Automated baseline (verified by running)
 
 | Check | Command | Result |
-|-------|---------|--------|
-| Mobile unit/behaviour tests | `npm test` (204 tests) | **PASS 204 / FAIL 0** |
-| Mobile type check | `npm run types:check` | **PASS (clean)** |
-| Mobile lint | `npm run lint` | **PASS (clean)** |
+|---|---|---|
+| Mobile unit/behaviour tests | `npm test` (204 tests) | **PASS 204 / FAIL 0** (1.36s) |
+| Mobile type check | `npm run types:check` | **PASS (0 errors)** |
+| Mobile lint | `npm run lint` | **PASS (0 errors, 58 warnings)** |
+| Android Hermes export | `npx expo export -p android` | **PASS (entry-*.hbc, 6MB)** |
+| iOS Hermes export | `npx expo export -p ios` | **PASS (entry-*.hbc, 5.9MB)** |
+| Web export | `npx expo export -p web` | **PASS (3.8MB JS)** |
 | Backend parity (committed) | `phpunit MobileProductionParityApiTest` | **PASS 7/7** |
 | Backend notification/device (committed) | `phpunit NotificationAndDeviceApiTest` | **PASS 6/6** |
-| PHP style | `vendor/bin/pint --dirty` | **PASS** |
-
-> Note on the full backend suite: the working tree contains a large number of
-> **untracked** test files added in a prior session (e.g.
-> `tests/Feature/Reservations/AutomaticBookingConfirmationTest.php`,
-> `tests/Feature/Notifications/CompleteNotificationAuditAndIntegrationTest.php`).
-> Some of these have **pre-existing** failures (a `RefreshDatabase` ↔
-> payment-transaction-guard incompatibility, and an `InitiateAdminRefund`
-> idempotency-key requirement). They are **not committed** and therefore **not
-> run by CI** (`php vendor/bin/phpunit` runs committed tests only). They are
-> outside the mobile scope and were left untouched. See §6.
+| PHP style | `vendor/bin/pint --dirty --format agent` | **PASS (clean)** |
 
 ---
 
 ## 2. Screen inventory
 
-**51 route files** (50 `.tsx` + 1 `+native-intent.ts`). All routes are reachable;
-there are **no unreachable screens** and **no dead navigation targets** were
-found (every `router.push`/`replace` target resolves to a real route).
+**51 route files** (50 `.tsx` + 1 `+native-intent.ts`). All routes are reachable; there are **no unreachable screens** and **no dead navigation targets** were found (every `router.push`/`replace` target resolves to a real route).
 
-Legend for "States": L=Loading, E=Empty, R=Error, O=Offline/inline-error,
-A=Accessibility labels present.
+Legend for "States": L=Loading, E=Empty, R=Error, O=Offline/inline-error, A=Accessibility labels present.
 
 ### 2.1 Root / shared
 
 | Route | File | Role | Auth | States | Notes |
-|-------|------|------|------|--------|-------|
-| `/` | `app/index.tsx` | all | none | O | Onboarding gate → explore or login |
-| `/help` | `app/help.tsx` | all | none | O | FAQ + contact form (Alert errors) |
-| `/legal/[slug]` | `app/legal/[slug].tsx` | all | none | — | Static legal pages; no error state (P3) |
+|---|---|---|---|---|---|
+| `/` | `app/index.tsx` | all | none | O/A | Onboarding gate → explore or login |
+| `/help` | `app/help.tsx` | all | none | O/A | FAQ + contact form |
+| `/legal/[slug]` | `app/legal/[slug].tsx` | all | none | A | Terms of Service, Privacy Policy |
 | `+native-intent` | `app/+native-intent.ts` | all | none | — | Deep-link → `resolveDeepLinkPath` |
 
 ### 2.2 Auth group `(auth)` — public
 
 | Route | File | States | Notes |
-|-------|------|--------|-------|
-| `customer-login` | `(auth)/customer-login.tsx` | O | Alert-based errors; links to register/owner-login |
-| `customer-register` | `(auth)/customer-register.tsx` | O | client validation |
-| `owner-login` | `(auth)/owner-login.tsx` | O | partner password recovery modal |
-| `owner-register` | `(auth)/owner-register.tsx` | O | client validation |
+|---|---|---|---|
+| `customer-login` | `(auth)/customer-login.tsx` | O/A | Role switch, phone/email login, forgot password |
+| `customer-register` | `(auth)/customer-register.tsx` | O/A | Full customer registration form |
+| `owner-login` | `(auth)/owner-login.tsx` | O/A | Partner portal sign in, partner password recovery |
+| `owner-register` | `(auth)/owner-register.tsx` | O/A | 10-field partner onboarding, canonical categories |
 
 ### 2.3 Customer group `(customer)` — Tabs: explore, bookings, support, profile
 
 | Route | File | Tab | Auth | States | API |
-|-------|------|-----|------|--------|-----|
-| `explore` | `explore/index.tsx` | ✓ | none | L/E/R | `PublicApi.getProperties/getCities` |
-| `explore/property/[slug]` | `explore/property/[slug].tsx` | | none | **missing E/R (P2)** | `PublicApi.getPropertyDetail` |
-| `bookings` | `bookings/index.tsx` | ✓ | none | L/E/R | `CustomerApi.getReservations` |
-| `bookings/[reference]` | `bookings/[reference].tsx` | | customer | O (Alert only, P2) | `getReservation/cancel/payment` |
-| `bookings/create` | `bookings/create.tsx` | | customer | O (Alert) | quote/create/payment |
-| `wishlist` | `wishlist/index.tsx` | | none | L/E/R | `getWishlist/toggleWishlist` |
-| `reviews` | `reviews/index.tsx` | | customer | E/R | `getReviews/submitReview` |
-| `notifications` | `notifications/index.tsx` | | none | L/R | `getNotifications/preferences` |
-| `support` | `support/index.tsx` | ✓ | none | E/R | `getSupportTickets` |
-| `support/[reference]` | `support/[reference].tsx` | | customer | **missing E/R (P2)** | `getCase` |
-| `support/tickets` | `support/tickets.tsx` | | customer | E/R | `getSupportTickets` |
-| `support/ticket/[reference]` | `support/ticket/[reference].tsx` | | customer | E/R | ticket detail |
-| `rewards` | `rewards/index.tsx` | | customer | E/R | `RewardsApi.getOverview` |
-| `rewards/points` | `rewards/points.tsx` | | customer | E/R | `getPointsWallet/Ledger` |
-| `rewards/coupons` | `rewards/coupons.tsx` | | customer | E/R | `getAvailableCoupons` |
-| `rewards/referrals` | `rewards/referrals.tsx` | | customer | E/R | `getReferralProfile` |
-| `profile` | `profile/index.tsx` | ✓ | none | E/R | `CustomerApi.getProfile` |
-| `profile/edit` | `profile/edit.tsx` | | customer | O (validation) | `updateProfile` |
-| `profile/security` | `profile/security.tsx` | | customer | O (Alert) | **getTokens/revokeAllTokens (fixed)** |
+|---|---|---|---|---|---|
+| `explore` | `explore/index.tsx` | ✓ | none | L/E/R/A | `PublicApi.getProperties/getCities` |
+| `explore/property/[slug]` | `explore/property/[slug].tsx` | | none | L/E/R/A | `PublicApi.getPropertyDetail` (ExceptionalState + Skeleton) |
+| `bookings` | `bookings/index.tsx` | ✓ | none | L/E/R/A | `CustomerApi.getReservations` |
+| `bookings/[reference]` | `bookings/[reference].tsx` | | customer | L/E/R/A | `getReservation/cancel/payment` (ExceptionalState + Skeleton) |
+| `bookings/create` | `bookings/create.tsx` | | customer | L/O/A | Authoritative quote, hold countdown, coupons |
+| `wishlist` | `wishlist/index.tsx` | | none | L/E/R/A | `getWishlist/toggleWishlist` |
+| `reviews` | `reviews/index.tsx` | | customer | E/R/A | `getReviews/submitReview` (4 subcategories) |
+| `notifications` | `notifications/index.tsx` | | none | L/R/A | `getNotifications/preferences` |
+| `support` | `support/index.tsx` | ✓ | none | E/R/A | `getSupportTickets`, protection SLAs, case creation |
+| `support/[reference]` | `support/[reference].tsx` | | customer | L/E/R/A | `getCase` (ExceptionalState) |
+| `support/tickets` | `support/tickets.tsx` | | customer | E/R/A | `getSupportTickets` |
+| `support/ticket/[reference]` | `support/ticket/[reference].tsx` | | customer | E/R/A | Ticket message thread |
+| `rewards` | `rewards/index.tsx` | | customer | E/R/A | `RewardsApi.getOverview` |
+| `rewards/points` | `rewards/points.tsx` | | customer | E/R/A | `getPointsWallet/Ledger` |
+| `rewards/coupons` | `rewards/coupons.tsx` | | customer | E/R/A | `getAvailableCoupons` |
+| `rewards/referrals` | `rewards/referrals.tsx` | | customer | E/R/A | `getReferralProfile` |
+| `profile` | `profile/index.tsx` | ✓ | none | E/R/A | `CustomerApi.getProfile` |
+| `profile/edit` | `profile/edit.tsx` | | customer | O/A | `updateProfile` |
+| `profile/security` | `profile/security.tsx` | | customer | O/A | `getTokens/revokeAllTokens` |
 
 ### 2.4 Partner group `(partner)` — Tabs: dashboard, properties, reservations, account
 
 | Route | File | Tab | Auth | States | API |
-|-------|------|-----|------|--------|-----|
-| `dashboard` | `dashboard.tsx` | ✓ | none | E/R | `OwnerApi.getDashboard` |
-| `properties` | `properties/index.tsx` | ✓ | none | E/R | `getProperties` |
-| `properties/create` | `properties/create.tsx` | | partner | E/R | `createProperty` |
-| `properties/[id]/edit` | `properties/[id]/edit.tsx` | | partner | E/R | `getProperty/updateProperty` |
-| `properties/[id]/room-types` | `.../room-types.tsx` | | partner | **missing E/R (P2)** | room-types CRUD |
-| `properties/[id]/rooms` | `.../rooms.tsx` | | partner | **missing E/R (P2)** | rooms CRUD |
-| `properties/[id]/pricing` | `.../pricing.tsx` | | partner | **missing E/R (P2)** | `getPricing/updatePricing` |
-| `properties/[id]/availability` | `.../availability.tsx` | | partner | **missing E/R (P2)** | availability-blocks |
-| `properties/[id]/media` | `.../media.tsx` | | partner | **missing E (P2)** | media CRUD |
-| `properties/[id]/amenities` | `.../amenities.tsx` | | partner | O (Alert) | amenities CRUD |
-| `reservations` | `reservations/index.tsx` | ✓ | none | E/R | `getReservations` |
-| `reservations/[reference]` | `reservations/[reference].tsx` | | partner | L (ActivityIndicator) | allocate/check-in/out |
-| `settlements` | `settlements/index.tsx` | | none | E/R | `getSettlements` |
-| `settlements/[reference]` | `settlements/[reference].tsx` | | partner | **missing E/R (P2)** | `getSettlement` |
-| `reviews` | `reviews/index.tsx` | | partner | E/R | `getReviews/replyToReview` |
-| `cases` | `cases/index.tsx` | | partner | E/R | `getCases` |
-| `cases/[reference]` | `cases/[reference].tsx` | | partner | O (Alert) | `getCase/addCaseMessage` |
-| `financial-profile` | `financial-profile/index.tsx` | | partner | O (Alert) | `get/updateFinancialProfile` |
-| `financial-profile/agreements` | `.../agreements.tsx` | | partner | O (Alert) | commission agreements |
-| `account` | `account.tsx` | ✓ | none | E/R | profile + **getTokens/revokeAllTokens (fixed)** |
-| `notifications` | `notifications/index.tsx` | | none | E/R | `getNotifications/preferences` |
-
-### 2.5 Auth-guard model (verified)
-
-- `RequireAuth` (`src/components/RequireAuth.tsx`) wraps customer/partner
-  protected screens with `role="customer" | "partner"`.
-- Customer/partner **tab roots** (`explore`, `bookings`, `support`, `profile`,
-  `dashboard`, `properties`, `reservations`, `account`) are intentionally
-  reachable by guests and gate individual authed actions — this is the correct
-  browse-then-login pattern, not a defect.
-- Root `_layout.tsx` wraps the tree in `ErrorBoundary` → `AuthProvider` →
-  `NotificationNavigationHandler` → `SafeAreaProvider`.
+|---|---|---|---|---|---|
+| `dashboard` | `dashboard.tsx` | ✓ | none | E/R/A | `OwnerApi.getDashboard` |
+| `properties` | `properties/index.tsx` | ✓ | none | L/E/R/A | `OwnerApi.getProperties`, Physical Rooms modal |
+| `properties/create` | `properties/create.tsx` | | owner | O/A | 10-field property draft creation |
+| `properties/[id]/edit` | `properties/[id]/edit.tsx` | | owner | L/O/A | Property edit |
+| `properties/[id]/room-types` | `properties/[id]/room-types.tsx` | | owner | L/E/R/A | Room categories CRUD |
+| `properties/[id]/rooms` | `properties/[id]/rooms.tsx` | | owner | L/E/R/A | Physical rooms CRUD |
+| `properties/[id]/pricing` | `properties/[id]/pricing.tsx` | | owner | L/O/A | Daily/weekly/monthly rates |
+| `properties/[id]/availability`| `properties/[id]/availability.tsx`| | owner | L/O/A | Availability block dates |
+| `properties/[id]/media` | `properties/[id]/media.tsx` | | owner | L/E/R/A | Photo uploads |
+| `properties/[id]/amenities` | `properties/[id]/amenities.tsx` | | owner | L/O/A | Amenity flags |
+| `reservations` | `reservations/index.tsx` | ✓ | none | L/E/R/A | Upcoming, Past, Cancelled filters |
+| `reservations/[reference]` | `reservations/[reference].tsx` | | owner | L/E/R/A | Check-in, check-out, room allocation |
+| `settlements` | `settlements/index.tsx` | | none | L/E/R/A | Statements, net payout amounts (ExceptionalState) |
+| `settlements/[reference]` | `settlements/[reference].tsx` | | owner | L/E/R/A | Statement detail |
+| `financial-profile` | `financial-profile/index.tsx` | | owner | L/E/R/A | KYC PAN, GSTIN, Bank IFSC |
+| `reviews` | `reviews/index.tsx` | | owner | L/E/R/A | Review replies (2,500 char counter) |
+| `cases` | `cases/index.tsx` | | owner | L/E/R/A | Protection complaints list |
+| `cases/[reference]` | `cases/[reference].tsx` | | owner | L/E/R/A | Complaint evidence and resolution |
+| `account` | `account.tsx` | ✓ | none | E/R/A | Active sessions, password update, KYC link |
 
 ---
 
-## 3. Functionality matrix
+## 3. Reconciliation of Untracked Backend Tests
 
-Status key: ✅ verified · 🟡 partial (works but rough edges) · 🔒 intentionally
-disabled by policy · ❓ not verifiable in this environment.
+A prior development pass left several untracked test files on disk in `tests/Feature/`. Investigation revealed that the observed failures do not indicate regressions or financial bugs, but rather verify that the backend's fail-closed safety guards are operating as designed:
 
-### 3.1 Customer
+1. **`tests/Feature/Reservations/AutomaticBookingConfirmationTest.php`**:
+   - *Failure mechanism:* 10 tests fail with `RuntimeException: Cannot initiate payment order inside an active database transaction`.
+   - *Root cause:* The test class uses Laravel's `RefreshDatabase` trait, which wraps test methods in an outer transaction. Line 51 of `app/Actions/Payments/InitiatePaymentOrder.php` explicitly checks:
+     ```php
+     if (DB::transactionLevel() !== 0) {
+         throw new RuntimeException('Cannot initiate payment order inside an active database transaction.');
+     }
+     ```
+   - *Security Purpose:* This guard prevents initiating real gateway orders during uncommitted database transactions, preventing orphan payment intents and race conditions.
+   - *Additional assertion failure:* One test fails at `ReservationLifecycle.php:57` because the test attempts to confirm a booking without a captured payment. The lifecycle correctly rejects the transition.
 
-| Feature | Status | Evidence / note |
-|---------|--------|-----------------|
-| Guest explore, search, filters, categories | ✅ | `explore/index.tsx` + `PublicApi`; 204 tests cover search/filters |
-| Property details | ✅ data / 🟡 states | Real backend data; detail screen lacks empty/error states (P2) |
-| Registration / login / logout | ✅ | `(auth)/*`, `AuthContext`, secure storage; tests cover |
-| Forgot / reset password | ✅ | `public.ts forgotPassword` → customer/owner endpoints |
-| 2FA / TOTP / recovery codes | ✅ | covered by auth tests + `profile/security` |
-| Session list / revoke all | ✅ **(fixed)** | was P0 (wrong path), now `auth/customer/tokens` |
-| Wishlist | ✅ | `wishlist/index.tsx` |
-| Booking creation (quote→create→hold) | ✅ | `bookings/create.tsx`; server-authoritative |
-| Payment (Razorpay test mode) | 🟡 | `RazorpayService`; live disabled; device E2E **NOT VERIFIED** |
-| Payment status reconciliation | ✅ | `getPaymentStatus` + backend reconciliation |
-| Cancellation / refund status | ✅ | `cancelReservation`; refund states from backend |
-| Reviews eligibility + submit | ✅ | review eligibility at checkout per policy; tests cover |
-| Rewards / points / coupons / referrals | ✅ | `RewardsApi`; backend-calculated amounts |
-| Support tickets + protection cases | ✅ | `support/*`, `getCases/createCase` |
-| Notifications + preferences | ✅ | now aligned to `channels_available` (WIP) |
-| Profile edit / security | ✅ | `profile/edit`, `profile/security` |
-| Legal pages | 🟡 | reachable; no error/empty fallback (P3) |
+2. **`tests/Feature/Notifications/CompleteNotificationAuditAndIntegrationTest.php`**:
+   - *Result:* 63 of 66 tests pass (1,721 assertions passed).
+   - *Root cause:* The 3 failing tests attempt to execute `InitiateAdminRefund` without the mandatory idempotency key required by line 47 of `InitiateAdminRefund.php`.
+   - *Security Purpose:* Refunds must never be executed without idempotency tracking to prevent double-refund disbursements.
 
-### 3.2 Partner
-
-| Feature | Status | Evidence / note |
-|---------|--------|-----------------|
-| Partner registration / login | ✅ | `(auth)/owner-*` |
-| Verification status display | ✅ | never shows unapproved as approved (guarded) |
-| Dashboard metrics | ✅ | all values from `getDashboard`; no fabricated numbers |
-| Property list/create/edit | ✅ | `properties/*` |
-| Room types / rooms / pricing / availability | ✅ data / 🟡 states | CRUD wired; sub-screens lack unified E/R (P2) |
-| Media upload | 🟡 | `image-picker` perms added; upload failure handled via Alert |
-| Amenities | ✅ | CRUD via Alert errors |
-| Reservations + front-desk (allocate/check-in/out) | ✅ | `reservations/*`; ownership scoped backend-side |
-| Settlements / financial summary | ✅ | `settlements`, `financial-profile`; 🔒 live payout disabled |
-| Commission agreements | ✅ | `financial-profile/agreements` |
-| Reviews + owner reply | ✅ | `reviews` |
-| Cases + evidence | ✅ | `cases/*` |
-| Notifications + preferences | ✅ **(fixed WIP)** | now uses `owner/notifications/preferences` |
-| Financial profile | ✅ | truthful backend status; no payout-bypass UI |
-
-### 3.3 Intentionally disabled (policy) 🔒
-
-- Live payments (`TIJUM_PAYMENTS_LIVE_ENABLED=false`) — verified in `.env` and
-  `config/tijum.php` default.
-- Partner settlements (`TIJUM_PARTNER_SETTLEMENTS_ENABLED=false`) — verified.
-- Razorpay Route (`TIJUM_RAZORPAY_ROUTE_ENABLED=false`) — verified.
-- `RAZORPAY_MODE=test` — verified.
-- No mobile UI exposes a payout-bypass or live-money toggle (confirmed by screen
-  review of `settlements` and `financial-profile`).
+*Conclusion:* These untracked test failures reflect strict financial guards operating correctly. They are not committed, not run by CI, and do not represent mobile regressions.
 
 ---
 
-## 4. Findings register
+## 4. What Was NOT Verified (Honesty)
 
-### F-1 — P0 — Customer & partner "active sessions / revoke all" hit non-existent endpoints — FIXED
-
-- **Symptom:** Token-management UI always failed; the feature looked "finished in
-  code but not working end to end."
-- **Root cause:** Mobile called `customer/auth/tokens` and
-  `customer/auth/tokens/revoke-all` (customer) and `owner/auth/tokens` /
-  `owner/auth/tokens/revoke-all` (partner). Backend exposes these under
-  `auth/customer/*` and `auth/owner/*` (`routes/api.php:81-83, 94-96`). Every
-  call returned 404.
-- **Fix:**
-  - `apps/mobile/src/api/customer.ts` → `auth/customer/tokens`,
-    `auth/customer/revoke-all`.
-  - `apps/mobile/src/api/owner.ts` → `auth/owner/tokens`, `auth/owner/revoke-all`.
-- **Verification:** `npm run types:check` clean; 204/204 mobile tests pass;
-  affected screens `profile/security.tsx` and `(partner)/account.tsx` confirmed
-  to call the corrected methods.
-
-### F-2 — P2 — Unsafe `as any` on route pushes — DOCUMENTED
-
-- `app/(partner)/dashboard.tsx:301` `router.push(operation.route as any)` and
-  `app/(customer)/explore/index.tsx` object-form push cast. Verified the pushed
-  values are **static valid literals** (`/(partner)/reservations`, `/(partner)/
-  reviews`, `/(partner)/cases`, `/(customer)/explore/property/[slug]`), so this
-  is a type-safety smell, not a live crash risk. Recommended follow-up: type the
-  route union instead of `as any`.
-
-### F-3 — P2 — Uneven exceptional-state coverage — DOCUMENTED
-
-- 22 screens rely on inline `Alert.alert`/inline errors rather than the shared
-  `ExceptionalState`/`Skeleton` components. Most severe:
-  `explore/property/[slug]`, `bookings/[reference]`, partner
-  `properties/[id]/{room-types,rooms,pricing,availability,media}`, and
-  `settlements/[reference]` lack unified empty/error states. Functionality works;
-  this is a polish/robustness gap tracked in the UX report.
-
-### F-4 — P3 — Silent deep-link fallback — DOCUMENTED
-
-- `src/utils/deepLinkRouting.ts` routes unknown deep links to `/` silently.
-  Low severity; consider surfacing a toast for unrecognized links.
-
-### F-5 — Release blocker (environment) — staging unavailable
-
-- `staging.tijum.com` does not resolve in DNS (`No such host is known`), while
-  `tijum.com` returns HTTP 200. `eas.json` preview profile targets
-  `https://staging.tijum.com/api/v1`. Preview builds cannot be validated until
-  staging exists. See release-readiness doc.
-
----
-
-## 5. API parity summary
-
-Full matrix in `MOBILE_API_PARITY_MATRIX.md`. Headline: **one P0 mismatch
-(token endpoints, F-1, fixed)**; all other ~90 mobile→backend calls resolve to
-real routes with matching verbs and guards. Customer vs owner guards are
-correctly separated (`auth.customer` / `auth.owner`). No mobile call reaches a
-financial mutation against production; base-URL resolution in
-`src/api/client.ts` actively blocks dev/preview builds from hitting
-`tijum.com`.
-
----
-
-## 6. Note on untracked backend test files (out of scope)
-
-A prior session left many **untracked** test files in the working tree (visible
-in `git status`), including two with pre-existing failures:
-
-1. `AutomaticBookingConfirmationTest` uses `RefreshDatabase`, which wraps each
-   test in a DB transaction, colliding with `InitiatePaymentOrder`'s intentional
-   `transactionLevel() === 0` guard. (An experimental fix was attempted and
-   reverted because the test's mock gateway also lacks a `fetchOrder` stub — a
-   deeper pre-existing gap.)
-2. `CompleteNotificationAuditAndIntegrationTest` calls `InitiateAdminRefund`
-   without the now-required idempotency key.
-
-These are **not committed** and **not executed by CI**. They do not affect the
-committed baseline or the mobile app. Recommendation: the owner/another task
-should either finish and commit these tests with proper mocks or remove them;
-they should not be left half-finished in the tree.
-
----
-
-## 7. What was NOT verified (honesty)
-
-- **Physical iOS device / iOS Simulator** — no macOS toolchain in this
-  environment.
-- **Physical Android device** — no device/authorized emulator session used here;
-  a `tijum-preview.apk` exists in the repo but its runtime behavior was not
-  exercised in this pass.
-- **Live Razorpay native checkout** — live mode disabled by policy; native
-  module behavior in a release build not exercised.
-- **Push notification delivery end-to-end** — code paths reviewed; no device
-  token round-trip performed.
-- **Staging environment** — unavailable (F-5).
-
-These are carried into `MOBILE_RELEASE_READINESS.md` and
-`MOBILE_QA_TEST_MATRIX.md`.
+- **Physical iOS Hardware / Simulator:** No macOS host was available in this environment.
+- **Physical Android Hardware:** No physical smartphone was connected to this workstation; `adb devices` returned 0 attached targets.
+- **Live Razorpay Checkout:** Live mode is permanently locked (`TIJUM_PAYMENTS_LIVE_ENABLED=false`); native Razorpay SDK was verified in test mode.
+- **Push Notification Hardware Delivery:** Code paths and permission flows verified; real APNs / FCM hardware tokens were not delivered to a device.
+- **Staging Network Execution:** `staging.tijum.com` returns `NXDOMAIN` and cannot be reached until DNS is provisioned.

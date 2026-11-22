@@ -9,7 +9,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "vp lint app src __tests__ -D correctness --format=agent",
+    "lint": "eslint --config eslint.config.cjs app src",
     "types:check": "tsc --noEmit",
     "test": "node --experimental-strip-types --test __tests__/*.test.ts"
   },
@@ -39,6 +39,8 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~19.2.10",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~55.0.1",
     "typescript": "^5.7.2"
   },
   "overrides": {

@@ -1,16 +1,108 @@
 appId: com.tijum.app
-name: "02 - Customer Authentication, Bookings, Rewards, Profile & Support"
+name: "02 - Customer Authentication, Booking Hold, Cancellation & Support Workflow"
+tags:
+  - e2e
+  - customer
+  - booking
+  - support
 ---
-- launchApp
-- tapOn:
-    text: "Profile"
-    optional: true
-- tapOn:
-    text: "Sign In"
-    optional: true
+- launchApp:
+    clearState: false
+
+# 1. Customer Authentication Flow
+- openLink: "tijum://(auth)/customer-login"
 - assertVisible: "Welcome Back"
+- assertVisible:
+    id: "login-identifier-input"
+- assertVisible:
+    id: "login-password-input"
+- assertVisible:
+    id: "login-submit-button"
+
+# Verify toggle to registration
 - tapOn: "Create Customer Account"
-- assertVisible: "Create Customer Account"
-- navigateBack
-- tapOn: "Partner Portal →"
-- assertVisible: "Partner Sign In"
+- assertVisible:
+    id: "register-submit-button"
+- assertVisible:
+    id: "register-name-input"
+- back
+
+# Enter customer test credentials (isolated fixtures)
+- tapOn:
+    id: "login-identifier-input"
+- inputText: "customer.test@tijum.internal"
+- tapOn:
+    id: "login-password-input"
+- inputText: "Secret123!"
+- tapOn:
+    id: "login-submit-button"
+
+# 2. Search, Select Property & Booking Hold Creation
+- tapOn:
+    text: "Home"
+- scrollUntilVisible:
+    element:
+      id: "property-card-.*"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: "property-card-.*"
+
+# Open Booking Sheet
+- assertVisible:
+    id: "property-book-stay-btn"
+- tapOn:
+    id: "property-book-stay-btn"
+
+# Assert Booking Parameters & Authoritative Quote
+- assertVisible: "Confirm Booking"
+- assertVisible: "Estimated Summary"
+- scrollUntilVisible:
+    element:
+      id: "booking-submit-button"
+    direction: DOWN
+    timeout: 8000
+
+# Submit reservation hold request
+- tapOn:
+    id: "booking-submit-button"
+
+# Verify Hold Banner & Payment Action (Fail-Safe: dismiss without mutating live funds)
+- runFlow:
+    when:
+      visible: "Proceed to Payment"
+    commands:
+      - tapOn: "Proceed to Payment"
+
+- runFlow:
+    when:
+      visible:
+        id: "booking-pay-btn"
+    commands:
+      - assertVisible: "Action Required: Pay to Confirm"
+      - assertVisible:
+          id: "booking-cancel-btn"
+
+# 3. Customer Protection & Support Ticket Workflow
+- tapOn:
+    text: "Support"
+- assertVisible: "Official Support Helpline"
+- assertVisible:
+    id: "support-raise-request-btn"
+
+# Open Support Modal & Submit Inquiry
+- tapOn:
+    id: "support-raise-request-btn"
+- assertVisible:
+    id: "support-booking-ref-input"
+- tapOn:
+    id: "support-booking-ref-input"
+- inputText: "BK-TEST-AUDIT"
+- tapOn:
+    id: "support-description-input"
+- inputText: "Automated Maestro E2E test inquiry regarding check-in timings and meal inclusions."
+
+# Close / Submit
+- tapOn:
+    id: "support-modal-close-btn"
+- assertVisible: "Customer Protection SLAs"

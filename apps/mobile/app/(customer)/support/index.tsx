@@ -258,7 +258,7 @@ export default function CustomerSupportScreen() {
                         </View>
 
                         <Text style={styles.heroTitle}>
-                            We're here to help!
+                            We&apos;re here to help!
                         </Text>
                         <Text style={styles.heroSubtitle}>
                             Raise a support request or track your existing case.
@@ -266,6 +266,7 @@ export default function CustomerSupportScreen() {
 
                         <View style={styles.heroActionButtons}>
                             <TouchableOpacity
+                                testID="support-raise-request-btn"
                                 style={styles.primaryPlumButton}
                                 onPress={() => setModalVisible(true)}
                                 activeOpacity={0.85}
@@ -330,7 +331,7 @@ export default function CustomerSupportScreen() {
                             </Text>
                             <Text style={styles.caseDateText}>
                                 Need help with a stay or promised meals? Tap
-                                "Raise a Request" above to open a protected case.
+                                &ldquo;Raise a Request&rdquo; above to open a protected case.
                             </Text>
                         </View>
                     ) : (
@@ -495,6 +496,7 @@ export default function CustomerSupportScreen() {
                                 Raise a Support Request
                             </Text>
                             <TouchableOpacity
+                                testID="support-modal-close-btn"
                                 style={styles.modalCloseBtn}
                                 onPress={() => setModalVisible(false)}
                                 accessibilityRole="button"
@@ -512,6 +514,7 @@ export default function CustomerSupportScreen() {
                                 Booking Reference *
                             </Text>
                             <TextInput
+                                testID="support-booking-ref-input"
                                 style={styles.textInput}
                                 placeholder="Enter booking reference"
                                 value={bookingRef}
@@ -545,6 +548,7 @@ export default function CustomerSupportScreen() {
 
                             <Text style={styles.inputLabel}>Description *</Text>
                             <TextInput
+                                testID="support-description-input"
                                 style={[styles.textInput, styles.textArea]}
                                 placeholder="Describe the issue in detail..."
                                 multiline
@@ -554,6 +558,7 @@ export default function CustomerSupportScreen() {
                             />
 
                             <TouchableOpacity
+                                testID="support-submit-btn"
                                 style={styles.submitModalBtn}
                                 onPress={handleCreateCase}
                                 disabled={submitting}
