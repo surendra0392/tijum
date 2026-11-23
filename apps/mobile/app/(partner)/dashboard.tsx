@@ -330,55 +330,57 @@ export default function PartnerDashboardScreen() {
                 </View>
 
                 {dashboardData ? (
-                    <TouchableOpacity
-                        style={styles.inventoryCard}
-                        onPress={() => router.push('/(partner)/properties')}
-                        activeOpacity={0.85}
-                        accessibilityRole="button"
-                    >
-                        <View
-                            style={{
-                                flexDirection: 'row',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                            }}
+                    <View style={styles.inventoryCard}>
+                        <TouchableOpacity
+                            onPress={() => router.push('/(partner)/properties')}
+                            activeOpacity={0.85}
+                            accessibilityRole="button"
                         >
-                            <Text style={styles.sectionHeading}>
-                                Property Inventory
-                            </Text>
-                            <ChevronRight size={16} color={Colors.gray400} />
-                        </View>
-                        <View style={styles.inventoryRow}>
-                            <Text style={styles.inventoryText}>
-                                {
-                                    dashboardData.property_summary
-                                        .properties_total
-                                }{' '}
-                                properties
-                            </Text>
-                            <Text style={styles.inventoryText}>
-                                {
-                                    dashboardData.property_summary
-                                        .verified_properties
-                                }{' '}
-                                verified
-                            </Text>
-                            <Text style={styles.inventoryText}>
-                                {
-                                    dashboardData.property_summary
-                                        .room_types_total
-                                }{' '}
-                                categories
-                            </Text>
-                            <Text style={styles.inventoryText}>
-                                {dashboardData.property_summary.rooms_total}{' '}
-                                rooms
-                            </Text>
-                        </View>
+                            <View
+                                style={{
+                                    flexDirection: 'row',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Text style={styles.sectionHeading}>
+                                    Property Inventory
+                                </Text>
+                                <ChevronRight size={16} color={Colors.gray400} />
+                            </View>
+                            <View style={styles.inventoryRow}>
+                                <Text style={styles.inventoryText}>
+                                    {
+                                        dashboardData.property_summary
+                                            .properties_total
+                                    }{' '}
+                                    properties
+                                </Text>
+                                <Text style={styles.inventoryText}>
+                                    {
+                                        dashboardData.property_summary
+                                            .verified_properties
+                                    }{' '}
+                                    verified
+                                </Text>
+                                <Text style={styles.inventoryText}>
+                                    {
+                                        dashboardData.property_summary
+                                            .room_types_total
+                                    }{' '}
+                                    categories
+                                </Text>
+                                <Text style={styles.inventoryText}>
+                                    {dashboardData.property_summary.rooms_total}{' '}
+                                    rooms
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
                         <TouchableOpacity
                             onPress={() =>
                                 router.push('/(partner)/settlements')
                             }
+                            accessibilityRole="button"
                             style={{ marginTop: 4 }}
                         >
                             <Text style={styles.payoutText}>
@@ -390,7 +392,7 @@ export default function PartnerDashboardScreen() {
                                 →
                             </Text>
                         </TouchableOpacity>
-                    </TouchableOpacity>
+                    </View>
                 ) : null}
 
                 {dashboardData &&

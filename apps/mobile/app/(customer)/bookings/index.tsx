@@ -151,16 +151,16 @@ export default function CustomerBookingsScreen() {
         const propertyName =
             item.property_name ?? item.property?.name ?? 'Verified Stay';
         const isAwaitingPayment = canPayReservation(item);
+        const openBooking = () => router.push(resolveReservationListActionRoute(reference));
 
         return (
-            <TouchableOpacity
-                style={styles.card}
-                activeOpacity={0.88}
-                onPress={() =>
-                    router.push(resolveReservationListActionRoute(reference))
-                }
-            >
-                <View style={styles.cardRow}>
+            <View style={styles.card}>
+                <TouchableOpacity
+                    style={styles.cardRow}
+                    activeOpacity={0.88}
+                    accessibilityRole="button"
+                    onPress={openBooking}
+                >
                     {photoUrl ? (
                         <Image
                             source={{ uri: photoUrl }}
@@ -216,7 +216,7 @@ export default function CustomerBookingsScreen() {
                             Booking ID: {reference}
                         </Text>
                     </View>
-                </View>
+                </TouchableOpacity>
 
                 <View style={styles.cardBottomRow}>
                     <Text style={styles.priceText}>
@@ -224,18 +224,15 @@ export default function CustomerBookingsScreen() {
                     </Text>
                     <TouchableOpacity
                         style={styles.viewDetailsBtn}
-                        onPress={() =>
-                            router.push(
-                                resolveReservationListActionRoute(reference),
-                            )
-                        }
+                        accessibilityRole="button"
+                        onPress={openBooking}
                     >
                         <Text style={styles.viewDetailsText}>
                             {isAwaitingPayment ? 'Pay Now' : 'View Details'}
                         </Text>
                     </TouchableOpacity>
                 </View>
-            </TouchableOpacity>
+            </View>
         );
     };
 

@@ -21,6 +21,9 @@ interface Props {
     onToggleWishlist?: (propertyId: number) => void;
 }
 
+const PROPERTY_IMAGE_HEIGHT = 190;
+const WISHLIST_BUTTON_SIZE = 48;
+
 export function PropertyCard({
     property,
     onPress,
@@ -53,136 +56,133 @@ export function PropertyCard({
         property.rating_average > 0 && property.reviews_count > 0;
 
     return (
-        <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={onPress}
-            style={styles.container}
-            testID={`property-card-${property.id}`}
-            accessibilityLabel={`View property ${property.name}`}
-            accessibilityRole="button"
-        >
-            <View style={styles.imageContainer}>
-                {imageUri ? (
-                    <Image
-                        source={{ uri: imageUri }}
-                        style={styles.image}
-                        resizeMode="cover"
-                    />
-                ) : (
-                    <View style={styles.imagePlaceholder}>
-                        <Building2 size={44} color={Colors.gray400} />
-                    </View>
-                )}
-                {property.is_verified ? (
-                    <View style={styles.verifiedBadge}>
-                        <CheckCircle2
-                            size={12}
-                            color={Colors.successText}
-                            style={styles.badgeIcon}
+        <View style={styles.container}>
+            <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={onPress}
+                testID={`property-card-${property.id}`}
+                accessibilityLabel={`View property ${property.name}`}
+                accessibilityRole="button"
+            >
+                <View style={styles.imageContainer}>
+                    {imageUri ? (
+                        <Image
+                            source={{ uri: imageUri }}
+                            style={styles.image}
+                            resizeMode="cover"
                         />
-                        <Text style={styles.verifiedText}>Verified</Text>
-                    </View>
-                ) : null}
-                {hasReviews ? (
-                    <View style={styles.ratingBadge}>
-                        <Star
-                            size={11}
-                            color={Colors.softPeach}
-                            fill={Colors.softPeach}
-                            style={styles.badgeIcon}
-                        />
-                        <Text style={styles.ratingText}>
-                            {property.rating_average.toFixed(1)}
-                        </Text>
-                    </View>
-                ) : null}
-                <TouchableOpacity
-                    accessibilityLabel={
-                        effectiveWishlisted
-                            ? `Remove ${property.name} from wishlist`
-                            : `Add ${property.name} to wishlist`
-                    }
-                    accessibilityRole="button"
-                    style={styles.wishlistButton}
-                    activeOpacity={0.8}
-                    onPress={() => {
-                        setLocalWishlisted(!localWishlisted);
-                        onToggleWishlist?.(property.id);
-                    }}
-                >
-                    <Heart
-                        size={16}
-                        color={effectiveWishlisted ? Colors.rose : Colors.white}
-                        fill={
-                            effectiveWishlisted
-                                ? Colors.rose
-                                : 'rgba(0, 0, 0, 0.35)'
-                        }
-                    />
-                </TouchableOpacity>
-            </View>
-
-            <View style={styles.details}>
-                <View style={styles.categoryLocalityRow}>
-                    <CategoryBadge category={property.category} size="sm" />
-                    <View style={styles.localityRow}>
-                        <MapPin
-                            size={12}
-                            color={Colors.coralPrimary}
-                            style={{ marginRight: 3 }}
-                        />
-                        <Text style={styles.locality} numberOfLines={1}>
-                            {property.locality ||
-                                property.city?.name ||
-                                'Location not provided'}
-                            {property.distance_km
-                                ? ` • ${property.distance_km} km`
-                                : ''}
-                        </Text>
-                    </View>
-                </View>
-
-                <View style={styles.titleRatingRow}>
-                    <Text numberOfLines={1} style={styles.name}>
-                        {property.name}
-                    </Text>
-                    {hasReviews ? (
-                        <Text style={styles.reviewsCountText}>
-                            ({property.reviews_count} reviews)
-                        </Text>
+                    ) : (
+                        <View style={styles.imagePlaceholder}>
+                            <Building2 size={44} color={Colors.gray400} />
+                        </View>
+                    )}
+                    {property.is_verified ? (
+                        <View style={styles.verifiedBadge}>
+                            <CheckCircle2
+                                size={12}
+                                color={Colors.successText}
+                                style={styles.badgeIcon}
+                            />
+                            <Text style={styles.verifiedText}>Verified</Text>
+                        </View>
                     ) : null}
-                </View>
-
-                <View style={styles.amenityChipsRow}>
-                    {property.food_provided ? (
-                        <View style={styles.amenityChip}>
-                            <Text style={styles.amenityChipText}>
-                                Food available
+                    {hasReviews ? (
+                        <View style={styles.ratingBadge}>
+                            <Star
+                                size={11}
+                                color={Colors.softPeach}
+                                fill={Colors.softPeach}
+                                style={styles.badgeIcon}
+                            />
+                            <Text style={styles.ratingText}>
+                                {property.rating_average.toFixed(1)}
                             </Text>
                         </View>
                     ) : null}
                 </View>
 
-                <View style={styles.footer}>
-                    <View>
-                        {formattedPrice ? (
-                            <Text style={styles.price}>
-                                {formattedPrice}
-                                <Text style={styles.priceUnit}> / month</Text>
+                <View style={styles.details}>
+                    <View style={styles.categoryLocalityRow}>
+                        <CategoryBadge category={property.category} size="sm" />
+                        <View style={styles.localityRow}>
+                            <MapPin
+                                size={12}
+                                color={Colors.coralPrimary}
+                                style={{ marginRight: 3 }}
+                            />
+                            <Text style={styles.locality} numberOfLines={1}>
+                                {property.locality ||
+                                    property.city?.name ||
+                                    'Location not provided'}
+                                {property.distance_km
+                                    ? ` • ${property.distance_km} km`
+                                    : ''}
                             </Text>
-                        ) : (
-                            <Text style={styles.priceUnavailable}>
-                                Price unavailable
-                            </Text>
-                        )}
+                        </View>
                     </View>
 
-                    <View style={styles.bookNowButton}>
-                        <Text style={styles.bookNowButtonText}>Book Now</Text>
+                    <View style={styles.titleRatingRow}>
+                        <Text numberOfLines={1} style={styles.name}>
+                            {property.name}
+                        </Text>
+                        {hasReviews ? (
+                            <Text style={styles.reviewsCountText}>
+                                ({property.reviews_count} reviews)
+                            </Text>
+                        ) : null}
+                    </View>
+
+                    <View style={styles.amenityChipsRow}>
+                        {property.food_provided ? (
+                            <View style={styles.amenityChip}>
+                                <Text style={styles.amenityChipText}>
+                                    Food available
+                                </Text>
+                            </View>
+                        ) : null}
+                    </View>
+
+                    <View style={styles.footer}>
+                        <View>
+                            {formattedPrice ? (
+                                <Text style={styles.price}>
+                                    {formattedPrice}
+                                    <Text style={styles.priceUnit}> / month</Text>
+                                </Text>
+                            ) : (
+                                <Text style={styles.priceUnavailable}>
+                                    Price unavailable
+                                </Text>
+                            )}
+                        </View>
+
+                        <View style={styles.bookNowButton}>
+                            <Text style={styles.bookNowButtonText}>Book Now</Text>
+                        </View>
                     </View>
                 </View>
-            </View>
-        </TouchableOpacity>
+            </TouchableOpacity>
+            <TouchableOpacity
+                accessibilityLabel={
+                    effectiveWishlisted
+                        ? `Remove ${property.name} from wishlist`
+                        : `Add ${property.name} to wishlist`
+                }
+                accessibilityRole="button"
+                style={styles.wishlistButton}
+                activeOpacity={0.8}
+                onPress={() => {
+                    setLocalWishlisted(!localWishlisted);
+                    onToggleWishlist?.(property.id);
+                }}
+            >
+                <Heart
+                    size={16}
+                    color={effectiveWishlisted ? Colors.rose : Colors.white}
+                    fill={effectiveWishlisted ? Colors.rose : 'rgba(0, 0, 0, 0.35)'}
+                />
+            </TouchableOpacity>
+        </View>
     );
 }
 
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
         ...Shadows.card,
     },
     imageContainer: {
-        height: 190,
+        height: PROPERTY_IMAGE_HEIGHT,
         backgroundColor: Colors.surfaceSubtle,
         position: 'relative',
     },
@@ -249,11 +249,11 @@ const styles = StyleSheet.create({
     },
     wishlistButton: {
         position: 'absolute',
-        bottom: Spacing.sm,
+        top: PROPERTY_IMAGE_HEIGHT - WISHLIST_BUTTON_SIZE - Spacing.sm,
         right: Spacing.sm,
         backgroundColor: 'rgba(38, 24, 36, 0.72)',
-        width: 48,
-        height: 48,
+        width: WISHLIST_BUTTON_SIZE,
+        height: WISHLIST_BUTTON_SIZE,
         borderRadius: BorderRadius.full,
         alignItems: 'center',
         justifyContent: 'center',

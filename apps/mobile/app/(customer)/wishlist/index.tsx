@@ -119,72 +119,69 @@ export default function WishlistScreen() {
         const photo = item.cover_image_url;
 
         return (
-            <TouchableOpacity
-                accessibilityLabel={`Open ${item.name}`}
-                accessibilityRole="button"
-                style={styles.gridCard}
-                activeOpacity={0.88}
-                onPress={() =>
-                    router.push(
-                        `/(customer)/explore/property/${item.slug}` as any,
-                    )
-                }
-            >
-                <View style={styles.imageWrapper}>
-                    {photo ? (
-                        <Image
-                            source={{ uri: photo }}
-                            style={styles.cardImage}
-                            resizeMode="cover"
-                        />
-                    ) : (
-                        <View style={styles.cardImagePlaceholder}>
-                            <Building2 size={36} color={Colors.gray400} />
-                        </View>
-                    )}
-                    <TouchableOpacity
-                        accessibilityLabel={`Remove ${item.name} from wishlist`}
-                        accessibilityRole="button"
-                        style={styles.heartBtn}
-                        onPress={() => handleRemove(item.id)}
-                        activeOpacity={0.8}
-                    >
-                        <Heart
-                            size={15}
-                            color={Colors.white}
-                            fill={Colors.rose}
-                        />
-                    </TouchableOpacity>
-                </View>
+            <View style={styles.gridCard}>
+                <TouchableOpacity
+                    accessibilityLabel={`Open ${item.name}`}
+                    accessibilityRole="button"
+                    activeOpacity={0.88}
+                    onPress={() =>
+                        router.push(
+                            `/(customer)/explore/property/${item.slug}` as any,
+                        )
+                    }
+                >
+                    <View style={styles.imageWrapper}>
+                        {photo ? (
+                            <Image
+                                source={{ uri: photo }}
+                                style={styles.cardImage}
+                                resizeMode="cover"
+                            />
+                        ) : (
+                            <View style={styles.cardImagePlaceholder}>
+                                <Building2 size={36} color={Colors.gray400} />
+                            </View>
+                        )}
+                    </View>
 
-                <View style={styles.cardDetails}>
-                    <Text style={styles.cardTitle} numberOfLines={1}>
-                        {item.name}
-                    </Text>
+                    <View style={styles.cardDetails}>
+                        <Text style={styles.cardTitle} numberOfLines={1}>
+                            {item.name}
+                        </Text>
 
-                    {hasReviews ? (
-                        <View style={styles.ratingRow}>
-                            <Star size={11} color="#D97706" fill="#D97706" />
-                            <Text style={styles.ratingText}>
-                                {' '}
-                                {item.rating_average.toFixed(1)} (
-                                {item.reviews_count})
+                        {hasReviews ? (
+                            <View style={styles.ratingRow}>
+                                <Star size={11} color="#D97706" fill="#D97706" />
+                                <Text style={styles.ratingText}>
+                                    {' '}
+                                    {item.rating_average.toFixed(1)} (
+                                    {item.reviews_count})
+                                </Text>
+                            </View>
+                        ) : null}
+
+                        {rawPrice !== null ? (
+                            <Text style={styles.cardPrice}>
+                                ₹{rawPrice.toLocaleString('en-IN')}{' '}
+                                <Text style={styles.perMonthText}>/ month</Text>
                             </Text>
-                        </View>
-                    ) : null}
-
-                    {rawPrice !== null ? (
-                        <Text style={styles.cardPrice}>
-                            ₹{rawPrice.toLocaleString('en-IN')}{' '}
-                            <Text style={styles.perMonthText}>/ month</Text>
-                        </Text>
-                    ) : (
-                        <Text style={styles.priceUnavailable}>
-                            Price unavailable
-                        </Text>
-                    )}
-                </View>
-            </TouchableOpacity>
+                        ) : (
+                            <Text style={styles.priceUnavailable}>
+                                Price unavailable
+                            </Text>
+                        )}
+                    </View>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    accessibilityLabel={`Remove ${item.name} from wishlist`}
+                    accessibilityRole="button"
+                    style={styles.heartBtn}
+                    onPress={() => handleRemove(item.id)}
+                    activeOpacity={0.8}
+                >
+                    <Heart size={15} color={Colors.white} fill={Colors.rose} />
+                </TouchableOpacity>
+            </View>
         );
     };
 

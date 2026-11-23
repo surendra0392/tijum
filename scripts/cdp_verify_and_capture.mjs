@@ -345,6 +345,7 @@ async function run() {
                     .map((f) => f.family);
                 return {
                     textLength: (document.body?.innerText || '').trim().length,
+                    nestedButtons: document.querySelectorAll('button button').length,
                     docOverflow,
                     maxScrollHeight,
                     totalImgs: imgs.length,
@@ -410,6 +411,9 @@ async function run() {
             screenErrors.push(
                 `Uncaught JS exception(s): ${JSON.stringify(currentExceptions)}`,
             );
+        }
+        if (metrics.nestedButtons > 0) {
+            screenErrors.push(`Buttons nested inside buttons: ${metrics.nestedButtons}`);
         }
         if (metrics.docOverflow > 4) {
             screenErrors.push(
@@ -939,6 +943,44 @@ async function run() {
             throw new Error('Stay Filters did not close.');
         }
         return 'Opened the rendered filter dialog and dismissed it with its close button';
+    });
+
+    await verifyCheck(uiInteractionResults, 'WEB UI', 'Explore wishlist and property actions work independently', async () => {
+        await evalJs(cdp, `(async () => {
+            async function waitFor(predicate, message) {
+                for (let attempt = 0; attempt < 50; attempt++) {
+                    const result = predicate();
+                    if (result) return result;
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                throw new Error(message);
+            }
+            const card = await waitFor(
+                () => document.querySelector('[data-testid^="property-card-"]'),
+                'No Explore property card was rendered',
+            );
+            const heart = card.parentElement.querySelector('button[aria-label$="wishlist"]');
+            if (!heart || heart.parentElement !== card.parentElement) {
+                throw new Error('The property and wishlist actions must be sibling buttons');
+            }
+            const explorePath = location.pathname;
+            const propertyName = card.getAttribute('aria-label').replace('View property ', '');
+            const previousLabel = heart.getAttribute('aria-label');
+            heart.scrollIntoView({ block: 'center' });
+            const bounds = heart.getBoundingClientRect();
+            const target = document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+            if (!heart.contains(target)) throw new Error('Wishlist button is covered by the card');
+            heart.click();
+            await waitFor(() => heart.getAttribute('aria-label') !== previousLabel, 'Wishlist action did not toggle');
+            if (location.pathname !== explorePath) throw new Error('Wishlist action navigated away from Explore');
+
+            card.click();
+            await waitFor(
+                () => location.pathname !== explorePath && document.querySelector('[data-testid="property-book-stay-btn"]') && document.body.innerText.includes(propertyName),
+                'Property action did not open the selected property',
+            );
+        })()`);
+        return 'Toggled the wishlist from Explore, then opened the same property using its card';
     });
 
     console.log('\nExecuting direct API integration checks against the isolated test database...');

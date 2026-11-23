@@ -122,16 +122,16 @@ export default function PartnerReservationsScreen() {
             formatPartnerBookingAmounts(item);
         const photoUrl = item.property?.cover_image_url;
         const nights = item.total_stay_days ?? item.duration_quantity ?? 1;
+        const openBooking = () => router.push(`/(partner)/reservations/${reference}` as any);
 
         return (
-            <TouchableOpacity
-                style={styles.card}
-                activeOpacity={0.88}
-                onPress={() =>
-                    router.push(`/(partner)/reservations/${reference}` as any)
-                }
-            >
-                <View style={styles.cardRow}>
+            <View style={styles.card}>
+                <TouchableOpacity
+                    style={styles.cardRow}
+                    activeOpacity={0.88}
+                    accessibilityRole="button"
+                    onPress={openBooking}
+                >
                     {photoUrl ? (
                         <Image
                             source={{ uri: photoUrl }}
@@ -180,16 +180,13 @@ export default function PartnerReservationsScreen() {
                             Estimated partner payout: {estimatedPayout}
                         </Text>
                     </View>
-                </View>
+                </TouchableOpacity>
 
                 <View style={styles.cardActionRow}>
                     <TouchableOpacity
                         style={styles.actionBtnOutline}
-                        onPress={() =>
-                            router.push(
-                                `/(partner)/reservations/${reference}` as any,
-                            )
-                        }
+                        accessibilityRole="button"
+                        onPress={openBooking}
                     >
                         <Text style={styles.actionBtnOutlineText}>
                             View Details
@@ -198,11 +195,8 @@ export default function PartnerReservationsScreen() {
 
                     <TouchableOpacity
                         style={[styles.actionBtnOutline, styles.manageBtn]}
-                        onPress={() =>
-                            router.push(
-                                `/(partner)/reservations/${reference}` as any,
-                            )
-                        }
+                        accessibilityRole="button"
+                        onPress={openBooking}
                     >
                         <Text
                             style={[
@@ -214,7 +208,7 @@ export default function PartnerReservationsScreen() {
                         </Text>
                     </TouchableOpacity>
                 </View>
-            </TouchableOpacity>
+            </View>
         );
     };
 
