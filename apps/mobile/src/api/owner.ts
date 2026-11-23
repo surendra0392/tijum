@@ -244,12 +244,12 @@ export const OwnerApi = {
             breakfast_included?: boolean;
             lunch_included?: boolean;
             dinner_included?: boolean;
-            room_types: Array<{
+            room_types: {
                 id: number;
                 daily_rate_minor?: number | null;
                 weekly_rate_minor?: number | null;
                 monthly_rate_minor?: number | null;
-            }>;
+            }[];
         },
     ) =>
         ApiClient.put<ApiResponse<PropertyPricingData>>(

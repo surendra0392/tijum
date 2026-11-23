@@ -4,6 +4,8 @@ node_modules/
 .env.local
 .env.*.local
 !.env.example
+.maestro/.env.local
+.maestro/*.local
 .expo/
 dist/
 npm-debug.*

@@ -1,0 +1,686 @@
+{
+  "generatedAt": "2026-11-23T00:37:55.067Z",
+  "viewport": "390x844 @2x mobile",
+  "totalScreens": 27,
+  "passedScreens": 27,
+  "failedScreens": 0,
+  "totalMutations": 7,
+  "passedMutations": 7,
+  "failedMutations": 0,
+  "screens": [
+    {
+      "name": "Onboarding Welcome Screen",
+      "file": "01-onboarding.png",
+      "route": "/",
+      "role": "guest",
+      "passed": true,
+      "viewportHeight": 844,
+      "bytes": 835405,
+      "metrics": {
+        "textLength": 117,
+        "docOverflow": 0,
+        "maxScrollHeight": 844,
+        "totalImgs": 1,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-SemiBold",
+          "Montserrat-Bold",
+          "Montserrat-ExtraBold",
+          "Nunito-Regular",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "TIJUM Skip Comfortable Stays Hostels, PGs, Homestays & Co-living spaces Next → Have an account? Sign In Host Portal →"
+    },
+    {
+      "name": "Customer Login Screen",
+      "file": "02-customer-login.png",
+      "route": "/(auth)/customer-login",
+      "role": "guest",
+      "passed": true,
+      "viewportHeight": 844,
+      "bytes": 115961,
+      "metrics": {
+        "textLength": 346,
+        "docOverflow": 0,
+        "maxScrollHeight": 844,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-SemiBold",
+          "Montserrat-Bold",
+          "Montserrat-ExtraBold",
+          "Nunito-Regular",
+          "Nunito-SemiBold",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Customer Sign In TIJUM Stay easy. Eat well. Spend less. Welcome Back! Sign in to continue your stay search Customer Partner Portal Sign in to manage your reservations with transparent meal disclosures, payments, and verified reviews. Email Address or Mobile Pa"
+    },
+    {
+      "name": "Customer Register Screen",
+      "file": "03-customer-register.png",
+      "route": "/(auth)/customer-register",
+      "role": "guest",
+      "passed": true,
+      "viewportHeight": 844,
+      "bytes": 121762,
+      "metrics": {
+        "textLength": 331,
+        "docOverflow": 0,
+        "maxScrollHeight": 844,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-Bold",
+          "Nunito-Regular",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Create Customer Account Join TIJUM Create your customer account to book verified stays with clear food and meal details. Full Name Email Address Mobile Phone (Required) Password (min 8 characters) Referral Code (Optional) I accept the Terms & Conditions and Pr"
+    },
+    {
+      "name": "Partner Login Screen",
+      "file": "04-owner-login.png",
+      "route": "/(auth)/owner-login",
+      "role": "guest",
+      "passed": true,
+      "viewportHeight": 844,
+      "bytes": 109195,
+      "metrics": {
+        "textLength": 345,
+        "docOverflow": 0,
+        "maxScrollHeight": 844,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-SemiBold",
+          "Montserrat-Bold",
+          "Montserrat-ExtraBold",
+          "Nunito-Regular",
+          "Nunito-SemiBold",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Partner Sign In TIJUM Stay easy. Eat well. Spend less. Customer Partner Portal ACCOMMODATION PARTNER Welcome Back, Partner Sign in to manage your properties, bookings, guests and payouts. Partner Email or Mobile Phone Password Forgot Password? Sign In as Partn"
+    },
+    {
+      "name": "Partner Onboarding Register Screen (Real Cities Loaded)",
+      "file": "05-owner-register.png",
+      "route": "/(auth)/owner-register",
+      "role": "guest",
+      "passed": true,
+      "viewportHeight": 1599,
+      "bytes": 252974,
+      "metrics": {
+        "textLength": 738,
+        "docOverflow": 0,
+        "maxScrollHeight": 1575,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-Bold",
+          "Nunito-Regular",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Partner Registration PARTNER ONBOARDING List Your Property Join TIJUM to reach verified tenants with seamless monthly billing, meal disclosures, and guaranteed payouts. 1. PARTNER ACCOUNT DETAILS Partner / Owner Full Name Email Address Mobile Phone (Mandatory)"
+    },
+    {
+      "name": "Explore Verified Stays (Populated with Real Seeded Properties)",
+      "file": "06-explore-stays.png",
+      "route": "/(customer)/explore",
+      "role": "customer",
+      "passed": true,
+      "viewportHeight": 1900,
+      "bytes": 1521099,
+      "metrics": {
+        "textLength": 1927,
+        "docOverflow": 0,
+        "maxScrollHeight": 5244,
+        "totalImgs": 15,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-SemiBold",
+          "Montserrat-Bold",
+          "Montserrat-ExtraBold",
+          "Nunito-Regular",
+          "Nunito-SemiBold",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "All Cities TIJUM Stay easy. Eat well. Spend less. All Stays Hostels/PG Homestays Co-Living Filters All Cities Hyderabad Guntur Vijayawada Visakhapatnam AC Only All Genders Men Only Women Only Stay Categories See All > Hostels/PG Homestays Co-Living ACCOMMODATI"
+    },
+    {
+      "name": "Property Details (Rooms, Pricing, Meals & Reviews)",
+      "file": "07-property-details.png",
+      "route": "/(customer)/explore/property/sri-sai-balaji-executive-hostel-pg-tjp-2026-001001",
+      "role": "customer",
+      "passed": true,
+      "viewportHeight": 2228,
+      "bytes": 891927,
+      "metrics": {
+        "textLength": 1463,
+        "docOverflow": 0,
+        "maxScrollHeight": 2204,
+        "totalImgs": 1,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-SemiBold",
+          "Montserrat-Bold",
+          "Nunito-Regular",
+          "Nunito-SemiBold",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Sri Sai Balaji Executive Hostel & PG Madhapur 5 Photos Hostels/PG Hyderabad Sri Sai Balaji Executive Hostel & PG Plot 42, Hitech City Main Road, Near Ayyappa Society, Hyderabad Open Exact Pin in Google Maps Hostels/PG Explore hostel and paying guest accommodat"
+    },
+    {
+      "name": "Booking Creation with Authoritative Server Quote",
+      "file": "08-booking-create.png",
+      "route": "/(customer)/bookings/create?property_id=1&property_slug=sri-sai-balaji-executive-hostel-pg-tjp-2026-001001&property_room_type_id=1",
+      "role": "customer",
+      "passed": true,
+      "viewportHeight": 1772,
+      "bytes": 300816,
+      "metrics": {
+        "textLength": 952,
+        "docOverflow": 0,
+        "maxScrollHeight": 1748,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-SemiBold",
+          "Montserrat-Bold",
+          "Nunito-Regular",
+          "Nunito-SemiBold",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Confirm Booking Sri Sai Balaji Executive Hostel & PG Plot 42, Hitech City Main Road, Near Ayyappa Society, Hyderabad Standard Stay Timing Policy Check-in starts at 09:00 AM • Checkout by 08:00 AM 1. Select Room Category Choose your preferred room type. No bed "
+    },
+    {
+      "name": "Customer Bookings List (Authenticated Populated Stays)",
+      "file": "09-customer-bookings.png",
+      "route": "/(customer)/bookings",
+      "role": "customer",
+      "passed": true,
+      "viewportHeight": 844,
+      "bytes": 318638,
+      "metrics": {
+        "textLength": 538,
+        "docOverflow": 0,
+        "maxScrollHeight": 844,
+        "totalImgs": 3,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "My Bookings Manage your upcoming stays & reservations Upcoming Action Past Cancelled Confirmed Sri Sai Balaji Executive Hostel & PG 2026-11-23 - 2026-11-27 (4 Nights) Booking ID: TJR-2026-TODAY-QA02 Total: ₹3,400 View Details Confirmed Hitec CyberNest Co-Livin"
+    },
+    {
+      "name": "Customer Booking Detail — Active Payment Hold Countdown",
+      "file": "10-booking-detail-hold.png",
+      "route": "/(customer)/bookings/TJR-2026-HOLD-QA01",
+      "role": "customer",
+      "passed": true,
+      "viewportHeight": 1379,
+      "bytes": 277001,
+      "metrics": {
+        "textLength": 926,
+        "docOverflow": 0,
+        "maxScrollHeight": 1355,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-SemiBold",
+          "Montserrat-Bold",
+          "Nunito-Regular",
+          "Nunito-SemiBold",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Reservation Details Action Required: Pay to Confirm Your room inventory is reserved on hold. Complete payment before the window expires: 14:12 TJR-2026-HOLD-QA01 Awaiting Payment Sri Sai Balaji Executive Hostel & PG Room Category: Executive Single Room 9:00 AM"
+    },
+    {
+      "name": "Customer Support & Protection Cases (Authenticated)",
+      "file": "11-customer-support.png",
+      "route": "/(customer)/support",
+      "role": "customer",
+      "passed": true,
+      "viewportHeight": 1017,
+      "bytes": 143949,
+      "metrics": {
+        "textLength": 468,
+        "docOverflow": 0,
+        "maxScrollHeight": 993,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Support & Protection Your safety, comfort, and satisfaction guaranteed General Helpdesk Tickets We're here to help! Raise a support request or track your existing case. Raise a Request My Cases Your Cases Open Latest > CASE-2026-QA001 under review Booking Prob"
+    },
+    {
+      "name": "Customer Profile (Authenticated Rahul Sharma)",
+      "file": "12-customer-profile.png",
+      "route": "/(customer)/profile",
+      "role": "customer",
+      "passed": true,
+      "viewportHeight": 1254,
+      "bytes": 139512,
+      "metrics": {
+        "textLength": 377,
+        "docOverflow": 0,
+        "maxScrollHeight": 1230,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-Bold",
+          "Nunito-Regular",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "My Profile R Rahul Sharma customer@tijum.com +919876543210 Email Verified Edit Profile Change Password My Bookings Rewards & Referrals My Wishlist 2 My Reviews Support & Protection Notification Settings Help Centre Terms & Conditions Privacy Policy About TIJUM"
+    },
+    {
+      "name": "Customer Rewards & Points Wallet (Authenticated)",
+      "file": "13-customer-rewards.png",
+      "route": "/(customer)/rewards",
+      "role": "customer",
+      "passed": true,
+      "viewportHeight": 924,
+      "bytes": 165787,
+      "metrics": {
+        "textLength": 791,
+        "docOverflow": 0,
+        "maxScrollHeight": 900,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-Bold",
+          "Nunito-SemiBold",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Rewards & Points TIJUM LOYALTY CLUB 1 pt = ₹1 Available Balance 750 pts Approx. value: ₹750.00 off next stay Pending Points 0 pts Total Earned 1250 pts Rewards & Offers Points Wallet & Ledger Track available, pending, and redeemed points with full audit histor"
+    },
+    {
+      "name": "Customer Wishlist (Authenticated Saved Stays)",
+      "file": "14-customer-wishlist.png",
+      "route": "/(customer)/wishlist",
+      "role": "customer",
+      "passed": true,
+      "viewportHeight": 844,
+      "bytes": 276767,
+      "metrics": {
+        "textLength": 131,
+        "docOverflow": 0,
+        "maxScrollHeight": 844,
+        "totalImgs": 2,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-Bold",
+          "Nunito-Regular",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Saved Stays Sri Sai Balaji Executive Hostel & PG 4.8 (32) ₹7,500 / month Kailasagiri Sea Breeze Homestay 4.9 (42) ₹26,000 / month"
+    },
+    {
+      "name": "Partner Dashboard (Authenticated Kalyan Chakravarthy)",
+      "file": "15-partner-dashboard.png",
+      "route": "/(partner)/dashboard",
+      "role": "owner",
+      "passed": true,
+      "viewportHeight": 1571,
+      "bytes": 252370,
+      "metrics": {
+        "textLength": 855,
+        "docOverflow": 0,
+        "maxScrollHeight": 1547,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-Bold",
+          "Nunito-Regular",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Hello, Kalyan Chakravarthy Here's your business overview Confirmed Stays 2 ₹ Monthly Earnings ₹12,861 Today's Operations 1 Arrivals Today 0 Departures Today 0 In-House Guests 2 Active Stays 1 Reviews to Reply 1 Open Cases Property Inventory 7 properties 7 veri"
+    },
+    {
+      "name": "Partner Properties List (Authenticated Listings & Tools)",
+      "file": "16-partner-properties.png",
+      "route": "/(partner)/properties",
+      "role": "owner",
+      "passed": true,
+      "viewportHeight": 2200,
+      "bytes": 1667663,
+      "metrics": {
+        "textLength": 3236,
+        "docOverflow": 0,
+        "maxScrollHeight": 4652,
+        "totalImgs": 7,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-SemiBold",
+          "Montserrat-Bold",
+          "Nunito-Regular",
+          "Nunito-SemiBold",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "My Properties 7 active stays All 7 Hostels/PG 4 Homestays 2 Co-Living 1 Hostels/PG active Beachway Executive PG for Men Near Dutt Island, Siripuram Junction, Visakhapatnam 9:00 AM Check-In • 8:00 AM Checkout Meals Provided: Breakfast • Lunch • Dinner Configure"
+    },
+    {
+      "name": "Partner Reservations List (Authenticated Guest Bookings)",
+      "file": "17-partner-reservations.png",
+      "route": "/(partner)/reservations",
+      "role": "owner",
+      "passed": true,
+      "viewportHeight": 844,
+      "bytes": 224434,
+      "metrics": {
+        "textLength": 342,
+        "docOverflow": 0,
+        "maxScrollHeight": 844,
+        "totalImgs": 2,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-Bold",
+          "Nunito-Regular",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Bookings Manage guest reservations and check-ins Upcoming Past Cancelled Confirmed Sri Sai Balaji Executive Hostel & PG 2026-11-23 - 2026-11-27 (4 Nights) ₹2,915.16 View Details Manage Booking Confirmed Sri Sai Balaji Executive Hostel & PG 2026-11-28 - 2026-12"
+    },
+    {
+      "name": "Partner Reservation Detail & Front-Desk Check-In Panel",
+      "file": "18-partner-reservation-detail.png",
+      "route": "/(partner)/reservations/TJR-2026-TODAY-QA02",
+      "role": "owner",
+      "passed": true,
+      "viewportHeight": 1373,
+      "bytes": 301982,
+      "metrics": {
+        "textLength": 951,
+        "docOverflow": 0,
+        "maxScrollHeight": 1349,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-SemiBold",
+          "Montserrat-Bold",
+          "Nunito-Regular",
+          "Nunito-SemiBold",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Booking Review TJR-2026-TODAY-QA02 TJR-2026-TODAY-QA02 Confirmed Guest: Rahul Sharma Sri Sai Balaji Executive Hostel & PG 9:00 AM Check-In • 8:00 AM Checkout Stay Specifications Room Category: Executive Single Room Rooms Requested: 1 Room(s) Guest Profile: Mal"
+    },
+    {
+      "name": "Partner Financial Profile & KYC (Verified PAN/GSTIN/IFSC)",
+      "file": "19-partner-financial-profile.png",
+      "route": "/(partner)/financial-profile",
+      "role": "owner",
+      "passed": true,
+      "viewportHeight": 844,
+      "bytes": 133274,
+      "metrics": {
+        "textLength": 605,
+        "docOverflow": 0,
+        "maxScrollHeight": 844,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-Bold",
+          "Nunito-SemiBold",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Financial Profile Banking, Tax & Settlement KYC Payout Eligibility ACTIVE Your banking and tax profile is verified. Automatic settlement transfers are active. Business & Tax Entity Legal Entity Name Sri Sai Balaji Hospitality Private Limited Constitution Priva"
+    },
+    {
+      "name": "Partner Settlements List (Settled & Approved Cycles)",
+      "file": "20-partner-settlements.png",
+      "route": "/(partner)/settlements",
+      "role": "owner",
+      "passed": true,
+      "viewportHeight": 844,
+      "bytes": 68272,
+      "metrics": {
+        "textLength": 205,
+        "docOverflow": 0,
+        "maxScrollHeight": 844,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-Bold",
+          "Nunito-Regular",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Settlement Overview Total Settled ₹12,861 Pending Payouts ₹2,915.16 Settlement History All Settled Pending 23 Nov 2026 Ref: STL-2026-QA002 ₹2,915.16 approved 13 Nov 2026 Ref: STL-2026-QA001 ₹12,861 settled"
+    },
+    {
+      "name": "Partner Settlement Statement Detail Breakdown",
+      "file": "21-partner-settlement-detail.png",
+      "route": "/(partner)/settlements/STL-2026-QA001",
+      "role": "owner",
+      "passed": true,
+      "viewportHeight": 844,
+      "bytes": 124559,
+      "metrics": {
+        "textLength": 509,
+        "docOverflow": 0,
+        "maxScrollHeight": 844,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-Bold",
+          "Nunito-SemiBold",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Settlement Statement STL-2026-QA001 Settled Period: 2026-10-24 to 2026-11-08 NET SETTLEMENT PAYOUT ₹12,861.00 Transfer ID / UTR: trf_qa_settled_001 (processed) Payout Computation Gross Booking Value ₹15,000.00 TIJUM Platform Commission - ₹1,800.00 GST on Commi"
+    },
+    {
+      "name": "Public Help & FAQs Screen (API-Loaded FAQs)",
+      "file": "22-help-faq.png",
+      "route": "/help",
+      "role": "guest",
+      "passed": true,
+      "viewportHeight": 1576,
+      "bytes": 215330,
+      "metrics": {
+        "textLength": 676,
+        "docOverflow": 0,
+        "maxScrollHeight": 1552,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-Bold",
+          "Nunito-Regular",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Help Centre How can we help? Browse common questions or reach our support desk directly. CALL US +91 81423 34033 EMAIL support@tijum.com Frequently Asked Questions Is food guaranteed in every accommodation on TIJUM? What accommodation categories are available "
+    },
+    {
+      "name": "Legal Terms of Service Screen",
+      "file": "23-legal-terms.png",
+      "route": "/legal/terms",
+      "role": "guest",
+      "passed": true,
+      "viewportHeight": 1900,
+      "bytes": 430327,
+      "metrics": {
+        "textLength": 4002,
+        "docOverflow": 0,
+        "maxScrollHeight": 2659,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-Bold",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Terms & Conditions LEGAL & USER AGREEMENT Terms & Conditions Marketplace terms, booking conditions, meal disclosures, and mutual responsibilities for guests and partners on TIJUM. 1. Acceptance of Terms & Eligibility By registering an account, searching stays,"
+    },
+    {
+      "name": "Legitimate Empty State — Customer with Zero Bookings",
+      "file": "states/state-empty-customer-bookings.png",
+      "route": "/(customer)/bookings",
+      "role": "customer",
+      "passed": true,
+      "viewportHeight": 844,
+      "bytes": 58847,
+      "metrics": {
+        "textLength": 192,
+        "docOverflow": 0,
+        "maxScrollHeight": 844,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "My Bookings Manage your upcoming stays & reservations Upcoming Action Past Cancelled No upcoming bookings Browse properties and book your next stay! Explore Stays Home Bookings Support Profile"
+    },
+    {
+      "name": "Legitimate Empty State — Partner with Zero Properties",
+      "file": "states/state-empty-partner-properties.png",
+      "route": "/(partner)/properties",
+      "role": "owner",
+      "passed": true,
+      "viewportHeight": 844,
+      "bytes": 77109,
+      "metrics": {
+        "textLength": 239,
+        "docOverflow": 0,
+        "maxScrollHeight": 844,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-Bold",
+          "Nunito-SemiBold",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "My Properties 0 active stays All 0 Hostels/PG 0 Homestays 0 Co-Living 0 No properties listed Create your first property draft to configure rooms, pricing, and submit for TIJUM verification. Add New Property Home Properties Bookings Profile"
+    },
+    {
+      "name": "Legitimate Auth Gate — Guest Visiting Partner Dashboard",
+      "file": "states/state-auth-gate-partner-dashboard.png",
+      "route": "/(partner)/dashboard",
+      "role": "guest",
+      "passed": true,
+      "viewportHeight": 844,
+      "bytes": 61701,
+      "metrics": {
+        "textLength": 195,
+        "docOverflow": 0,
+        "maxScrollHeight": 844,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-Bold",
+          "Nunito-Regular",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "Partner Portal Partner Access Required Please sign in to your verified partner portal to manage properties, view occupancy, and track earnings. Sign In as Partner Home Properties Bookings Profile"
+    },
+    {
+      "name": "Legitimate Error State — Explore Screen When API Returns HTTP 503",
+      "file": "states/state-error-explore-api-down.png",
+      "route": "/(customer)/explore",
+      "role": "guest",
+      "passed": true,
+      "viewportHeight": 844,
+      "bytes": 107479,
+      "metrics": {
+        "textLength": 272,
+        "docOverflow": 0,
+        "maxScrollHeight": 844,
+        "totalImgs": 0,
+        "brokenImgs": [],
+        "loadedFonts": [
+          "Montserrat-SemiBold",
+          "Montserrat-Bold",
+          "Montserrat-ExtraBold",
+          "Nunito-Regular",
+          "Nunito-Bold"
+        ]
+      },
+      "errors": [],
+      "textPreview": "All Cities TIJUM Stay easy. Eat well. Spend less. All Stays Hostels/PG Homestays Co-Living Filters All Cities AC Only All Genders Men Only Women Only Unable to Load Stays Service temporarily unavailable (simulated QA 503 outage). Tap to Retry Home Bookings Sup"
+    }
+  ],
+  "mutations": [
+    {
+      "name": "Customer UI Login Form establishes live Sanctum session",
+      "passed": true,
+      "detail": "UI form authenticated customer (customer, token len=50)"
+    },
+    {
+      "name": "Customer Booking Hold, Payment Dismissal Safety & Cancellation",
+      "passed": true,
+      "detail": "Created hold TJR-2026-01M82XD078JBVDBDMG5ACCYFS8 (awaiting_payment), verified status endpoint, cancelled & confirmed backend status=cancelled"
+    },
+    {
+      "name": "Customer Protection Case Creation & Backend Persistence",
+      "passed": true,
+      "detail": "Submitted case TPC-2026-01M82XD0W8T8A8ERHPMECXG1KV & verified persistence via GET /customer/cases"
+    },
+    {
+      "name": "Partner Property Draft Creation & Backend Persistence",
+      "passed": true,
+      "detail": "Created property draft #27 (QA Verified Residency 4427) & verified persistence"
+    },
+    {
+      "name": "Partner Physical Room Inventory Addition & Persistence",
+      "passed": true,
+      "detail": "Added physical room QA-592 to property #1 & verified persistence"
+    },
+    {
+      "name": "Partner Front-Desk Check-In and Check-Out Lifecycle",
+      "passed": true,
+      "detail": "Checked in & checked out TJR-2026-TODAY-QA02 with persisted timestamps"
+    },
+    {
+      "name": "Partner Financial KYC Submission & Backend Persistence",
+      "passed": true,
+      "detail": "Submitted KYC update & verified PAN=ABCDE1234F, IFSC=HDFC0001234 in backend"
+    }
+  ]
+}

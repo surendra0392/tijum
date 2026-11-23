@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
@@ -13,6 +13,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
+import {
+    AlertTriangle,
+    Clock,
+    HelpCircle,
+    MessageSquare,
+    Search,
+    X,
+} from 'lucide-react-native';
 import { OwnerApi } from '../../../src/api/owner';
 import { OwnerCase } from '../../../src/api/types';
 import { AppHeader } from '../../../src/components/AppHeader';
@@ -25,14 +33,6 @@ import { Typography } from '../../../src/theme/typography';
 
 const STATUTORY_ACKNOWLEDGEMENT_COPY =
     'Statutory formal acknowledgement within 48h; formal resolution tracking up to 30 days.';
-import {
-    AlertTriangle,
-    Clock,
-    HelpCircle,
-    MessageSquare,
-    Search,
-    X,
-} from 'lucide-react-native';
 
 const STATUS_TABS = [
     { key: 'all', label: 'All Cases' },
@@ -51,38 +51,55 @@ export default function PartnerCasesScreen() {
     const [cases, setCases] = useState<OwnerCase[]>([]);
     const [selectedTab, setSelectedTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const searchQueryRef = useRef(searchQuery);
+    searchQueryRef.current = searchQuery;
+    const loadSeqRef = useRef(0);
 
-    const fetchCases = async (overrideSearch?: string) => {
-        try {
-            setLoadError(null);
-            const params: { status?: string; search?: string } = {};
-            if (selectedTab !== 'all') {
-                params.status = selectedTab;
-            }
-            const activeSearch =
-                overrideSearch !== undefined ? overrideSearch : searchQuery;
-            if (activeSearch.trim()) {
-                params.search = activeSearch.trim();
-            }
+    const fetchCases = useCallback(
+        async (overrideSearch?: string) => {
+            const reqId = ++loadSeqRef.current;
+            try {
+                setLoadError(null);
+                const params: { status?: string; search?: string } = {};
+                if (selectedTab !== 'all') {
+                    params.status = selectedTab;
+                }
+                const activeSearch =
+                    overrideSearch !== undefined
+                        ? overrideSearch
+                        : searchQueryRef.current;
+                if (activeSearch.trim()) {
+                    params.search = activeSearch.trim();
+                }
 
-            const res = await OwnerApi.getCases(params);
-            setCases(Array.isArray(res.data) ? res.data : []);
-        } catch (error: any) {
-            setLoadError(
-                error?.message || 'Failed to load support cases.',
-            );
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    };
+                const res = await OwnerApi.getCases(params);
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
+                setCases(Array.isArray(res.data) ? res.data : []);
+            } catch (error: any) {
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
+                setLoadError(
+                    error?.message || 'Failed to load support cases.',
+                );
+            } finally {
+                if (reqId === loadSeqRef.current) {
+                    setLoading(false);
+                    setRefreshing(false);
+                }
+            }
+        },
+        [selectedTab],
+    );
 
     useEffect(() => {
         if (isFocused) {
             setLoading(true);
             void fetchCases();
         }
-    }, [selectedTab, isFocused]);
+    }, [isFocused, fetchCases]);
 
     const onRefresh = () => {
         setRefreshing(true);

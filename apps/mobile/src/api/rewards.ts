@@ -13,7 +13,7 @@ export interface RewardsOverviewResponse {
     wallet: PointsWallet;
     referral_profile: ReferralProfile;
     active_coupons_count: number;
-    expiring_soon_points?: Array<{ points: number; expires_at: string }>;
+    expiring_soon_points?: { points: number; expires_at: string }[];
     recent_transactions: PointsLedgerItem[];
 }
 

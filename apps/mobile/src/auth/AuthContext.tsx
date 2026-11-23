@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useRef,
+    useState,
+} from 'react';
 import { ApiClient, setUnauthorizedHandler } from '../api/client';
 import { ApiResponse, CustomerProfile, OwnerProfile } from '../api/types';
 import {
@@ -106,21 +113,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const clearAuthNotice = () => setAuthNotice(null);
 
-    useEffect(() => {
-        void restoreAndVerifySession();
-    }, []);
-
-    useEffect(() => {
-        setUnauthorizedHandler(() => {
-            setToken(null);
-            setPrincipalType(null);
-            setCustomerUser(null);
-            setPartnerUser(null);
-            setSessionEpoch((prev) => prev + 1);
-            setAuthState('session_expired');
-        });
-
-        return () => setUnauthorizedHandler(null);
+    /**
+     * Reconcile all pending server-side revocations queued during offline logouts.
+     */
+    const reconcilePendingRevocations = useCallback(async () => {
+        try {
+            await reconcilePendingRevocationQueue((endpoint, options) =>
+                ApiClient.request(endpoint, {
+                    ...options,
+                    skipAuthInterceptor: true,
+                }),
+            );
+        } catch {
+            // Ignored
+        }
     }, []);
 
     /**
@@ -130,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
      * 3. Confirm the authenticated principal type.
      * 4. Restore state or safely purge credentials if revoked/expired.
      */
-    const restoreAndVerifySession = async () => {
+    const restoreAndVerifySession = useCallback(async () => {
         let currentSession: {
             token: string;
             principalType: PrincipalType;
@@ -225,23 +231,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [reconcilePendingRevocations]);
 
-    /**
-     * Reconcile all pending server-side revocations queued during offline logouts.
-     */
-    const reconcilePendingRevocations = async () => {
-        try {
-            await reconcilePendingRevocationQueue((endpoint, options) =>
-                ApiClient.request(endpoint, {
-                    ...options,
-                    skipAuthInterceptor: true,
-                }),
-            );
-        } catch {
-            // Ignored
-        }
-    };
+    useEffect(() => {
+        void restoreAndVerifySession();
+    }, [restoreAndVerifySession]);
+
+    useEffect(() => {
+        setUnauthorizedHandler(() => {
+            setToken(null);
+            setPrincipalType(null);
+            setCustomerUser(null);
+            setPartnerUser(null);
+            setSessionEpoch((prev) => prev + 1);
+            setAuthState('session_expired');
+        });
+
+        return () => setUnauthorizedHandler(null);
+    }, []);
 
     /**
      * Authenticate Customer: Establishes single Customer principal.

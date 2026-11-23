@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     RefreshControl,
@@ -36,24 +36,44 @@ export default function SettlementDetailScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [statement, setStatement] = useState<SettlementDetail | null>(null);
 
-    const fetchStatement = async () => {
-        if (!reference) return;
-        try {
-            const res = await OwnerApi.getSettlement(reference);
-            if (res.data) {
-                setStatement(res.data);
-            }
-        } catch {
-            setStatement(null);
-        } finally {
+    const loadSeqRef = useRef(0);
+
+    const fetchStatement = useCallback(async () => {
+        if (!reference) {
             setLoading(false);
             setRefreshing(false);
+            setStatement(null);
+            return;
         }
-    };
+        const reqId = ++loadSeqRef.current;
+        try {
+            const res = await OwnerApi.getSettlement(reference);
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
+            if (res.data) {
+                setStatement(res.data);
+            } else {
+                setStatement(null);
+            }
+        } catch {
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
+            setStatement(null);
+        } finally {
+            if (reqId === loadSeqRef.current) {
+                setLoading(false);
+                setRefreshing(false);
+            }
+        }
+    }, [reference]);
 
     useEffect(() => {
+        setLoading(true);
+        setStatement(null);
         void fetchStatement();
-    }, [reference]);
+    }, [fetchStatement]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -92,8 +112,10 @@ export default function SettlementDetailScreen() {
                                 variant={getStatusVariant(statement.status)}
                                 size="sm"
                             >
-                                {statement.status_label ||
-                                    statement.status.toUpperCase()}
+                                {statement.status === 'settled'
+                                    ? 'Settled'
+                                    : statement.status_label ||
+                                      statement.status.toUpperCase()}
                             </Badge>
                         ) : undefined
                     }

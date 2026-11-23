@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -37,38 +37,58 @@ export default function CustomerSupportTicketDetailScreen() {
     const [reply, setReply] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
-    const loadTicket = async (isRefresh = false) => {
-        if (!reference || !token || authState !== 'customer_authenticated') {
-            return;
-        }
+    const loadSeqRef = useRef(0);
 
-        try {
-            if (isRefresh) {
-                setRefreshing(true);
-            } else {
-                setLoading(true);
+    const loadTicket = useCallback(
+        async (isRefresh = false) => {
+            if (
+                !reference ||
+                !token ||
+                authState !== 'customer_authenticated'
+            ) {
+                setLoading(false);
+                setRefreshing(false);
+                return;
             }
-            setErrorMessage(null);
-            const response = await CustomerApi.getSupportTicket(reference);
-            setTicket(response.data.ticket);
-            setMessages(response.data.messages);
-        } catch (error: unknown) {
-            setErrorMessage(
-                error instanceof Error
-                    ? error.message
-                    : 'Unable to load this support ticket.',
-            );
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    };
+
+            const reqId = ++loadSeqRef.current;
+            try {
+                if (isRefresh) {
+                    setRefreshing(true);
+                } else {
+                    setLoading(true);
+                }
+                setErrorMessage(null);
+                const response = await CustomerApi.getSupportTicket(reference);
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
+                setTicket(response.data.ticket);
+                setMessages(response.data.messages);
+            } catch (error: unknown) {
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
+                setErrorMessage(
+                    error instanceof Error
+                        ? error.message
+                        : 'Unable to load this support ticket.',
+                );
+            } finally {
+                if (reqId === loadSeqRef.current) {
+                    setLoading(false);
+                    setRefreshing(false);
+                }
+            }
+        },
+        [authState, reference, token],
+    );
 
     useEffect(() => {
         setTicket(null);
         setMessages([]);
         void loadTicket();
-    }, [authState, reference, token]);
+    }, [loadTicket]);
 
     const sendReply = async () => {
         if (!reference || !reply.trim()) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -41,7 +41,7 @@ const PRIORITIES = [
 export default function CustomerSupportTicketsScreen() {
     const router = useRouter();
     const isFocused = useIsFocused();
-    const { token, authState } = useAuth();
+    const { token, authState, sessionEpoch } = useAuth();
     const [data, setData] = useState<SupportTicketIndexData | null>(null);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
@@ -55,38 +55,61 @@ export default function CustomerSupportTicketsScreen() {
         'low' | 'standard' | 'high' | 'urgent'
     >('standard');
     const [bookingReference, setBookingReference] = useState('');
+    const hasLoadedRef = useRef(false);
+    const loadSeqRef = useRef(0);
 
-    const loadTickets = async (isRefresh = false) => {
-        if (!token || authState !== 'customer_authenticated') {
-            return;
-        }
+    useEffect(() => {
+        setData(null);
+        setErrorMessage(null);
+        hasLoadedRef.current = false;
+    }, [sessionEpoch]);
 
-        try {
-            if (isRefresh) {
-                setRefreshing(true);
-            } else {
-                setLoading(true);
+    const loadTickets = useCallback(
+        async (isRefresh = false) => {
+            if (!token || authState !== 'customer_authenticated') {
+                setLoading(false);
+                setRefreshing(false);
+                return;
             }
-            setErrorMessage(null);
-            const response = await CustomerApi.getSupportTickets();
-            setData(response.data);
-        } catch (error: unknown) {
-            setErrorMessage(
-                error instanceof Error
-                    ? error.message
-                    : 'Unable to load helpdesk tickets.',
-            );
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    };
+
+            const reqId = ++loadSeqRef.current;
+            try {
+                if (isRefresh) {
+                    setRefreshing(true);
+                } else {
+                    setLoading(true);
+                }
+                setErrorMessage(null);
+                const response = await CustomerApi.getSupportTickets();
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
+                setData(response.data);
+                hasLoadedRef.current = response.data !== null;
+            } catch (error: unknown) {
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
+                setErrorMessage(
+                    error instanceof Error
+                        ? error.message
+                        : 'Unable to load helpdesk tickets.',
+                );
+            } finally {
+                if (reqId === loadSeqRef.current) {
+                    setLoading(false);
+                    setRefreshing(false);
+                }
+            }
+        },
+        [authState, token],
+    );
 
     useEffect(() => {
         if (isFocused) {
-            void loadTickets(data !== null);
+            void loadTickets(hasLoadedRef.current);
         }
-    }, [authState, isFocused, token]);
+    }, [isFocused, loadTickets, sessionEpoch]);
 
     const resetForm = () => {
         setSubject('');

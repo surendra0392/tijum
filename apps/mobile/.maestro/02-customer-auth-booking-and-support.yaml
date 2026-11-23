@@ -1,15 +1,39 @@
 appId: com.tijum.app
-name: "02 - Customer Authentication, Booking Hold, Cancellation & Support Workflow"
+name: "02 - Customer Auth, Booking Hold, Razorpay Cancel, Reservation Cancel & Support Submission"
 tags:
   - e2e
   - customer
   - booking
   - support
+  - mutating
+# Required runtime env vars (see apps/mobile/.maestro/env.example — NEVER hardcode passwords):
+#   MAESTRO_API_URL
+#   MAESTRO_CUSTOMER_EMAIL
+#   MAESTRO_CUSTOMER_PASSWORD
+#   MAESTRO_UPCOMING_BOOKING_REF
+#   MAESTRO_CASE_MARKER
 ---
 - launchApp:
-    clearState: false
+    clearState: true
 
-# 1. Customer Authentication Flow
+# Dismiss onboarding if shown
+- runFlow:
+    when:
+      visible:
+        id: "onboarding-skip-btn"
+    commands:
+      - tapOn:
+          id: "onboarding-skip-btn"
+
+- runFlow:
+    when:
+      visible:
+        id: "onboarding-skip-permission-btn"
+    commands:
+      - tapOn:
+          id: "onboarding-skip-permission-btn"
+
+# 1. Customer Authentication (credentials supplied via runtime test env)
 - openLink: "tijum://(auth)/customer-login"
 - assertVisible: "Welcome Back"
 - assertVisible:
@@ -19,90 +43,151 @@ tags:
 - assertVisible:
     id: "login-submit-button"
 
-# Verify toggle to registration
-- tapOn: "Create Customer Account"
+# Verify link to Customer Registration
+- tapOn:
+    id: "customer-register-link"
 - assertVisible:
     id: "register-submit-button"
 - assertVisible:
     id: "register-name-input"
 - back
 
-# Enter customer test credentials (isolated fixtures)
+# Sign in using isolated fixture credentials from environment
 - tapOn:
     id: "login-identifier-input"
-- inputText: "customer.test@tijum.internal"
+- inputText: "${MAESTRO_CUSTOMER_EMAIL}"
 - tapOn:
     id: "login-password-input"
-- inputText: "Secret123!"
+- inputText: "${MAESTRO_CUSTOMER_PASSWORD}"
+- hideKeyboard
 - tapOn:
     id: "login-submit-button"
 
-# 2. Search, Select Property & Booking Hold Creation
-- tapOn:
-    text: "Home"
+# Confirm authenticated session reached Explore
+- extendedWaitUntil:
+    visible:
+      id: "explore-search-input"
+    timeout: 15000
+
+# 2. Select Verified Property & Create Real Booking Hold
 - scrollUntilVisible:
     element:
       id: "property-card-.*"
     direction: DOWN
-    timeout: 10000
+    timeout: 12000
 - tapOn:
     id: "property-card-.*"
 
-# Open Booking Sheet
-- assertVisible:
-    id: "property-book-stay-btn"
+- extendedWaitUntil:
+    visible:
+      id: "property-book-stay-btn"
+    timeout: 10000
 - tapOn:
     id: "property-book-stay-btn"
 
-# Assert Booking Parameters & Authoritative Quote
+- extendedWaitUntil:
+    visible: "Estimated Summary"
+    timeout: 12000
 - assertVisible: "Confirm Booking"
-- assertVisible: "Estimated Summary"
+- assertVisible: "Total Payable"
+
 - scrollUntilVisible:
     element:
       id: "booking-submit-button"
     direction: DOWN
-    timeout: 8000
-
-# Submit reservation hold request
+    timeout: 10000
 - tapOn:
     id: "booking-submit-button"
 
-# Verify Hold Banner & Payment Action (Fail-Safe: dismiss without mutating live funds)
+# Handle intermediate confirmation modal if displayed
 - runFlow:
     when:
       visible: "Proceed to Payment"
     commands:
       - tapOn: "Proceed to Payment"
 
+# 3. Verify Hold State, Test-Mode Razorpay Entry & Safe Dismissal, then Cancel Hold
+- extendedWaitUntil:
+    visible:
+      id: "booking-pay-btn"
+    timeout: 15000
+- assertVisible: "Action Required: Pay to Confirm"
+- assertVisible:
+    id: "booking-cancel-btn"
+
+# Trigger Razorpay checkout (in test mode) and safely cancel/dismiss without mutating live funds
+- tapOn:
+    id: "booking-pay-btn"
 - runFlow:
     when:
-      visible:
-        id: "booking-pay-btn"
+      visible: "Payment Incomplete"
     commands:
-      - assertVisible: "Action Required: Pay to Confirm"
-      - assertVisible:
-          id: "booking-cancel-btn"
+      - tapOn: "OK"
+- runFlow:
+    when:
+      notVisible:
+        id: "booking-cancel-btn"
+    commands:
+      - back
+      - runFlow:
+          when:
+            visible: "Yes"
+          commands:
+            - tapOn: "Yes"
 
-# 3. Customer Protection & Support Ticket Workflow
+# Reservation MUST remain awaiting_payment after checkout dismissal — now execute real cancellation
+- extendedWaitUntil:
+    visible:
+      id: "booking-cancel-btn"
+    timeout: 10000
 - tapOn:
-    text: "Support"
+    id: "booking-cancel-btn"
+- assertVisible: "Are you sure you want to cancel this reservation? Cancellation policies will apply."
+- tapOn: "Cancel Reservation"
+
+- extendedWaitUntil:
+    visible: "Reservation Cancelled"
+    timeout: 12000
+- tapOn: "OK"
+- assertVisible: "Cancellation & Refund Tracking"
+
+# Assert backend database actually transitioned this reservation to status=cancelled
+- runScript: scripts/assert-booking-cancelled.js
+
+# 4. Customer Protection Case Submission (Real Mutation — NOT closing the modal)
+- openLink: "tijum://(customer)/support"
+- extendedWaitUntil:
+    visible:
+      id: "support-raise-request-btn"
+    timeout: 12000
 - assertVisible: "Official Support Helpline"
-- assertVisible:
-    id: "support-raise-request-btn"
+- assertVisible: "Customer Protection SLAs"
 
-# Open Support Modal & Submit Inquiry
 - tapOn:
     id: "support-raise-request-btn"
 - assertVisible:
     id: "support-booking-ref-input"
 - tapOn:
     id: "support-booking-ref-input"
-- inputText: "BK-TEST-AUDIT"
+- inputText: "${MAESTRO_UPCOMING_BOOKING_REF}"
 - tapOn:
     id: "support-description-input"
-- inputText: "Automated Maestro E2E test inquiry regarding check-in timings and meal inclusions."
+- inputText: "Automated Maestro E2E support verification [${MAESTRO_CASE_MARKER}] requesting meal timing confirmation."
+- hideKeyboard
 
-# Close / Submit
+# Actually submit the support protection request
+- scrollUntilVisible:
+    element:
+      id: "support-submit-btn"
+    direction: DOWN
+    timeout: 6000
 - tapOn:
-    id: "support-modal-close-btn"
-- assertVisible: "Customer Protection SLAs"
+    id: "support-submit-btn"
+
+- extendedWaitUntil:
+    visible: "Request Submitted"
+    timeout: 12000
+- tapOn: "OK"
+
+# Assert backend database actually persisted the submitted customer protection case
+- runScript: scripts/assert-case-created.js

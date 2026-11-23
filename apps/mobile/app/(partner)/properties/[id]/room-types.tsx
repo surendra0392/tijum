@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -64,28 +64,42 @@ export default function PropertyRoomTypesScreen() {
     const [earlyCheckInEnabled, setEarlyCheckInEnabled] = useState(false);
     const [description, setDescription] = useState('');
 
-    useEffect(() => {
-        if (propertyId) {
-            void loadRoomTypes();
-        }
-    }, [propertyId]);
+    const loadSeqRef = useRef(0);
 
-    const loadRoomTypes = async () => {
+    const loadRoomTypes = useCallback(async () => {
+        if (!propertyId) {
+            return;
+        }
+        const reqId = ++loadSeqRef.current;
         try {
             setLoading(true);
             const res = await OwnerApi.getRoomTypes(propertyId);
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
             if (res.data) {
                 setRoomTypes(res.data);
             }
         } catch (e: any) {
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
             Alert.alert(
                 'Failed to Load Room Categories',
                 e.message || 'Unable to retrieve room types.',
             );
         } finally {
-            setLoading(false);
+            if (reqId === loadSeqRef.current) {
+                setLoading(false);
+            }
         }
-    };
+    }, [propertyId]);
+
+    useEffect(() => {
+        if (propertyId) {
+            void loadRoomTypes();
+        }
+    }, [propertyId, loadRoomTypes]);
 
     const onRefresh = async () => {
         setRefreshing(true);

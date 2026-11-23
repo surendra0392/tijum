@@ -1,15 +1,43 @@
 appId: com.tijum.app
-name: "03 - Partner Authentication, Dashboard, Physical Rooms, Reservations & KYC"
+name: "03 - Partner Auth, Property Creation, Room Inventory, Front-Desk Check-In/Out & KYC Update"
 tags:
   - e2e
   - partner
   - operations
   - kyc
+  - mutating
+# Required runtime env vars (see apps/mobile/.maestro/env.example — NEVER hardcode passwords):
+#   MAESTRO_API_URL
+#   MAESTRO_PARTNER_EMAIL
+#   MAESTRO_PARTNER_PASSWORD
+#   MAESTRO_PROPERTY_ID
+#   MAESTRO_TODAY_BOOKING_REF
+#   MAESTRO_NEW_PROPERTY_NAME
+#   MAESTRO_NEW_ROOM_NUMBER
+#   MAESTRO_KYC_PAN
+#   MAESTRO_KYC_IFSC
 ---
 - launchApp:
-    clearState: false
+    clearState: true
 
-# 1. Partner Authentication & Onboarding Verification
+# Dismiss onboarding if shown
+- runFlow:
+    when:
+      visible:
+        id: "onboarding-skip-btn"
+    commands:
+      - tapOn:
+          id: "onboarding-skip-btn"
+
+- runFlow:
+    when:
+      visible:
+        id: "onboarding-skip-permission-btn"
+    commands:
+      - tapOn:
+          id: "onboarding-skip-permission-btn"
+
+# 1. Partner Authentication (credentials supplied via runtime test env)
 - openLink: "tijum://(auth)/owner-login"
 - assertVisible: "Welcome Back, Partner"
 - assertVisible:
@@ -19,70 +47,255 @@ tags:
 - assertVisible:
     id: "partner-login-submit-button"
 
-# Verify Partner Registration / Onboarding Link
+# Verify Partner Registration / Onboarding Link uses canonical categories
 - tapOn:
     id: "partner-register-link"
 - assertVisible: "List Your Property"
-- assertVisible: "PARTNER ONBOARDING"
+- assertVisible: "Hostels/PG"
+- assertVisible: "Homestays"
+- assertVisible: "Co-Living"
 - back
 
-# Enter Partner Test Credentials
+# Sign in using isolated partner fixture credentials
 - tapOn:
     id: "partner-login-identifier-input"
-- inputText: "partner.test@tijum.internal"
+- inputText: "${MAESTRO_PARTNER_EMAIL}"
 - tapOn:
     id: "partner-login-password-input"
-- inputText: "PartnerSecret123!"
+- inputText: "${MAESTRO_PARTNER_PASSWORD}"
+- hideKeyboard
 - tapOn:
     id: "partner-login-submit-button"
 
-# 2. Partner Dashboard Operations
-- assertVisible: "Here's your business overview"
-- assertVisible: "Arrivals Today"
+# Confirm Partner Dashboard loaded with real metrics
+- extendedWaitUntil:
+    visible: "Arrivals Today"
+    timeout: 15000
 
-# 3. Property Management & Physical Rooms Inspection
+# 2. Partner Property Draft Creation (Real 3-Step Mutation)
+- openLink: "tijum://(partner)/properties"
+- extendedWaitUntil:
+    visible:
+      id: "partner-add-property-btn"
+    timeout: 12000
 - tapOn:
-    text: "Properties"
-- assertVisible: "My Properties"
-- assertVisible:
     id: "partner-add-property-btn"
 
-# Inspect Physical Rooms modal
-- runFlow:
-    when:
-      visible:
-        id: "partner-inspect-rooms-btn"
-    commands:
-      - tapOn:
-          id: "partner-inspect-rooms-btn"
-      - assertVisible: "Physical Rooms"
-      - tapOn: "Close"
-
-# 4. Front-Desk Reservations & Check-In Verification
+# Step 1: Canonical category + basic overview + primary contact
+- extendedWaitUntil:
+    visible:
+      id: "partner-prop-name-input"
+    timeout: 12000
 - tapOn:
-    text: "Bookings"
-- assertVisible: "Upcoming"
-- assertVisible: "Past"
-- assertVisible: "Cancelled"
-
-# Tap Upcoming reservation if available
-- runFlow:
-    when:
-      visible: "View Details"
-    commands:
-      - tapOn: "View Details"
-      - assertVisible: "Stay Schedule"
-      - back
-
-# 5. Partner Account, KYC & Financial Profile
+    id: "partner-prop-name-input"
+- inputText: "${MAESTRO_NEW_PROPERTY_NAME}"
 - tapOn:
-    text: "Profile"
-- assertVisible: "Partner ID"
-- assertVisible: "Bank & Tax Information (KYC)"
-- assertVisible: "Commission Agreements"
+    id: "partner-prop-description-input"
+- inputText: "Automated Maestro E2E draft property verifying canonical category and partner listing persistence."
+- scrollUntilVisible:
+    element:
+      id: "partner-prop-contact-phone-input"
+    direction: DOWN
+    timeout: 8000
+- tapOn:
+    id: "partner-prop-contact-name-input"
+- inputText: "Kalyan Chakravarthy"
+- tapOn:
+    id: "partner-prop-contact-phone-input"
+- inputText: "9848099888"
+- hideKeyboard
+- tapOn:
+    id: "partner-prop-next-btn"
 
-# Inspect KYC & Banking Profile
-- tapOn: "Bank & Tax Information (KYC)"
+# Step 2: City & Address
+- extendedWaitUntil:
+    visible:
+      id: "partner-prop-city-hyderabad"
+    timeout: 10000
+- tapOn:
+    id: "partner-prop-city-hyderabad"
+- tapOn:
+    id: "partner-prop-locality-input"
+- inputText: "Madhapur"
+- tapOn:
+    id: "partner-prop-address1-input"
+- inputText: "Plot 99, QA Verification Road"
+- scrollUntilVisible:
+    element:
+      id: "partner-prop-pincode-input"
+    direction: DOWN
+    timeout: 8000
+- tapOn:
+    id: "partner-prop-pincode-input"
+- inputText: "500081"
+- hideKeyboard
+- tapOn:
+    id: "partner-prop-next-btn"
+
+# Step 3: Declaration & Submit
+- extendedWaitUntil:
+    visible:
+      id: "partner-prop-declaration-checkbox"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: "partner-prop-declaration-checkbox"
+    direction: DOWN
+    timeout: 8000
+- tapOn:
+    id: "partner-prop-declaration-checkbox"
+- tapOn:
+    id: "partner-prop-submit-btn"
+
+- extendedWaitUntil:
+    visible: "Draft Created"
+    timeout: 15000
+- tapOn: "OK"
+
+# Assert backend database actually persisted the new property draft
+- runScript: scripts/assert-property-created.js
+
+# 3. Partner Physical Room Inventory Mutation
+- openLink: "tijum://(partner)/properties/${MAESTRO_PROPERTY_ID}/rooms"
+- extendedWaitUntil:
+    visible:
+      id: "partner-room-add-btn"
+    timeout: 12000
+- tapOn:
+    id: "partner-room-add-btn"
+
+- extendedWaitUntil:
+    visible:
+      id: "partner-room-number-input"
+    timeout: 8000
+- tapOn:
+    id: "partner-room-number-input"
+- inputText: "${MAESTRO_NEW_ROOM_NUMBER}"
+- tapOn:
+    id: "partner-room-floor-input"
+- inputText: "4"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "partner-room-submit-btn"
+    direction: DOWN
+    timeout: 6000
+- tapOn:
+    id: "partner-room-submit-btn"
+
+- extendedWaitUntil:
+    visible: "Added"
+    timeout: 12000
+- tapOn: "OK"
+
+# Assert backend database persisted the new physical room
+- runScript: scripts/assert-room-added.js
+
+# 4. Partner Front-Desk Check-In & Check-Out Lifecycle (Real Mutations)
+- openLink: "tijum://(partner)/reservations/${MAESTRO_TODAY_BOOKING_REF}"
+- extendedWaitUntil:
+    visible: "Front-Desk Actions"
+    timeout: 12000
+
+- scrollUntilVisible:
+    element:
+      id: "partner-checkin-btn"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: "partner-checkin-notes-input"
+- inputText: "Maestro E2E verified guest ID and handed over keys"
+- hideKeyboard
+- tapOn:
+    id: "partner-checkin-btn"
+- assertVisible: "Confirm Guest Check-In"
+- tapOn: "Confirm Check-In"
+
+- extendedWaitUntil:
+    visible: "Guest Checked In"
+    timeout: 12000
+- tapOn: "OK"
+
+# Assert backend persisted checked_in_at timestamp
+- runScript:
+    file: scripts/assert-checkin-checkout.js
+    env:
+      ASSERT_CHECKOUT: "false"
+
+# Now perform guest Check-Out
+- scrollUntilVisible:
+    element:
+      id: "partner-checkout-btn"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: "partner-checkout-notes-input"
+- inputText: "Maestro E2E room inspected and keys collected"
+- hideKeyboard
+- tapOn:
+    id: "partner-checkout-btn"
+- assertVisible: "Confirm Guest Checkout"
+- tapOn: "Confirm Checkout"
+
+- extendedWaitUntil:
+    visible: "Guest Checked Out"
+    timeout: 12000
+- tapOn: "OK"
+
+# Assert backend persisted both checked_in_at and checked_out_at timestamps
+- runScript:
+    file: scripts/assert-checkin-checkout.js
+    env:
+      ASSERT_CHECKOUT: "true"
+
+# 5. Partner Financial Profile & KYC Submission (Real Mutation)
+- openLink: "tijum://(partner)/financial-profile"
+- extendedWaitUntil:
+    visible:
+      id: "partner-kyc-edit-btn"
+    timeout: 12000
 - assertVisible: "Financial Profile"
-- assertVisible: "Tax & Identity (KYC)"
-- back
+- tapOn:
+    id: "partner-kyc-edit-btn"
+
+- extendedWaitUntil:
+    visible:
+      id: "partner-kyc-pan-input"
+    timeout: 8000
+- tapOn:
+    id: "partner-kyc-pan-input"
+- eraseText: 15
+- inputText: "${MAESTRO_KYC_PAN}"
+- scrollUntilVisible:
+    element:
+      id: "partner-kyc-account-input"
+    direction: DOWN
+    timeout: 8000
+- tapOn:
+    id: "partner-kyc-account-input"
+- inputText: "${MAESTRO_KYC_ACCOUNT}"
+- scrollUntilVisible:
+    element:
+      id: "partner-kyc-ifsc-input"
+    direction: DOWN
+    timeout: 8000
+- tapOn:
+    id: "partner-kyc-ifsc-input"
+- eraseText: 15
+- inputText: "${MAESTRO_KYC_IFSC}"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "partner-kyc-save-btn"
+    direction: DOWN
+    timeout: 8000
+- tapOn:
+    id: "partner-kyc-save-btn"
+
+- extendedWaitUntil:
+    visible: "Success"
+    timeout: 12000
+- tapOn: "OK"
+
+# Assert backend database persisted the KYC financial profile update
+- runScript: scripts/assert-kyc-updated.js

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     Alert,
     FlatList,
@@ -39,28 +39,43 @@ export default function WishlistScreen() {
         authState === 'session_expired' ||
         authState === 'owner_authenticated';
 
+    const hasLoadedRef = useRef(false);
+    const loadSeqRef = useRef(0);
+
     useEffect(() => {
         setProperties([]);
+        hasLoadedRef.current = false;
     }, [sessionEpoch]);
 
     const loadWishlist = useCallback(
         async (options?: { silent?: boolean }) => {
             if (isGuest) return;
+            const reqId = ++loadSeqRef.current;
             try {
                 if (!options?.silent) {
                     setLoading(true);
                 }
                 setErrorMessage(null);
                 const res = await CustomerApi.getWishlist();
-                setProperties(res.data ?? []);
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
+                const list = res.data ?? [];
+                setProperties(list);
+                hasLoadedRef.current = list.length > 0;
             } catch (loadError: unknown) {
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
                 setErrorMessage(
                     loadError instanceof Error
                         ? loadError.message
                         : 'Unable to load your wishlist. Please try again.',
                 );
             } finally {
-                setLoading(false);
+                if (reqId === loadSeqRef.current) {
+                    setLoading(false);
+                }
             }
         },
         [isGuest],
@@ -68,9 +83,9 @@ export default function WishlistScreen() {
 
     useEffect(() => {
         if (!isGuest && isFocused) {
-            void loadWishlist({ silent: properties.length > 0 });
+            void loadWishlist({ silent: hasLoadedRef.current });
         }
-    }, [isGuest, isFocused]);
+    }, [isGuest, isFocused, loadWishlist, sessionEpoch]);
 
     const handleRemove = (propertyId: number) => {
         const previous = properties;

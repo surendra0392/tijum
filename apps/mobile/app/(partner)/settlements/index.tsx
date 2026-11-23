@@ -15,6 +15,7 @@ import {
     Wallet,
     ChevronLeft,
     CheckCircle2,
+    Clock,
     AlertCircle,
     ChevronRight,
 } from 'lucide-react-native';
@@ -24,6 +25,21 @@ import { useAuth } from '../../../src/auth/AuthContext';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
 import { OwnerFinancialSummary, SettlementDetail } from '../../../src/api/types';
+
+function formatSettlementDate(raw?: string | null): string {
+    if (!raw) {
+        return 'Pending Schedule';
+    }
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+        return raw;
+    }
+    return parsed.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
+}
 
 const TABS = [
     { id: 'all', label: 'All' },
@@ -217,8 +233,10 @@ export default function PartnerSettlementsScreen() {
                                     >
                                         ₹
                                         {(
-                                            (summary.settlements
-                                                ?.total_settled_amount_minor ||
+                                            (summary.total_settled_paise ??
+                                                summary.lifetime_settled_paise ??
+                                                summary.settlements
+                                                    ?.total_settled_amount_minor ??
                                                 0) / 100
                                         ).toLocaleString('en-IN')}
                                     </Text>
@@ -249,8 +267,10 @@ export default function PartnerSettlementsScreen() {
                                     >
                                         ₹
                                         {(
-                                            (summary.settlements
-                                                ?.pending_settlement_amount_minor ||
+                                            (summary.pending_payout_paise ??
+                                                summary.pending_settlement_paise ??
+                                                summary.settlements
+                                                    ?.pending_settlement_amount_minor ??
                                                 0) / 100
                                         ).toLocaleString('en-IN')}
                                     </Text>
@@ -298,6 +318,11 @@ export default function PartnerSettlementsScreen() {
                                 item.net_settlement_amount_minor ??
                                 item.net_payable_minor ??
                                 0;
+                            const st = (item.status || '').toLowerCase();
+                            const isSettled =
+                                st === 'settled' ||
+                                st === 'completed' ||
+                                st === 'processed';
                             return (
                                 <TouchableOpacity
                                     key={item.id}
@@ -312,19 +337,32 @@ export default function PartnerSettlementsScreen() {
                                     accessibilityLabel={`View settlement statement ${item.settlement_reference}`}
                                 >
                                     <View style={styles.historyLeft}>
-                                        <View style={styles.historyCheckCircle}>
-                                            <CheckCircle2
-                                                size={16}
-                                                color={Colors.success}
-                                            />
+                                        <View
+                                            style={[
+                                                styles.historyCheckCircle,
+                                                !isSettled && {
+                                                    backgroundColor: '#FEF3C7',
+                                                },
+                                            ]}
+                                        >
+                                            {isSettled ? (
+                                                <CheckCircle2
+                                                    size={16}
+                                                    color={Colors.success}
+                                                />
+                                            ) : (
+                                                <Clock
+                                                    size={16}
+                                                    color="#B45309"
+                                                />
+                                            )}
                                         </View>
                                         <View style={{ marginLeft: 10 }}>
                                             <Text style={styles.historyDate}>
-                                                {item.settled_at
-                                                    ? new Date(
-                                                          item.settled_at,
-                                                      ).toLocaleDateString()
-                                                    : item.period_end}
+                                                {formatSettlementDate(
+                                                    item.settled_at ||
+                                                        item.period_end,
+                                                )}
                                             </Text>
                                             <Text style={styles.historyRef}>
                                                 Ref: {item.settlement_reference}
@@ -349,11 +387,22 @@ export default function PartnerSettlementsScreen() {
                                                     netMinor / 100
                                                 ).toLocaleString('en-IN')}
                                             </Text>
-                                            <View style={styles.settledBadge}>
+                                            <View
+                                                style={[
+                                                    styles.settledBadge,
+                                                    !isSettled && {
+                                                        backgroundColor:
+                                                            '#FEF3C7',
+                                                    },
+                                                ]}
+                                            >
                                                 <Text
-                                                    style={
-                                                        styles.settledBadgeText
-                                                    }
+                                                    style={[
+                                                        styles.settledBadgeText,
+                                                        !isSettled && {
+                                                            color: '#92400E',
+                                                        },
+                                                    ]}
                                                 >
                                                     {item.status_label ||
                                                         item.status}

@@ -351,11 +351,7 @@ export default function OwnerRegisterScreen() {
                             </TouchableOpacity>
                         </View>
                     ) : (
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.cityRow}
-                        >
+                        <View style={styles.radioRow}>
                             {cities.map((city) => {
                                 const isSelected = selectedCityId === city.id;
                                 return (
@@ -387,7 +383,7 @@ export default function OwnerRegisterScreen() {
                                     </TouchableOpacity>
                                 );
                             })}
-                        </ScrollView>
+                        </View>
                     )}
 
                     <Input

@@ -392,6 +392,7 @@ export default function CustomerLoginScreen() {
                             Don&apos;t have an account?{' '}
                         </Text>
                         <TouchableOpacity
+                            testID="customer-register-link"
                             style={styles.textHitTarget}
                             accessibilityRole="button"
                             onPress={() =>

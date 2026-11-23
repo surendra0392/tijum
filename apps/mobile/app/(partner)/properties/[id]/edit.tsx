@@ -49,7 +49,7 @@ import {
     normalizeCategorySlug,
 } from '../../../../src/constants/categories';
 
-const DEFAULT_REQUIRED_DOC_TYPES: Array<{ type: string; label: string }> = [
+const DEFAULT_REQUIRED_DOC_TYPES: { type: string; label: string }[] = [
     { type: 'ownership_proof', label: 'Ownership / Lease Proof' },
     { type: 'identity_proof', label: 'Owner Identity Proof' },
     { type: 'address_proof', label: 'Property Address Proof' },
@@ -75,9 +75,9 @@ export default function EditPropertyScreen() {
     const [decisionReason, setDecisionReason] = useState<string | null>(null);
     const [requestedChanges, setRequestedChanges] = useState<string | null>(null);
     const [documents, setDocuments] = useState<OwnerVerificationDocument[]>([]);
-    const [requiredDocTypes, setRequiredDocTypes] = useState<Array<{ type: string; label: string }>>(
-        DEFAULT_REQUIRED_DOC_TYPES,
-    );
+    const [requiredDocTypes, setRequiredDocTypes] = useState<
+        { type: string; label: string }[]
+    >(DEFAULT_REQUIRED_DOC_TYPES);
     const [selectedDocType, setSelectedDocType] = useState<string>('ownership_proof');
     const [docNotes, setDocNotes] = useState<string>('');
     const [uploadingDoc, setUploadingDoc] = useState(false);

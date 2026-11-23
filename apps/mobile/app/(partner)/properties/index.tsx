@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
@@ -91,6 +91,45 @@ export default function PartnerPropertiesScreen() {
         setRoomsError('');
     };
 
+    const loadSeqRef = useRef(0);
+
+    const loadProperties = useCallback(async () => {
+        if (!token || authState !== 'owner_authenticated') {
+            setIsUnauthenticated(true);
+            setProperties([]);
+            setLoading(false);
+            return;
+        }
+        const reqId = ++loadSeqRef.current;
+        try {
+            setLoading(true);
+            setIsUnauthenticated(false);
+            setLoadError(null);
+            const res = await OwnerApi.getProperties();
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
+            if (res.data && res.data.length > 0) {
+                setProperties(res.data);
+            } else {
+                setProperties([]);
+            }
+        } catch (err: unknown) {
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
+            setLoadError(
+                err instanceof Error
+                    ? err.message
+                    : 'Unable to load your property listings.',
+            );
+        } finally {
+            if (reqId === loadSeqRef.current) {
+                setLoading(false);
+            }
+        }
+    }, [token, authState]);
+
     useEffect(() => {
         if (authLoading) return;
         if (!token || authState !== 'owner_authenticated') {
@@ -103,35 +142,7 @@ export default function PartnerPropertiesScreen() {
         if (!isFocused) return;
         setIsUnauthenticated(false);
         void loadProperties();
-    }, [token, authState, authLoading, isFocused, sessionEpoch]);
-
-    const loadProperties = async () => {
-        if (!token || authState !== 'owner_authenticated') {
-            setIsUnauthenticated(true);
-            setProperties([]);
-            setLoading(false);
-            return;
-        }
-        try {
-            setLoading(true);
-            setIsUnauthenticated(false);
-            setLoadError(null);
-            const res = await OwnerApi.getProperties();
-            if (res.data && res.data.length > 0) {
-                setProperties(res.data);
-            } else {
-                setProperties([]);
-            }
-        } catch (err: unknown) {
-            setLoadError(
-                err instanceof Error
-                    ? err.message
-                    : 'Unable to load your property listings.',
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
+    }, [token, authState, authLoading, isFocused, sessionEpoch, loadProperties]);
 
     const onRefresh = async () => {
         if (!token || authState !== 'owner_authenticated') {

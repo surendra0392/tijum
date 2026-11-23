@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -82,9 +82,13 @@ export default function CustomerSupportScreen() {
         authState === 'session_expired' ||
         authState === 'owner_authenticated';
 
+    const hasLoadedRef = useRef(false);
+    const loadSeqRef = useRef(0);
+
     useEffect(() => {
         setCases([]);
         setErrorMessage(null);
+        hasLoadedRef.current = false;
     }, [sessionEpoch]);
 
     useEffect(() => {
@@ -101,6 +105,7 @@ export default function CustomerSupportScreen() {
             if (isGuest) {
                 return;
             }
+            const reqId = ++loadSeqRef.current;
             try {
                 if (isRefresh) {
                     setRefreshing(true);
@@ -109,15 +114,26 @@ export default function CustomerSupportScreen() {
                 }
                 setErrorMessage(null);
                 const res = await CustomerApi.getCases();
-                setCases(Array.isArray(res.data) ? res.data : []);
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
+                const list = Array.isArray(res.data) ? res.data : [];
+                setCases(list);
+                hasLoadedRef.current = list.length > 0;
             } catch {
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
                 setErrorMessage(
                     'Unable to load your support cases. Please try again.',
                 );
                 setCases([]);
+                hasLoadedRef.current = false;
             } finally {
-                setLoading(false);
-                setRefreshing(false);
+                if (reqId === loadSeqRef.current) {
+                    setLoading(false);
+                    setRefreshing(false);
+                }
             }
         },
         [isGuest],
@@ -125,9 +141,9 @@ export default function CustomerSupportScreen() {
 
     useEffect(() => {
         if (!authLoading && !isGuest && isFocused) {
-            void loadCases(cases.length > 0);
+            void loadCases(hasLoadedRef.current);
         }
-    }, [authLoading, isGuest, isFocused]);
+    }, [authLoading, isGuest, isFocused, loadCases, sessionEpoch]);
 
     const handleCreateCase = async () => {
         if (!bookingRef.trim()) {

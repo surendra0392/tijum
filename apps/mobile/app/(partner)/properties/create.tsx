@@ -405,6 +405,7 @@ export default function CreatePropertyScreen() {
                                 2. Property Overview
                             </Text>
                             <Input
+                                testID="partner-prop-name-input"
                                 label="Property Name *"
                                 placeholder="e.g. Royal Heritage Stay"
                                 value={name}
@@ -412,6 +413,7 @@ export default function CreatePropertyScreen() {
                                 error={errors.name}
                             />
                             <Input
+                                testID="partner-prop-description-input"
                                 label="Detailed Description *"
                                 placeholder="Highlight your property atmosphere, student/professional amenities, and location advantages..."
                                 value={description}
@@ -431,6 +433,7 @@ export default function CreatePropertyScreen() {
                                 3. Primary Contact
                             </Text>
                             <Input
+                                testID="partner-prop-contact-name-input"
                                 label="Host / Contact Person Name *"
                                 placeholder="e.g. Rajesh Sharma"
                                 value={contactName}
@@ -438,6 +441,7 @@ export default function CreatePropertyScreen() {
                                 error={errors.contactName}
                             />
                             <Input
+                                testID="partner-prop-contact-phone-input"
                                 label="Contact Mobile Number (10 digits) *"
                                 placeholder="9876543210"
                                 value={contactPhone}
@@ -447,6 +451,7 @@ export default function CreatePropertyScreen() {
                                 error={errors.contactPhone}
                             />
                             <Input
+                                testID="partner-prop-contact-email-input"
                                 label="Contact Email (Optional)"
                                 placeholder="host@example.com"
                                 value={contactEmail}
@@ -474,6 +479,7 @@ export default function CreatePropertyScreen() {
                                     return (
                                         <TouchableOpacity
                                             key={city.id}
+                                            testID={`partner-prop-city-${city.slug}`}
                                             activeOpacity={0.8}
                                             onPress={() =>
                                                 setSelectedCityId(city.id)
@@ -513,6 +519,7 @@ export default function CreatePropertyScreen() {
                             ) : null}
 
                             <Input
+                                testID="partner-prop-locality-input"
                                 label="Locality / Area *"
                                 placeholder="e.g. Madhapur, Koramangala"
                                 value={locality}
@@ -520,6 +527,7 @@ export default function CreatePropertyScreen() {
                                 error={errors.locality}
                             />
                             <Input
+                                testID="partner-prop-address1-input"
                                 label="Street Address Line 1 *"
                                 placeholder="e.g. Plot 42, 3rd Cross, Silicon Valley"
                                 value={addressLine1}
@@ -539,6 +547,7 @@ export default function CreatePropertyScreen() {
                                 onChangeText={setLandmark}
                             />
                             <Input
+                                testID="partner-prop-pincode-input"
                                 label="Postal PIN Code (6 digits) *"
                                 placeholder="500081"
                                 value={postalCode}
@@ -655,6 +664,7 @@ export default function CreatePropertyScreen() {
                                 ]}
                             >
                                 <TouchableOpacity
+                                    testID="partner-prop-declaration-checkbox"
                                     style={styles.declarationRow}
                                     onPress={() =>
                                         setDeclarationAccepted((v) => !v)
@@ -684,12 +694,14 @@ export default function CreatePropertyScreen() {
                     <View style={styles.actionsBox}>
                         {step < 3 ? (
                             <Button
+                                testID="partner-prop-next-btn"
                                 title="Next Step →"
                                 onPress={handleNext}
                                 variant="primary"
                             />
                         ) : (
                             <Button
+                                testID="partner-prop-submit-btn"
                                 title="Create Property Draft"
                                 onPress={handleSubmit}
                                 variant="primary"

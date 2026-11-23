@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
@@ -45,6 +45,51 @@ export default function PartnerReservationsScreen() {
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const isGuest = !token || authState !== 'owner_authenticated';
 
+    const loadSeqRef = useRef(0);
+
+    const loadReservations = useCallback(
+        async (page = 1) => {
+            const reqId = ++loadSeqRef.current;
+            try {
+                if (page === 1) {
+                    setLoading(true);
+                } else {
+                    setLoadingMore(true);
+                }
+                setErrorMessage(null);
+                const res = await OwnerApi.getReservations(
+                    activeTab as 'upcoming' | 'past' | 'cancelled',
+                    page,
+                );
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
+                const items = res.data || [];
+                setReservations((prev) =>
+                    page === 1 ? items : [...prev, ...items],
+                );
+                setCurrentPage(res.meta?.current_page ?? page);
+                setLastPage(res.meta?.last_page ?? 1);
+            } catch {
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
+                if (page === 1) {
+                    setErrorMessage(
+                        'Unable to load your reservations. Please try again.',
+                    );
+                    setReservations([]);
+                }
+            } finally {
+                if (reqId === loadSeqRef.current) {
+                    setLoading(false);
+                    setLoadingMore(false);
+                }
+            }
+        },
+        [activeTab],
+    );
+
     useEffect(() => {
         if (isGuest) {
             setReservations([]);
@@ -54,38 +99,7 @@ export default function PartnerReservationsScreen() {
         if (isFocused) {
             void loadReservations(1);
         }
-    }, [activeTab, isGuest, isFocused, sessionEpoch]);
-
-    const loadReservations = async (page = 1) => {
-        try {
-            if (page === 1) {
-                setLoading(true);
-            } else {
-                setLoadingMore(true);
-            }
-            setErrorMessage(null);
-            const res = await OwnerApi.getReservations(
-                activeTab as 'upcoming' | 'past' | 'cancelled',
-                page,
-            );
-            const items = res.data || [];
-            setReservations((prev) =>
-                page === 1 ? items : [...prev, ...items],
-            );
-            setCurrentPage(res.meta?.current_page ?? page);
-            setLastPage(res.meta?.last_page ?? 1);
-        } catch {
-            if (page === 1) {
-                setErrorMessage(
-                    'Unable to load your reservations. Please try again.',
-                );
-                setReservations([]);
-            }
-        } finally {
-            setLoading(false);
-            setLoadingMore(false);
-        }
-    };
+    }, [isGuest, isFocused, sessionEpoch, loadReservations]);
 
     const onRefresh = async () => {
         if (isGuest) return;
@@ -103,8 +117,11 @@ export default function PartnerReservationsScreen() {
 
     const renderBookingCard = ({ item }: { item: Reservation }) => {
         const reference = item.reference ?? item.booking_reference;
-        const rawAmount =
-            ((item.owner_payable_paise ?? item.total_amount_paise) || 0) / 100;
+        const displayMinor =
+            item.owner_payable_paise && item.owner_payable_paise > 0
+                ? item.owner_payable_paise
+                : item.total_amount_paise || 0;
+        const rawAmount = displayMinor / 100;
         const photoUrl = item.property?.cover_image_url;
         const nights = item.total_stay_days ?? item.duration_quantity ?? 1;
 

@@ -37,11 +37,34 @@ import {
 
 const CONSTITUTION_OPTIONS = [
     { value: 'individual', label: 'Individual / Sole Proprietor' },
+    { value: 'proprietorship', label: 'Proprietorship Firm' },
     { value: 'partnership', label: 'Partnership Firm' },
     { value: 'llp', label: 'Limited Liability Partnership (LLP)' },
     { value: 'private_limited', label: 'Private Limited Company' },
     { value: 'trust_society', label: 'Trust / Society' },
 ];
+
+const GST_CLASSIFICATION_LABELS: Record<string, string> = {
+    unregistered: 'Unregistered / GST Exempt',
+    regular: 'Regular GST Supplier',
+    composition: 'Composition Scheme',
+    hospitality_service_provider: 'Hospitality Service Provider',
+};
+
+function formatHumanLabel(value: string | undefined | null, fallback: string): string {
+    if (!value) {
+        return fallback;
+    }
+    const mapped =
+        CONSTITUTION_OPTIONS.find((c) => c.value === value)?.label ??
+        GST_CLASSIFICATION_LABELS[value];
+    if (mapped) {
+        return mapped;
+    }
+    return value
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
 
 export default function FinancialProfileScreen() {
     const router = useRouter();
@@ -54,6 +77,7 @@ export default function FinancialProfileScreen() {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [legalName, setLegalName] = useState('');
     const [constitution, setConstitution] = useState('individual');
+    const [gstClassification, setGstClassification] = useState<'unregistered' | 'regular' | 'composition'>('unregistered');
     const [pan, setPan] = useState('');
     const [gstRegistered, setGstRegistered] = useState(false);
     const [gstin, setGstin] = useState('');
@@ -72,13 +96,25 @@ export default function FinancialProfileScreen() {
                 setLegalName(
                     d.legal_business_name || d.bank_beneficiary_name || '',
                 );
-                setConstitution(
-                    d.supplier_legal_classification ||
-                        d.business_constitution ||
-                        'individual',
+                const rawConst = (d.business_constitution || '').trim();
+                const matchedOption = CONSTITUTION_OPTIONS.find(
+                    (c) =>
+                        c.value === rawConst ||
+                        c.label.toLowerCase() === rawConst.toLowerCase(),
                 );
+                setConstitution(matchedOption ? matchedOption.value : 'individual');
+                const hasGst = Boolean(d.gst_registered || d.gstin);
+                setGstRegistered(hasGst);
+                if (
+                    d.supplier_legal_classification === 'unregistered' ||
+                    d.supplier_legal_classification === 'regular' ||
+                    d.supplier_legal_classification === 'composition'
+                ) {
+                    setGstClassification(d.supplier_legal_classification);
+                } else {
+                    setGstClassification(hasGst ? 'regular' : 'unregistered');
+                }
                 setPan(d.pan_number || d.pan || '');
-                setGstRegistered(Boolean(d.gst_registered || d.gstin));
                 setGstin(d.gstin || '');
                 setBankIfsc(d.bank_ifsc || '');
                 setBankName(d.bank_name || '');
@@ -110,6 +146,7 @@ export default function FinancialProfileScreen() {
         const cleanPan = pan.trim().toUpperCase();
         const cleanIfsc = bankIfsc.trim().toUpperCase();
         const cleanGstin = gstin.trim().toUpperCase();
+        const cleanAccount = bankAccountNumber.trim();
         const cleanBeneficiary = (holderName.trim() || legalName.trim());
 
         if (!cleanBeneficiary) {
@@ -138,7 +175,14 @@ export default function FinancialProfileScreen() {
             );
             return;
         }
-        if (cleanIfsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(cleanIfsc)) {
+        if (!/^[0-9]{9,18}$/.test(cleanAccount)) {
+            Alert.alert(
+                'Account Number Required',
+                'Please enter or re-confirm your 9 to 18 digit settlement bank account number.',
+            );
+            return;
+        }
+        if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(cleanIfsc)) {
             Alert.alert(
                 'Invalid IFSC',
                 'Please enter a valid 11-character bank IFSC code (e.g. HDFC0001234).',
@@ -146,20 +190,24 @@ export default function FinancialProfileScreen() {
             return;
         }
 
+        const effectiveTaxClassification = gstRegistered
+            ? gstClassification === 'composition'
+                ? 'composition'
+                : 'regular'
+            : 'unregistered';
+
         setSaving(true);
         try {
             await OwnerApi.updateFinancialProfile({
                 legal_business_name: legalName.trim() || cleanBeneficiary,
-                supplier_legal_classification: constitution,
                 business_constitution: constitution,
+                supplier_legal_classification: effectiveTaxClassification,
                 pan_number: cleanPan,
                 pan: cleanPan,
                 gst_registered: gstRegistered,
                 gstin: gstRegistered && cleanGstin ? cleanGstin : null,
-                bank_account_number: bankAccountNumber.trim()
-                    ? bankAccountNumber.trim()
-                    : undefined,
-                bank_ifsc: cleanIfsc || undefined,
+                bank_account_number: cleanAccount,
+                bank_ifsc: cleanIfsc,
                 bank_name: bankName.trim() ? bankName.trim() : undefined,
                 bank_beneficiary_name: cleanBeneficiary,
                 bank_account_holder_name: cleanBeneficiary,
@@ -207,9 +255,8 @@ export default function FinancialProfileScreen() {
     const rejectionReasons: string[] = profile?.rejection_reason
         ? [profile.rejection_reason]
         : profile?.rejection_reasons || [];
-    const resolvedConstitution =
-        profile?.supplier_legal_classification ||
-        profile?.business_constitution;
+    const resolvedConstitution = profile?.business_constitution;
+    const resolvedTaxClassification = profile?.supplier_legal_classification;
     const resolvedPan = profile?.pan_number || profile?.pan;
     const resolvedMaskedAccount =
         profile?.bank_account_number_masked || profile?.bank_account_masked;
@@ -228,12 +275,13 @@ export default function FinancialProfileScreen() {
                     fallbackRoute="/(partner)/account"
                     rightElement={
                         <TouchableOpacity
+                            testID="partner-kyc-edit-btn"
                             style={styles.editButton}
                             onPress={() => setIsEditModalOpen(true)}
                             accessibilityRole="button"
                             accessibilityLabel="Edit Financial Profile"
                         >
-                            <Edit3 size={18} color={Colors.primary} />
+                            <Edit3 size={18} color={Colors.white} />
                         </TouchableOpacity>
                     }
                 />
@@ -331,11 +379,24 @@ export default function FinancialProfileScreen() {
                         <View style={styles.fieldRow}>
                             <Text style={styles.fieldLabel}>Constitution</Text>
                             <Text style={styles.fieldValue}>
-                                {CONSTITUTION_OPTIONS.find(
-                                    (c) => c.value === resolvedConstitution,
-                                )?.label ||
-                                    resolvedConstitution ||
-                                    'Individual'}
+                                {formatHumanLabel(
+                                    resolvedConstitution,
+                                    'Individual / Sole Proprietor',
+                                )}
+                            </Text>
+                        </View>
+
+                        <View style={styles.fieldRow}>
+                            <Text style={styles.fieldLabel}>
+                                Tax Classification
+                            </Text>
+                            <Text style={styles.fieldValue}>
+                                {formatHumanLabel(
+                                    resolvedTaxClassification,
+                                    profile?.gst_registered
+                                        ? 'Regular GST Supplier'
+                                        : 'Unregistered / GST Exempt',
+                                )}
                             </Text>
                         </View>
 
@@ -458,6 +519,7 @@ export default function FinancialProfileScreen() {
                                 Legal Entity / Trade Name *
                             </Text>
                             <TextInput
+                                testID="partner-kyc-legal-name-input"
                                 style={styles.input}
                                 placeholder="Enter legal business name"
                                 placeholderTextColor={Colors.textTertiary}
@@ -472,6 +534,7 @@ export default function FinancialProfileScreen() {
                                 {CONSTITUTION_OPTIONS.map((c) => (
                                     <TouchableOpacity
                                         key={c.value}
+                                        testID={`partner-kyc-constitution-${c.value}`}
                                         style={[
                                             styles.constitutionChip,
                                             constitution === c.value &&
@@ -494,6 +557,7 @@ export default function FinancialProfileScreen() {
 
                             <Text style={styles.inputLabel}>PAN Number *</Text>
                             <TextInput
+                                testID="partner-kyc-pan-input"
                                 style={styles.input}
                                 placeholder="e.g. ABCDE1234F"
                                 placeholderTextColor={Colors.textTertiary}
@@ -530,6 +594,7 @@ export default function FinancialProfileScreen() {
                                         GSTIN (15 characters) *
                                     </Text>
                                     <TextInput
+                                        testID="partner-kyc-gstin-input"
                                         style={styles.input}
                                         placeholder="e.g. 29ABCDE1234F1Z5"
                                         placeholderTextColor={Colors.textTertiary}
@@ -556,6 +621,7 @@ export default function FinancialProfileScreen() {
                                 Account Number
                             </Text>
                             <TextInput
+                                testID="partner-kyc-account-input"
                                 style={styles.input}
                                 placeholder={
                                     profile?.bank_account_masked ||
@@ -569,6 +635,7 @@ export default function FinancialProfileScreen() {
 
                             <Text style={styles.inputLabel}>IFSC Code</Text>
                             <TextInput
+                                testID="partner-kyc-ifsc-input"
                                 style={styles.input}
                                 placeholder="e.g. HDFC0001234"
                                 placeholderTextColor={Colors.textTertiary}
@@ -582,6 +649,7 @@ export default function FinancialProfileScreen() {
 
                             <Text style={styles.inputLabel}>Bank Name</Text>
                             <TextInput
+                                testID="partner-kyc-bank-input"
                                 style={styles.input}
                                 placeholder="e.g. HDFC Bank Ltd"
                                 placeholderTextColor={Colors.textTertiary}
@@ -593,6 +661,7 @@ export default function FinancialProfileScreen() {
                                 Account Holder Name
                             </Text>
                             <TextInput
+                                testID="partner-kyc-holder-input"
                                 style={styles.input}
                                 placeholder="Name as per bank records"
                                 placeholderTextColor={Colors.textTertiary}
@@ -609,6 +678,7 @@ export default function FinancialProfileScreen() {
                                 style={{ flex: 1, marginRight: Spacing.sm }}
                             />
                             <Button
+                                testID="partner-kyc-save-btn"
                                 title={
                                     saving ? 'Submitting...' : 'Save & Submit'
                                 }
@@ -656,9 +726,12 @@ const styles = StyleSheet.create({
         color: Colors.textSecondary,
     },
     editButton: {
-        padding: Spacing.xs + 2,
-        borderRadius: BorderRadius.full,
-        backgroundColor: Colors.primary + '15',
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255,255,255,0.16)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     scrollContent: {
         padding: Spacing.md,

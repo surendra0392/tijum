@@ -1,6 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
     Alert,
     Image,
     Linking,
@@ -70,11 +69,14 @@ export default function PropertyDetailScreen() {
     >(null);
     const [isWishlisted, setIsWishlisted] = useState(false);
 
+    const loadSeqRef = useRef(0);
+
     const loadProperty = useCallback(
         async (isRefresh = false) => {
             if (!slug) {
                 return;
             }
+            const reqId = ++loadSeqRef.current;
             try {
                 if (isRefresh) {
                     setRefreshing(true);
@@ -83,6 +85,9 @@ export default function PropertyDetailScreen() {
                 }
                 setError(null);
                 const res = await PublicApi.getProperty(slug);
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
                 if (res.data) {
                     setProperty(res.data);
                     const rooms = res.data.room_types || [];
@@ -96,6 +101,9 @@ export default function PropertyDetailScreen() {
                     setError('Property details are unavailable.');
                 }
             } catch (loadError: unknown) {
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
                 setProperty(null);
                 setError(
                     loadError instanceof Error
@@ -103,8 +111,10 @@ export default function PropertyDetailScreen() {
                         : 'Unable to load this property. Please try again.',
                 );
             } finally {
-                setLoading(false);
-                setRefreshing(false);
+                if (reqId === loadSeqRef.current) {
+                    setLoading(false);
+                    setRefreshing(false);
+                }
             }
         },
         [slug],
@@ -114,18 +124,27 @@ export default function PropertyDetailScreen() {
         void loadProperty();
     }, [loadProperty]);
 
+    const propertyId = property?.id ?? null;
+
     useEffect(() => {
-        if (!token || authState !== 'customer_authenticated' || !property) {
+        if (!token || authState !== 'customer_authenticated' || !propertyId) {
             setIsWishlisted(false);
             return;
         }
+        let cancelled = false;
         void CustomerApi.getWishlist()
             .then((res) => {
+                if (cancelled) {
+                    return;
+                }
                 const list = Array.isArray(res.data) ? res.data : [];
-                setIsWishlisted(list.some((item) => item.id === property.id));
+                setIsWishlisted(list.some((item) => item.id === propertyId));
             })
             .catch(() => {});
-    }, [authState, token, property?.id]);
+        return () => {
+            cancelled = true;
+        };
+    }, [authState, token, propertyId]);
 
     const handleToggleWishlist = async () => {
         if (!property) {
@@ -799,9 +818,25 @@ export default function PropertyDetailScreen() {
                                         </View>
                                     </View>
                                     <Text style={styles.reviewDate}>
-                                        {rev.published_at ||
-                                            rev.created_at ||
-                                            ''}
+                                        {(() => {
+                                            const rawDate =
+                                                rev.published_at ||
+                                                rev.created_at ||
+                                                '';
+                                            if (!rawDate) return '';
+                                            const parsed = new Date(rawDate);
+                                            if (Number.isNaN(parsed.getTime())) {
+                                                return rawDate;
+                                            }
+                                            return parsed.toLocaleDateString(
+                                                'en-IN',
+                                                {
+                                                    day: '2-digit',
+                                                    month: 'short',
+                                                    year: 'numeric',
+                                                },
+                                            );
+                                        })()}
                                     </Text>
                                     {rev.title ? (
                                         <Text style={styles.reviewTitle}>
@@ -831,6 +866,13 @@ export default function PropertyDetailScreen() {
                                     ) : null}
                                 </View>
                             ))
+                        ) : property.reviews_count > 0 ? (
+                            <Text style={styles.emptyText}>
+                                Rated {ratingValue.toFixed(1)}★ across{' '}
+                                {property.reviews_count} verified stays. Written
+                                guest commentary will appear here as reviews are
+                                published.
+                            </Text>
                         ) : (
                             <Text style={styles.emptyText}>
                                 No reviews yet. Be the first to book and share
@@ -1121,6 +1163,8 @@ const styles = StyleSheet.create({
         marginBottom: Spacing.md,
     },
     mealBadgesContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: Spacing.sm,
     },
     mealNotes: {
@@ -1219,6 +1263,8 @@ const styles = StyleSheet.create({
         gap: Spacing.sm,
     },
     amenityChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
         backgroundColor: Colors.gray100,
         paddingHorizontal: Spacing.md,
         paddingVertical: Spacing.xs,

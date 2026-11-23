@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -87,6 +87,49 @@ export default function ReservationDetailScreen() {
     const [reviewContent, setReviewContent] = useState('');
     const [reviewError, setReviewError] = useState('');
 
+    const loadSeqRef = useRef(0);
+
+    const loadReservation = useCallback(
+        async (options?: { silent?: boolean }) => {
+            if (!reference) {
+                setLoading(false);
+                setLoadError('Reservation reference is missing.');
+                return;
+            }
+            const reqId = ++loadSeqRef.current;
+            try {
+                if (!options?.silent) {
+                    setLoading(true);
+                }
+                setLoadError(null);
+                const res = await CustomerApi.getReservation(reference);
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
+                if (res.data) {
+                    setReservation(res.data);
+                    return;
+                }
+                setReservation(null);
+                setLoadError('Reservation could not be found.');
+            } catch (e: any) {
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
+                const msg = e?.message || 'Failed to load reservation details.';
+                setLoadError(msg);
+                if (options?.silent) {
+                    Alert.alert('Error', msg);
+                }
+            } finally {
+                if (reqId === loadSeqRef.current) {
+                    setLoading(false);
+                }
+            }
+        },
+        [reference],
+    );
+
     useEffect(() => {
         setReservation(null);
         setLoadError(null);
@@ -102,27 +145,23 @@ export default function ReservationDetailScreen() {
             setLoading(false);
             setLoadError('Reservation reference is missing.');
         }
-    }, [reference]);
+    }, [reference, loadReservation]);
+
+    const isWindowPayable = reservation ? canPayReservation(reservation) : false;
+    const paymentDeadlineStr =
+        reservation?.payment_deadline_at ||
+        reservation?.payment_window_expires_at ||
+        null;
 
     // Payment Countdown Timer (15-minute window)
     useEffect(() => {
-        if (!reservation) {
-            setTimeLeft(null);
-            return;
-        }
-
-        const isWindowPayable = canPayReservation(reservation);
-        const deadlineStr =
-            reservation.payment_deadline_at ||
-            reservation.payment_window_expires_at;
-
-        if (!isWindowPayable || !deadlineStr) {
+        if (!isWindowPayable || !paymentDeadlineStr) {
             setTimeLeft(null);
             return;
         }
 
         const calculateSeconds = () => {
-            const expires = new Date(deadlineStr).getTime();
+            const expires = new Date(paymentDeadlineStr).getTime();
             const now = Date.now();
             return Math.max(0, Math.floor((expires - now) / 1000));
         };
@@ -151,41 +190,7 @@ export default function ReservationDetailScreen() {
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [
-        reference,
-        reservation?.status,
-        reservation?.payment_deadline_at,
-        reservation?.payment_window_expires_at,
-    ]);
-
-    const loadReservation = async (options?: { silent?: boolean }) => {
-        if (!reference) {
-            setLoading(false);
-            setLoadError('Reservation reference is missing.');
-            return;
-        }
-        try {
-            if (!options?.silent) {
-                setLoading(true);
-            }
-            setLoadError(null);
-            const res = await CustomerApi.getReservation(reference);
-            if (res.data) {
-                setReservation(res.data);
-                return;
-            }
-            setReservation(null);
-            setLoadError('Reservation could not be found.');
-        } catch (e: any) {
-            const msg = e?.message || 'Failed to load reservation details.';
-            setLoadError(msg);
-            if (options?.silent) {
-                Alert.alert('Error', msg);
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
+    }, [reference, isWindowPayable, paymentDeadlineStr, loadReservation]);
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -193,51 +198,55 @@ export default function ReservationDetailScreen() {
         setRefreshing(false);
     };
 
-    const handleCheckPaymentStatus = async (options?: { silent?: boolean }) => {
-        const targetRef =
-            reservation?.reference ?? reservation?.booking_reference ?? reference;
-        if (!targetRef) {
-            return;
-        }
-        try {
-            if (!options?.silent) {
-                setCheckingStatus(true);
+    const activeReservationRef =
+        reservation?.reference ?? reservation?.booking_reference ?? reference;
+
+    const handleCheckPaymentStatus = useCallback(
+        async (options?: { silent?: boolean }) => {
+            if (!activeReservationRef) {
+                return;
             }
-            await RazorpayService.reconcile(targetRef);
-            await loadReservation({ silent: true });
-            if (!options?.silent) {
-                Alert.alert(
-                    'Payment Status Refreshed',
-                    'Latest payment state synced from the server.',
-                );
+            try {
+                if (!options?.silent) {
+                    setCheckingStatus(true);
+                }
+                await RazorpayService.reconcile(activeReservationRef);
+                await loadReservation({ silent: true });
+                if (!options?.silent) {
+                    Alert.alert(
+                        'Payment Status Refreshed',
+                        'Latest payment state synced from the server.',
+                    );
+                }
+            } catch (e: any) {
+                if (!options?.silent) {
+                    Alert.alert(
+                        'Status Check Failed',
+                        e?.message || 'Unable to verify payment status right now.',
+                    );
+                }
+            } finally {
+                if (!options?.silent) {
+                    setCheckingStatus(false);
+                }
             }
-        } catch (e: any) {
-            if (!options?.silent) {
-                Alert.alert(
-                    'Status Check Failed',
-                    e?.message || 'Unable to verify payment status right now.',
-                );
-            }
-        } finally {
-            if (!options?.silent) {
-                setCheckingStatus(false);
-            }
-        }
-    };
+        },
+        [activeReservationRef, loadReservation],
+    );
+
+    const shouldReconcileOnResume = Boolean(
+        reservation && (paying || isWindowPayable),
+    );
 
     // Reconcile payment state when returning to foreground during/around payment
     useEffect(() => {
         const sub = AppState.addEventListener('change', (nextState) => {
-            if (
-                nextState === 'active' &&
-                reservation &&
-                (paying || canPayReservation(reservation))
-            ) {
+            if (nextState === 'active' && shouldReconcileOnResume) {
                 void handleCheckPaymentStatus({ silent: true });
             }
         });
         return () => sub.remove();
-    }, [paying, reservation?.reference, reservation?.booking_reference, reservation?.status]);
+    }, [shouldReconcileOnResume, handleCheckPaymentStatus]);
 
     const handlePayWithRazorpay = async () => {
         if (!reservation || paymentInFlightRef.current) return;
@@ -617,7 +626,20 @@ export default function ReservationDetailScreen() {
                                 <Text style={styles.infoLabel}>Duration:</Text>
                                 <Text style={styles.infoValue}>
                                     {reservation.duration_quantity}{' '}
-                                    {reservation.duration_type}
+                                    {reservation.duration_type === 'daily'
+                                        ? reservation.duration_quantity === 1
+                                            ? 'Day'
+                                            : 'Days'
+                                        : reservation.duration_type === 'weekly'
+                                          ? reservation.duration_quantity === 1
+                                              ? 'Week'
+                                              : 'Weeks'
+                                          : reservation.duration_type ===
+                                              'monthly'
+                                            ? reservation.duration_quantity === 1
+                                                ? 'Month'
+                                                : 'Months'
+                                            : reservation.duration_type}
                                 </Text>
                             </View>
                             <View style={styles.infoRow}>
@@ -640,7 +662,12 @@ export default function ReservationDetailScreen() {
                                     Guest Gender:
                                 </Text>
                                 <Text style={styles.infoValue}>
-                                    {reservation.guest_gender}
+                                    {reservation.guest_gender
+                                        ? reservation.guest_gender
+                                              .charAt(0)
+                                              .toUpperCase() +
+                                          reservation.guest_gender.slice(1)
+                                        : 'Any'}
                                 </Text>
                             </View>
                             {reservation.guest_composition_label ? (
@@ -1203,9 +1230,15 @@ export default function ReservationDetailScreen() {
                         { paddingBottom: Math.max(insets.bottom, Spacing.md) },
                     ]}
                 >
-                    <View style={{ flex: 1, marginRight: Spacing.sm }}>
-                        <Text style={styles.bottomLabel}>Amount Due</Text>
-                        <Text style={styles.bottomPrice}>
+                    <View style={styles.bottomPriceBox}>
+                        <Text style={styles.bottomLabel} numberOfLines={1}>
+                            Amount Due
+                        </Text>
+                        <Text
+                            style={styles.bottomPrice}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                        >
                             ₹
                             {(
                                 reservation.total_amount_paise / 100
@@ -1242,9 +1275,10 @@ export default function ReservationDetailScreen() {
                         <Button
                             testID="booking-pay-btn"
                             title="Pay with Razorpay"
+                            size="sm"
                             loading={paying}
                             onPress={handlePayWithRazorpay}
-                            style={{ paddingHorizontal: Spacing.lg }}
+                            style={{ paddingHorizontal: Spacing.md }}
                         />
                     </View>
                 </View>
@@ -1534,6 +1568,8 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     mealBadgesContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: Spacing.sm,
     },
     bottomBar: {
@@ -1544,7 +1580,7 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.white,
         borderTopWidth: 1,
         borderTopColor: Colors.gray200,
-        paddingHorizontal: Spacing.lg,
+        paddingHorizontal: Spacing.md,
         paddingTop: Spacing.md,
         paddingBottom: Spacing.md,
         flexDirection: 'row',
@@ -1556,17 +1592,23 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 8,
     },
+    bottomPriceBox: {
+        flexShrink: 0,
+        minWidth: 88,
+        marginRight: Spacing.sm,
+    },
     bottomActionsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: Spacing.sm,
+        gap: Spacing.xs + 2,
+        flexShrink: 1,
     },
     checkStatusBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        minHeight: 44,
-        paddingHorizontal: Spacing.md,
+        gap: 4,
+        minHeight: 40,
+        paddingHorizontal: Spacing.sm + 2,
         borderRadius: BorderRadius.md,
         borderWidth: 1,
         borderColor: Colors.deepPlum,

@@ -1,5 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
     ApiClient,
     ApiError,
@@ -213,6 +215,34 @@ describe('Behavioral Suite 1: ApiClient HTTP Lifecycle, FormData & Session Revoc
             );
         } finally {
             globalThis.fetch = originalFetch;
+        }
+    });
+
+    it('references process.env.EXPO_PUBLIC_* with direct dot notation so Metro/Babel inlines build env', () => {
+        const clientSource = fs.readFileSync(
+            path.resolve(import.meta.dirname, '../src/api/client.ts'),
+            'utf8',
+        );
+        assert.match(clientSource, /process\.env\.EXPO_PUBLIC_API_URL/);
+        assert.match(clientSource, /process\.env\.EXPO_PUBLIC_ENVIRONMENT/);
+
+        const prevUrl = process.env.EXPO_PUBLIC_API_URL;
+        const prevEnv = process.env.EXPO_PUBLIC_ENVIRONMENT;
+        try {
+            process.env.EXPO_PUBLIC_API_URL = 'https://staging.tijum.com/api/v1/';
+            process.env.EXPO_PUBLIC_ENVIRONMENT = 'preview';
+            assert.equal(resolveApiBaseUrl(), 'https://staging.tijum.com/api/v1');
+        } finally {
+            if (prevUrl === undefined) {
+                delete process.env.EXPO_PUBLIC_API_URL;
+            } else {
+                process.env.EXPO_PUBLIC_API_URL = prevUrl;
+            }
+            if (prevEnv === undefined) {
+                delete process.env.EXPO_PUBLIC_ENVIRONMENT;
+            } else {
+                process.env.EXPO_PUBLIC_ENVIRONMENT = prevEnv;
+            }
         }
     });
 });

@@ -3,134 +3,117 @@
 **Branch:** `feat/mobile-production-hardening-redesign`  
 **GitHub Pull Request:** [PR #2 (surendra0392/tijum/pull/2)](https://github.com/surendra0392/tijum/pull/2)  
 **Baseline Commit:** `1719e2df65a874ec23379c5519f4d2c9738e1e23`  
-**Working Commit:** Under review on PR #2  
-**Verdict:** **NO-GO FOR PUBLIC STORE RELEASE** (Automated checks green, lint clean, Hermes exports verified; physical hardware QA and staging DNS resolution pending)  
+**Verdict:** **NO-GO FOR PUBLIC STORE RELEASE** (Automated checks, 0-warning lint, authenticated 27-screen visual QA, 7 live backend mutations, and Hermes Android/iOS exports all pass; physical device execution and reachable `staging.tijum.com` DNS remain open blockers)  
 **Assessment Date:** 2026-11-23  
 
 ---
 
 ## 1. Release Verdict & Policy Posture
 
-**Public production release verdict is strictly NO-GO.**
+**Public production release verdict remains strictly NO-GO.**
 
-While all automated tests, type checks, lint checks, visual screenshot captures, and Hermes production bytecode exports are fully green, the application **cannot and must not be submitted to Google Play or Apple App Store** until:
-1. Physical device QA is completed on real Android and iOS hardware across critical user journeys.
-2. The isolated staging infrastructure (`staging.tijum.com`) is operational with DNS and SSL configured.
-3. Live payment and payout controls remain securely disabled per mandatory safety rules.
+Although automated quality gates, strict TypeScript checking, zero-warning ESLint, authenticated visual QA against a real isolated Laravel backend, 7 live end-to-end backend mutations, and Android/iOS Hermes production exports all pass, TIJUM mobile **must not be submitted to Google Play or Apple App Store** until:
+1. Real Android and iOS physical device QA is executed across critical booking, payment, upload, and front-desk journeys.
+2. Isolated staging infrastructure (`staging.tijum.com`) resolves via DNS with TLS so internal preview APKs can be tested end-to-end on hardware.
+3. Live payment and payout controls remain disabled until explicit owner sign-off.
 
 ---
 
 ## 2. Six-Way Verification Partitioning
 
 ### 2.1 Tests Actually Executed
-The following test suites and quality gates were executed directly in this environment and verified 100% passing:
+All checks below were executed directly in this environment on the Pass-4 codebase:
 
 | Gate / Suite | Runner / Command | Count / Scope | Result |
 |---|---|---|---|
-| Mobile Behavioral & Unit Tests | `node --test __tests__/*.test.ts` | 21 test files / 204 tests / 85 suites | **PASS 204 / FAIL 0** (1.36s) |
-| Mobile TypeScript Strict Check | `tsc --noEmit` in `apps/mobile/` | Full mobile codebase (51 routes + components) | **PASS (0 errors)** |
-| Mobile ESLint Quality Gate | `eslint --config eslint.config.cjs app src` | Flat config (`eslint-config-expo/flat`), 51 routes + components | **PASS (0 errors, 58 warnings)** |
-| Mobile Expo Project Doctor | `npx expo-doctor` in `apps/mobile/` | 20 configuration and dependency checks | **PASS (20/20 clean)** |
-| Android Hermes Production Bytecode | `npx expo export --platform android` | 2,902 bundled modules | **PASS (`entry-*.hbc`, 6MB)** |
-| iOS Hermes Production Bytecode | `npx expo export --platform ios` | 2,880 bundled modules | **PASS (`entry-*.hbc`, 5.9MB)** |
-| Web Production Export | `npx expo export --platform web` | 2,522 bundled modules | **PASS (3.8MB JS)** |
-| Visual QA Screen Captures | `python scripts/capture_screens.py` | 16 mobile screens rendered via Chrome headless (390x844) | **PASS (16/16 captured)** |
-| Backend API Parity Suite | `phpunit MobileProductionParityApiTest.php` | 7 tests / 58 assertions | **PASS 7 / FAIL 0** |
-| Backend Notification & Device Suite | `phpunit NotificationAndDeviceApiTest.php` | 6 tests / 58 assertions | **PASS 6 / FAIL 0** |
-| Backend PHP Style | `vendor/bin/pint --dirty --format agent` | Changed PHP files | **PASS (clean)** |
+| Mobile Behavioral & Unit Tests | `cd apps/mobile && npm test` | 21 test files / 205 tests / 85 suites | **PASS 205 / FAIL 0** |
+| Mobile TypeScript Strict Check | `cd apps/mobile && npm run types:check` | Full mobile codebase (51 routes + services) | **PASS (0 errors)** |
+| Mobile ESLint Quality Gate | `cd apps/mobile && npm run lint` | Flat config (`eslint.config.cjs`), `app` + `src` | **PASS (0 errors, 0 warnings)** |
+| Mobile Expo Project Doctor | `cd apps/mobile && npx expo-doctor` | 20 Expo SDK 55 config & dependency checks | **PASS (20/20 clean)** |
+| Android Hermes Bytecode Export | `npx expo export -p android` (`preview` env) | Compiled Hermes bytecode (`.hbc`) | **PASS** |
+| iOS Hermes Bytecode Export | `npx expo export -p ios` (`preview` env) | Compiled Hermes bytecode (`.hbc`) | **PASS** |
+| Authenticated Visual QA Harness | `python scripts/capture_screens.py` | 23 populated screens + 4 explicit empty/auth/error states against isolated SQLite Laravel API | **PASS (27/27 screens, 0 broken images, 0 JS exceptions, 0 overflow)** |
+| Live Isolated Backend Mutations | `scripts/cdp_verify_and_capture.mjs` (via `capture_screens.py`) | UI customer login, booking hold + status + cancel, support case creation, partner property draft, room addition, front-desk check-in/out, partner KYC update | **PASS (7/7 mutations verified in backend DB)** |
+| Backend API V1 PHPUnit Suite | `vendor/bin/phpunit tests/Feature/Api/V1` | 113 tests / 881 assertions (in-memory SQLite) | **PASS 113 / FAIL 0** |
+| Backend PHP Style | `vendor/bin/pint scripts/seed_mobile_qa.php --format agent` | QA seeder PHP script | **PASS** |
 
-### 2.2 Native Builds Actually Compiled & EAS Cloud History
-- **Local Compilation Level:** JavaScript, assets, and Hermes bytecode compilation (`.hbc`) succeeded cleanly for Android, iOS, and Web targets.
-- **Local Binary Compilation (`.apk`, `.aab`, `.ipa`):** **NOT COMPILED LOCALLY**. Full local binary compilation requires native Android SDK/NDK/Gradle on Linux/macOS/Windows and Xcode on macOS.
-- **EAS Cloud Build Account & Verified Records:**
-  - Authenticated Account: `@tijum-app` (User: `tijum`, Email: `tijum.official@gmail.com`)
-  - EAS Project ID: `b8ab7524-7056-43e3-99d6-1631315a58c2`
-  - Verified Cloud Builds on Record (`npx eas-cli build:list`):
-    1. **Android Production (Store AAB)**:
-       - Build ID: `d293d94d-6d28-460b-8add-2e5846093cc6`
-       - Status: `finished` | Version: `1.0.0` (code `3`) | Channel: `production`
-       - Artifact: `https://expo.dev/artifacts/eas/CLu0vbe6ly0zuAnvi9OP2EKFWnKfLJIKmLafzJ8mx-8.aab`
-    2. **Android Internal Preview (APK)**:
-       - Build ID: `f3b03fc4-0366-4d25-b907-41a878ddda21`
-       - Status: `finished` | Version: `1.0.0` (code `2`) | Channel: `preview`
-       - Artifact: `https://expo.dev/artifacts/eas/Wy0TveE3GjZ8boPjVhGN2DpLEvLBo-jV2CeI_aTlCM4.apk`
-    3. **Android Production Earlier (Store AAB)**:
-       - Build ID: `15cd47f2-9f4b-410c-999a-ba627b2b663e`
-       - Status: `finished` | Version: `1.0.0` (code `2`) | Channel: `production`
-       - Artifact: `https://expo.dev/artifacts/eas/lkbdulMHMKE24_ee7vZNsU22mjh42i9e5S56lRKVu5Y.aab`
+### 2.2 Native Builds Compiled & EAS Cloud Records
+- **Local Compilation:** Android and iOS Hermes production bytecode (`.hbc`) and Expo web bundles compile cleanly with verified static `process.env.EXPO_PUBLIC_API_URL` inlining.
+- **Local Native Binaries (`.apk` / `.aab` / `.ipa`):** **NOT compiled locally** (Android SDK/Gradle and macOS Xcode are not installed on this workstation).
+- **EAS Cloud Build Account:** `@tijum-app` (`tijum` / `tijum.official@gmail.com`), Project ID `b8ab7524-7056-43e3-99d6-1631315a58c2`.
+- **Previous Historical Builds on Record (Pre-PR #2):**
+  - `f3b03fc4-0366-4d25-b907-41a878ddda21`: Android `preview` internal APK built on 2026-11-20 from older commit `dc2511f2152fe4980158436da5df6b99f47d45be` (does **not** contain PR #2 fixes).
+  - `d293d94d-6d28-460b-8add-2e5846093cc6`: Android `production` AAB built on 2026-11-20 (pre-PR #2, **do not distribute**).
+- **Pass-4 Internal Android Preview APK:** Queued/triggered on EAS (`--profile preview --platform android`, `distribution: internal`, `buildType: apk`, `EXPO_PUBLIC_API_URL=https://staging.tijum.com/api/v1`, `EXPO_PUBLIC_ENVIRONMENT=preview`) directly from the pushed PR #2 commit SHA. Exact Build ID and real-time EAS status are reported in the PR #2 delivery report. No production build distributed and no `eas update` published.
 
-### 2.3 Tests Actually Run on Physical Devices
-- **Physical Device Count:** **0 devices**.
-- **Execution Record:** No real Android smartphone or physical iPhone was connected to this workstation. No emulator daemon (`adb devices` returned no targets) was active.
-- **Truthful Status:** Zero physical touch, thermal, biometric, or battery tests were conducted on hardware.
+### 2.3 Tests Actually Run on Physical Devices / Emulators
+- **Physical Device / Emulator Count:** **0 devices / 0 emulators**.
+- **Reason:** Android SDK (`adb`, `emulator`), Maestro CLI, and macOS/Xcode Simulator are not installed on this Windows workstation, and no physical smartphone is attached.
 
-### 2.4 Tests Written and Upgraded (Maestro E2E Flows)
-The superficial smoke tests were completely replaced with genuine multi-step functional user journeys equipped with stable accessibility identifiers (`testID`):
+### 2.4 Maestro E2E Flows Written (Not Executed on Native Device)
+All 3 Maestro E2E flows in `apps/mobile/.maestro/` were upgraded to deterministic mutating flows with **zero hardcoded fixture passwords** (credentials injected via `.maestro/.env.local` / `-e KEY=VALUE`; see `apps/mobile/.maestro/env.example`) and paired with 6 backend assertion scripts (`apps/mobile/.maestro/scripts/assert-*.js`):
 
-| Test Flow File | Target Journey | Steps Covered | Execution Status |
-|---|---|---|---|
-| `apps/mobile/.maestro/01-guest-explore-and-property.yaml` | Guest Onboarding, Explore, Category Discovery & Property Details | Onboarding skip → canonical category switching (`hostels-pg`, `homestays`, `co-living`, `all`) → city search → filter sheet open/dismiss → property card selection → room options & amenities inspection | Ready for runner with attached device/emulator |
-| `apps/mobile/.maestro/02-customer-auth-booking-and-support.yaml` | Customer Auth, Booking Hold, Mock Payment & Support Tickets | Customer login (`customer.test@tijum.internal`) → toggle registration → explore stays → select room & request hold → authoritative quote verification → 15-min countdown verification → Razorpay mock dismissal / cancellation → support hub inquiry creation | Ready for runner with attached device/emulator |
-| `apps/mobile/.maestro/03-partner-dashboard-operations-and-kyc.yaml` | Partner Auth, Dashboard, Physical Rooms, Reservations & KYC | Partner login (`partner.test@tijum.internal`) → onboarding toggle ("List Your Property") → Dashboard metrics inspection → Properties list & Physical Rooms inspection modal → front-desk reservations review → KYC PAN, GSTIN & bank IFSC verification | Ready for runner with attached device/emulator |
-
-### 2.5 Untested Screens & Workflows (Physical Device Dependency)
-1. **Dynamic Safe Areas:** iPhone Dynamic Island / notch clipping on physical iPhone 14/15/16 Pro displays.
-2. **Accessibility Font Scaling:** Layout reflow and text truncation when iOS "Larger Accessibility Sizes" (200%+) or Android "Font Size: Largest" is enabled.
-3. **Android Physical Back Button:** Back navigation state handling through deep nested modal sheets.
-4. **Biometric Auth Integration:** FaceID / Fingerprint hardware prompt behavior during 2FA challenge.
-5. **Live Network Degradation:** Edge network drop/reconnect during active payment checkout or multipart image upload.
-
-### 2.6 Infrastructure & Policy Blockers
-1. **Staging DNS Resolution (NXDOMAIN):**
-   - Domain: `staging.tijum.com`
-   - Current Status: `nslookup staging.tijum.com` returns `NXDOMAIN`.
-   - Impact: `eas.json` preview profile targets `https://staging.tijum.com/api/v1`. Any preview build distributed to internal testers fails on network calls until staging DNS resolves.
-   - Exact Deployment Prerequisites (Without Touching Production):
-     - Provision DNS `A` record for `staging.tijum.com` pointing to the isolated staging server IP.
-     - Configure Nginx / Caddy virtual host with Let's Encrypt TLS certificate.
-     - Provision dedicated MySQL database `tijum_staging` with isolated credentials (never pointed at `tijum_production`).
-     - Deploy backend code with `.env.staging` containing `APP_ENV=staging`, `TIJUM_PAYMENTS_LIVE_ENABLED=false`, `RAZORPAY_MODE=test`, `TIJUM_PARTNER_SETTLEMENTS_ENABLED=false`, `TIJUM_RAZORPAY_ROUTE_ENABLED=false`.
-2. **Financial Safety Controls (Mandatory Lock):**
-   - `TIJUM_PAYMENTS_LIVE_ENABLED=false` (Verified)
-   - `TIJUM_PARTNER_SETTLEMENTS_ENABLED=false` (Verified)
-   - `TIJUM_RAZORPAY_ROUTE_ENABLED=false` (Verified)
-   - `RAZORPAY_MODE=test` (Verified)
-
----
-
-## 3. Visual QA Screen Capture Index
-
-All 16 core customer, partner, auth, and legal screens were captured at mobile viewport (390x844) and archived in `docs/mobile/screenshots/`:
-
-| Screen # | Artifact Filename | Route / View | Verification Highlights |
-|---|---|---|---|
-| 01 | `01-onboarding.png` | `/` | Carousel, brand mark, skip and continue buttons |
-| 02 | `02-customer-login.png` | `/(auth)/customer-login` | Input fields, role switch, password recovery |
-| 03 | `03-customer-register.png` | `/(auth)/customer-register` | Full customer registration form, terms agreement |
-| 04 | `04-owner-login.png` | `/(auth)/owner-login` | Partner portal sign in, partner badge |
-| 05 | `05-owner-register.png` | `/(auth)/owner-register` | 10-field partner onboarding, canonical categories |
-| 06 | `06-explore-stays.png` | `/(customer)/explore` | Canonical category pills, search bar, filters button |
-| 07 | `07-customer-bookings.png` | `/(customer)/bookings` | Bookings list filter tabs (upcoming, past, cancelled) |
-| 08 | `08-customer-support.png` | `/(customer)/support` | Official support helpline, SLA link, raise request |
-| 09 | `09-customer-profile.png` | `/(customer)/profile` | Profile details, security settings, wishlist navigation |
-| 10 | `10-rewards-referrals.png` | `/(customer)/rewards/referrals` | Referral code, share button, rewards overview |
-| 11 | `11-partner-dashboard.png` | `/(partner)/dashboard` | Business overview, arrivals today, occupancy |
-| 12 | `12-partner-properties.png` | `/(partner)/properties` | Property cards, inspect physical rooms, add stay |
-| 13 | `13-partner-reservations.png` | `/(partner)/reservations` | Guest bookings list, status badges, manage booking |
-| 14 | `14-partner-settlements.png` | `/(partner)/settlements` | Payout history, statements, settlement statuses |
-| 15 | `15-help-faq.png` | `/help` | FAQs, customer protection guidance, contact inquiry |
-| 16 | `16-legal-terms.png` | `/legal/terms` | Formatted terms of service, platform guarantees |
-
----
-
-## 4. Release Configuration Status
-
-| Attribute | Specification | Status |
+| Flow File | Real Mutations & Backend Assertions | Native Maestro Execution |
 |---|---|---|
-| Package / Bundle ID | `com.tijum.app` (Android & iOS) | ✅ Aligned |
-| App Version / VersionCode | `1.0.0` / versionCode `3` / buildNumber `3` | ✅ Incremented |
-| App Icon | 1024x1024 24-bit opaque RGB PNG (no alpha) | ✅ Apple ITMS-90717 compliant |
-| Razorpay Plugin | `./plugins/withRazorpayConfig.cjs` (iOS UPI schemes + ProGuard) | ✅ Verified |
-| iOS Usage Descriptions | Camera, Photo Library, Location When In Use | ✅ Configured |
-| Android Permissions | `RECEIVE_BOOT_COMPLETED`, `POST_NOTIFICATIONS` | ✅ Minimal scope |
-| Deep-Link Intent Filters | `https://tijum.com` (`/properties/*`, `/reservations/*`, `/owner/*`, etc.) | ✅ Configured |
+| `01-guest-explore-and-property.yaml` | Onboarding dismissal → canonical categories (`hostels-pg`, `homestays`, `co-living`, `all`) → city search → filter sheet → property details | **NOT EXECUTED** (no Android/iOS device/Maestro CLI) |
+| `02-customer-auth-booking-and-support.yaml` | Customer login (env creds) → booking hold creation → test-mode Razorpay open & safe dismissal → real reservation cancellation (`assert-booking-cancelled.js`) → real protection case submission via `support-submit-btn` (`assert-case-created.js`) | **NOT EXECUTED** on native device (equivalent mutations verified via CDP + PHPUnit) |
+| `03-partner-dashboard-operations-and-kyc.yaml` | Partner login (env creds) → 3-step property draft creation (`assert-property-created.js`) → physical room addition (`assert-room-added.js`) → front-desk check-in & check-out (`assert-checkin-checkout.js`) → financial KYC update (`assert-kyc-updated.js`) | **NOT EXECUTED** on native device (equivalent mutations verified via CDP + PHPUnit) |
+
+### 2.5 Untested Native-Only Behaviors (Require Physical Hardware)
+1. Dynamic Island / notch / gesture-bar safe-area insets on physical iPhones and Android phones.
+2. System Accessibility font scaling (200%+ Dynamic Type / Largest font size).
+3. Hardware Android back gesture across nested modals and payment sheets.
+4. Native Razorpay SDK checkout sheet & UPI app-switch intent handoff on real Android/iOS builds.
+5. Camera / photo-library OS permission dialogs and multipart upload under mobile network handoffs.
+6. Push notification hardware token delivery (FCM / APNs).
+
+### 2.6 Infrastructure & Safety Controls
+1. **Staging DNS Blocker (Verified 2026-11-23):**
+   - `nslookup staging.tijum.com` returns **`Non-existent domain` (NXDOMAIN)**.
+   - Internal preview APKs target `https://staging.tijum.com/api/v1` and therefore cannot reach a live staging API until DNS + TLS + isolated `tijum_staging` DB are provisioned (never point preview builds at production `tijum.com`).
+2. **Production Financial Controls (Verified Locked):**
+   - `TIJUM_PAYMENTS_LIVE_ENABLED=false`
+   - `TIJUM_PARTNER_SETTLEMENTS_ENABLED=false`
+   - `TIJUM_RAZORPAY_ROUTE_ENABLED=false`
+   - `RAZORPAY_MODE=test`
+
+---
+
+## 3. Authenticated Visual QA Screenshot Inventory
+
+All screenshots were captured at mobile viewport (`390x844 @2x`) against a live isolated SQLite Laravel backend via `python scripts/capture_screens.py` (which hard-fails on API errors, unexpected sign-in gates, uncaught JS exceptions, broken images, or horizontal overflow) and visually inspected:
+
+### 3.1 Populated Customer, Partner, Auth & Public Screens (`docs/mobile/screenshots/`)
+| # | File | Auth Role | Verified Real Data Rendered |
+|---|---|---|---|
+| 01 | `01-onboarding.png` | Guest | Welcome carousel, TIJUM mark, Skip/Next/Host Portal actions |
+| 02 | `02-customer-login.png` | Guest | Customer/Partner switcher, login inputs, Sign Up link |
+| 03 | `03-customer-register.png` | Guest | Full registration form, terms consent, CTA |
+| 04 | `04-owner-login.png` | Guest | Partner login form, forgot password, Register as Partner |
+| 05 | `05-owner-register.png` | Guest | 10-field onboarding, canonical categories, all 4 wrapped API cities (`Hyderabad`, `Guntur`, `Vijayawada`, `Visakhapatnam`) |
+| 06 | `06-explore-stays.png` | Customer | Canonical category cards (`Hostels/PG`, `Homestays`, `Co-Living`) with TIJUM room imagery + real verified property cards with prices & ratings (`15` loaded images) |
+| 07 | `07-property-details.png` | Customer | `Sri Sai Balaji Executive Hostel & PG`, 3 room categories with Daily/Weekly/Monthly pricing, horizontal meal badges, inline checkmark amenities, verified review card (`19 Nov 2026`) |
+| 08 | `08-booking-create.png` | Customer | Live room category selection, dates/duration, loyalty points balance (`750 pts`), authoritative quote (`₹850`) |
+| 09 | `09-customer-bookings.png` | Customer | 3 real populated reservations (`TJR-2026-TODAY-QA02`, `TJR-2026-ACTIVE-02`, `TJR-2026-UPCOMING-01`) with real thumbnails & totals |
+| 10 | `10-booking-detail-hold.png` | Customer | Active `TJR-2026-HOLD-QA01` hold with live `14:xx` countdown, horizontal meal pills, `3 Days`, single-line sticky payment bar (`₹2,550`, `Status`, `Pay with Razorpay`), `Cancel Reservation` |
+| 11 | `11-customer-support.png` | Customer | Authenticated Support Hub with seeded protection case `CASE-2026-QA001`, SLA policy trigger, official helpline |
+| 12 | `12-customer-profile.png` | Customer | Authenticated `Rahul Sharma` (`customer@tijum.com`), Email Verified badge, Wishlist count (`2`), full account menu |
+| 13 | `13-customer-rewards.png` | Customer | `750 pts` wallet, `4 ACTIVE` coupons, formatted activity date (`23 Nov 2026`) |
+| 14 | `14-customer-wishlist.png` | Customer | 2 saved stays with real property photography and ratings |
+| 15 | `15-partner-dashboard.png` | Partner | Authenticated `Hello, Kalyan Chakravarthy`, `Confirmed Stays: 2`, `Monthly Earnings: ₹12,861`, `1 Arrivals Today`, `7 properties / 127 rooms`, `Unsettled payout: ₹2,915.16`, 4 recent bookings |
+| 16 | `16-partner-properties.png` | Partner | 7 active verified properties with real cover photos, room category summaries, meal disclosures, `Inspect Physical Rooms` & management tools |
+| 17 | `17-partner-reservations.png` | Partner | Authenticated upcoming guest bookings with real payouts (`₹2,915.16` and `₹5,950`), `View Details`, `Manage Booking` |
+| 18 | `18-partner-reservation-detail.png` | Partner | `TJR-2026-TODAY-QA02`, `4 Days`, horizontal meal obligations, Gross `₹3,400`, Commission `-₹408`, Estimated Host Payout `₹2,915.16`, Allocated `Room #102`, `Check In Guest` action |
+| 19 | `19-partner-financial-profile.png` | Partner | Verified `Sri Sai Balaji Hospitality Private Limited`, `Private Limited Company`, `Hospitality Service Provider`, PAN `ABCDE1234F`, GSTIN `36ABCDE1234F1Z5`, HDFC Bank `XXXXXX4892`, visible white Edit header button |
+| 20 | `20-partner-settlements.png` | Partner | Summary cards (`Total Settled: ₹12,861`, `Pending Payouts: ₹2,915.16`), formatted dates (`23 Nov 2026`, `13 Nov 2026`), amber `approved` vs emerald `settled` badges |
+| 21 | `21-partner-settlement-detail.png` | Partner | Unclipped `Settlement Statement` header + `Settled` pill, `₹12,861.00` net payout, `trf_qa_settled_001`, full deduction math (`₹15,000 - ₹1,800 - ₹324 - ₹15`) |
+| 22 | `22-help-faq.png` | Guest | API-loaded FAQs + support contact card |
+| 23 | `23-legal-terms.png` | Guest | Formatted Terms & Conditions |
+
+### 3.2 Explicitly Categorized Empty, Auth-Gate & Error States (`docs/mobile/screenshots/states/`)
+| File | Scenario Verified |
+|---|---|
+| `states/state-empty-customer-bookings.png` | Authenticated zero-booking customer (`empty.customer@tijum.test`) sees clean "No upcoming bookings" empty state with "Explore Stays" CTA |
+| `states/state-empty-partner-properties.png` | Authenticated zero-property partner (`empty.partner@tijum.test`) sees clean "No properties listed" empty state with "+ Add New Property" CTA |
+| `states/state-auth-gate-partner-dashboard.png` | Unauthenticated guest visiting `/(partner)/dashboard` sees intentional "Partner Access Required" gate |
+| `states/state-error-explore-api-down.png` | Simulated HTTP 503 outage on `/api/v1/*` renders clean "Unable to Load Stays" recovery state with "Tap to Retry" CTA |

@@ -93,11 +93,11 @@ export interface RoomType {
     preferred_guest_gender?: 'male' | 'female' | 'mixed';
     preferred_guest_gender_label?: string;
     strict_gender_preference?: boolean;
-    allowed_guest_genders?: Array<{
+    allowed_guest_genders?: {
         value: 'male' | 'female' | 'mixed';
         label: string;
-    }>;
-    allowed_guest_compositions?: Array<{ value: string; label: string }>;
+    }[];
+    allowed_guest_compositions?: { value: string; label: string }[];
     default_guest_composition?: string;
     guest_composition_policy?: string[];
     max_guests_per_room: number;
@@ -143,7 +143,7 @@ export interface PropertyDetail extends PropertyCard {
     dinner_timing?: string;
     meals_description?: string;
     rating?: number;
-    reviews?: Array<{
+    reviews?: {
         id: number;
         overall_rating: number;
         cleanliness_rating?: number | null;
@@ -159,21 +159,21 @@ export interface PropertyDetail extends PropertyCard {
         created_at?: string | null;
         owner_reply?: string | null;
         owner_reply_at?: string | null;
-    }>;
-    gallery: Array<{
+    }[];
+    gallery: {
         id: number;
         url: string;
         caption?: string;
         is_primary?: boolean;
-    }>;
-    amenities: Array<{
+    }[];
+    amenities: {
         id: number;
         name: string;
         code?: string;
         category?: string;
         icon?: string;
         icon_key?: string;
-    }>;
+    }[];
     room_types: RoomType[];
     timing?: {
         timezone?: string;
@@ -337,13 +337,13 @@ export interface Reservation {
     primary_room_number?: string | null;
     allocated_room_number?: string | null;
     allocated_floor?: string | number | null;
-    allocations?: Array<{
+    allocations?: {
         id: number;
         property_room_id: number;
         room_number: string;
         floor_number?: string | number | null;
         allocated_quantity: number;
-    }>;
+    }[];
     is_reviewed?: boolean;
     review?: {
         id?: number;
@@ -466,14 +466,14 @@ export interface StayQuoteResponse {
         total_amount_minor: number;
         currency_code: string;
         early_check_in_allowed: boolean;
-        allowed_guest_genders: Array<{
+        allowed_guest_genders: {
             value: 'male' | 'female' | 'mixed';
             label: string;
-        }>;
+        }[];
         preferred_guest_gender: 'male' | 'female' | 'mixed';
         preferred_guest_gender_label: string;
         strict_gender_preference: boolean;
-        allowed_guest_compositions: Array<{ value: string; label: string }>;
+        allowed_guest_compositions: { value: string; label: string }[];
         default_guest_composition: string;
         timing: Record<string, any>;
     };
@@ -503,10 +503,10 @@ export interface StayQuoteResponse {
         early_check_in_enabled: boolean;
     };
     booking_options: {
-        booking_for_options: Array<{
+        booking_for_options: {
             value: 'self' | 'other';
             label: string;
-        }>;
+        }[];
         contact_phone_digits: number;
     };
 }
@@ -677,12 +677,12 @@ export interface SupportTicketMessage {
 
 export interface SupportTicketIndexData {
     tickets: SupportTicketSummary[];
-    categories: Array<{ value: string; label: string }>;
-    reservations: Array<{
+    categories: { value: string; label: string }[];
+    reservations: {
         id: number;
         booking_reference: string;
         property_name: string;
-    }>;
+    }[];
 }
 
 export interface PartnerDashboardData {
@@ -841,30 +841,30 @@ export interface PromotionQuoteResult {
 
 export interface OwnerReferenceData {
     cities: City[];
-    categories: Array<{
+    categories: {
         id: number;
         name: string;
         slug: string;
         code?: string;
         description?: string;
-    }>;
-    canonical_categories: Array<{
+    }[];
+    canonical_categories: {
         slug: CanonicalCategorySlug;
         name: string;
-    }>;
-    room_type_modes: Array<{ value: string; label: string }>;
-    gender_policies: Array<{ value: string; label: string }>;
-    guest_compositions: Array<{ value: string; label: string }>;
-    room_operational_statuses: Array<{ value: string; label: string }>;
-    block_scopes: Array<{ value: string; label: string }>;
-    block_types: Array<{ value: string; label: string }>;
-    amenities: Array<{
+    }[];
+    room_type_modes: { value: string; label: string }[];
+    gender_policies: { value: string; label: string }[];
+    guest_compositions: { value: string; label: string }[];
+    room_operational_statuses: { value: string; label: string }[];
+    block_scopes: { value: string; label: string }[];
+    block_types: { value: string; label: string }[];
+    amenities: {
         id: number;
         name: string;
         code: string;
         category?: string;
         icon_key?: string;
-    }>;
+    }[];
 }
 
 export interface PropertyPricingData {
@@ -876,7 +876,7 @@ export interface PropertyPricingData {
         lunch: boolean;
         dinner: boolean;
     };
-    room_types: Array<{
+    room_types: {
         id: number;
         name: string;
         accommodation_mode: 'shared' | 'private';
@@ -889,7 +889,7 @@ export interface PropertyPricingData {
         daily_rate_minor?: number | null;
         weekly_rate_minor?: number | null;
         monthly_rate_minor?: number | null;
-    }>;
+    }[];
     evaluation: {
         active_room_types_count: number;
         configured_room_types_count: number;
@@ -1016,7 +1016,7 @@ export interface PropertyVerificationChecklistItem {
 export interface PropertyVerificationDocumentsResponse {
     documents: PropertyVerificationDocumentItem[];
     checklist: PropertyVerificationChecklistItem[];
-    required_types?: Array<string | { type: string; label: string }>;
+    required_types?: (string | { type: string; label: string })[];
 }
 
 export interface OwnerFinancialProfile {
@@ -1069,10 +1069,13 @@ export interface OwnerCommissionAgreement {
 
 export interface FinancialSummaryData {
     total_settled_paise: number;
+    lifetime_settled_paise?: number;
     pending_settlement_paise: number;
+    pending_payout_paise?: number;
     on_hold_paise?: number;
     settled_count?: number;
     pending_count?: number;
+    total_statements_count?: number;
     settlements?: {
         total_settled_amount_minor?: number;
         pending_settlement_amount_minor?: number;

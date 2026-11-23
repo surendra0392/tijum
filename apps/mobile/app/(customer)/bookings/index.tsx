@@ -34,10 +34,10 @@ import {
     resolveReservationListActionRoute,
 } from '../../../src/utils/reservationState';
 
-const FILTER_TABS: Array<{
+const FILTER_TABS: {
     label: string;
     value: 'upcoming' | 'awaiting_action' | 'past' | 'cancelled';
-}> = [
+}[] = [
     { label: 'Upcoming', value: 'upcoming' },
     { label: 'Action', value: 'awaiting_action' },
     { label: 'Past', value: 'past' },

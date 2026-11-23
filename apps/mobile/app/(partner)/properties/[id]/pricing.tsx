@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -58,16 +58,19 @@ export default function PropertyPricingScreen() {
         >
     >({});
 
-    useEffect(() => {
-        if (propertyId) {
-            void loadPricing();
-        }
-    }, [propertyId]);
+    const loadSeqRef = useRef(0);
 
-    const loadPricing = async () => {
+    const loadPricing = useCallback(async () => {
+        if (!propertyId) {
+            return;
+        }
+        const reqId = ++loadSeqRef.current;
         try {
             setLoading(true);
             const res = await OwnerApi.getPricing(propertyId);
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
             if (res.data) {
                 setPricingData(res.data);
                 setFoodProvided(res.data.food.provided);
@@ -103,15 +106,26 @@ export default function PropertyPricingScreen() {
                 setRatesMap(map);
             }
         } catch (e: any) {
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
             Alert.alert(
                 'Failed to Load Pricing',
                 e.message ||
                     'Unable to retrieve property rates and meal configuration.',
             );
         } finally {
-            setLoading(false);
+            if (reqId === loadSeqRef.current) {
+                setLoading(false);
+            }
         }
-    };
+    }, [propertyId]);
+
+    useEffect(() => {
+        if (propertyId) {
+            void loadPricing();
+        }
+    }, [propertyId, loadPricing]);
 
     const handleRateChange = (
         roomTypeId: number,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     RefreshControl,
@@ -45,18 +45,17 @@ export default function PartnerDashboardScreen() {
 
     const isGuest = !token || authState !== 'owner_authenticated';
 
+    const hasLoadedRef = useRef(false);
+    const loadSeqRef = useRef(0);
+
     useEffect(() => {
         setDashboardData(null);
         setUnreadCount(0);
+        hasLoadedRef.current = false;
     }, [sessionEpoch]);
 
-    useEffect(() => {
-        if (!isGuest && isFocused) {
-            void loadDashboard(dashboardData !== null);
-        }
-    }, [isGuest, isFocused]);
-
-    const loadDashboard = async (silent = false) => {
+    const loadDashboard = useCallback(async (silent = false) => {
+        const reqId = ++loadSeqRef.current;
         try {
             if (!silent) {
                 setLoading(true);
@@ -66,25 +65,41 @@ export default function PartnerDashboardScreen() {
                 OwnerApi.getDashboard(),
                 OwnerApi.getUnreadCount().catch(() => null),
             ]);
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
             if (res.data) {
                 setDashboardData(res.data);
+                hasLoadedRef.current = true;
             } else {
                 setDashboardData(null);
+                hasLoadedRef.current = false;
                 setErrorMessage('Dashboard data is unavailable.');
             }
             if (typeof unreadRes?.data?.unread_count === 'number') {
                 setUnreadCount(unreadRes.data.unread_count);
             }
         } catch (loadError: unknown) {
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
             setErrorMessage(
                 loadError instanceof Error
                     ? loadError.message
                     : 'Unable to load your dashboard.',
             );
         } finally {
-            setLoading(false);
+            if (reqId === loadSeqRef.current) {
+                setLoading(false);
+            }
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        if (!isGuest && isFocused) {
+            void loadDashboard(hasLoadedRef.current);
+        }
+    }, [isGuest, isFocused, loadDashboard, sessionEpoch]);
 
     const partnerName = isGuest ? 'Partner' : owner?.name || '—';
 

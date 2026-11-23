@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -78,13 +78,13 @@ export default function PropertyAvailabilityScreen() {
     const [reason, setReason] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
-    useEffect(() => {
-        if (propertyId) {
-            void loadData();
-        }
-    }, [propertyId]);
+    const loadSeqRef = useRef(0);
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
+        if (!propertyId) {
+            return;
+        }
+        const reqId = ++loadSeqRef.current;
         try {
             setLoading(true);
             const [blocksRes, rtRes, roomsRes] = await Promise.all([
@@ -92,31 +92,51 @@ export default function PropertyAvailabilityScreen() {
                 OwnerApi.getRoomTypes(propertyId),
                 OwnerApi.getPropertyRooms(propertyId),
             ]);
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
 
             if (blocksRes.data) {
                 setBlocks(blocksRes.data);
             }
             if (rtRes.data) {
-                setRoomTypes(rtRes.data);
-                if (rtRes.data.length > 0 && !selectedRoomTypeId) {
-                    setSelectedRoomTypeId(rtRes.data[0].id);
-                }
+                const nextRoomTypes = rtRes.data;
+                setRoomTypes(nextRoomTypes);
+                setSelectedRoomTypeId((prev) =>
+                    prev && nextRoomTypes.some((rt) => rt.id === prev)
+                        ? prev
+                        : (nextRoomTypes[0]?.id ?? null),
+                );
             }
             if (roomsRes.data) {
-                setRooms(roomsRes.data);
-                if (roomsRes.data.length > 0 && !selectedRoomId) {
-                    setSelectedRoomId(roomsRes.data[0].id);
-                }
+                const nextRooms = roomsRes.data;
+                setRooms(nextRooms);
+                setSelectedRoomId((prev) =>
+                    prev && nextRooms.some((r) => r.id === prev)
+                        ? prev
+                        : (nextRooms[0]?.id ?? null),
+                );
             }
         } catch (e: any) {
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
             Alert.alert(
                 'Load Failed',
                 e.message || 'Unable to retrieve availability blocks.',
             );
         } finally {
-            setLoading(false);
+            if (reqId === loadSeqRef.current) {
+                setLoading(false);
+            }
         }
-    };
+    }, [propertyId]);
+
+    useEffect(() => {
+        if (propertyId) {
+            void loadData();
+        }
+    }, [propertyId, loadData]);
 
     const onRefresh = async () => {
         setRefreshing(true);

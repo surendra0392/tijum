@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -46,41 +46,55 @@ export default function CustomerCaseDetailScreen() {
     const [replyText, setReplyText] = useState('');
     const [sending, setSending] = useState(false);
 
-    const fetchCase = async (options?: { silent?: boolean }) => {
-        if (!reference) {
-            setLoading(false);
-            setLoadError('Support case reference is missing.');
-            return;
-        }
-        try {
-            if (!options?.silent) {
-                setLoading(true);
-            }
-            setLoadError(null);
-            const res = await CustomerApi.getCase(reference);
-            const data = (res.data as any)?.case || res.data;
-            if (data) {
-                setCaseData(data);
+    const loadSeqRef = useRef(0);
+
+    const fetchCase = useCallback(
+        async (options?: { silent?: boolean }) => {
+            if (!reference) {
+                setLoading(false);
+                setLoadError('Support case reference is missing.');
                 return;
             }
-            setCaseData(null);
-            setLoadError('Support case not found.');
-        } catch (error: any) {
-            setCaseData(null);
-            setLoadError(
-                error?.message || 'Failed to load support case details.',
-            );
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    };
+            const reqId = ++loadSeqRef.current;
+            try {
+                if (!options?.silent) {
+                    setLoading(true);
+                }
+                setLoadError(null);
+                const res = await CustomerApi.getCase(reference);
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
+                const data = (res.data as any)?.case || res.data;
+                if (data) {
+                    setCaseData(data);
+                    return;
+                }
+                setCaseData(null);
+                setLoadError('Support case not found.');
+            } catch (error: any) {
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
+                setCaseData(null);
+                setLoadError(
+                    error?.message || 'Failed to load support case details.',
+                );
+            } finally {
+                if (reqId === loadSeqRef.current) {
+                    setLoading(false);
+                    setRefreshing(false);
+                }
+            }
+        },
+        [reference],
+    );
 
     useEffect(() => {
         setCaseData(null);
         setLoadError(null);
         void fetchCase();
-    }, [reference]);
+    }, [fetchCase]);
 
     const onRefresh = () => {
         setRefreshing(true);

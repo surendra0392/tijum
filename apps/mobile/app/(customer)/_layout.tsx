@@ -19,13 +19,18 @@ export default function CustomerTabsLayout() {
                 tabBarStyle: {
                     backgroundColor: Colors.white,
                     borderTopColor: Colors.gray200,
-                    height: 54 + bottomInset,
-                    paddingBottom: bottomInset,
+                    height: 68 + bottomInset,
+                    paddingBottom: bottomInset + 4,
                     paddingTop: 6,
+                },
+                tabBarItemStyle: {
+                    paddingVertical: 2,
                 },
                 tabBarLabelStyle: {
                     fontSize: 11,
+                    lineHeight: 15,
                     fontWeight: '700',
+                    marginBottom: 2,
                 },
                 tabBarHideOnKeyboard: true,
                 headerStyle: {

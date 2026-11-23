@@ -41,10 +41,25 @@ export class ApiError extends Error {
     }
 }
 
+function readDefaultRuntimeEnv(): Record<string, string | undefined> {
+    // Direct dot-notation access is required so Expo's Metro/Babel inline-env-vars
+    // transform statically substitutes EXPO_PUBLIC_* in Android, iOS, and web builds.
+    return {
+        EXPO_PUBLIC_API_URL:
+            typeof process !== 'undefined'
+                ? process.env.EXPO_PUBLIC_API_URL
+                : undefined,
+        EXPO_PUBLIC_ENVIRONMENT:
+            typeof process !== 'undefined'
+                ? process.env.EXPO_PUBLIC_ENVIRONMENT
+                : undefined,
+        NODE_ENV:
+            typeof process !== 'undefined' ? process.env.NODE_ENV : undefined,
+    };
+}
+
 export function resolveApiBaseUrl(
-    env: Record<string, string | undefined> = typeof process !== 'undefined'
-        ? (process.env as Record<string, string | undefined>)
-        : {},
+    env: Record<string, string | undefined> = readDefaultRuntimeEnv(),
 ): string {
     const rawUrl = env.EXPO_PUBLIC_API_URL?.trim();
     const environment = (env.EXPO_PUBLIC_ENVIRONMENT ?? 'development')
@@ -101,9 +116,7 @@ export function resolveApiBaseUrl(
 }
 
 export function resolveApiOrigin(
-    env: Record<string, string | undefined> = typeof process !== 'undefined'
-        ? (process.env as Record<string, string | undefined>)
-        : {},
+    env: Record<string, string | undefined> = readDefaultRuntimeEnv(),
 ): string {
     return resolveApiBaseUrl(env).replace(/\/api\/v1\/?$/, '');
 }

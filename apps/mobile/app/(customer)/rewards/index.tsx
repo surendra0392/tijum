@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     RefreshControl,
@@ -24,6 +24,7 @@ import {
     Info,
 } from 'lucide-react-native';
 import { RewardsApi, RewardsOverviewResponse } from '../../../src/api/rewards';
+import { useAuth } from '../../../src/auth/AuthContext';
 import { AppHeader } from '../../../src/components/AppHeader';
 import { RequireAuth } from '../../../src/components/RequireAuth';
 import { Colors } from '../../../src/theme/colors';
@@ -33,44 +34,73 @@ import { Typography } from '../../../src/theme/typography';
 export default function RewardsDashboardScreen() {
     const router = useRouter();
     const isFocused = useIsFocused();
+    const { token, authState, sessionEpoch } = useAuth();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [overview, setOverview] = useState<RewardsOverviewResponse | null>(
         null,
     );
+    const hasLoadedRef = useRef(false);
+    const loadSeqRef = useRef(0);
 
-    const loadRewards = async (isRefresh = false) => {
-        if (isRefresh) {
-            setRefreshing(true);
-        } else {
-            setLoading(true);
-        }
+    useEffect(() => {
+        setOverview(null);
         setErrorMessage(null);
+        hasLoadedRef.current = false;
+    }, [sessionEpoch]);
 
-        try {
-            const res = await RewardsApi.getOverview();
-            if (res.data) {
-                setOverview(res.data);
-            } else {
-                setOverview(null);
+    const loadRewards = useCallback(
+        async (isRefresh = false) => {
+            if (!token || authState !== 'customer_authenticated') {
+                setLoading(false);
+                setRefreshing(false);
+                return;
             }
-        } catch {
-            setErrorMessage(
-                'Unable to load your rewards profile. Please try again.',
-            );
-            setOverview(null);
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    };
+            const reqId = ++loadSeqRef.current;
+            if (isRefresh) {
+                setRefreshing(true);
+            } else {
+                setLoading(true);
+            }
+            setErrorMessage(null);
+
+            try {
+                const res = await RewardsApi.getOverview();
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
+                if (res.data) {
+                    setOverview(res.data);
+                    hasLoadedRef.current = true;
+                } else {
+                    setOverview(null);
+                    hasLoadedRef.current = false;
+                }
+            } catch {
+                if (reqId !== loadSeqRef.current) {
+                    return;
+                }
+                setErrorMessage(
+                    'Unable to load your rewards profile. Please try again.',
+                );
+                setOverview(null);
+                hasLoadedRef.current = false;
+            } finally {
+                if (reqId === loadSeqRef.current) {
+                    setLoading(false);
+                    setRefreshing(false);
+                }
+            }
+        },
+        [token, authState],
+    );
 
     useEffect(() => {
         if (isFocused) {
-            void loadRewards(overview !== null);
+            void loadRewards(hasLoadedRef.current);
         }
-    }, [isFocused]);
+    }, [isFocused, loadRewards, sessionEpoch]);
 
     if (loading && !refreshing && !overview) {
         return (
@@ -406,7 +436,17 @@ export default function RewardsDashboardScreen() {
                                         {tx.description}
                                     </Text>
                                     <Text style={styles.txDate}>
-                                        {tx.created_at}
+                                        {(() => {
+                                            const parsed = new Date(tx.created_at);
+                                            if (Number.isNaN(parsed.getTime())) {
+                                                return tx.created_at;
+                                            }
+                                            return parsed.toLocaleDateString('en-IN', {
+                                                day: '2-digit',
+                                                month: 'short',
+                                                year: 'numeric',
+                                            });
+                                        })()}
                                     </Text>
                                 </View>
                                 <View style={{ alignItems: 'flex-end' }}>

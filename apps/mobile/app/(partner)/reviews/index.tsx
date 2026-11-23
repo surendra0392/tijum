@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -52,7 +52,11 @@ export default function PartnerReviewsScreen() {
     const [replying, setReplying] = useState(false);
     const [replyError, setReplyError] = useState('');
 
-    const loadReviews = async (isRefresh = false) => {
+    const hasLoadedRef = useRef(false);
+    const loadSeqRef = useRef(0);
+
+    const loadReviews = useCallback(async (isRefresh = false) => {
+        const reqId = ++loadSeqRef.current;
         if (isRefresh) {
             setRefreshing(true);
         } else {
@@ -62,24 +66,34 @@ export default function PartnerReviewsScreen() {
         try {
             setLoadError(null);
             const res = await OwnerApi.getReviews();
-            setReviews(res.data ?? []);
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
+            const nextReviews = res.data ?? [];
+            setReviews(nextReviews);
+            hasLoadedRef.current = nextReviews.length > 0;
         } catch (reviewLoadError: unknown) {
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
             setLoadError(
                 reviewLoadError instanceof Error
                     ? reviewLoadError.message
                     : 'Unable to load partner reviews.',
             );
         } finally {
-            setLoading(false);
-            setRefreshing(false);
+            if (reqId === loadSeqRef.current) {
+                setLoading(false);
+                setRefreshing(false);
+            }
         }
-    };
+    }, []);
 
     useEffect(() => {
         if (isFocused) {
-            void loadReviews(reviews.length > 0);
+            void loadReviews(hasLoadedRef.current);
         }
-    }, [isFocused]);
+    }, [isFocused, loadReviews]);
 
     const handleOpenReplyModal = (review: OwnerReview) => {
         setSelectedReview(review);

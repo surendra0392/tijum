@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -67,38 +67,55 @@ export default function PropertyRoomsScreen() {
     const [statusReason, setStatusReason] = useState('');
     const [updatingStatus, setUpdatingStatus] = useState(false);
 
-    useEffect(() => {
-        if (propertyId) {
-            void loadData();
-        }
-    }, [propertyId]);
+    const loadSeqRef = useRef(0);
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
+        if (!propertyId) {
+            return;
+        }
+        const reqId = ++loadSeqRef.current;
         try {
             setLoading(true);
             const [roomsRes, rtRes] = await Promise.all([
                 OwnerApi.getPropertyRooms(propertyId),
                 OwnerApi.getRoomTypes(propertyId),
             ]);
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
 
             if (roomsRes.data) {
                 setRooms(roomsRes.data);
             }
             if (rtRes.data) {
-                setRoomTypes(rtRes.data);
-                if (rtRes.data.length > 0 && !selectedRoomTypeId) {
-                    setSelectedRoomTypeId(rtRes.data[0].id);
-                }
+                const nextRoomTypes = rtRes.data;
+                setRoomTypes(nextRoomTypes);
+                setSelectedRoomTypeId((prev) =>
+                    prev && nextRoomTypes.some((rt) => rt.id === prev)
+                        ? prev
+                        : (nextRoomTypes[0]?.id ?? null),
+                );
             }
         } catch (e: any) {
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
             Alert.alert(
                 'Load Failed',
                 e.message || 'Unable to retrieve physical rooms.',
             );
         } finally {
-            setLoading(false);
+            if (reqId === loadSeqRef.current) {
+                setLoading(false);
+            }
         }
-    };
+    }, [propertyId]);
+
+    useEffect(() => {
+        if (propertyId) {
+            void loadData();
+        }
+    }, [propertyId, loadData]);
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -345,6 +362,7 @@ export default function PropertyRoomsScreen() {
                     fallbackRoute={`/(partner)/properties/${propertyId}/edit`}
                     rightElement={
                         <TouchableOpacity
+                            testID="partner-room-add-btn"
                             style={styles.addBtn}
                             onPress={handleOpenCreate}
                             activeOpacity={0.8}
@@ -458,6 +476,7 @@ export default function PropertyRoomsScreen() {
 
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <Input
+                                testID="partner-room-number-input"
                                 label="Room Number / Identifier *"
                                 placeholder="e.g. 101, A-102"
                                 value={roomNumber}
@@ -497,6 +516,7 @@ export default function PropertyRoomsScreen() {
                             </View>
 
                             <Input
+                                testID="partner-room-floor-input"
                                 label="Floor Number (Optional)"
                                 placeholder="e.g. 1, 2, Ground"
                                 value={floorNumber}
@@ -517,6 +537,7 @@ export default function PropertyRoomsScreen() {
 
                             <View style={{ marginTop: Spacing.lg }}>
                                 <Button
+                                    testID="partner-room-submit-btn"
                                     title={
                                         editingRoom
                                             ? 'Update Room'

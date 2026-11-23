@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -89,7 +89,7 @@ const CATEGORY_TABS: CategoryTabItem[] = [
     },
 ];
 
-const GENDER_OPTIONS: Array<{ key: 'all' | 'male' | 'female'; label: string }> =
+const GENDER_OPTIONS: { key: 'all' | 'male' | 'female'; label: string }[] =
     [
         { key: 'all', label: 'All Genders' },
         { key: 'male', label: 'Men Only' },
@@ -281,6 +281,10 @@ export default function ExploreScreen() {
         resetDraftFilters();
     };
 
+    const searchQueryRef = useRef(searchQuery);
+    searchQueryRef.current = searchQuery;
+    const fetchSeqRef = useRef(0);
+
     const fetchProperties = useCallback(
         async (
             pageNum: number = 1,
@@ -289,7 +293,7 @@ export default function ExploreScreen() {
         ) => {
             const effCity = override?.city ?? selectedCity;
             const effCat = override?.category ?? selectedCategory;
-            const effSearch = override?.searchQuery ?? searchQuery;
+            const effSearch = override?.searchQuery ?? searchQueryRef.current;
             const effAc = override?.filterAc ?? filterAc;
             const effGender = override?.gender ?? selectedGender;
             const effBreakfast = override?.breakfast ?? filterBreakfast;
@@ -303,6 +307,7 @@ export default function ExploreScreen() {
             const effMaxPrice = override?.maxPrice ?? maxPrice;
             const effCheckIn = override?.checkInDate ?? checkInDate;
             const effCheckOut = override?.checkOutDate ?? checkOutDate;
+            const reqId = ++fetchSeqRef.current;
 
             if (pageNum > 1) {
                 setLoadingMore(true);
@@ -359,6 +364,9 @@ export default function ExploreScreen() {
                 }
 
                 const res = await PublicApi.getProperties(filters);
+                if (reqId !== fetchSeqRef.current) {
+                    return;
+                }
                 let nextProperties = res.data || [];
 
                 // Local normalization filter to ensure client displays strictly matching canonical category
@@ -387,6 +395,9 @@ export default function ExploreScreen() {
                 setCurrentPage(res.meta?.current_page ?? pageNum);
                 setLastPage(res.meta?.last_page ?? pageNum);
             } catch (err: any) {
+                if (reqId !== fetchSeqRef.current) {
+                    return;
+                }
                 if (pageNum === 1) {
                     setProperties([]);
                     setErrorStatus(
@@ -398,15 +409,16 @@ export default function ExploreScreen() {
                     );
                 }
             } finally {
-                setLoading(false);
-                setRefreshing(false);
-                setLoadingMore(false);
+                if (reqId === fetchSeqRef.current) {
+                    setLoading(false);
+                    setRefreshing(false);
+                    setLoadingMore(false);
+                }
             }
         },
         [
             selectedCity,
             selectedCategory,
-            searchQuery,
             filterAc,
             selectedGender,
             filterBreakfast,
@@ -432,20 +444,7 @@ export default function ExploreScreen() {
 
     useEffect(() => {
         void fetchProperties(1, false);
-    }, [
-        selectedCity,
-        selectedCategory,
-        filterAc,
-        selectedGender,
-        filterBreakfast,
-        filterLunch,
-        filterDinner,
-        selectedSharing,
-        minPrice,
-        maxPrice,
-        checkInDate,
-        checkOutDate,
-    ]);
+    }, [fetchProperties]);
 
     // Fetch cities from API for city selector
     useEffect(() => {
@@ -918,7 +917,7 @@ export default function ExploreScreen() {
                                         activeOpacity={0.85}
                                     >
                                         <Image
-                                            source={require('../../../assets/onboarding/stays.jpg')}
+                                            source={require('../../../assets/categories/hostels-pg.jpg')}
                                             style={styles.visualCatImg}
                                         />
                                         <Text
@@ -929,7 +928,7 @@ export default function ExploreScreen() {
                                                     styles.visualCatLabelActive,
                                             ]}
                                         >
-                                            Hostels PGs
+                                            Hostels/PG
                                         </Text>
                                     </TouchableOpacity>
 
@@ -949,7 +948,7 @@ export default function ExploreScreen() {
                                         activeOpacity={0.85}
                                     >
                                         <Image
-                                            source={require('../../../assets/onboarding/home.jpg')}
+                                            source={require('../../../assets/categories/homestays.jpg')}
                                             style={styles.visualCatImg}
                                         />
                                         <Text
@@ -980,7 +979,7 @@ export default function ExploreScreen() {
                                         activeOpacity={0.85}
                                     >
                                         <Image
-                                            source={require('../../../assets/onboarding/food.jpg')}
+                                            source={require('../../../assets/categories/co-living.jpg')}
                                             style={styles.visualCatImg}
                                         />
                                         <Text

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     View,
     Text,
@@ -123,32 +123,18 @@ export default function CreateReservationScreen() {
             });
     }, [authState, token]);
 
-    useEffect(() => {
-        setSubmissionToken(createUuid());
-        void loadProperty();
-    }, [property_slug, property_room_type_id]);
+    const loadSeqRef = useRef(0);
 
-    // Rotate submission token whenever booking parameters change so a fresh intent is formed
-    useEffect(() => {
-        setSubmissionToken(createUuid());
-    }, [
-        selectedRoomId,
-        checkInDate,
-        durationType,
-        durationQuantity,
-        quantity,
-        guestGender,
-        guestComposition,
-        appliedCoupon?.code,
-        redeemPointsActive,
-    ]);
-
-    const loadProperty = async () => {
+    const loadProperty = useCallback(async () => {
+        const reqId = ++loadSeqRef.current;
         try {
             setLoading(true);
             setLoadError(null);
             const effectiveSlug = property_slug || '';
             const res = await PublicApi.getProperty(effectiveSlug);
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
             if (res.data) {
                 setProperty(res.data);
                 const rooms = res.data.room_types || [];
@@ -171,44 +157,82 @@ export default function CreateReservationScreen() {
                 setLoadError('Property details could not be loaded.');
             }
         } catch (err: any) {
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
             setProperty(null);
             setSelectedRoomId(null);
             setLoadError(
                 err?.message || 'Unable to load property details right now.',
             );
         } finally {
-            setLoading(false);
+            if (reqId === loadSeqRef.current) {
+                setLoading(false);
+            }
         }
-    };
+    }, [property_slug, property_room_type_id]);
 
-    const selectedRoom: RoomType | null =
-        property?.room_types.find((r: RoomType) => r.id === selectedRoomId) ??
-        null;
+    useEffect(() => {
+        setSubmissionToken(createUuid());
+        void loadProperty();
+    }, [loadProperty]);
 
-    const allowedGenders = selectedRoom?.allowed_guest_genders?.length
-        ? selectedRoom.allowed_guest_genders
-        : [
-              { value: 'male' as const, label: 'Male' },
-              { value: 'female' as const, label: 'Female' },
-              { value: 'mixed' as const, label: 'Mixed' },
-          ];
+    // Rotate submission token whenever booking parameters change so a fresh intent is formed
+    useEffect(() => {
+        setSubmissionToken(createUuid());
+    }, [
+        selectedRoomId,
+        checkInDate,
+        durationType,
+        durationQuantity,
+        quantity,
+        guestGender,
+        guestComposition,
+        appliedCoupon?.code,
+        redeemPointsActive,
+    ]);
 
-    const allowedCompositions = selectedRoom?.allowed_guest_compositions?.length
-        ? selectedRoom.allowed_guest_compositions
-        : [{ value: 'individuals', label: 'Individual' }];
+    const selectedRoom: RoomType | null = useMemo(
+        () =>
+            property?.room_types.find((r: RoomType) => r.id === selectedRoomId) ??
+            null,
+        [property, selectedRoomId],
+    );
+
+    const allowedGenders = useMemo(
+        () =>
+            selectedRoom?.allowed_guest_genders?.length
+                ? selectedRoom.allowed_guest_genders
+                : [
+                      { value: 'male' as const, label: 'Male' },
+                      { value: 'female' as const, label: 'Female' },
+                      { value: 'mixed' as const, label: 'Mixed' },
+                  ],
+        [selectedRoom],
+    );
+
+    const allowedCompositions = useMemo(
+        () =>
+            selectedRoom?.allowed_guest_compositions?.length
+                ? selectedRoom.allowed_guest_compositions
+                : [{ value: 'individuals', label: 'Individual' }],
+        [selectedRoom],
+    );
 
     useEffect(() => {
         if (!selectedRoom) return;
-        if (!allowedGenders.some((g) => g.value === guestGender)) {
-            setGuestGender(allowedGenders[0].value);
-        }
-        if (!allowedCompositions.some((c) => c.value === guestComposition)) {
-            setGuestComposition(
-                selectedRoom.default_guest_composition ||
-                    allowedCompositions[0].value,
-            );
-        }
-    }, [selectedRoomId]);
+        setGuestGender((prev) =>
+            allowedGenders.some((g) => g.value === prev)
+                ? prev
+                : allowedGenders[0].value,
+        );
+        setGuestComposition((prev) =>
+            allowedCompositions.some((c) => c.value === prev)
+                ? prev
+                : selectedRoom.default_guest_composition ||
+                  allowedCompositions[0].value,
+        );
+    }, [selectedRoom, allowedGenders, allowedCompositions]);
 
     // Debounced Authoritative Backend Quote Calculation
     useEffect(() => {

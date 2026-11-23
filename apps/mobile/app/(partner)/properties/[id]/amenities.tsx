@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -57,26 +57,41 @@ export default function PropertyAmenitiesScreen() {
     const [amenityDetails, setAmenityDetails] = useState('');
     const [saving, setSaving] = useState(false);
 
-    const fetchData = async () => {
+    const loadSeqRef = useRef(0);
+
+    const fetchData = useCallback(async () => {
+        if (!propertyId) {
+            return;
+        }
+        const reqId = ++loadSeqRef.current;
         try {
             const res = await OwnerApi.getAmenities(propertyId);
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
             if (res.data) {
                 setAssigned(res.data.assigned || []);
                 setCatalogue(res.data.catalogue || []);
             }
         } catch (error: any) {
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
             Alert.alert('Error', error.message || 'Failed to load amenities.');
         } finally {
-            setLoading(false);
-            setRefreshing(false);
+            if (reqId === loadSeqRef.current) {
+                setLoading(false);
+                setRefreshing(false);
+            }
         }
-    };
+    }, [propertyId]);
 
     useEffect(() => {
         if (propertyId) {
+            setLoading(true);
             void fetchData();
         }
-    }, [propertyId]);
+    }, [propertyId, fetchData]);
 
     const onRefresh = () => {
         setRefreshing(true);

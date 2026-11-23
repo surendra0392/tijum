@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -57,31 +57,54 @@ export default function PartnerReservationDetailScreen() {
     const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
     const [allocateError, setAllocateError] = useState('');
 
-    useEffect(() => {
-        if (reference) {
-            void loadReservation();
-        }
-    }, [reference]);
+    const loadSeqRef = useRef(0);
 
-    const loadReservation = async () => {
+    const loadReservation = useCallback(async () => {
+        if (!reference) {
+            setLoading(false);
+            setReservation(null);
+            return;
+        }
+        const reqId = ++loadSeqRef.current;
         try {
             setLoading(true);
             const res = await OwnerApi.getReservation(reference);
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
             if (res.data) {
                 setReservation(res.data);
                 return;
             }
             setReservation(null);
         } catch (e: any) {
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
             setReservation(null);
             Alert.alert(
                 'Error',
                 e.message || 'Failed to load booking details.',
             );
         } finally {
+            if (reqId === loadSeqRef.current) {
+                setLoading(false);
+            }
+        }
+    }, [reference]);
+
+    useEffect(() => {
+        setReservation(null);
+        setCheckInNotes('');
+        setCheckOutNotes('');
+        setShowAllocateModal(false);
+        setAllocateError('');
+        if (reference) {
+            void loadReservation();
+        } else {
             setLoading(false);
         }
-    };
+    }, [reference, loadReservation]);
 
     const executeCheckIn = async () => {
         if (!reservation) return;
@@ -401,9 +424,20 @@ export default function PartnerReservationDetailScreen() {
                                     Guest Profile:
                                 </Text>
                                 <Text style={styles.infoValue}>
-                                    {reservation.guest_gender} (
-                                    {reservation.guest_composition ||
-                                        'standard'}
+                                    {reservation.guest_gender
+                                        ? reservation.guest_gender.charAt(0).toUpperCase() +
+                                          reservation.guest_gender.slice(1)
+                                        : 'Guest'}{' '}
+                                    (
+                                    {reservation.guest_composition_label ||
+                                        (reservation.guest_composition
+                                            ? reservation.guest_composition
+                                                  .charAt(0)
+                                                  .toUpperCase() +
+                                              reservation.guest_composition.slice(
+                                                  1,
+                                              )
+                                            : 'Standard')}
                                     )
                                 </Text>
                             </View>
@@ -427,7 +461,20 @@ export default function PartnerReservationDetailScreen() {
                                 <Text style={styles.infoLabel}>Duration:</Text>
                                 <Text style={styles.infoValue}>
                                     {reservation.duration_quantity}{' '}
-                                    {reservation.duration_type}
+                                    {reservation.duration_type === 'daily'
+                                        ? reservation.duration_quantity === 1
+                                            ? 'Day'
+                                            : 'Days'
+                                        : reservation.duration_type === 'weekly'
+                                          ? reservation.duration_quantity === 1
+                                              ? 'Week'
+                                              : 'Weeks'
+                                          : reservation.duration_type ===
+                                              'monthly'
+                                            ? reservation.duration_quantity === 1
+                                                ? 'Month'
+                                                : 'Months'
+                                            : reservation.duration_type}
                                 </Text>
                             </View>
                             {reservation.checked_in_at ? (
@@ -602,12 +649,13 @@ export default function PartnerReservationDetailScreen() {
                                     Estimated Host Payout:
                                 </Text>
                                 <Text style={styles.totalValue}>
-                                    ₹
-                                    {(
-                                        (reservation.owner_payable_paise ??
-                                            reservation.total_amount_paise) /
-                                        100
-                                    ).toLocaleString('en-IN')}
+                                    {reservation.owner_payable_paise &&
+                                    reservation.owner_payable_paise > 0
+                                        ? `₹${(
+                                              reservation.owner_payable_paise /
+                                              100
+                                          ).toLocaleString('en-IN')}`
+                                        : 'Pending Settlement Calc'}
                                 </Text>
                             </View>
                             {reservation.refunds &&
@@ -765,6 +813,7 @@ export default function PartnerReservationDetailScreen() {
                                     </View>
                                     {isConfirmed && !isCheckedOut ? (
                                         <Button
+                                            testID="partner-assign-room-btn"
                                             title="Assign Physical Room"
                                             variant="primary"
                                             size="sm"
@@ -800,12 +849,14 @@ export default function PartnerReservationDetailScreen() {
                                     record check-in to mark the room occupied.
                                 </Text>
                                 <Input
+                                    testID="partner-checkin-notes-input"
                                     label="Check-In Notes (Optional)"
                                     value={checkInNotes}
                                     onChangeText={setCheckInNotes}
                                     placeholder="e.g. Room 204 allocated, keys handed over"
                                 />
                                 <Button
+                                    testID="partner-checkin-btn"
                                     title="Check In Guest"
                                     loading={actionLoading}
                                     onPress={handleCheckIn}
@@ -823,12 +874,14 @@ export default function PartnerReservationDetailScreen() {
                                     checkout.
                                 </Text>
                                 <Input
+                                    testID="partner-checkout-notes-input"
                                     label="Checkout Notes (Optional)"
                                     value={checkOutNotes}
                                     onChangeText={setCheckOutNotes}
                                     placeholder="e.g. Keys returned, room inspected and cleared"
                                 />
                                 <Button
+                                    testID="partner-checkout-btn"
                                     title="Check Out Guest"
                                     loading={actionLoading}
                                     onPress={handleCheckOut}
@@ -1203,6 +1256,8 @@ const styles = StyleSheet.create({
         fontWeight: '800',
     },
     mealBadgesContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: Spacing.sm,
     },
     actionSection: {

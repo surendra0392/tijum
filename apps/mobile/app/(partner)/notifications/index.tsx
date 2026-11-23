@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     View,
     Text,
@@ -40,9 +40,70 @@ export default function PartnerNotificationsScreen() {
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [pushActive, setPushActive] = useState(true);
 
+    const loadSeqRef = useRef(0);
+
     useEffect(() => {
         setNotifications([]);
     }, [sessionEpoch]);
+
+    const loadPreferences = useCallback(async () => {
+        try {
+            const res = await OwnerApi.getNotificationPreferences();
+            const d = res?.data;
+            if (d) {
+                setPushActive(
+                    d.push_operational ?? d.channels_available?.push ?? true,
+                );
+            }
+        } catch {
+            // Non-blocking
+        }
+    }, []);
+
+    const loadNotifications = useCallback(async () => {
+        if (
+            !token ||
+            authState === 'guest' ||
+            authState === 'session_expired' ||
+            authState === 'customer_authenticated'
+        ) {
+            setIsUnauthenticated(true);
+            setLoading(false);
+            return;
+        }
+        const reqId = ++loadSeqRef.current;
+        try {
+            setLoading(true);
+            setIsUnauthenticated(false);
+            setErrorMessage(null);
+            const res = await OwnerApi.getNotifications();
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
+            if (res.data) {
+                setNotifications(res.data);
+            }
+        } catch (loadError: unknown) {
+            if (reqId !== loadSeqRef.current) {
+                return;
+            }
+            const error = loadError as { status?: number; message?: string };
+            if (
+                error.status === 401 ||
+                error.message?.includes('Unauthenticated')
+            ) {
+                setIsUnauthenticated(true);
+            } else {
+                setErrorMessage(
+                    error.message ?? 'Unable to load partner notifications.',
+                );
+            }
+        } finally {
+            if (reqId === loadSeqRef.current) {
+                setLoading(false);
+            }
+        }
+    }, [token, authState]);
 
     useEffect(() => {
         if (authLoading) return;
@@ -61,21 +122,15 @@ export default function PartnerNotificationsScreen() {
             void loadNotifications();
             void loadPreferences();
         }
-    }, [token, authState, authLoading, isFocused]);
-
-    const loadPreferences = async () => {
-        try {
-            const res = await OwnerApi.getNotificationPreferences();
-            const d = res?.data;
-            if (d) {
-                setPushActive(
-                    d.push_operational ?? d.channels_available?.push ?? true,
-                );
-            }
-        } catch {
-            // Non-blocking
-        }
-    };
+    }, [
+        token,
+        authState,
+        authLoading,
+        isFocused,
+        loadNotifications,
+        loadPreferences,
+        sessionEpoch,
+    ]);
 
     const handleTogglePush = async (val: boolean) => {
         if (val) {
@@ -104,42 +159,6 @@ export default function PartnerNotificationsScreen() {
                 'Preferences Not Saved',
                 'Could not update push notification setting.',
             );
-        }
-    };
-
-    const loadNotifications = async () => {
-        if (
-            !token ||
-            authState === 'guest' ||
-            authState === 'session_expired' ||
-            authState === 'customer_authenticated'
-        ) {
-            setIsUnauthenticated(true);
-            setLoading(false);
-            return;
-        }
-        try {
-            setLoading(true);
-            setIsUnauthenticated(false);
-            setErrorMessage(null);
-            const res = await OwnerApi.getNotifications();
-            if (res.data) {
-                setNotifications(res.data);
-            }
-        } catch (loadError: unknown) {
-            const error = loadError as { status?: number; message?: string };
-            if (
-                error.status === 401 ||
-                error.message?.includes('Unauthenticated')
-            ) {
-                setIsUnauthenticated(true);
-            } else {
-                setErrorMessage(
-                    error.message ?? 'Unable to load partner notifications.',
-                );
-            }
-        } finally {
-            setLoading(false);
         }
     };
 
