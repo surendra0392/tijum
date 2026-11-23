@@ -124,7 +124,7 @@ export default function OwnerLoginScreen() {
                 keyboardShouldPersistTaps="handled"
             >
                 <View style={styles.header}>
-                    <BrandLogo size={138} tone="dark" />
+                    <BrandLogo size={200} />
 
                     {/* Role Segmented Switch */}
                     <View style={styles.segmentedContainer}>

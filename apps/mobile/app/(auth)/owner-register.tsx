@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { PublicApi } from '../../src/api/public';
 import { City } from '../../src/api/types';
 import { useAuth } from '../../src/auth/AuthContext';
+import { BrandLogo } from '../../src/components/BrandLogo';
 import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
 import {
@@ -177,6 +178,7 @@ export default function OwnerRegisterScreen() {
                 keyboardShouldPersistTaps="handled"
             >
                 <View style={styles.header}>
+                    <BrandLogo size={156} style={styles.brandLogo} />
                     <View style={styles.badge}>
                         <Text style={styles.badgeText}>PARTNER ONBOARDING</Text>
                     </View>
@@ -482,6 +484,10 @@ const styles = StyleSheet.create({
     },
     header: {
         marginBottom: Spacing.lg,
+    },
+    brandLogo: {
+        alignSelf: 'flex-start',
+        marginBottom: Spacing.base,
     },
     badge: {
         backgroundColor: Colors.softPeach,

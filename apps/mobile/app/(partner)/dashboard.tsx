@@ -27,6 +27,7 @@ import { OwnerApi } from '../../src/api/owner';
 import { useAuth } from '../../src/auth/AuthContext';
 import { Colors } from '../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../src/theme/spacing';
+import { BrandLogo } from '../../src/components/BrandLogo';
 import { ExceptionalState } from '../../src/components/ExceptionalState';
 import { ReservationStatusBadge } from '../../src/components/ReservationStatusBadge';
 import { PartnerDashboardData, Reservation } from '../../src/api/types';
@@ -152,6 +153,7 @@ export default function PartnerDashboardScreen() {
                         { paddingTop: Math.max(insets.top, Spacing.base) },
                     ]}
                 >
+                    <BrandLogo size={152} tone="light" style={styles.headerLogo} />
                     <Text style={styles.greetingText}>Partner Portal</Text>
                 </View>
                 <ExceptionalState
@@ -219,14 +221,7 @@ export default function PartnerDashboardScreen() {
                     ]}
                 >
                     <View style={styles.headerTopRow}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.greetingText}>
-                                Hello, {partnerName}
-                            </Text>
-                            <Text style={styles.greetingSubtext}>
-                                Here&apos;s your business overview
-                            </Text>
-                        </View>
+                        <BrandLogo size={152} tone="light" />
 
                         <TouchableOpacity
                             accessibilityLabel="Open notifications"
@@ -266,6 +261,10 @@ export default function PartnerDashboardScreen() {
                             ) : null}
                         </TouchableOpacity>
                     </View>
+                    <Text style={styles.greetingText}>Hello, {partnerName}</Text>
+                    <Text style={styles.greetingSubtext}>
+                        Here&apos;s your business overview
+                    </Text>
                 </View>
 
                 {/* 2 Primary Metric Cards */}
@@ -716,6 +715,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        marginBottom: Spacing.sm,
+    },
+    headerLogo: {
+        alignSelf: 'flex-start',
+        marginBottom: Spacing.sm,
     },
     greetingText: {
         fontSize: 22,

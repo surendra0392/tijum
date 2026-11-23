@@ -172,7 +172,7 @@ export default function CustomerLoginScreen() {
             >
                 {/* Curved Plum Hero Banner with TIJUM Logo */}
                 <View style={styles.plumHeroBanner}>
-                    <BrandLogo size={158} tone="light" />
+                    <BrandLogo size={216} tone="light" />
                 </View>
 
                 {/* Main Card */}
@@ -480,28 +480,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderBottomLeftRadius: 36,
         borderBottomRightRadius: 36,
-    },
-    brandLogoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 2,
-    },
-    brandTitle: {
-        fontSize: 26,
-        fontWeight: '800',
-        color: Colors.white,
-        letterSpacing: 2,
-    },
-    brandTagline: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: Colors.coral,
-        letterSpacing: 1,
-    },
-    brandSubtag: {
-        fontSize: 11,
-        color: 'rgba(255, 255, 255, 0.7)',
-        marginTop: 4,
     },
     cardContainer: {
         backgroundColor: Colors.white,

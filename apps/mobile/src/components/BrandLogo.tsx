@@ -1,83 +1,30 @@
 import React from 'react';
-import { StyleSheet, StyleProp, View, ViewStyle, Text } from 'react-native';
-import { Colors } from '../theme/colors';
-import { Typography } from '../theme/typography';
+import { Image, type ImageStyle, type StyleProp } from 'react-native';
 
-type BrandTone = 'light' | 'dark';
+const LOGOS = {
+    light: require('../../assets/brand-logo-light.png'),
+    dark: require('../../assets/brand-logo-dark.png'),
+};
 
 type BrandLogoProps = {
     size?: number;
-    tone?: BrandTone;
-    showTagline?: boolean;
-    style?: StyleProp<ViewStyle>;
+    tone?: keyof typeof LOGOS;
+    style?: StyleProp<ImageStyle>;
 };
 
-export function BrandLogo({
-    size = 190,
-    tone = 'dark',
-    showTagline = true,
-    style,
-}: BrandLogoProps) {
-    const wordColor = tone === 'light' ? Colors.warmCream : Colors.deepPlum;
-    const wordmarkFontSize = Math.max(Typography.fontSize.xxl, size * 0.26);
-
+export function BrandLogo({ size = 190, tone = 'dark', style }: BrandLogoProps) {
     return (
-        <View
-            style={[styles.container, style]}
+        <Image
+            source={LOGOS[tone]}
+            style={[
+                { width: size, height: size * (143 / 500), alignSelf: 'center' },
+                style,
+            ]}
+            resizeMode="contain"
             accessible
-            accessibilityLabel="TIJUM brand logo"
-        >
-            <Text
-                style={[
-                    styles.wordmark,
-                    {
-                        color: wordColor,
-                        fontSize: wordmarkFontSize,
-                        lineHeight: wordmarkFontSize * 1.1,
-                        fontFamily: Typography.fontFamily.headingExtraBold,
-                        letterSpacing: wordmarkFontSize * 0.006,
-                        textAlign: 'center',
-                    },
-                ]}
-            >
-                TIJUM
-            </Text>
-            {showTagline && (
-                <Text
-                    style={[
-                        styles.tagline,
-                        {
-                            color:
-                                tone === 'light'
-                                    ? Colors.softPeach
-                                    : Colors.coralDark,
-                            fontSize: Typography.fontSize.sm,
-                            lineHeight: Typography.lineHeight.sm,
-                            fontFamily: Typography.fontFamily.subheading,
-                            letterSpacing: 0.3,
-                            textAlign: 'center',
-                            marginTop: 4,
-                        },
-                    ]}
-                >
-                    Stay easy. Eat well. Spend less.
-                </Text>
-            )}
-        </View>
+            accessibilityRole="image"
+            accessibilityLabel="TIJUM. Stay easy. Eat well. Spend less."
+            testID={`tijum-brand-logo-${tone}`}
+        />
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 16,
-    },
-    wordmark: {
-        includeFontPadding: false,
-        textAlign: 'center',
-    },
-    tagline: {
-        textAlign: 'center',
-    },
-});

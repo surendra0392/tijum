@@ -251,6 +251,7 @@ async function run() {
             role = 'guest',
             token = null,
             expectTexts = [],
+            expectBrandLogo = null,
             forbidTexts = [],
             expectApiFailure = false,
             fullPage = false,
@@ -326,6 +327,14 @@ async function run() {
             cdp,
             `(() => {
                 const imgs = Array.from(document.querySelectorAll('img'));
+                const brandLogos = Array.from(document.querySelectorAll('[data-testid^="tijum-brand-logo-"]'))
+                    .filter((element) => {
+                        const img = element.matches('img') ? element : element.querySelector('img');
+                        const bounds = element.getBoundingClientRect();
+                        return img?.complete && img.naturalWidth === 500 && img.naturalHeight === 143
+                            && bounds.width > 100 && Math.abs(bounds.height - bounds.width * (143 / 500)) < 1;
+                    })
+                    .map((element) => element.dataset.testid);
                 const brokenImgs = imgs
                     .filter((img) => img.src && (!img.complete || img.naturalWidth === 0))
                     .map((img) => img.src);
@@ -349,6 +358,7 @@ async function run() {
                     docOverflow,
                     maxScrollHeight,
                     totalImgs: imgs.length,
+                    brandLogos,
                     brokenImgs,
                     loadedFonts: Array.from(new Set(loadedFonts)),
                 };
@@ -414,6 +424,9 @@ async function run() {
         }
         if (metrics.nestedButtons > 0) {
             screenErrors.push(`Buttons nested inside buttons: ${metrics.nestedButtons}`);
+        }
+        if (expectBrandLogo && !metrics.brandLogos.includes(`tijum-brand-logo-${expectBrandLogo}`)) {
+            screenErrors.push(`Missing rendered TIJUM ${expectBrandLogo} logo artwork.`);
         }
         if (metrics.docOverflow > 4) {
             screenErrors.push(
@@ -488,6 +501,7 @@ async function run() {
     await captureAndVerify({
         name: 'Onboarding Welcome Screen',
         file: '01-onboarding.png',
+        expectBrandLogo: 'light',
         route: '/',
         role: 'guest',
         expectTexts: ['Skip', 'Comfortable Stays', 'Hostels, PGs, Homestays & Co-living spaces'],
@@ -497,6 +511,7 @@ async function run() {
     await captureAndVerify({
         name: 'Customer Login Screen',
         file: '02-customer-login.png',
+        expectBrandLogo: 'light',
         route: '/(auth)/customer-login',
         role: 'guest',
         expectTexts: ['Welcome Back', 'Log In', 'Sign Up'],
@@ -506,6 +521,7 @@ async function run() {
     await captureAndVerify({
         name: 'Customer Register Screen',
         file: '03-customer-register.png',
+        expectBrandLogo: 'dark',
         route: '/(auth)/customer-register',
         role: 'guest',
         fullPage: true,
@@ -516,6 +532,7 @@ async function run() {
     await captureAndVerify({
         name: 'Partner Login Screen',
         file: '04-owner-login.png',
+        expectBrandLogo: 'dark',
         route: '/(auth)/owner-login',
         role: 'guest',
         expectTexts: ['Welcome Back, Partner', 'Sign In as Partner', 'Register as Partner'],
@@ -525,6 +542,7 @@ async function run() {
     await captureAndVerify({
         name: 'Partner Onboarding Register Screen (Real Cities Loaded)',
         file: '05-owner-register.png',
+        expectBrandLogo: 'dark',
         route: '/(auth)/owner-register',
         role: 'guest',
         fullPage: true,
@@ -536,6 +554,7 @@ async function run() {
     await captureAndVerify({
         name: 'Explore Verified Stays (Populated with Real Seeded Properties)',
         file: '06-explore-stays.png',
+        expectBrandLogo: 'light',
         route: '/(customer)/explore',
         role: 'customer',
         token: customerToken,
@@ -681,6 +700,7 @@ async function run() {
     await captureAndVerify({
         name: 'Partner Dashboard (Authenticated Kalyan Chakravarthy)',
         file: '15-partner-dashboard.png',
+        expectBrandLogo: 'light',
         route: '/(partner)/dashboard',
         role: 'owner',
         token: partnerToken,
@@ -851,6 +871,7 @@ async function run() {
     await captureAndVerify({
         name: 'Legitimate Auth Gate — Guest Visiting Partner Dashboard',
         file: 'states/state-auth-gate-partner-dashboard.png',
+        expectBrandLogo: 'light',
         route: '/(partner)/dashboard',
         role: 'guest',
         expectTexts: ['Partner Access Required', 'Sign In as Partner'],

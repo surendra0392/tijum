@@ -28,6 +28,7 @@
         "android": {
             "adaptiveIcon": {
                 "foregroundImage": "./assets/adaptive-icon.png",
+                "monochromeImage": "./assets/adaptive-icon-monochrome.png",
                 "backgroundColor": "#442F41"
             },
             "package": "com.tijum.app",

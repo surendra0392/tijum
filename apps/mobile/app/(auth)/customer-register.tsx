@@ -11,6 +11,7 @@ import {
 import { AlertCircle } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthContext';
+import { BrandLogo } from '../../src/components/BrandLogo';
 import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
 import { Colors } from '../../src/theme/colors';
@@ -97,6 +98,7 @@ export default function CustomerRegisterScreen() {
                 keyboardShouldPersistTaps="handled"
             >
                 <View style={styles.header}>
+                    <BrandLogo size={156} style={styles.brandLogo} />
                     <Text style={styles.title}>Join TIJUM</Text>
                     <Text style={styles.subtitle}>
                         Create your customer account to book verified stays with
@@ -252,6 +254,10 @@ const styles = StyleSheet.create({
     },
     header: {
         marginBottom: Spacing.xl,
+    },
+    brandLogo: {
+        alignSelf: 'flex-start',
+        marginBottom: Spacing.base,
     },
     title: {
         fontSize: Typography.fontSize.xxl,

@@ -557,7 +557,7 @@ export default function ExploreScreen() {
                     </View>
 
                     <View style={styles.brandHeroCenter}>
-                        <BrandLogo size={122} tone="light" />
+                        <BrandLogo size={168} tone="light" />
                     </View>
 
                     <View style={styles.searchBar}>
@@ -1455,33 +1455,6 @@ const styles = StyleSheet.create({
     brandHeroCenter: {
         alignItems: 'center',
         marginVertical: Spacing.xs,
-    },
-    logoBadgeRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 2,
-    },
-    roofMark: {
-        width: 14,
-        height: 8,
-        borderTopWidth: 2.5,
-        borderLeftWidth: 2.5,
-        borderRightWidth: 2.5,
-        borderColor: Colors.coral,
-        marginRight: 6,
-        borderRadius: 2,
-    },
-    brandLogoText: {
-        fontSize: 24,
-        fontWeight: '800',
-        color: Colors.white,
-        letterSpacing: 2,
-    },
-    brandTaglineText: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: Colors.coral,
-        letterSpacing: 1,
     },
     searchSection: {
         backgroundColor: Colors.white,

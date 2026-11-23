@@ -184,7 +184,7 @@ export default function WelcomeScreen() {
         return (
             <View style={styles.splashLoading}>
                 <StatusBar style="light" />
-                <BrandLogo size={148} tone="light" />
+                <BrandLogo size={214} tone="light" />
                 <ActivityIndicator
                     color={Colors.coral}
                     size="small"
@@ -227,11 +227,7 @@ export default function WelcomeScreen() {
                 <SafeAreaView edges={['top']} style={styles.topBarSafe}>
                     <View style={styles.topBar}>
                         <View style={styles.logoBadge}>
-                            <BrandLogo
-                                size={78}
-                                tone="light"
-                                showTagline={false}
-                            />
+                            <BrandLogo size={128} tone="light" />
                         </View>
                         {!isPermissionSlide && (
                             <TouchableOpacity
@@ -457,18 +453,6 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
         paddingHorizontal: 12,
         borderRadius: 20,
-    },
-    logoText: {
-        color: Colors.white,
-        fontWeight: '800',
-        fontSize: 16,
-        letterSpacing: 1.5,
-    },
-    logoSubtext: {
-        color: Colors.coral,
-        fontSize: 9,
-        fontWeight: '700',
-        letterSpacing: 0.8,
     },
     skipBtn: {
         backgroundColor: 'rgba(38, 24, 36, 0.72)',
