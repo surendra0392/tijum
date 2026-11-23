@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Enums\CommissionSnapshotStatus;
 use App\Enums\PropertyGuestComposition;
 use App\Enums\ReservationStatus;
 use App\Models\Owner;
@@ -224,6 +225,12 @@ class ReservationResource extends JsonResource
             'commission_amount_paise' => (int) ($this->commission_amount_minor ?? 0),
             'commission_tax_paise' => (int) ($this->commission_tax_amount_minor ?? 0),
             'owner_payable_paise' => (int) ($this->net_partner_payable_minor ?? 0),
+            'estimated_partner_payout_paise' => match ($this->commission_status) {
+                CommissionSnapshotStatus::Snapshotted,
+                CommissionSnapshotStatus::SettlementPending,
+                CommissionSnapshotStatus::Settled => $this->net_partner_payable_minor,
+                default => null,
+            },
         ] : []);
     }
 }

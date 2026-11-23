@@ -24,6 +24,7 @@ import { ReservationStatusBadge } from '../../../src/components/ReservationStatu
 import { useAuth } from '../../../src/auth/AuthContext';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Shadows, Spacing } from '../../../src/theme/spacing';
+import { formatPartnerBookingAmounts } from '../../../src/utils/reservationState';
 
 const FILTER_TABS = [
     { label: 'Upcoming', value: 'upcoming' },
@@ -117,11 +118,8 @@ export default function PartnerReservationsScreen() {
 
     const renderBookingCard = ({ item }: { item: Reservation }) => {
         const reference = item.reference ?? item.booking_reference;
-        const displayMinor =
-            item.owner_payable_paise && item.owner_payable_paise > 0
-                ? item.owner_payable_paise
-                : item.total_amount_paise || 0;
-        const rawAmount = displayMinor / 100;
+        const { grossBookingValue, estimatedPayout } =
+            formatPartnerBookingAmounts(item);
         const photoUrl = item.property?.cover_image_url;
         const nights = item.total_stay_days ?? item.duration_quantity ?? 1;
 
@@ -176,7 +174,10 @@ export default function PartnerReservationsScreen() {
                         </View>
 
                         <Text style={styles.priceText}>
-                            ₹{rawAmount.toLocaleString('en-IN')}
+                            Gross booking value: {grossBookingValue}
+                        </Text>
+                        <Text style={styles.metaText}>
+                            Estimated partner payout: {estimatedPayout}
                         </Text>
                     </View>
                 </View>

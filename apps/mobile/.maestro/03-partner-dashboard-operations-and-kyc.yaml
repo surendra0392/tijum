@@ -16,7 +16,9 @@ tags:
 #   MAESTRO_NEW_ROOM_NUMBER
 #   MAESTRO_KYC_PAN
 #   MAESTRO_KYC_IFSC
+#   MAESTRO_KYC_ACCOUNT
 ---
+- runScript: scripts/require-qa-api.js
 - launchApp:
     clearState: true
 
@@ -38,7 +40,7 @@ tags:
           id: "onboarding-skip-permission-btn"
 
 # 1. Partner Authentication (credentials supplied via runtime test env)
-- openLink: "tijum://(auth)/owner-login"
+- openLink: "tijum:///(auth)/owner-login"
 - assertVisible: "Welcome Back, Partner"
 - assertVisible:
     id: "partner-login-identifier-input"
@@ -51,10 +53,20 @@ tags:
 - tapOn:
     id: "partner-register-link"
 - assertVisible: "List Your Property"
+- scrollUntilVisible:
+    element:
+      text: "Hostels/PG"
+    direction: DOWN
+    timeout: 10000
 - assertVisible: "Hostels/PG"
 - assertVisible: "Homestays"
 - assertVisible: "Co-Living"
-- back
+- scrollUntilVisible:
+    element:
+      text: "Partner Sign In"
+    direction: DOWN
+    timeout: 10000
+- tapOn: "Partner Sign In"
 
 # Sign in using isolated partner fixture credentials
 - tapOn:
@@ -73,7 +85,7 @@ tags:
     timeout: 15000
 
 # 2. Partner Property Draft Creation (Real 3-Step Mutation)
-- openLink: "tijum://(partner)/properties"
+- openLink: "tijum:///partner/properties"
 - extendedWaitUntil:
     visible:
       id: "partner-add-property-btn"
@@ -94,7 +106,7 @@ tags:
 - inputText: "Automated Maestro E2E draft property verifying canonical category and partner listing persistence."
 - scrollUntilVisible:
     element:
-      id: "partner-prop-contact-phone-input"
+      id: "partner-prop-contact-name-input"
     direction: DOWN
     timeout: 8000
 - tapOn:
@@ -104,6 +116,11 @@ tags:
     id: "partner-prop-contact-phone-input"
 - inputText: "9848099888"
 - hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "partner-prop-next-btn"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     id: "partner-prop-next-btn"
 
@@ -129,14 +146,15 @@ tags:
     id: "partner-prop-pincode-input"
 - inputText: "500081"
 - hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "partner-prop-next-btn"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     id: "partner-prop-next-btn"
 
 # Step 3: Declaration & Submit
-- extendedWaitUntil:
-    visible:
-      id: "partner-prop-declaration-checkbox"
-    timeout: 10000
 - scrollUntilVisible:
     element:
       id: "partner-prop-declaration-checkbox"
@@ -144,6 +162,11 @@ tags:
     timeout: 8000
 - tapOn:
     id: "partner-prop-declaration-checkbox"
+- scrollUntilVisible:
+    element:
+      id: "partner-prop-submit-btn"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     id: "partner-prop-submit-btn"
 
@@ -156,7 +179,7 @@ tags:
 - runScript: scripts/assert-property-created.js
 
 # 3. Partner Physical Room Inventory Mutation
-- openLink: "tijum://(partner)/properties/${MAESTRO_PROPERTY_ID}/rooms"
+- openLink: "tijum:///partner/properties/${MAESTRO_PROPERTY_ID}/rooms"
 - extendedWaitUntil:
     visible:
       id: "partner-room-add-btn"
@@ -192,14 +215,11 @@ tags:
 - runScript: scripts/assert-room-added.js
 
 # 4. Partner Front-Desk Check-In & Check-Out Lifecycle (Real Mutations)
-- openLink: "tijum://(partner)/reservations/${MAESTRO_TODAY_BOOKING_REF}"
-- extendedWaitUntil:
-    visible: "Front-Desk Actions"
-    timeout: 12000
+- openLink: "tijum:///partner/reservations/${MAESTRO_TODAY_BOOKING_REF}"
 
 - scrollUntilVisible:
     element:
-      id: "partner-checkin-btn"
+      id: "partner-checkin-notes-input"
     direction: DOWN
     timeout: 10000
 - tapOn:
@@ -225,7 +245,7 @@ tags:
 # Now perform guest Check-Out
 - scrollUntilVisible:
     element:
-      id: "partner-checkout-btn"
+      id: "partner-checkout-notes-input"
     direction: DOWN
     timeout: 10000
 - tapOn:
@@ -249,7 +269,7 @@ tags:
       ASSERT_CHECKOUT: "true"
 
 # 5. Partner Financial Profile & KYC Submission (Real Mutation)
-- openLink: "tijum://(partner)/financial-profile"
+- openLink: "tijum:///partner/financial-profile"
 - extendedWaitUntil:
     visible:
       id: "partner-kyc-edit-btn"

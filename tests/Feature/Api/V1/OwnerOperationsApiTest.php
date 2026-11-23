@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api\V1;
 
+use App\Enums\CommissionSnapshotStatus;
 use App\Enums\ReservationStatus;
 use App\Models\Reservation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -123,6 +124,55 @@ class OwnerOperationsApiTest extends TestCase
         $this->withHeader('Authorization', 'Bearer '.$ownerToken)
             ->postJson("/api/v1/owner/reservations/{$reference}/decline")
             ->assertNotFound();
+    }
+
+    public function test_owner_reservation_estimate_distinguishes_unassigned_and_zero_payouts(): void
+    {
+        $owner = $this->createActiveOwner();
+        $property = $this->createBookableProperty($owner);
+        $roomType = $this->createBookableRoomType($property);
+        $customer = $this->createCustomerUser();
+        $reservation = Reservation::factory()->create([
+            'property_id' => $property->id,
+            'property_room_type_id' => $roomType->id,
+            'user_id' => $customer->id,
+            'status' => ReservationStatus::Confirmed,
+            'checkout_date' => now()->addDays(5)->toDateString(),
+            'original_amount_minor' => 150000,
+            'total_amount_minor' => 125000,
+            'commission_status' => CommissionSnapshotStatus::Unassigned,
+            'net_partner_payable_minor' => 150000,
+        ]);
+
+        $ownerToken = $owner->createToken('host')->plainTextToken;
+        $listUrl = '/api/v1/owner/reservations?stage=upcoming';
+        $detailUrl = '/api/v1/owner/reservations/'.$reservation->booking_reference;
+        $this->withToken($ownerToken)->getJson($listUrl)
+            ->assertOk()
+            ->assertJsonStructure(['data' => [['estimated_partner_payout_paise']]])
+            ->assertJsonPath('data.0.original_amount_paise', 150000)
+            ->assertJsonPath('data.0.total_amount_paise', 125000)
+            ->assertJsonPath('data.0.owner_payable_paise', 150000)
+            ->assertJsonPath('data.0.estimated_partner_payout_paise', null);
+
+        $reservation->forceFill([
+            'commission_status' => CommissionSnapshotStatus::Snapshotted,
+            'net_partner_payable_minor' => 98000,
+        ])->save();
+        $this->withToken($ownerToken)->getJson($detailUrl)
+            ->assertOk()
+            ->assertJsonPath('data.estimated_partner_payout_paise', 98000);
+
+        $reservation->forceFill(['net_partner_payable_minor' => 0])->save();
+        $this->withToken($ownerToken)->getJson($listUrl)
+            ->assertOk()
+            ->assertJsonPath('data.0.estimated_partner_payout_paise', 0);
+
+        $this->app['auth']->forgetGuards();
+        $this->withToken($customer->createToken('customer')->plainTextToken)
+            ->getJson('/api/v1/customer/reservations/'.$reservation->booking_reference)
+            ->assertOk()
+            ->assertJsonMissingPath('data.estimated_partner_payout_paise');
     }
 
     public function test_owner_can_check_in_and_check_out_guest_via_api(): void

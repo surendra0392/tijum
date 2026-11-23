@@ -341,6 +341,7 @@ export default function CreatePropertyScreen() {
                 </View>
 
                 <ScrollView
+                    key={step}
                     contentContainerStyle={styles.contentContainer}
                     showsVerticalScrollIndicator={false}
                 >

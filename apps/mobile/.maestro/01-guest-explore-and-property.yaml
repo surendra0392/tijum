@@ -50,29 +50,38 @@ tags:
 - tapOn:
     id: "explore-search-input"
 - inputText: "Hyderabad"
-- pressKey: Enter
+- pressKey: enter
 
 # Open and dismiss advanced filter sheet
 - tapOn:
     id: "explore-filter-button"
-- assertVisible: "Filter Stays"
-- tapOn: "Close"
+- assertVisible: "Stay Filters"
+- tapOn:
+    id: "explore-filter-close-button"
 
 # 4. Property Detail Inspection
 - scrollUntilVisible:
     element:
-      id: "property-card-.*"
+      id: "property-card-${MAESTRO_PROPERTY_ID}"
     direction: DOWN
     timeout: 10000
 
 - tapOn:
-    id: "property-card-.*"
+    id: "property-card-${MAESTRO_PROPERTY_ID}"
 
 # Verify Property Screen Sections
 - assertVisible:
     id: "property-book-stay-btn"
-- assertVisible: "About This Stay"
-- assertVisible: "Available Room Categories"
+- scrollUntilVisible:
+    element:
+      text: "Available Room Categories"
+    direction: DOWN
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      text: "About This Stay"
+    direction: DOWN
+    timeout: 8000
 
 # Verify Stay Timing & Meal Disclosures
 - scrollUntilVisible:
@@ -81,6 +90,6 @@ tags:
     direction: DOWN
     timeout: 8000
 
-- back
+- tapOn: "Go back"
 - assertVisible:
     id: "explore-search-input"

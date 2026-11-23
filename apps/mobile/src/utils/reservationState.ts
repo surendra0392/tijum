@@ -1,4 +1,4 @@
-import type { Reservation } from '../api/types.ts';
+import type { PhysicalRoom, Reservation } from '../api/types.ts';
 
 export type ReservationButtonTarget =
     | Reservation
@@ -29,8 +29,8 @@ export function canPayReservation(
         return false;
     }
 
-    if (typeof reservation.can_pay === 'boolean') {
-        return reservation.can_pay;
+    if (reservation.can_pay === false) {
+        return false;
     }
 
     if (reservation.status !== 'awaiting_payment') {
@@ -157,4 +157,42 @@ export function resolvePaymentVerifyAlert(
 
 export function resolveReservationListActionRoute(reference: string): string {
     return `/(customer)/bookings/${reference}`;
+}
+
+export function formatPartnerBookingAmounts(
+    reservation: Pick<
+        Reservation,
+        | 'original_amount_paise'
+        | 'total_amount_paise'
+        | 'estimated_partner_payout_paise'
+    >,
+): { grossBookingValue: string; estimatedPayout: string } {
+    const formatPaise = (amount: number) =>
+        `₹${(amount / 100).toLocaleString('en-IN')}`;
+    return {
+        grossBookingValue: formatPaise(
+            reservation.original_amount_paise ?? reservation.total_amount_paise,
+        ),
+        estimatedPayout:
+            reservation.estimated_partner_payout_paise == null
+                ? 'Settlement calculation pending'
+                : formatPaise(reservation.estimated_partner_payout_paise),
+    };
+}
+
+export function filterAssignableRooms(
+    rooms: PhysicalRoom[],
+    reservation: Pick<Reservation, 'room_type' | 'property_room_type_id'>,
+): PhysicalRoom[] {
+    const roomTypeId =
+        reservation.room_type?.id ?? reservation.property_room_type_id;
+    return rooms
+        .filter(
+            (room) => room.is_active && room.property_room_type_id === roomTypeId,
+        )
+        .sort((first, second) =>
+            first.room_number.localeCompare(second.room_number, undefined, {
+                numeric: true,
+            }),
+        );
 }

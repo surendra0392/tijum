@@ -36,12 +36,10 @@ if (!res.ok) {
 }
 
 var booking = json(res.body).data;
-if (!booking || !booking.checked_in_at) {
+if (!booking || booking.reference !== MAESTRO_TODAY_BOOKING_REF || !booking.checked_in_at) {
     throw new Error('Backend assertion failed: checked_in_at is not set on ' + MAESTRO_TODAY_BOOKING_REF);
 }
 
-if (typeof ASSERT_CHECKOUT !== 'undefined' && ASSERT_CHECKOUT === 'true') {
-    if (!booking.checked_out_at) {
-        throw new Error('Backend assertion failed: checked_out_at is not set on ' + MAESTRO_TODAY_BOOKING_REF);
-    }
+if (Boolean(booking.checked_out_at) !== (ASSERT_CHECKOUT === 'true')) {
+    throw new Error('Backend assertion failed: unexpected checkout state on ' + MAESTRO_TODAY_BOOKING_REF);
 }

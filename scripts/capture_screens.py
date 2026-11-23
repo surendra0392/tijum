@@ -37,9 +37,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MOBILE_DIR = REPO_ROOT / "apps" / "mobile"
-SCREENSHOTS_DIR = REPO_ROOT / "docs" / "mobile" / "screenshots"
+SCREENSHOTS_DIR = Path(os.environ.get("QA_SCREENSHOTS_DIR") or REPO_ROOT / "docs" / "mobile" / "screenshots").resolve()
 PUBLIC_DIR = REPO_ROOT / "public"
-STORAGE_PUBLIC_DIR = REPO_ROOT / "storage" / "app" / "public"
 SEEDER_SCRIPT = REPO_ROOT / "scripts" / "seed_mobile_qa.php"
 CDP_SCRIPT = REPO_ROOT / "scripts" / "cdp_verify_and_capture.mjs"
 
@@ -71,7 +70,7 @@ def find_free_port(preferred: int) -> int:
         return int(s.getsockname()[1])
 
 
-def make_qa_proxy_handler(dist_dir: Path, backend_port: int, state: dict):
+def make_qa_proxy_handler(dist_dir: Path, storage_public_dir: Path, backend_port: int, state: dict):
     class QaProxySpaHandler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=str(dist_dir), **kwargs)
@@ -211,7 +210,7 @@ def make_qa_proxy_handler(dist_dir: Path, backend_port: int, state: dict):
 
             # Serve Laravel public media directly so images render reliably on Windows
             if req_path.startswith("/storage/"):
-                if self._send_static_file(STORAGE_PUBLIC_DIR, req_path[len("/storage/"):]):
+                if self._send_static_file(storage_public_dir, req_path[len("/storage/"):]):
                     return
             if req_path.startswith("/images/") or req_path.startswith("/brand/"):
                 if self._send_static_file(PUBLIC_DIR, req_path.lstrip("/")):
@@ -300,6 +299,9 @@ def main() -> int:
     tmp_dir = Path(tempfile.mkdtemp(prefix="tijum_mobile_qa_"))
     qa_db_path = tmp_dir / "mobile_qa.sqlite"
     qa_db_path.touch()
+    storage_dir = tmp_dir / "storage"
+    (storage_dir / "framework" / "views").mkdir(parents=True)
+    storage_public_dir = storage_dir / "app" / "public"
     dist_dir = tmp_dir / "dist-web-qa"
     chrome_profile = tmp_dir / "chrome-profile"
     config_file = tmp_dir / "cdp_config.json"
@@ -321,8 +323,11 @@ def main() -> int:
             "APP_ENV": "testing",
             "APP_DEBUG": "false",
             "APP_URL": base_url,
+            "APP_CONFIG_CACHE": str(tmp_dir / "config.php"),
+            "LARAVEL_STORAGE_PATH": str(storage_dir),
             "DB_CONNECTION": "sqlite",
             "DB_DATABASE": str(qa_db_path),
+            "DB_URL": "",
             "CACHE_STORE": "database",
             "SESSION_DRIVER": "database",
             "QUEUE_CONNECTION": "sync",
@@ -331,6 +336,9 @@ def main() -> int:
             "TIJUM_PARTNER_SETTLEMENTS_ENABLED": "false",
             "TIJUM_RAZORPAY_ROUTE_ENABLED": "false",
             "RAZORPAY_MODE": "test",
+            "RAZORPAY_KEY_ID": "",
+            "RAZORPAY_KEY_SECRET": "",
+            "RAZORPAY_WEBHOOK_SECRET": "",
             "QA_CUSTOMER_PASSWORD": customer_password,
             "QA_PARTNER_PASSWORD": partner_password,
             "QA_EMPTY_PASSWORD": empty_password,
@@ -366,19 +374,15 @@ def main() -> int:
         )
 
         print(f"[2/6] Starting isolated Laravel backend on 127.0.0.1:{backend_port}...")
+        router_script = REPO_ROOT / "server.php"
+        if not router_script.is_file():
+            router_script = REPO_ROOT / "vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php"
         backend_proc = subprocess.Popen(
-            [
-                "php",
-                "artisan",
-                "serve",
-                "--host=127.0.0.1",
-                f"--port={backend_port}",
-                "--no-reload",
-            ],
-            cwd=str(REPO_ROOT),
+            ["php", "-S", f"127.0.0.1:{backend_port}", str(router_script)],
+            cwd=str(PUBLIC_DIR),
             env=php_env,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
         )
         wait_for_backend(backend_port)
         print(f"      Laravel QA backend healthy at http://127.0.0.1:{backend_port}/api/v1")
@@ -416,7 +420,7 @@ def main() -> int:
 
         print(f"[4/6] Starting local QA proxy + SPA server on {base_url}...")
         proxy_state = {"simulate_api_error": False}
-        handler_cls = make_qa_proxy_handler(dist_dir, backend_port, proxy_state)
+        handler_cls = make_qa_proxy_handler(dist_dir, storage_public_dir, backend_port, proxy_state)
         proxy_server = ThreadingHTTPServer(("127.0.0.1", proxy_port), handler_cls)
         proxy_thread = threading.Thread(
             target=proxy_server.serve_forever, daemon=True
@@ -455,7 +459,7 @@ def main() -> int:
         }
         config_file.write_text(json.dumps(config_payload, indent=2), encoding="utf-8")
 
-        print("[6/6] Running authenticated screen verification & live mutation suite...")
+        print("[6/6] Running web screen, web UI interaction, and API integration checks...")
         cdp_run = subprocess.run(
             ["node", str(CDP_SCRIPT), str(config_file)],
             cwd=str(REPO_ROOT),

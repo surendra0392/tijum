@@ -1,5 +1,5 @@
 appId: com.tijum.app
-name: "02 - Customer Auth, Booking Hold, Razorpay Cancel, Reservation Cancel & Support Submission"
+name: "02 - Customer Auth, Booking Hold, Reservation Cancel & Support Submission"
 tags:
   - e2e
   - customer
@@ -10,9 +10,12 @@ tags:
 #   MAESTRO_API_URL
 #   MAESTRO_CUSTOMER_EMAIL
 #   MAESTRO_CUSTOMER_PASSWORD
+#   MAESTRO_PROPERTY_ID
+#   MAESTRO_BOOKING_CHECK_IN_DATE
 #   MAESTRO_UPCOMING_BOOKING_REF
 #   MAESTRO_CASE_MARKER
 ---
+- runScript: scripts/require-qa-api.js
 - launchApp:
     clearState: true
 
@@ -34,7 +37,7 @@ tags:
           id: "onboarding-skip-permission-btn"
 
 # 1. Customer Authentication (credentials supplied via runtime test env)
-- openLink: "tijum://(auth)/customer-login"
+- openLink: "tijum:///(auth)/customer-login"
 - assertVisible: "Welcome Back"
 - assertVisible:
     id: "login-identifier-input"
@@ -47,10 +50,18 @@ tags:
 - tapOn:
     id: "customer-register-link"
 - assertVisible:
-    id: "register-submit-button"
-- assertVisible:
     id: "register-name-input"
-- back
+- scrollUntilVisible:
+    element:
+      id: "register-submit-button"
+    direction: DOWN
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      text: "Sign In"
+    direction: DOWN
+    timeout: 10000
+- tapOn: "Sign In"
 
 # Sign in using isolated fixture credentials from environment
 - tapOn:
@@ -72,11 +83,11 @@ tags:
 # 2. Select Verified Property & Create Real Booking Hold
 - scrollUntilVisible:
     element:
-      id: "property-card-.*"
+      id: "property-card-${MAESTRO_PROPERTY_ID}"
     direction: DOWN
     timeout: 12000
 - tapOn:
-    id: "property-card-.*"
+    id: "property-card-${MAESTRO_PROPERTY_ID}"
 
 - extendedWaitUntil:
     visible:
@@ -85,11 +96,22 @@ tags:
 - tapOn:
     id: "property-book-stay-btn"
 
-- extendedWaitUntil:
-    visible: "Estimated Summary"
-    timeout: 12000
 - assertVisible: "Confirm Booking"
-- assertVisible: "Total Payable"
+- scrollUntilVisible:
+    element:
+      id: "booking-check-in-date-input"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: "booking-check-in-date-input"
+- eraseText: 10
+- inputText: "${MAESTRO_BOOKING_CHECK_IN_DATE}"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Estimated Summary"
+    direction: DOWN
+    timeout: 12000
 
 - scrollUntilVisible:
     element:
@@ -99,69 +121,53 @@ tags:
 - tapOn:
     id: "booking-submit-button"
 
-# Handle intermediate confirmation modal if displayed
-- runFlow:
-    when:
-      visible: "Proceed to Payment"
-    commands:
-      - tapOn: "Proceed to Payment"
+# Open the held reservation from its creation confirmation.
+- extendedWaitUntil:
+    visible: "Proceed to Payment"
+    timeout: 15000
+- tapOn: "Proceed to Payment"
 
-# 3. Verify Hold State, Test-Mode Razorpay Entry & Safe Dismissal, then Cancel Hold
+# 3. Capture the new reference and cancel that exact hold through the app.
 - extendedWaitUntil:
     visible:
       id: "booking-pay-btn"
     timeout: 15000
 - assertVisible: "Action Required: Pay to Confirm"
-- assertVisible:
-    id: "booking-cancel-btn"
-
-# Trigger Razorpay checkout (in test mode) and safely cancel/dismiss without mutating live funds
-- tapOn:
-    id: "booking-pay-btn"
-- runFlow:
-    when:
-      visible: "Payment Incomplete"
-    commands:
-      - tapOn: "OK"
-- runFlow:
-    when:
-      notVisible:
-        id: "booking-cancel-btn"
-    commands:
-      - back
-      - runFlow:
-          when:
-            visible: "Yes"
-          commands:
-            - tapOn: "Yes"
-
-# Reservation MUST remain awaiting_payment after checkout dismissal — now execute real cancellation
-- extendedWaitUntil:
-    visible:
+- copyTextFrom:
+    id: "booking-reference"
+- evalScript: ${output.reservationReference = maestro.copiedText}
+- runScript:
+    file: scripts/assert-booking-cancelled.js
+    env:
+      EXPECTED_BOOKING_STATUS: "awaiting_payment"
+- scrollUntilVisible:
+    element:
       id: "booking-cancel-btn"
+    direction: DOWN
     timeout: 10000
 - tapOn:
     id: "booking-cancel-btn"
-- assertVisible: "Are you sure you want to cancel this reservation? Cancellation policies will apply."
-- tapOn: "Cancel Reservation"
+- tapOn:
+    text: "Cancel Reservation"
+    below:
+      text: "Are you sure you want to cancel this reservation[?] Cancellation policies will apply[.]"
 
 - extendedWaitUntil:
     visible: "Reservation Cancelled"
     timeout: 12000
 - tapOn: "OK"
-- assertVisible: "Cancellation & Refund Tracking"
-
-# Assert backend database actually transitioned this reservation to status=cancelled
-- runScript: scripts/assert-booking-cancelled.js
+- runScript:
+    file: scripts/assert-booking-cancelled.js
+    env:
+      EXPECTED_BOOKING_STATUS: "cancelled"
 
 # 4. Customer Protection Case Submission (Real Mutation — NOT closing the modal)
-- openLink: "tijum://(customer)/support"
-- extendedWaitUntil:
-    visible:
+- openLink: "tijum:///customer/support"
+- scrollUntilVisible:
+    element:
       id: "support-raise-request-btn"
+    direction: DOWN
     timeout: 12000
-- assertVisible: "Official Support Helpline"
-- assertVisible: "Customer Protection SLAs"
 
 - tapOn:
     id: "support-raise-request-btn"

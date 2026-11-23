@@ -17,6 +17,10 @@ const {
     credentials,
 } = config;
 
+if (!/^http:\/\/127\.0\.0\.1:\d+$/.test(baseUrl)) {
+    throw new Error('CDP verification requires the isolated loopback QA proxy.');
+}
+
 const statesDir = path.join(screenshotsDir, 'states');
 fs.mkdirSync(screenshotsDir, { recursive: true });
 fs.mkdirSync(statesDir, { recursive: true });
@@ -100,6 +104,7 @@ async function apiLogin(role, email, password) {
             : `${baseUrl}/api/v1/auth/customer/login`;
     const res = await fetch(endpoint, {
         method: 'POST',
+        redirect: 'error',
         headers: {
             Accept: 'application/json',
             'Content-Type': 'application/json',
@@ -122,6 +127,7 @@ async function apiLogin(role, email, password) {
 async function apiFetch(endpoint, token, options = {}) {
     const res = await fetch(`${baseUrl}/api/v1/${endpoint.replace(/^\//, '')}`, {
         method: options.method || 'GET',
+        redirect: 'error',
         headers: {
             Accept: 'application/json',
             'Content-Type': 'application/json',
@@ -233,7 +239,8 @@ async function run() {
     });
 
     const results = [];
-    const mutationResults = [];
+    const uiInteractionResults = [];
+    const apiIntegrationResults = [];
     const failures = [];
 
     async function captureAndVerify(spec) {
@@ -716,7 +723,8 @@ async function run() {
             'Upcoming',
             'Sri Sai Balaji Executive Hostel & PG',
             'Manage Booking',
-            '₹5,950',
+            'Gross booking value: ₹5,950',
+            'Estimated partner payout: Settlement calculation pending',
         ],
         forbidTexts: COMMON_HEALTHY_FORBID,
     });
@@ -734,8 +742,10 @@ async function run() {
             'Physical Room Allocation',
             'Front-Desk Actions',
             'Check In Guest',
+            'Gross Booking Value:',
             '₹3,400',
-            '₹2,915',
+            'Estimated Partner Payout:',
+            '₹2,918.56',
         ],
         forbidTexts: COMMON_HEALTHY_FORBID,
     });
@@ -858,23 +868,20 @@ async function run() {
         await toggleSimulatedApiError(false);
     }
 
-    // 7. Execute Real Deterministic End-to-End Backend Mutation Verification Flows
-    console.log('\nExecuting live backend mutation verifications against isolated test DB...');
-
-    async function verifyMutation(name, fn) {
+    async function verifyCheck(results, label, name, fn) {
         try {
             const detail = await fn();
-            console.log(`[MUTATION PASS] ${name} — ${detail}`);
-            mutationResults.push({ name, passed: true, detail });
+            console.log(`[${label} PASS] ${name} — ${detail}`);
+            results.push({ name, passed: true, detail });
         } catch (err) {
-            console.error(`[MUTATION FAIL] ${name} — ${err.message}`);
-            mutationResults.push({ name, passed: false, error: err.message });
+            console.error(`[${label} FAIL] ${name} — ${err.message}`);
+            results.push({ name, passed: false, error: err.message });
             failures.push({ name, errors: [err.message] });
         }
     }
 
     // M1: Customer UI Login via real form controls on /(auth)/customer-login
-    await verifyMutation('Customer UI Login Form establishes live Sanctum session', async () => {
+    await verifyCheck(uiInteractionResults, 'WEB UI', 'Customer login form establishes a session', async () => {
         await setSession(cdp, null, null);
         await cdp.send('Page.navigate', { url: `${baseUrl}/(auth)/customer-login` });
         await sleep(1200);
@@ -901,8 +908,8 @@ async function run() {
                     await new Promise(r => setTimeout(r, 250));
                     const tok = window.sessionStorage.getItem('tijum_active_session_token');
                     const pType = window.sessionStorage.getItem('tijum_active_principal_type');
-                    if (tok && pType === 'customer') {
-                        return { ok: true, principalType: pType, tokenLength: tok.length };
+                    if (tok && pType === 'customer' && document.querySelector('[data-testid="explore-search-input"]')) {
+                        return { ok: true };
                     }
                 }
                 return { ok: false, reason: 'Session token not persisted after login submit', text: document.body.innerText.slice(0, 200) };
@@ -911,19 +918,40 @@ async function run() {
         if (!loginResult?.ok) {
             throw new Error(JSON.stringify(loginResult));
         }
-        return `UI form authenticated customer (${loginResult.principalType}, token len=${loginResult.tokenLength})`;
+        return 'Submitted the rendered login form and reached Explore as a signed-in customer';
     });
 
-    // M2: Customer Booking Hold -> Payment Status Check (stays awaiting_payment) -> Cancel Reservation -> Backend Assert
-    await verifyMutation('Customer Booking Hold, Payment Dismissal Safety & Cancellation', async () => {
-        const tomorrow = new Date(Date.now() + 20 * 86400000).toISOString().split('T')[0];
+    await verifyCheck(uiInteractionResults, 'WEB UI', 'Explore filters open and close', async () => {
+        const filtersClosed = await evalJs(cdp, `(async () => {
+            async function waitFor(testId, visible = true) {
+                for (let attempt = 0; attempt < 40; attempt++) {
+                    const control = document.querySelector('[data-testid="' + testId + '"]');
+                    if (Boolean(control) === visible) return visible ? control : true;
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                throw new Error('Unexpected visibility for ' + testId);
+            }
+            (await waitFor('explore-filter-button')).click();
+            (await waitFor('explore-filter-close-button')).click();
+            return await waitFor('explore-filter-close-button', false);
+        })()`);
+        if (!filtersClosed) {
+            throw new Error('Stay Filters did not close.');
+        }
+        return 'Opened the rendered filter dialog and dismissed it with its close button';
+    });
+
+    console.log('\nExecuting direct API integration checks against the isolated test database...');
+    const verifyApi = (name, fn) => verifyCheck(apiIntegrationResults, 'API', name, fn);
+
+    await verifyApi('Customer booking hold, unpaid status and cancellation', async () => {
         const createRes = await apiFetch('customer/reservations', customerToken, {
             method: 'POST',
             body: {
                 submission_token: crypto.randomUUID(),
                 property_id: fixtures.property_id,
                 property_room_type_id: fixtures.room_type_id,
-                check_in_date: tomorrow,
+                check_in_date: fixtures.booking_check_in_date,
                 duration_type: 'daily',
                 duration_quantity: 2,
                 quantity: 1,
@@ -942,8 +970,9 @@ async function run() {
 
         // Verify payment status remains unconfirmed prior to gateway capture
         const payStatusRes = await apiFetch(`customer/reservations/${ref}/payment/status`, customerToken);
-        if (!payStatusRes.ok) {
-            throw new Error(`Payment status check failed: HTTP ${payStatusRes.status}`);
+        const payment = payStatusRes.json?.data;
+        if (!payStatusRes.ok || payment?.booking_reference !== ref || payment.status !== 'awaiting_payment' || payment.has_captured_payment !== false) {
+            throw new Error(`Expected an unpaid awaiting-payment hold for ${ref}: HTTP ${payStatusRes.status}`);
         }
 
         // Cancel reservation and assert backend state transitions to cancelled
@@ -956,14 +985,14 @@ async function run() {
         }
 
         const verifyRes = await apiFetch(`customer/reservations/${ref}`, customerToken);
-        if (verifyRes.json?.data?.status !== 'cancelled') {
+        if (!verifyRes.ok || verifyRes.json?.data?.reference !== ref || verifyRes.json.data.status !== 'cancelled') {
             throw new Error(`Expected backend status 'cancelled', got '${verifyRes.json?.data?.status}'`);
         }
         return `Created hold ${ref} (awaiting_payment), verified status endpoint, cancelled & confirmed backend status=cancelled`;
     });
 
     // M3: Customer Support Protection Case Submission -> Backend Persistence Assert
-    await verifyMutation('Customer Protection Case Creation & Backend Persistence', async () => {
+    await verifyApi('Customer Protection Case Creation & Backend Persistence', async () => {
         const createCaseRes = await apiFetch('customer/cases', customerToken, {
             method: 'POST',
             body: {
@@ -986,7 +1015,7 @@ async function run() {
 
     // M4: Partner Property Draft Creation -> Backend Persistence Assert
     let createdPropertyId = null;
-    await verifyMutation('Partner Property Draft Creation & Backend Persistence', async () => {
+    await verifyApi('Partner Property Draft Creation & Backend Persistence', async () => {
         const refDataRes = await apiFetch('owner/reference-data', partnerToken);
         const hostelsCat = (refDataRes.json?.data?.categories || []).find((c) => c.slug === 'hostels-pg');
         const hydCity = (refDataRes.json?.data?.cities || []).find((c) => c.slug === 'hyderabad');
@@ -1021,7 +1050,7 @@ async function run() {
     });
 
     // M5: Partner Inventory Mutation (Add Physical Room) -> Backend Persistence Assert
-    await verifyMutation('Partner Physical Room Inventory Addition & Persistence', async () => {
+    await verifyApi('Partner Physical Room Inventory Addition & Persistence', async () => {
         const roomNo = `QA-${Date.now().toString().slice(-3)}`;
         const addRoomRes = await apiFetch(`owner/properties/${fixtures.property_id}/rooms`, partnerToken, {
             method: 'POST',
@@ -1044,7 +1073,7 @@ async function run() {
     });
 
     // M6: Partner Front-Desk Check-In & Check-Out -> Backend State Assert
-    await verifyMutation('Partner Front-Desk Check-In and Check-Out Lifecycle', async () => {
+    await verifyApi('Partner Front-Desk Check-In and Check-Out Lifecycle', async () => {
         const ref = fixtures.today_booking_ref;
         const checkInRes = await apiFetch(`owner/reservations/${ref}/check-in`, partnerToken, {
             method: 'POST',
@@ -1068,7 +1097,7 @@ async function run() {
     });
 
     // M7: Partner KYC Financial Profile Update -> Backend Persistence Assert
-    await verifyMutation('Partner Financial KYC Submission & Backend Persistence', async () => {
+    await verifyApi('Partner Financial KYC Submission & Backend Persistence', async () => {
         const updateRes = await apiFetch('owner/financial-profile', partnerToken, {
             method: 'PUT',
             body: {
@@ -1079,7 +1108,7 @@ async function run() {
                 gst_registered: true,
                 gstin: '36ABCDE1234F1Z5',
                 bank_account_number: '50100123454892',
-                bank_ifsc: 'HDFC0001234',
+                bank_ifsc: 'HDFC0004321',
                 bank_name: 'HDFC Bank Ltd',
                 bank_beneficiary_name: 'Sri Sai Balaji Hospitality Pvt Ltd',
             },
@@ -1089,10 +1118,10 @@ async function run() {
         }
         const getKycRes = await apiFetch('owner/financial-profile', partnerToken);
         const kyc = getKycRes.json?.data;
-        if (!kyc || (kyc.pan_number || kyc.pan) !== 'ABCDE1234F' || kyc.bank_ifsc !== 'HDFC0001234') {
-            throw new Error(`KYC verification mismatch: ${JSON.stringify(kyc)}`);
+        if (!getKycRes.ok || !kyc || (kyc.pan_number || kyc.pan) !== 'ABCDE1234F' || kyc.bank_ifsc !== 'HDFC0004321') {
+            throw new Error('Updated PAN or IFSC was not returned by the financial profile API.');
         }
-        return `Submitted KYC update & verified PAN=ABCDE1234F, IFSC=HDFC0001234 in backend`;
+        return 'Updated the financial profile and verified the persisted PAN and changed IFSC';
     });
 
     const manifest = {
@@ -1101,11 +1130,9 @@ async function run() {
         totalScreens: results.length,
         passedScreens: results.filter((r) => r.passed).length,
         failedScreens: results.filter((r) => !r.passed).length,
-        totalMutations: mutationResults.length,
-        passedMutations: mutationResults.filter((m) => m.passed).length,
-        failedMutations: mutationResults.filter((m) => !m.passed).length,
         screens: results,
-        mutations: mutationResults,
+        webUiInteractions: uiInteractionResults,
+        apiIntegrationChecks: apiIntegrationResults,
     };
 
     fs.writeFileSync(
@@ -1121,7 +1148,7 @@ async function run() {
     }
 
     console.log(
-        `\nALL VERIFICATIONS PASSED: ${manifest.passedScreens}/${manifest.totalScreens} screens + ${manifest.passedMutations}/${manifest.totalMutations} backend mutations.`,
+        `\nALL VERIFICATIONS PASSED: ${manifest.passedScreens}/${manifest.totalScreens} web screen checks, ${uiInteractionResults.length} web UI interactions, ${apiIntegrationResults.length} direct API checks.`,
     );
 }
 

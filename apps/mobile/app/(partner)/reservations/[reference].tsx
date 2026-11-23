@@ -18,6 +18,7 @@ import { PhysicalRoom, Reservation } from '../../../src/api/types';
 import { Colors } from '../../../src/theme/colors';
 import { BorderRadius, Spacing } from '../../../src/theme/spacing';
 import { Typography } from '../../../src/theme/typography';
+import { filterAssignableRooms, formatPartnerBookingAmounts } from '../../../src/utils/reservationState';
 import { ReservationStatusBadge } from '../../../src/components/ReservationStatusBadge';
 import { StayTimingBadge } from '../../../src/components/StayTimingBadge';
 import { MealBadge } from '../../../src/components/MealBadge';
@@ -193,7 +194,8 @@ export default function PartnerReservationDetailScreen() {
             reservation.physical_room_id ||
             reservation.allocations?.[0]?.property_room_id ||
             null;
-        setSelectedRoomId(existingRoomId);
+        setSelectedRoomId(null);
+        setRooms([]);
         setAllocateError('');
 
         const propId =
@@ -211,35 +213,16 @@ export default function PartnerReservationDetailScreen() {
         try {
             setLoadingRooms(true);
             const res = await OwnerApi.getPropertyRooms(propId);
-            if (res.data) {
-                // Filter out inactive or maintenance rooms and prioritize matching room type
-                const activeRooms = res.data.filter(
-                    (r) =>
-                        r.is_active !== false &&
-                        r.operational_status !== 'maintenance' &&
-                        r.operational_status !== 'inactive',
-                );
-                const targetRoomTypeId = reservation.property_room_type_id;
-                const sorted = [...activeRooms].sort((a, b) => {
-                    if (targetRoomTypeId) {
-                        const aMatch =
-                            a.property_room_type_id === targetRoomTypeId
-                                ? 1
-                                : 0;
-                        const bMatch =
-                            b.property_room_type_id === targetRoomTypeId
-                                ? 1
-                                : 0;
-                        if (aMatch !== bMatch) return bMatch - aMatch;
-                    }
-                    return String(a.room_number).localeCompare(
-                        String(b.room_number),
-                        undefined,
-                        { numeric: true },
-                    );
-                });
-                setRooms(sorted);
-            }
+            const assignableRooms = filterAssignableRooms(
+                res.data ?? [],
+                reservation,
+            );
+            setRooms(assignableRooms);
+            setSelectedRoomId(
+                assignableRooms.some((room) => room.id === existingRoomId)
+                    ? existingRoomId
+                    : null,
+            );
         } catch (e: any) {
             setAllocateError(
                 e.message || 'Failed to retrieve property room inventory.',
@@ -324,6 +307,9 @@ export default function PartnerReservationDetailScreen() {
             </RequireAuth>
         );
     }
+
+    const { grossBookingValue, estimatedPayout } =
+        formatPartnerBookingAmounts(reservation);
 
     const isConfirmed = reservation.status === 'confirmed';
     const isCheckedIn = Boolean(
@@ -619,10 +605,7 @@ export default function PartnerReservationDetailScreen() {
                                     Gross Booking Value:
                                 </Text>
                                 <Text style={styles.infoValue}>
-                                    ₹
-                                    {(
-                                        reservation.total_amount_paise / 100
-                                    ).toLocaleString('en-IN')}
+                                    {grossBookingValue}
                                 </Text>
                             </View>
                             {reservation.commission_amount_paise ? (
@@ -646,16 +629,10 @@ export default function PartnerReservationDetailScreen() {
                             ) : null}
                             <View style={[styles.infoRow, styles.totalRow]}>
                                 <Text style={styles.totalLabel}>
-                                    Estimated Host Payout:
+                                    Estimated Partner Payout:
                                 </Text>
                                 <Text style={styles.totalValue}>
-                                    {reservation.owner_payable_paise &&
-                                    reservation.owner_payable_paise > 0
-                                        ? `₹${(
-                                              reservation.owner_payable_paise /
-                                              100
-                                          ).toLocaleString('en-IN')}`
-                                        : 'Pending Settlement Calc'}
+                                    {estimatedPayout}
                                 </Text>
                             </View>
                             {reservation.refunds &&
@@ -936,7 +913,10 @@ export default function PartnerReservationDetailScreen() {
                                     Assign Physical Room
                                 </Text>
                                 <Text style={styles.modalSubtitle}>
-                                    Category: {reservation.room_type_name}
+                                    Category: {reservation.room_type_name ?? reservation.room_type?.name}
+                                </Text>
+                                <Text style={styles.modalSubtitle}>
+                                    Availability is checked for the stay dates when you confirm.
                                 </Text>
                             </View>
                             <TouchableOpacity
@@ -993,8 +973,7 @@ export default function PartnerReservationDetailScreen() {
                                 }}
                             >
                                 <Text style={styles.emptyRoomsText}>
-                                    No physical rooms configured for this
-                                    property.
+                                    No active rooms in this category.
                                 </Text>
                             </View>
                         ) : (
@@ -1011,7 +990,6 @@ export default function PartnerReservationDetailScreen() {
                                     {rooms.map((room) => {
                                         const isSelected =
                                             selectedRoomId === room.id;
-                                        const isOccupied = room.is_occupied;
                                         const isCurrent =
                                             reservation.physical_room_id ===
                                             room.id;
@@ -1023,23 +1001,8 @@ export default function PartnerReservationDetailScreen() {
                                                     styles.roomChoiceCard,
                                                     isSelected &&
                                                         styles.roomChoiceCardSelected,
-                                                    isOccupied &&
-                                                        !isCurrent &&
-                                                        styles.roomChoiceCardDisabled,
                                                 ]}
-                                                onPress={() => {
-                                                    if (
-                                                        !isOccupied ||
-                                                        isCurrent
-                                                    ) {
-                                                        setSelectedRoomId(
-                                                            room.id,
-                                                        );
-                                                    }
-                                                }}
-                                                disabled={Boolean(
-                                                    isOccupied && !isCurrent,
-                                                )}
+                                                onPress={() => setSelectedRoomId(room.id)}
                                                 activeOpacity={0.7}
                                             >
                                                 <View style={{ flex: 1 }}>
@@ -1103,22 +1066,7 @@ export default function PartnerReservationDetailScreen() {
                                                         alignItems: 'flex-end',
                                                     }}
                                                 >
-                                                    {isOccupied &&
-                                                    !isCurrent ? (
-                                                        <View
-                                                            style={
-                                                                styles.occupiedTag
-                                                            }
-                                                        >
-                                                            <Text
-                                                                style={
-                                                                    styles.occupiedTagText
-                                                                }
-                                                            >
-                                                                Occupied
-                                                            </Text>
-                                                        </View>
-                                                    ) : isSelected ? (
+                                                    {isSelected ? (
                                                         <View
                                                             style={
                                                                 styles.selectedCircle
@@ -1131,21 +1079,7 @@ export default function PartnerReservationDetailScreen() {
                                                                 }
                                                             />
                                                         </View>
-                                                    ) : (
-                                                        <View
-                                                            style={
-                                                                styles.availableTag
-                                                            }
-                                                        >
-                                                            <Text
-                                                                style={
-                                                                    styles.availableTagText
-                                                                }
-                                                            >
-                                                                Available
-                                                            </Text>
-                                                        </View>
-                                                    )}
+                                                    ) : null}
                                                 </View>
                                             </TouchableOpacity>
                                         );
@@ -1474,10 +1408,6 @@ const styles = StyleSheet.create({
         borderColor: Colors.coral,
         backgroundColor: '#FFF7F5',
     },
-    roomChoiceCardDisabled: {
-        opacity: 0.5,
-        backgroundColor: Colors.gray100,
-    },
     roomChoiceNumber: {
         fontSize: 14,
         fontWeight: '700',
@@ -1504,28 +1434,6 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: '700',
         color: '#6D28D9',
-    },
-    occupiedTag: {
-        backgroundColor: '#FEE2E2',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 6,
-    },
-    occupiedTagText: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: '#DC2626',
-    },
-    availableTag: {
-        backgroundColor: '#DCFCE7',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 6,
-    },
-    availableTagText: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: '#15803D',
     },
     selectedCircle: {
         width: 22,

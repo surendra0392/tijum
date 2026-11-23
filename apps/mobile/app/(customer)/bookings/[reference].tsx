@@ -163,7 +163,7 @@ export default function ReservationDetailScreen() {
         const calculateSeconds = () => {
             const expires = new Date(paymentDeadlineStr).getTime();
             const now = Date.now();
-            return Math.max(0, Math.floor((expires - now) / 1000));
+            return Math.max(0, Math.ceil((expires - now) / 1000));
         };
 
         const initialSeconds = calculateSeconds();
@@ -249,7 +249,9 @@ export default function ReservationDetailScreen() {
     }, [shouldReconcileOnResume, handleCheckPaymentStatus]);
 
     const handlePayWithRazorpay = async () => {
-        if (!reservation || paymentInFlightRef.current) return;
+        if (!reservation || !canPayReservation(reservation) || paymentInFlightRef.current) {
+            return;
+        }
         try {
             paymentInFlightRef.current = true;
             setPaying(true);
@@ -547,8 +549,8 @@ export default function ReservationDetailScreen() {
                 <View style={styles.contentPadding}>
                     {/* Top Info */}
                     <View style={styles.rowBetween}>
-                        <Text style={styles.referenceText}>
-                            {reservation.reference}
+                        <Text style={styles.referenceText} testID="booking-reference">
+                            {activeReservationRef}
                         </Text>
                         <ReservationStatusBadge
                             status={reservation.status}

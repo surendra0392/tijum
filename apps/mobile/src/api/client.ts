@@ -1,6 +1,6 @@
 import { SecureTokenStorage } from '../auth/SecureTokenStorage.ts';
 
-const PRODUCTION_HOSTS = new Set(['tijum.com', 'www.tijum.com']);
+const PRODUCTION_HOSTS = new Set(['tijum.com', 'www.tijum.com', 'api.tijum.com']);
 const LOCAL_FALLBACK_BASE_URL = 'http://127.0.0.1:8000/api/v1';
 const DEFAULT_REQUEST_TIMEOUT_MS = 20000;
 const MULTIPART_REQUEST_TIMEOUT_MS = 60000;
@@ -73,7 +73,7 @@ export function resolveApiBaseUrl(
         let protocol = '';
         try {
             const parsedUrl = new URL(normalized);
-            hostname = parsedUrl.hostname.toLowerCase();
+            hostname = parsedUrl.hostname.toLowerCase().replace(/\.$/, '');
             protocol = parsedUrl.protocol.toLowerCase();
         } catch {
             hostname = '';

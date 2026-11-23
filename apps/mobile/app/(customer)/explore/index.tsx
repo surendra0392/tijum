@@ -1121,6 +1121,10 @@ export default function ExploreScreen() {
                             </View>
                             <TouchableOpacity
                                 onPress={() => setAdvancedModalVisible(false)}
+                                testID="explore-filter-close-button"
+                                accessibilityRole="button"
+                                accessibilityLabel="Close filters"
+                                hitSlop={10}
                                 style={{ padding: 4 }}
                             >
                                 <X size={20} color={Colors.deepPlum} />

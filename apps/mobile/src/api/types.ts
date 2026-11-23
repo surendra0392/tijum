@@ -329,6 +329,7 @@ export interface Reservation {
     commission_amount_paise?: number;
     commission_tax_paise?: number;
     owner_payable_paise?: number;
+    estimated_partner_payout_paise?: number | null;
     property_id?: number;
     property_room_type_id?: number;
     physical_room_id?: number | null;

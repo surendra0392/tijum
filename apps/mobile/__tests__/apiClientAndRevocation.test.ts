@@ -114,6 +114,18 @@ describe('Behavioral Suite 1: ApiClient HTTP Lifecycle, FormData & Session Revoc
         }
     });
 
+    it('blocks the production API subdomain and DNS-qualified hostname in preview', () => {
+        for (const host of ['api.tijum.com', 'tijum.com.', 'www.tijum.com']) {
+            assert.throws(
+                () => resolveApiBaseUrl({
+                    EXPO_PUBLIC_ENVIRONMENT: 'preview',
+                    EXPO_PUBLIC_API_URL: `https://${host}/api/v1`,
+                }),
+                { errorCode: 'UNSAFE_PRODUCTION_TARGET' },
+            );
+        }
+    });
+
     it('rejects non-HTTPS API URLs when EXPO_PUBLIC_ENVIRONMENT is production or preview', () => {
         assert.throws(
             () => {

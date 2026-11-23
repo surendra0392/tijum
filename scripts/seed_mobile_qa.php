@@ -37,6 +37,7 @@ use App\Models\ReservationRoomAllocation;
 use App\Models\SupportTicket;
 use App\Models\SupportTicketMessage;
 use App\Models\User;
+use App\Services\Financial\CommissionCalculationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Artisan;
@@ -49,9 +50,9 @@ $app = require __DIR__.'/../bootstrap/app.php';
 $kernel = $app->make(Kernel::class);
 $kernel->bootstrap();
 
-// Fail-closed safety checks: NEVER touch MySQL or production.
-if (app()->isProduction() || config('database.default') !== 'sqlite') {
-    fwrite(STDERR, "REFUSING TO SEED: Isolated SQLite non-production environment is mandatory.\n");
+$databasePath = $app['db']->connection()->getDatabaseName();
+if (! app()->environment('testing') || config('database.default') !== 'sqlite' || ! is_file($databasePath) || filesize($databasePath) !== 0) {
+    fwrite(STDERR, "REFUSING TO SEED: Set APP_ENV=testing and use a new, empty SQLite file.\n");
     exit(1);
 }
 
@@ -74,8 +75,11 @@ if ($customerPassword === '' || $partnerPassword === '' || $emptyPassword === ''
     exit(1);
 }
 
-Artisan::call('migrate:fresh', ['--force' => true]);
-Artisan::call('db:seed', ['--force' => true]);
+$migrateExitCode = Artisan::call('migrate', ['--seed' => true, '--force' => true]);
+if ($migrateExitCode !== 0) {
+    fwrite(STDERR, Artisan::output());
+    exit($migrateExitCode);
+}
 
 $now = CarbonImmutable::now();
 $today = CarbonImmutable::now('Asia/Kolkata');
@@ -166,10 +170,6 @@ $todayRef = 'TJR-2026-TODAY-QA02';
 $todayCheckIn = $today->startOfDay();
 $todayCheckOut = $todayCheckIn->addDays(4);
 $todayTotal = $holdRate * 4;
-$todayComm = (int) round($todayTotal * 0.12);
-$todayCommTax = (int) round($todayComm * 0.18);
-$todayTds = (int) round($todayTotal * 0.001);
-$todayNetPartner = $todayTotal - $todayComm - $todayCommTax - $todayTds;
 
 $todayRes = Reservation::query()->updateOrCreate(
     ['booking_reference' => $todayRef],
@@ -211,9 +211,6 @@ $todayRes = Reservation::query()->updateOrCreate(
         'unit_rate_minor' => $holdRate,
         'rate_unit' => ReservationRateUnit::PerPrivateRoom->value,
         'total_amount_minor' => $todayTotal,
-        'commission_amount_minor' => $todayComm,
-        'commission_tax_amount_minor' => $todayCommTax,
-        'net_partner_payable_minor' => $todayNetPartner,
         'status' => ReservationStatus::Confirmed,
         'submitted_at' => $now->subDay(),
         'confirmed_at' => $now->subDay(),
@@ -415,6 +412,8 @@ $agreement = PartnerCommissionAgreement::query()->updateOrCreate(
     ]
 );
 
+$todayRes = app(CommissionCalculationService::class)->snapshotCommissionOnReservation($todayRes, $agreement);
+
 $settledRef = 'STL-2026-QA001';
 $settled = PartnerSettlement::query()->updateOrCreate(
     ['settlement_reference' => $settledRef],
@@ -534,6 +533,7 @@ echo json_encode([
     'property_slug' => $property->slug,
     'property_name' => $property->name,
     'room_type_id' => $roomType->id,
+    'booking_check_in_date' => $today->addDays(20)->toDateString(),
     'upcoming_booking_ref' => $upcomingRes->booking_reference,
     'hold_booking_ref' => $holdRes->booking_reference,
     'today_booking_ref' => $todayRes->booking_reference,

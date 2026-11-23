@@ -679,6 +679,7 @@ export default function CreateReservationScreen() {
                     </Text>
                     <Input
                         label="Check-in Date (YYYY-MM-DD)"
+                        testID="booking-check-in-date-input"
                         value={checkInDate}
                         onChangeText={setCheckInDate}
                         placeholder="e.g. 2026-12-01"
