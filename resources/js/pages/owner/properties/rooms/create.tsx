@@ -3,15 +3,8 @@ import { PropertyStepNavigation } from '@/components/owner/properties/property-s
 import { RoomForm } from '@/components/owner/properties/room-form';
 import { PageHeader } from '@/components/shared/page-header';
 import { dashboard } from '@/routes/owner';
-import {
-    index as propertiesIndexRoute,
-    show as showPropertyRoute,
-} from '@/routes/owner/properties';
-import {
-    create as createRoomRoute,
-    index as roomsIndexRoute,
-    store as storeRoomRoute,
-} from '@/routes/owner/properties/rooms';
+import { index as propertiesIndexRoute } from '@/routes/owner/properties';
+import { store as storeRoomRoute } from '@/routes/owner/properties/rooms';
 import type {
     PropertyRoomStatus,
     PropertyRoomTypeData,
@@ -67,8 +60,6 @@ CreateRoomPage.layout = {
     breadcrumbs: [
         { title: 'Partner Overview', href: dashboard() },
         { title: 'My Properties', href: propertiesIndexRoute() },
-        { title: 'Property Overview', href: showPropertyRoute(1) },
-        { title: 'Physical Rooms', href: roomsIndexRoute(1) },
-        { title: 'Add Room', href: createRoomRoute(1) },
+        { title: 'Add Room', href: '#' },
     ],
 };

@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CouponCode;
 use App\Models\CustomerPointsLedger;
 use App\Models\CustomerReferral;
+use App\Models\PropertyCategory;
 use App\Models\RewardsSetting;
 use App\Models\User;
 use App\Services\Rewards\LoyaltyPointsService;
@@ -62,6 +63,10 @@ class RewardsController extends Controller
             'referred_reward_points' => (int) RewardsSetting::get('referral_referred_reward_points', 250),
         ];
 
+        $redemptionRatePaise = max(1, (int) RewardsSetting::get('points_redemption_rate_paise', 100));
+        $maxRedemptionPct = (int) RewardsSetting::get('points_redemption_max_percentage', 50);
+        $pointsPerRupee = round(100 / $redemptionRatePaise, 2);
+
         $activityData = $recentLedger->map(fn (CustomerPointsLedger $item) => [
             'id' => $item->id,
             'transaction_type' => $item->transaction_type->value,
@@ -73,7 +78,7 @@ class RewardsController extends Controller
             'status' => $item->status->value,
             'description' => $item->notes ?? $item->transaction_type->label(),
             'reference_code' => $item->reference_id ? "{$item->reference_type}-{$item->reference_id}" : ($item->idempotency_key ?? null),
-            'inr_value_minor' => (int) round($item->points * 100),
+            'inr_value_minor' => (int) round($item->points * $redemptionRatePaise),
             'created_at' => $item->created_at?->toIso8601String() ?? now()->toIso8601String(),
             'created_at_human' => $item->created_at?->format('d M Y, h:i A'),
         ])->all();
@@ -111,9 +116,9 @@ class RewardsController extends Controller
                 'total_earned_points' => $wallet->total_points_earned,
                 'total_redeemed_points' => $wallet->redeemed_points,
                 'expiring_points_30d' => (int) $expiringSoon->sum('points'),
-                'estimated_inr_value' => $wallet->available_points * 1.0,
-                'points_per_rupee' => 1.0,
-                'max_redemption_percentage' => (int) RewardsSetting::get('points_max_booking_redemption_pct', 20),
+                'estimated_inr_value' => round(($wallet->available_points * $redemptionRatePaise) / 100, 2),
+                'points_per_rupee' => $pointsPerRupee,
+                'max_redemption_percentage' => $maxRedemptionPct,
             ],
             'referral' => $referralData,
             'referral_profile' => $referralData,
@@ -145,6 +150,10 @@ class RewardsController extends Controller
             ->latest('id')
             ->paginate(20);
 
+        $redemptionRatePaise = max(1, (int) RewardsSetting::get('points_redemption_rate_paise', 100));
+        $maxRedemptionPct = (int) RewardsSetting::get('points_redemption_max_percentage', 50);
+        $pointsPerRupee = round(100 / $redemptionRatePaise, 2);
+
         return Inertia::render('customer/rewards/points', [
             'wallet' => [
                 'available_points' => $wallet->available_points,
@@ -156,9 +165,9 @@ class RewardsController extends Controller
                 'total_earned_points' => $wallet->total_points_earned,
                 'total_redeemed_points' => $wallet->redeemed_points,
                 'expiring_points_30d' => (int) $expiringSoon->sum('points'),
-                'estimated_inr_value' => $wallet->available_points * 1.0,
-                'points_per_rupee' => 1.0,
-                'max_redemption_percentage' => (int) RewardsSetting::get('points_max_booking_redemption_pct', 20),
+                'estimated_inr_value' => round(($wallet->available_points * $redemptionRatePaise) / 100, 2),
+                'points_per_rupee' => $pointsPerRupee,
+                'max_redemption_percentage' => $maxRedemptionPct,
             ],
             'ledger' => [
                 'data' => collect($ledger->items())->map(fn (CustomerPointsLedger $item) => [
@@ -172,7 +181,7 @@ class RewardsController extends Controller
                     'status' => $item->status->value,
                     'description' => $item->notes ?? $item->transaction_type->label(),
                     'reference_code' => $item->reference_id ? "{$item->reference_type}-{$item->reference_id}" : ($item->idempotency_key ?? null),
-                    'inr_value_minor' => (int) round($item->points * 100),
+                    'inr_value_minor' => (int) round($item->points * $redemptionRatePaise),
                     'created_at' => $item->created_at?->toIso8601String() ?? now()->toIso8601String(),
                     'created_at_human' => $item->created_at?->format('d M Y, h:i A'),
                     'expires_at' => $item->expires_at?->format('d M Y'),
@@ -204,7 +213,6 @@ class RewardsController extends Controller
             'friend_name' => $r->referred->name,
             'friend_email_masked' => Str::mask($r->referred->email, '*', 3, -4),
             'referred_name' => $r->referred->name,
-            'referred_email' => $r->referred->email,
             'referred_customer_name' => $r->referred->name,
             'status' => $r->status->value,
             'status_label' => $r->status->label(),
@@ -248,6 +256,10 @@ class RewardsController extends Controller
             ->latest('id')
             ->get();
 
+        $categorySlugsById = PropertyCategory::query()
+            ->pluck('slug', 'id')
+            ->all();
+
         return Inertia::render('customer/rewards/coupons', [
             'coupons' => $coupons->map(fn (CouponCode $c) => [
                 'id' => $c->id,
@@ -265,6 +277,10 @@ class RewardsController extends Controller
                 'min_stay_days' => $c->min_stay_days,
                 'funding_source' => $c->funding_source->value,
                 'funding_source_label' => $c->funding_source->label(),
+                'applicable_categories' => array_values(array_filter(array_map(
+                    static fn (int|string $id): ?string => $categorySlugsById[(int) $id] ?? null,
+                    $c->applies_to_category_ids ?? [],
+                ))),
                 'status' => 'active',
                 'valid_from' => $c->starts_at?->toIso8601String() ?? now()->toIso8601String(),
                 'valid_to' => $c->expires_at?->toIso8601String() ?? now()->addMonths(3)->toIso8601String(),

@@ -3,15 +3,8 @@ import { PropertyStepNavigation } from '@/components/owner/properties/property-s
 import { RoomTypeForm } from '@/components/owner/properties/room-type-form';
 import { PageHeader } from '@/components/shared/page-header';
 import { dashboard } from '@/routes/owner';
-import {
-    index as propertiesIndexRoute,
-    show as showPropertyRoute,
-} from '@/routes/owner/properties';
-import {
-    edit as editRoomTypeRoute,
-    index as roomTypesIndexRoute,
-    update as updateRoomTypeRoute,
-} from '@/routes/owner/properties/room-types';
+import { index as propertiesIndexRoute } from '@/routes/owner/properties';
+import { update as updateRoomTypeRoute } from '@/routes/owner/properties/room-types';
 import type {
     PropertyGenderPolicy,
     PropertyGuestComposition,
@@ -84,8 +77,6 @@ EditRoomTypePage.layout = {
     breadcrumbs: [
         { title: 'Partner Overview', href: dashboard() },
         { title: 'My Properties', href: propertiesIndexRoute() },
-        { title: 'Property Overview', href: showPropertyRoute(1) },
-        { title: 'Room Types', href: roomTypesIndexRoute(1) },
-        { title: 'Edit Room Type', href: editRoomTypeRoute([1, 1]) },
+        { title: 'Edit Room Type', href: '#' },
     ],
 };

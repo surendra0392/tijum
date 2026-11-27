@@ -6,6 +6,7 @@ namespace App\Actions\Protection;
 
 use App\Enums\AdminRole;
 use App\Enums\CaseStatus;
+use App\Enums\PropertyOperationalStatus;
 use App\Enums\RelocationStatus;
 use App\Models\Admin;
 use App\Models\CustomerProtectionCase;
@@ -54,6 +55,12 @@ class CreateRelocationOffer
             ]);
         }
 
+        if ($property->status !== PropertyOperationalStatus::Active || ! $property->is_verified || ! $property->booking_eligible || ! $roomType->is_active) {
+            throw ValidationException::withMessages([
+                'destination_property_id' => 'Destination property and room type must be verified, active, and booking-eligible.',
+            ]);
+        }
+
         $checkIn = $sourceReservation->check_in_date->toDateString();
         $checkout = $sourceReservation->checkout_date->toDateString();
         $quantity = $sourceReservation->quantity;
@@ -67,11 +74,17 @@ class CreateRelocationOffer
         }
 
         // Calculate alternative price
-        $unitRate = match ($sourceReservation->duration_type) {
-            'monthly' => (int) $roomType->monthly_rate_minor,
-            'weekly' => (int) $roomType->weekly_rate_minor,
-            default => (int) $roomType->daily_rate_minor,
+        $rawUnitRate = match ($sourceReservation->duration_type) {
+            'monthly' => $roomType->monthly_rate_minor,
+            'weekly' => $roomType->weekly_rate_minor,
+            default => $roomType->daily_rate_minor,
         };
+        if ($rawUnitRate === null || (int) $rawUnitRate <= 0) {
+            throw ValidationException::withMessages([
+                'destination_room_type_id' => "Selected room type does not have an active {$sourceReservation->duration_type} rate configured.",
+            ]);
+        }
+        $unitRate = (int) $rawUnitRate;
         $alternativePriceMinor = $unitRate * $sourceReservation->duration_quantity * $quantity;
         $priceDifferenceMinor = $sourceReservation->total_amount_minor - $alternativePriceMinor;
 

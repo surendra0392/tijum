@@ -339,7 +339,7 @@ class ReconcilePaymentRefund
                     variables: $variables + [
                         'error_description' => $refund->failure_reason ?? '',
                         'created_at' => now()->setTimezone('Asia/Kolkata')->format('d M Y, H:i').' IST',
-                        'action_url' => url("/admin/reservations/{$reservation->id}"),
+                        'action_url' => route('admin.reservations.show', $reservation),
                     ],
                     related: $refund,
                     relatedReference: $reference,
@@ -358,7 +358,7 @@ class ReconcilePaymentRefund
                 variables: $variables + [
                     'customer_name' => $reservation->user->name,
                     $completed ? 'completed_at' : 'initiated_at' => $timestamp,
-                    'action_url' => url("/reservations/{$reservation->id}"),
+                    'action_url' => route('reservations.show', $reservation),
                 ],
                 related: $reservation,
                 relatedReference: $reservation->booking_reference,

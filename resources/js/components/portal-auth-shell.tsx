@@ -4,7 +4,6 @@ import {
     ArrowRight,
     Building2,
     Coins,
-    Handshake,
     Home as HomeIcon,
     KeyRound,
     Lock,
@@ -13,7 +12,6 @@ import {
     Sparkles,
     Star,
     Utensils,
-    Zap,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { PropsWithChildren } from 'react';
@@ -216,7 +214,7 @@ export default function PortalAuthShell({
     const formWidthClass = maxWidth === 'wide' ? 'max-w-2xl' : 'max-w-[480px]';
 
     return (
-        <div className="tijum-portal min-h-dvh bg-tijum-cream text-tijum-plum selection:bg-tijum-coral/30 selection:text-tijum-plum">
+        <div className="tijum-auth tijum-portal min-h-dvh bg-tijum-cream text-tijum-plum selection:bg-tijum-coral/30 selection:text-tijum-plum">
             {/* Mobile / Tablet (< 1024px) Rich Branded Header */}
             <div className="relative overflow-hidden border-b border-tijum-plum/20 bg-tijum-plum px-5 py-6 text-tijum-cream sm:px-8 sm:py-8 lg:hidden">
                 <div

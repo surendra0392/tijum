@@ -58,10 +58,10 @@ export default function CustomerWishlistPage({ properties }: WishlistProps) {
     const totalSaved = properties?.total ?? items.length;
 
     useEffect(() => {
-        if (properties?.current_page === 1) {
+        if (properties?.current_page === 1 && properties?.last_page === 1) {
             syncWishlistIds(items.map((item) => item.id));
         }
-    }, [items, properties?.current_page]);
+    }, [items, properties?.current_page, properties?.last_page]);
 
     const handleRemove = (property: WishlistProperty) => {
         removeWishlistLocal(property.id);

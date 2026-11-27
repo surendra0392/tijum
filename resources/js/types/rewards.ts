@@ -82,6 +82,7 @@ export type RewardsCampaignStatus =
 export type CouponOfferType =
     | 'percentage'
     | 'fixed_amount'
+    | 'bonus_points'
     | 'points_multiplier'
     | 'combined';
 
@@ -95,6 +96,7 @@ export interface CouponCode {
     offer_type: CouponOfferType;
     discount_percentage?: number | null;
     discount_amount_minor?: number | null;
+    bonus_points?: number | null;
     max_discount_minor?: number | null;
     min_booking_amount_minor?: number | null;
     funding_source: CouponFundingSource;

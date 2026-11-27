@@ -40,7 +40,7 @@ class AdminActivityFeedService
                 'created_at' => $r->created_at?->toIso8601String(),
                 'created_timestamp' => $r->created_at?->timestamp ?? 0,
                 'created_formatted' => $r->created_at?->diffForHumans() ?? '',
-                'action_url' => "/admin/reservations/{$r->id}",
+                'action_url' => route('admin.reservations.show', $r),
                 'badge_variant' => match ($r->status) {
                     ReservationStatus::Confirmed => 'success',
                     ReservationStatus::AwaitingPayment => 'warning',
@@ -115,8 +115,8 @@ class AdminActivityFeedService
                 'created_formatted' => $s->created_at?->diffForHumans() ?? '',
                 'action_url' => "/admin/settlements/{$s->id}",
                 'badge_variant' => match ($s->status->value) {
-                    'completed' => 'success',
-                    'pending', 'approved', 'processing' => 'warning',
+                    'settled' => 'success',
+                    'pending_approval', 'approved', 'transfer_pending' => 'warning',
                     default => 'neutral',
                 },
             ]);
@@ -124,11 +124,16 @@ class AdminActivityFeedService
 
         // 5. Recent Partners
         $partners = Owner::query()
+            ->with('latestVerificationApplication')
             ->latest('created_at')
             ->limit(5)
             ->get();
 
         foreach ($partners as $o) {
+            $partnerUrl = $o->latestVerificationApplication !== null
+                ? route('admin.partners.show', $o->latestVerificationApplication)
+                : route('admin.partners.index');
+
             $activities->push([
                 'id' => "partner-{$o->id}",
                 'type' => 'partner',
@@ -139,7 +144,7 @@ class AdminActivityFeedService
                 'created_at' => $o->created_at?->toIso8601String(),
                 'created_timestamp' => $o->created_at?->timestamp ?? 0,
                 'created_formatted' => $o->created_at?->diffForHumans() ?? '',
-                'action_url' => "/admin/partners/{$o->id}",
+                'action_url' => $partnerUrl,
                 'badge_variant' => $o->status->value === 'active' ? 'success' : 'neutral',
             ]);
         }

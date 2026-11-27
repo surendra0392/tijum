@@ -304,16 +304,23 @@ export default function SearchPage(props: SearchPageProps) {
         });
 
     const buildParams = (overrides: Record<string, unknown> = {}) => {
+        const effectiveCity =
+            'city' in overrides ? overrides.city : city || undefined;
+        const hasCity =
+            typeof effectiveCity === 'string'
+                ? effectiveCity.trim() !== ''
+                : typeof effectiveCity === 'number';
+
         const p: Record<string, unknown> = {
             city: city || undefined,
             locality: locality || undefined,
             location_label: searchLocationLabel || undefined,
             lat: filters.lat ?? undefined,
             lng: filters.lng ?? undefined,
-            check_in: checkIn || undefined,
-            duration_type: durationType,
-            duration_count: Number(durationCount || 1),
-            guests: Number(guests || 1),
+            check_in: hasCity ? checkIn || undefined : undefined,
+            duration_type: hasCity ? durationType : undefined,
+            duration_count: hasCity ? Number(durationCount || 1) : undefined,
+            guests: hasCity ? Number(guests || 1) : undefined,
             category: selectedCategories.length
                 ? selectedCategories
                 : undefined,
@@ -875,6 +882,7 @@ export default function SearchPage(props: SearchPageProps) {
                 <div className="py-4">
                     <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-tijum-surface/80 bg-tijum-cream/35 p-3 transition-colors hover:border-tijum-peach">
                         <Checkbox
+                            aria-label="Early check-in available"
                             className="mt-0.5"
                             checked={earlyCheckIn}
                             onCheckedChange={(v) => setEarlyCheckIn(v === true)}

@@ -29,14 +29,31 @@ class OwnerSettlementController extends Controller
 
         $settlements = $query->paginate(15)->withQueryString();
 
-        // Calculate owner lifetime metrics
-        $all = $owner->settlements()->get();
-        $settledTotal = (int) $all->where('status', SettlementStatus::Settled)->sum('net_settlement_amount_minor');
-        $approvedTotal = (int) $all->where('status', SettlementStatus::Approved)->sum('net_settlement_amount_minor');
-        $pendingTotal = (int) $all->whereIn('status', [SettlementStatus::Draft, SettlementStatus::PendingApproval])->sum('net_settlement_amount_minor');
-        $onHoldTotal = (int) $all->where('status', SettlementStatus::OnHold)->sum('net_settlement_amount_minor');
-        $totalCommissionPaid = (int) $all->sum('commission_amount_minor');
-        $totalTaxDeducted = (int) $all->sum('statutory_deductions_minor');
+        // Calculate owner lifetime metrics in a single SQL aggregate query
+        $agg = $owner->settlements()
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN status = ? THEN net_settlement_amount_minor ELSE 0 END), 0) as settled_total_minor, '.
+                'COALESCE(SUM(CASE WHEN status = ? THEN net_settlement_amount_minor ELSE 0 END), 0) as approved_total_minor, '.
+                'COALESCE(SUM(CASE WHEN status IN (?, ?) THEN net_settlement_amount_minor ELSE 0 END), 0) as pending_total_minor, '.
+                'COALESCE(SUM(CASE WHEN status = ? THEN net_settlement_amount_minor ELSE 0 END), 0) as on_hold_total_minor, '.
+                'COALESCE(SUM(commission_amount_minor), 0) as commission_paid_minor, '.
+                'COALESCE(SUM(statutory_deductions_minor), 0) as tax_deducted_minor',
+                [
+                    SettlementStatus::Settled->value,
+                    SettlementStatus::Approved->value,
+                    SettlementStatus::Draft->value,
+                    SettlementStatus::PendingApproval->value,
+                    SettlementStatus::OnHold->value,
+                ]
+            )
+            ->first();
+
+        $settledTotal = (int) ($agg->settled_total_minor ?? 0);
+        $approvedTotal = (int) ($agg->approved_total_minor ?? 0);
+        $pendingTotal = (int) ($agg->pending_total_minor ?? 0);
+        $onHoldTotal = (int) ($agg->on_hold_total_minor ?? 0);
+        $totalCommissionPaid = (int) ($agg->commission_paid_minor ?? 0);
+        $totalTaxDeducted = (int) ($agg->tax_deducted_minor ?? 0);
 
         return Inertia::render('owner/settlements/index', [
             'settlements' => [
@@ -214,13 +231,13 @@ class OwnerSettlementController extends Controller
             fputcsv($file, ['Billing Period', sprintf('%s to %s', $settlement->period_start->toDateString(), $settlement->period_end->toDateString())]);
             fputcsv($file, ['Settlement Status', $settlement->status->label()]);
             fputcsv($file, ['Settled At', $settlement->settled_at?->format('Y-m-d H:i:s') ?? 'Pending Transfer']);
-            fputcsv($file, ['Partner Legal Name', $settlement->financialProfile?->legal_business_name ?? $owner->name]);
-            fputcsv($file, ['Partner PAN', $settlement->financialProfile?->pan_number ?? 'N/A']);
-            fputcsv($file, ['Partner GSTIN', $settlement->financialProfile?->gstin ?? 'N/A']);
-            fputcsv($file, ['Bank Beneficiary IFSC', $settlement->financialProfile?->bank_ifsc ?? 'N/A']);
-            fputcsv($file, ['Bank Account (Masked)', $settlement->financialProfile?->bank_account_number_masked ?? 'N/A']);
-            fputcsv($file, ['Platform Legal Name', config('tijum.settlements.platform_legal_name', 'TIJUM Marketplace Private Limited')]);
-            fputcsv($file, ['Platform GSTIN', config('tijum.settlements.platform_gstin', '36AAAAA0000A1Z5')]);
+            fputcsv($file, ['Partner Legal Name', $this->sanitizeCsvCell($settlement->financialProfile?->legal_business_name ?? $owner->name)]);
+            fputcsv($file, ['Partner PAN', $this->sanitizeCsvCell($settlement->financialProfile?->pan_number ?? 'N/A')]);
+            fputcsv($file, ['Partner GSTIN', $this->sanitizeCsvCell($settlement->financialProfile?->gstin ?? 'N/A')]);
+            fputcsv($file, ['Bank Beneficiary IFSC', $this->sanitizeCsvCell($settlement->financialProfile?->bank_ifsc ?? 'N/A')]);
+            fputcsv($file, ['Bank Account (Masked)', $this->sanitizeCsvCell($settlement->financialProfile?->bank_account_number_masked ?? 'N/A')]);
+            fputcsv($file, ['Platform Legal Name', $this->sanitizeCsvCell((string) config('tijum.settlements.platform_legal_name', 'TIJUM Marketplace Private Limited'))]);
+            fputcsv($file, ['Platform GSTIN', $this->sanitizeCsvCell((string) config('tijum.settlements.platform_gstin', '36AAAAA0000A1Z5'))]);
             fputcsv($file, []);
 
             // Summary Totals
@@ -248,8 +265,8 @@ class OwnerSettlementController extends Controller
 
             foreach ($settlement->items as $item) {
                 fputcsv($file, [
-                    $item->reservation->booking_reference,
-                    $item->reservation->property?->name ?? 'N/A',
+                    $this->sanitizeCsvCell($item->reservation->booking_reference),
+                    $this->sanitizeCsvCell($item->reservation->property?->name ?? 'N/A'),
                     $item->reservation->check_in_date->toDateString(),
                     $item->reservation->checkout_date->toDateString(),
                     number_format($item->gross_amount_minor / 100, 2, '.', ''),
@@ -264,5 +281,14 @@ class OwnerSettlementController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    private function sanitizeCsvCell(?string $value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        return in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true) ? "'".$value : $value;
     }
 }

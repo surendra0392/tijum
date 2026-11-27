@@ -9,6 +9,7 @@ use App\Enums\SupportTicketStatus;
 use App\Enums\SupportTicketType;
 use App\Http\Controllers\Controller;
 use App\Models\CustomerProtectionCase;
+use App\Models\PlatformSetting;
 use App\Models\Reservation;
 use App\Models\SupportTicket;
 use App\Models\User;
@@ -90,7 +91,7 @@ class CustomerSupportTicketController extends Controller
             'reservations' => $reservations,
             'categories' => $this->customerCategories(),
             'casesCount' => $casesCount,
-            'grievanceOfficer' => config('tijum.customer_protection.grievance_officer'),
+            'grievanceOfficer' => PlatformSetting::getGrievanceOfficer(),
         ]);
     }
 
@@ -213,7 +214,7 @@ class CustomerSupportTicketController extends Controller
                 'created_at' => $ticket->created_at->toISOString(),
             ],
             'messages' => $messages,
-            'grievanceOfficer' => config('tijum.customer_protection.grievance_officer'),
+            'grievanceOfficer' => PlatformSetting::getGrievanceOfficer(),
         ]);
     }
 

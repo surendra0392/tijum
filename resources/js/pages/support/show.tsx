@@ -15,6 +15,7 @@ import {
 import type React from 'react';
 import { useRef, useState } from 'react';
 import { Breadcrumbs } from '@/components/breadcrumbs';
+import InputError from '@/components/input-error';
 import { ResponsiveContainer } from '@/components/shared/responsive-container';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -49,6 +50,7 @@ interface CaseDetailProps {
         sender_type: 'customer' | 'owner' | 'admin' | 'system';
         sender_name: string;
         message: string;
+        attachment_url?: string | null;
         attachment_path?: string | null;
         attachment_name?: string | null;
         created_at: string;
@@ -593,10 +595,15 @@ export default function SupportShow({
                                             {msg.message}
                                         </p>
 
-                                        {msg.attachment_path && (
+                                        {(msg.attachment_url ||
+                                            msg.attachment_path) && (
                                             <div className="mt-2 border-t border-current/10 pt-1">
                                                 <a
-                                                    href={msg.attachment_path}
+                                                    href={
+                                                        msg.attachment_url ??
+                                                        msg.attachment_path ??
+                                                        '#'
+                                                    }
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="inline-flex items-center gap-1 font-semibold underline hover:opacity-80"
@@ -633,6 +640,12 @@ export default function SupportShow({
                                     }
                                     required
                                     className="resize-none text-xs"
+                                />
+                                <InputError
+                                    message={
+                                        messageForm.errors.message ??
+                                        messageForm.errors.attachment
+                                    }
                                 />
 
                                 <div className="flex flex-wrap items-center justify-between gap-2">

@@ -7,7 +7,7 @@ import { PublicSeoHead } from '@/components/public/public-seo-head';
 import { ResponsiveContainer } from '@/components/shared/responsive-container';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { createFullFaqGroups } from '@/data/public-content';
+import { createFullFaqGroups, type FaqGroup } from '@/data/public-content';
 import { register } from '@/routes';
 import { becomeAPartner, howItWorks } from '@/routes/public';
 import type { SeoMetadata } from '@/types';
@@ -16,10 +16,56 @@ import type { StayTimingData } from '@/types/public-search';
 type FaqsProps = {
     seo?: SeoMetadata;
     timing: StayTimingData;
+    cmsFaqGroups?: FaqGroup[];
 };
 
-export default function Faqs({ seo, timing }: FaqsProps) {
-    const faqGroups = useMemo(() => createFullFaqGroups(timing), [timing]);
+export default function Faqs({ seo, timing, cmsFaqGroups = [] }: FaqsProps) {
+    const faqGroups = useMemo(() => {
+        const baseGroups = createFullFaqGroups(timing);
+        if (!cmsFaqGroups || cmsFaqGroups.length === 0) {
+            return baseGroups;
+        }
+
+        const merged = baseGroups.map((group) => ({
+            ...group,
+            items: [...group.items],
+        }));
+
+        for (const cmsGroup of cmsFaqGroups) {
+            if (!cmsGroup.items || cmsGroup.items.length === 0) {
+                continue;
+            }
+
+            const targetIndex = merged.findIndex(
+                (group) =>
+                    group.id === cmsGroup.id ||
+                    group.category.toLowerCase() ===
+                        cmsGroup.category.toLowerCase(),
+            );
+
+            if (targetIndex >= 0) {
+                const existingQuestions = new Set(
+                    merged[targetIndex].items.map((item) =>
+                        item.question.trim().toLowerCase(),
+                    ),
+                );
+                const newCmsItems = cmsGroup.items.filter(
+                    (item) =>
+                        !existingQuestions.has(
+                            item.question.trim().toLowerCase(),
+                        ),
+                );
+                merged[targetIndex].items = [
+                    ...newCmsItems,
+                    ...merged[targetIndex].items,
+                ];
+            } else {
+                merged.unshift(cmsGroup);
+            }
+        }
+
+        return merged;
+    }, [timing, cmsFaqGroups]);
     const [query, setQuery] = useState('');
 
     const normalizedQuery = query.trim().toLowerCase();

@@ -255,7 +255,9 @@ class PropertyController extends Controller
                 ...PropertyPortalData::ownerSummary($property),
                 'details' => $property->effectiveFieldsForRevision($activeApp),
                 'approved_details' => $property->toApprovedPropertyFieldsSnapshot(),
-                'ownership_arrangement' => $latestApp->ownership_arrangement->value,
+                'ownership_arrangement' => $latestApp !== null
+                    ? $latestApp->ownership_arrangement->value
+                    : PropertyOwnershipArrangement::OwnerOperator->value,
                 'can_edit_details' => $canEditDetails,
             ],
             'categories' => PropertyCategory::query()->active()->ordered()->get()->map(static fn (PropertyCategory $c): array => $c->toOptionArray())->values(),

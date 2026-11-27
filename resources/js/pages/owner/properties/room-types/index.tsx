@@ -27,15 +27,11 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { dashboard } from '@/routes/owner';
-import {
-    index as propertiesIndexRoute,
-    show as showPropertyRoute,
-} from '@/routes/owner/properties';
+import { index as propertiesIndexRoute } from '@/routes/owner/properties';
 import {
     create as createRoomTypeRoute,
     destroy as destroyRoomTypeRoute,
     edit as editRoomTypeRoute,
-    index as roomTypesIndexRoute,
 } from '@/routes/owner/properties/room-types';
 import { formatStayTime } from '@/lib/stay-timing';
 import type {
@@ -400,7 +396,6 @@ RoomTypesIndex.layout = {
     breadcrumbs: [
         { title: 'Partner Overview', href: dashboard() },
         { title: 'My Properties', href: propertiesIndexRoute() },
-        { title: 'Property Overview', href: showPropertyRoute(1) },
-        { title: 'Room Types', href: roomTypesIndexRoute(1) },
+        { title: 'Room Types', href: '#' },
     ],
 };

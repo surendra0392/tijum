@@ -31,6 +31,7 @@ class TaxCalculationService
         ?OwnerFinancialProfile $profile,
         int $grossAmountMinor,
         CarbonImmutable $date,
+        ?int $excludeReservationId = null,
     ): array {
         $reviewRequired = $this->isTaxReviewRequired($owner, $profile);
         $reviewReason = null;
@@ -73,7 +74,7 @@ class TaxCalculationService
             && $hasVerifiedPan;
 
         $threshold = (int) config('tijum.settlements.tds_individual_huf_threshold_minor', 50000000); // INR 5,00,000 threshold
-        $cumulativeFySales = $this->getCumulativeFinancialYearSales($owner, $date);
+        $cumulativeFySales = $this->getCumulativeFinancialYearSales($owner, $date, $excludeReservationId);
         $projectedFySales = $cumulativeFySales + $grossAmountMinor;
 
         // Individual/HUF statutory exemption applies only if PAN is verified and cumulative FY turnover <= threshold
@@ -102,6 +103,10 @@ class TaxCalculationService
                 ->where('code', 'GST_TCS_SEC_52')
                 ->where('is_approved', true)
                 ->where('effective_from', '<=', $dateStr)
+                ->where(function ($query) use ($dateStr): void {
+                    $query->whereNull('effective_until')
+                        ->orWhere('effective_until', '>=', $dateStr);
+                })
                 ->first();
 
             if ($tcsConfig instanceof TaxConfiguration && ! $tcsConfig->is_exempt) {
@@ -159,9 +164,11 @@ class TaxCalculationService
         return [$fyStart, $fyEnd];
     }
 
-    public function getCumulativeFinancialYearSales(Owner $owner, CarbonImmutable $date): int
+    public function getCumulativeFinancialYearSales(Owner $owner, CarbonImmutable $date, ?int $excludeReservationId = null): int
     {
         [$fyStart, $fyEnd] = $this->getFinancialYearBounds($date);
+        $fyStartUtc = $fyStart->utc()->toDateTimeString();
+        $fyEndUtc = $fyEnd->utc()->toDateTimeString();
 
         $propertyIds = $owner->properties()->pluck('id');
         if ($propertyIds->isEmpty()) {
@@ -174,11 +181,12 @@ class TaxCalculationService
         $reservationQuery = Reservation::query()
             ->whereIn('property_id', $propertyIds)
             ->where('status', ReservationStatus::Confirmed)
-            ->where(function ($query) use ($fyStart, $fyEnd): void {
-                $query->whereBetween('confirmed_at', [$fyStart->toDateTimeString(), $fyEnd->toDateTimeString()])
-                    ->orWhere(function ($q) use ($fyStart, $fyEnd): void {
+            ->when($excludeReservationId !== null, fn ($q) => $q->where('id', '!=', $excludeReservationId))
+            ->where(function ($query) use ($fyStartUtc, $fyEndUtc): void {
+                $query->whereBetween('confirmed_at', [$fyStartUtc, $fyEndUtc])
+                    ->orWhere(function ($q) use ($fyStartUtc, $fyEndUtc): void {
                         $q->whereNull('confirmed_at')
-                            ->whereBetween('created_at', [$fyStart->toDateTimeString(), $fyEnd->toDateTimeString()]);
+                            ->whereBetween('created_at', [$fyStartUtc, $fyEndUtc]);
                     });
             });
 

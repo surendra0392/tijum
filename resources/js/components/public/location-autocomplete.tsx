@@ -532,7 +532,7 @@ export function LocationAutocomplete({
     return (
         <div
             ref={containerRef}
-            className={cn('relative min-w-[280px]', className)}
+            className={cn('relative w-full min-w-0', className)}
         >
             <div className="relative">
                 <input

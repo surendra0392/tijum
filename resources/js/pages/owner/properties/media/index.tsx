@@ -46,13 +46,9 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { dashboard } from '@/routes/owner';
-import {
-    index as propertiesIndexRoute,
-    show as showPropertyRoute,
-} from '@/routes/owner/properties';
+import { index as propertiesIndexRoute } from '@/routes/owner/properties';
 import {
     destroy as destroyMediaRoute,
-    index as mediaIndexRoute,
     reorder as reorderMediaRoute,
     store as storeMediaRoute,
     update as updateMediaRoute,
@@ -100,6 +96,7 @@ export default function PropertyMediaPage({
         null,
     );
     const [editAltText, setEditAltText] = useState('');
+    const [editAltError, setEditAltError] = useState<string | null>(null);
     const [deletingItem, setDeletingItem] = useState<PropertyMediaData | null>(
         null,
     );
@@ -184,6 +181,7 @@ export default function PropertyMediaPage({
         }
 
         setBusy(true);
+        setEditAltError(null);
         router.patch(
             updateMediaRoute.url([property.id, editingItem.id]),
             {
@@ -193,9 +191,20 @@ export default function PropertyMediaPage({
             },
             {
                 preserveScroll: true,
+                onSuccess: () => {
+                    setEditingItem(null);
+                    setEditAltError(null);
+                },
+                onError: (errors) => {
+                    const first = Object.values(errors)[0];
+                    setEditAltError(
+                        typeof first === 'string'
+                            ? first
+                            : 'Unable to update photo caption.',
+                    );
+                },
                 onFinish: () => {
                     setBusy(false);
-                    setEditingItem(null);
                 },
             },
         );
@@ -672,6 +681,7 @@ export default function PropertyMediaPage({
                                                 variant="outline"
                                                 aria-label={`Edit metadata for ${item.alt_text}`}
                                                 onClick={() => {
+                                                    setEditAltError(null);
                                                     setEditingItem(item);
                                                     setEditAltText(
                                                         item.alt_text,
@@ -702,7 +712,12 @@ export default function PropertyMediaPage({
 
                 <Dialog
                     open={editingItem !== null}
-                    onOpenChange={(open) => !open && setEditingItem(null)}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setEditingItem(null);
+                            setEditAltError(null);
+                        }
+                    }}
                 >
                     <DialogContent>
                         <form
@@ -721,6 +736,7 @@ export default function PropertyMediaPage({
                             <FormField
                                 id="edit-media-alt"
                                 label="Descriptive Alt Text"
+                                error={editAltError ?? undefined}
                                 required
                             >
                                 {(a11y) => (
@@ -737,7 +753,10 @@ export default function PropertyMediaPage({
                                 <Button
                                     type="button"
                                     variant="secondary"
-                                    onClick={() => setEditingItem(null)}
+                                    onClick={() => {
+                                        setEditingItem(null);
+                                        setEditAltError(null);
+                                    }}
                                 >
                                     Cancel
                                 </Button>
@@ -768,7 +787,6 @@ PropertyMediaPage.layout = {
     breadcrumbs: [
         { title: 'Partner Overview', href: dashboard() },
         { title: 'My Properties', href: propertiesIndexRoute() },
-        { title: 'Property Overview', href: showPropertyRoute(1) },
-        { title: 'Photos', href: mediaIndexRoute(1) },
+        { title: 'Photos', href: '#' },
     ],
 };

@@ -216,9 +216,17 @@ export default function OwnerNotificationsIndex({
                                                             <span>•</span>
                                                             <Link
                                                                 href={actionUrl}
-                                                                onClick={() => {
-                                                                    if (isUnread) {
-                                                                        markAsRead(notification.id);
+                                                                onClick={(
+                                                                    event,
+                                                                ) => {
+                                                                    if (
+                                                                        isUnread
+                                                                    ) {
+                                                                        event.preventDefault();
+                                                                        markAsRead(
+                                                                            notification.id,
+                                                                            actionUrl,
+                                                                        );
                                                                     }
                                                                 }}
                                                                 className="inline-flex items-center gap-1 font-semibold text-tijum-plum underline hover:text-tijum-coral dark:text-tijum-peach dark:hover:text-tijum-coral"

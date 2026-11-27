@@ -155,9 +155,13 @@ export default function OwnerLayout({
     return (
         <AppShell
             variant="sidebar"
-            className="tijum-owner min-h-svh w-full overflow-x-clip"
+            className="tijum-owner min-h-svh w-full overflow-x-clip print:block"
         >
-            <Sidebar collapsible="icon" variant="sidebar">
+            <Sidebar
+                collapsible="icon"
+                variant="sidebar"
+                className="print:hidden"
+            >
                 <SidebarHeader>
                     <SidebarMenu>
                         <SidebarMenuItem>
@@ -215,9 +219,9 @@ export default function OwnerLayout({
 
             <AppContent
                 variant="sidebar"
-                className="relative flex min-h-svh min-w-0 flex-1 flex-col overflow-x-clip bg-tijum-cream/40 dark:bg-background"
+                className="relative flex min-h-svh min-w-0 flex-1 flex-col overflow-x-clip bg-tijum-cream/40 dark:bg-background print:bg-white"
             >
-                <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center justify-between gap-3 border-b border-tijum-surface/80 bg-white/95 px-4 backdrop-blur-md sm:px-6 dark:border-border dark:bg-card/95">
+                <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center justify-between gap-3 border-b border-tijum-surface/80 bg-white/95 px-4 backdrop-blur-md sm:px-6 dark:border-border dark:bg-card/95 print:hidden">
                     <div className="flex min-w-0 items-center gap-2.5">
                         <SidebarTrigger className="-ml-1 text-tijum-plum dark:text-foreground" />
                         <Breadcrumbs breadcrumbs={breadcrumbs} />
@@ -330,7 +334,7 @@ export default function OwnerLayout({
                         {children}
                     </main>
 
-                    <footer className="border-t border-tijum-surface/80 bg-white/90 px-6 py-3 text-xs text-tijum-plum-muted dark:border-border dark:bg-card/90 dark:text-muted-foreground">
+                    <footer className="border-t border-tijum-surface/80 bg-white/90 px-6 py-3 text-xs text-tijum-plum-muted dark:border-border dark:bg-card/90 dark:text-muted-foreground print:hidden">
                         TIJUM Partner Portal — Stay easy. Eat well. Spend less.
                     </footer>
                 </div>

@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 
 export type BeforeInstallPromptEvent = Event & {
     readonly platforms: string[];
@@ -19,6 +19,7 @@ export type WebPushStatus =
     | 'unsubscribed';
 
 const INSTALL_DISMISS_STORAGE_KEY = 'tijum_pwa_install_dismissed_until';
+const INSTALLED_STORAGE_KEY = 'tijum_pwa_installed';
 const DISMISS_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
 
 let deferredInstallPrompt: BeforeInstallPromptEvent | null = null;
@@ -44,20 +45,37 @@ export function isStandalonePwa(): boolean {
     return mediaStandalone || iosStandalone;
 }
 
-export function isIosSafariBrowser(): boolean {
+export function isPwaMarkedInstalled(): boolean {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+
+    try {
+        return window.localStorage.getItem(INSTALLED_STORAGE_KEY) === '1';
+    } catch {
+        return false;
+    }
+}
+
+export function isIosDevice(): boolean {
     if (typeof window === 'undefined') {
         return false;
     }
 
     const ua = window.navigator.userAgent;
-    const isIosDevice =
-        /iPad|iPhone|iPod/.test(ua) ||
-        (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
 
-    if (!isIosDevice) {
+    return (
+        /iPad|iPhone|iPod/.test(ua) ||
+        (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1)
+    );
+}
+
+export function isIosSafariBrowser(): boolean {
+    if (!isIosDevice()) {
         return false;
     }
 
+    const ua = window.navigator.userAgent;
     const isOtherBrowser = /CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo/.test(ua);
     const isSafari = /Safari/.test(ua);
 
@@ -155,6 +173,11 @@ export function initPwaClient(): void {
 
     window.addEventListener('appinstalled', () => {
         deferredInstallPrompt = null;
+        try {
+            window.localStorage.setItem(INSTALLED_STORAGE_KEY, '1');
+        } catch {
+            // Ignore storage restrictions in private browsing
+        }
         notifyListeners();
     });
 
@@ -258,33 +281,88 @@ export function applyPwaUpdate(): void {
     waitingWorker.postMessage({ type: 'SKIP_WAITING' });
 }
 
-export function usePwaInstallState() {
-    const [, setTick] = useState(0);
+type PwaInstallSnapshot = {
+    canInstallNative: boolean;
+    canShowIosInstall: boolean;
+    isStandalone: boolean;
+    isInstalled: boolean;
+    isIosSafari: boolean;
+    isDismissed: boolean;
+    updateReady: boolean;
+};
 
-    useEffect(() => {
-        initPwaClient();
-        const onChange = () => setTick((n) => n + 1);
-        listeners.add(onChange);
+const SERVER_PWA_SNAPSHOT: PwaInstallSnapshot = {
+    canInstallNative: false,
+    canShowIosInstall: false,
+    isStandalone: false,
+    isInstalled: false,
+    isIosSafari: false,
+    isDismissed: false,
+    updateReady: false,
+};
 
-        const media = window.matchMedia?.('(display-mode: standalone)');
-        media?.addEventListener?.('change', onChange);
+let cachedPwaSnapshot: PwaInstallSnapshot = SERVER_PWA_SNAPSHOT;
 
-        return () => {
-            listeners.delete(onChange);
-            media?.removeEventListener?.('change', onChange);
-        };
-    }, []);
-
+function getPwaClientSnapshot(): PwaInstallSnapshot {
     const standalone = isStandalonePwa();
     const iosSafari = isIosSafariBrowser();
+    const iosDevice = isIosDevice();
 
-    return {
+    const next: PwaInstallSnapshot = {
         canInstallNative: deferredInstallPrompt !== null && !standalone,
-        canShowIosInstall: iosSafari && !standalone,
+        canShowIosInstall: iosDevice && !standalone,
         isStandalone: standalone,
+        isInstalled: isPwaMarkedInstalled(),
         isIosSafari: iosSafari,
         isDismissed: isInstallPromptDismissed(),
         updateReady,
+    };
+
+    if (
+        cachedPwaSnapshot.canInstallNative === next.canInstallNative &&
+        cachedPwaSnapshot.canShowIosInstall === next.canShowIosInstall &&
+        cachedPwaSnapshot.isStandalone === next.isStandalone &&
+        cachedPwaSnapshot.isInstalled === next.isInstalled &&
+        cachedPwaSnapshot.isIosSafari === next.isIosSafari &&
+        cachedPwaSnapshot.isDismissed === next.isDismissed &&
+        cachedPwaSnapshot.updateReady === next.updateReady
+    ) {
+        return cachedPwaSnapshot;
+    }
+
+    cachedPwaSnapshot = next;
+
+    return cachedPwaSnapshot;
+}
+
+function getPwaServerSnapshot(): PwaInstallSnapshot {
+    return SERVER_PWA_SNAPSHOT;
+}
+
+function subscribeToPwaStore(onStoreChange: () => void): () => void {
+    initPwaClient();
+    listeners.add(onStoreChange);
+
+    const media = window.matchMedia?.('(display-mode: standalone)');
+    media?.addEventListener?.('change', onStoreChange);
+    window.addEventListener('storage', onStoreChange);
+
+    return () => {
+        listeners.delete(onStoreChange);
+        media?.removeEventListener?.('change', onStoreChange);
+        window.removeEventListener('storage', onStoreChange);
+    };
+}
+
+export function usePwaInstallState() {
+    const snapshot = useSyncExternalStore(
+        subscribeToPwaStore,
+        getPwaClientSnapshot,
+        getPwaServerSnapshot,
+    );
+
+    return {
+        ...snapshot,
         triggerNativeInstall,
         dismissInstallPrompt,
         applyPwaUpdate,

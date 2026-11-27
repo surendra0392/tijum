@@ -241,8 +241,8 @@ export default function AdminRelocationSubsidiesIndex({
                     </span>
                     <div className="space-y-1">
                         <p className="font-heading text-sm font-semibold text-tijum-plum dark:text-foreground">
-                            Customer Price-Protection Guarantee (Phase 14 &amp;
-                            15 Accounting Policy)
+                            Customer Price-Protection Guarantee (Relocation
+                            Accounting Policy)
                         </p>
                         <p className="text-xs leading-relaxed text-tijum-plum-muted dark:text-muted-foreground">
                             When an owner-fault cancellation relocates a guest

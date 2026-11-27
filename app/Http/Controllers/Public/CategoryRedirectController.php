@@ -63,10 +63,10 @@ class CategoryRedirectController extends Controller
 
     /**
      * Redirect legacy category-in-city routes (e.g. /pgs-in-{citySlug}, /hotels-in-{citySlug})
-     * to the canonical city landing page (/hostels-in-{citySlug}) with HTTP 301.
+     * to the canonical city landing page (/stays-in-{citySlug}) with HTTP 301.
      */
     public function handleCity(string $category, string $citySlug, Request $request): RedirectResponse
     {
-        return redirect()->route('public.cities.show', ['citySlug' => $citySlug], 301);
+        return redirect()->route('public.cities.stays', ['citySlug' => $citySlug], 301);
     }
 }

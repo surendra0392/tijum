@@ -80,7 +80,7 @@ class AdminPaymentController extends Controller
         ]);
     }
 
-    public function show(ReservationPayment $payment): Response
+    public function show(Request $request, ReservationPayment $payment): Response
     {
         $payment->loadMissing([
             'reservation.property.city',
@@ -93,6 +93,7 @@ class AdminPaymentController extends Controller
         $hasUnresolvedRefund = $payment->hasUnresolvedRefund();
 
         return Inertia::render('admin/payments/show', [
+            'status' => $request->session()->get('status'),
             'refund_request_key' => (string) Str::uuid(),
             'payment' => [
                 'id' => $payment->id,

@@ -9,7 +9,6 @@ use App\Enums\LinkedAccountStatus;
 use App\Models\Owner;
 use App\Models\OwnerFinancialProfile;
 use App\Services\Payments\RazorpayRouteService;
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -59,7 +58,19 @@ class UpdateFinancialProfile
 
         return DB::transaction(function () use ($owner, $data, $pan, $gstRegistered, $gstin, $maskedAccount, $ifsc): OwnerFinancialProfile {
             /** @var OwnerFinancialProfile $profile */
-            $profile = OwnerFinancialProfile::firstOrNew(['owner_id' => $owner->id]);
+            $profile = OwnerFinancialProfile::query()
+                ->where('owner_id', $owner->id)
+                ->lockForUpdate()
+                ->first() ?? new OwnerFinancialProfile(['owner_id' => $owner->id]);
+
+            if ($profile->exists && in_array($profile->onboarding_status, [
+                FinancialOnboardingStatus::Active,
+                FinancialOnboardingStatus::UnderReview,
+            ], true)) {
+                throw ValidationException::withMessages([
+                    'onboarding_status' => 'Your financial profile is currently locked while under review or active. Contact TIJUM Finance to request banking updates.',
+                ]);
+            }
 
             $isNewAccount = blank($profile->razorpay_account_id);
 
@@ -67,7 +78,7 @@ class UpdateFinancialProfile
                 'legal_business_name' => trim((string) ($data['legal_business_name'] ?? $owner->name)),
                 'business_constitution' => trim((string) ($data['business_constitution'] ?? 'individual')),
                 'pan_number' => $pan,
-                'pan_verified_at' => CarbonImmutable::now(), // Simulated PAN verification check
+                'pan_verified_at' => null,
                 'gst_registered' => $gstRegistered,
                 'gstin' => $gstin,
                 'supplier_legal_classification' => trim((string) ($data['supplier_legal_classification'] ?? 'unregistered')),
@@ -75,7 +86,7 @@ class UpdateFinancialProfile
                 'bank_account_number_masked' => $maskedAccount,
                 'bank_ifsc' => $ifsc,
                 'bank_name' => trim((string) ($data['bank_name'] ?? 'Bank Account')),
-                'beneficiary_verified_at' => CarbonImmutable::now(),
+                'beneficiary_verified_at' => null,
                 'onboarding_status' => FinancialOnboardingStatus::Submitted,
             ]);
 

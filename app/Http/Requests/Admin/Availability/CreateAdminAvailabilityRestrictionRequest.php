@@ -16,7 +16,11 @@ class CreateAdminAvailabilityRestrictionRequest extends FormRequest
     {
         $admin = $this->user('admin');
 
-        return $admin instanceof Admin && $admin->hasPermission('availability.manage_restrictions');
+        return $admin instanceof Admin && (
+            $admin->role->isSuperAdmin()
+            || $admin->hasPermission('availability.manage_restrictions')
+            || $admin->hasPermission('pricing.manage_restrictions')
+        );
     }
 
     /**

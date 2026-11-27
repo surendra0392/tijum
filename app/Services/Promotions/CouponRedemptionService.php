@@ -30,17 +30,51 @@ class CouponRedemptionService
             /** @var CouponCode $lockedCoupon */
             $lockedCoupon = CouponCode::query()->lockForUpdate()->findOrFail($coupon->id);
 
-            // Re-check global limit inside transaction lock
-            if ($lockedCoupon->total_usage_limit !== null && $lockedCoupon->total_used_count >= $lockedCoupon->total_usage_limit) {
-                throw new RuntimeException('Coupon has reached its maximum usage limit.');
-            }
+            $now = CarbonImmutable::now();
 
-            // Release any existing active hold for this user & coupon
+            // Release expired holds (and any active hold for this exact reservation) without stealing live unexpired holds.
             CouponHold::query()
                 ->where('coupon_code_id', $lockedCoupon->id)
                 ->where('user_id', $user->id)
                 ->where('status', 'active')
+                ->where(function ($query) use ($reservation, $now): void {
+                    $query->where('expires_at', '<=', $now);
+                    if ($reservation !== null) {
+                        $query->orWhere('reservation_id', $reservation->id);
+                    }
+                })
                 ->update(['status' => 'released']);
+
+            // Re-check global limit (committed + active unexpired holds) inside transaction lock
+            if ($lockedCoupon->total_usage_limit !== null) {
+                $activeGlobalHolds = CouponHold::query()
+                    ->where('coupon_code_id', $lockedCoupon->id)
+                    ->where('status', 'active')
+                    ->where('expires_at', '>', $now)
+                    ->count();
+
+                if (($lockedCoupon->total_used_count + $activeGlobalHolds) >= $lockedCoupon->total_usage_limit) {
+                    throw new RuntimeException('Coupon has reached its maximum usage limit.');
+                }
+            }
+
+            // Re-check per-user limit (non-reverted redemptions + active unexpired holds) inside transaction lock
+            $userCommittedCount = CouponRedemption::query()
+                ->where('coupon_code_id', $lockedCoupon->id)
+                ->where('user_id', $user->id)
+                ->where('is_reverted', false)
+                ->count();
+
+            $userActiveHolds = CouponHold::query()
+                ->where('coupon_code_id', $lockedCoupon->id)
+                ->where('user_id', $user->id)
+                ->where('status', 'active')
+                ->where('expires_at', '>', $now)
+                ->count();
+
+            if (($userCommittedCount + $userActiveHolds) >= $lockedCoupon->per_user_limit) {
+                throw new RuntimeException('You have already reached the maximum usage limit for this coupon.');
+            }
 
             $holdDuration = (int) RewardsSetting::get('hold_duration_minutes', 15);
             $holdRef = 'HLD-CPN-'.strtoupper(Str::random(10));
@@ -51,7 +85,7 @@ class CouponRedemptionService
                 'reservation_id' => $reservation?->id,
                 'hold_reference' => $holdRef,
                 'discount_amount_minor' => $discountAmountMinor,
-                'expires_at' => CarbonImmutable::now()->addMinutes($holdDuration),
+                'expires_at' => $now->addMinutes($holdDuration),
                 'status' => 'active',
             ]);
         });
@@ -75,6 +109,20 @@ class CouponRedemptionService
 
             /** @var CouponCode $lockedCoupon */
             $lockedCoupon = CouponCode::query()->lockForUpdate()->findOrFail($lockedHold->coupon_code_id);
+
+            if ($lockedCoupon->total_usage_limit !== null && $lockedCoupon->total_used_count >= $lockedCoupon->total_usage_limit) {
+                throw new RuntimeException('Coupon has reached its maximum usage limit.');
+            }
+
+            $userRedemptions = CouponRedemption::query()
+                ->where('coupon_code_id', $lockedCoupon->id)
+                ->where('user_id', $lockedHold->user_id)
+                ->where('is_reverted', false)
+                ->count();
+
+            if ($userRedemptions >= $lockedCoupon->per_user_limit) {
+                throw new RuntimeException('Customer has already reached the per-user redemption limit for this coupon.');
+            }
 
             // Calculate funding shares
             $discountAmount = $lockedHold->discount_amount_minor;

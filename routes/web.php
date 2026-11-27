@@ -34,12 +34,15 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [PublicPageController::class, 'home'])->name('home');
 Route::get('/search', PropertySearchController::class)->name('public.search');
 Route::get('/explore', PropertySearchController::class)->name('public.explore');
-Route::get('/stays/{citySlug}/{property:slug}', PropertyDetailController::class)->name('public.properties.seo');
-Route::get('/properties/{property:slug}', PropertyDetailController::class)->name('public.properties.show');
+Route::get('/stays/{citySlug}/{property:slug}', [PropertyDetailController::class, 'showBySeo'])->name('public.properties.seo');
+Route::get('/properties/{property:slug}', [PropertyDetailController::class, 'show'])->name('public.properties.show');
 Route::get('/properties/{property:slug}/reserve', [ReservationController::class, 'create'])->name('reservations.create');
 Route::get('/how-it-works', [PublicPageController::class, 'howItWorks'])->name('public.how-it-works');
 Route::get('/about', [PublicPageController::class, 'about'])->name('public.about');
 Route::get('/contact', [PublicPageController::class, 'contact'])->name('public.contact');
+Route::post('/contact', [PublicPageController::class, 'submitContact'])
+    ->middleware('throttle:5,1')
+    ->name('public.contact.store');
 Route::get('/become-a-partner', [PublicPageController::class, 'becomeAPartner'])->name('public.become-a-partner');
 Route::get('/faqs', [PublicPageController::class, 'faqs'])->name('public.faqs');
 Route::get('/terms', [PublicPageController::class, 'terms'])->name('public.terms');
@@ -115,6 +118,7 @@ Route::middleware(['auth:web', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('reservations', [ReservationController::class, 'index'])->name('reservations.index');
     Route::post('reservations', [ReservationController::class, 'store'])->name('reservations.store');
+    Route::post('checkout/quote-promotions', [ReservationController::class, 'quotePromotions'])->name('reservations.quote-promotions');
     Route::get('reservations/{reservation}', [ReservationController::class, 'show'])->name('reservations.show');
     Route::post('reservations/{reservation}/cancel', [ReservationCancellationController::class, 'store'])->name('reservations.cancel');
     Route::post('reservations/{reservation}/pay', [CustomerPaymentController::class, 'initiate'])->name('reservations.pay');
@@ -125,6 +129,9 @@ Route::middleware(['auth:web', 'verified'])->group(function () {
     Route::get('my-support', [CustomerProtectionCaseController::class, 'index'])->name('support.cases.index');
     Route::get('my-support/{case:case_reference}', [CustomerProtectionCaseController::class, 'show'])->name('support.cases.show');
     Route::post('my-support/{case:case_reference}/messages', [CustomerProtectionCaseController::class, 'storeMessage'])->name('support.cases.messages.store');
+    Route::get('my-support/{case:case_reference}/messages/{message}/attachment', [CustomerProtectionCaseController::class, 'downloadAttachment'])
+        ->whereNumber('message')
+        ->name('support.cases.messages.attachment');
     Route::get('my-support/{case:case_reference}/acknowledgement', [CustomerProtectionCaseController::class, 'acknowledgement'])->name('support.cases.acknowledgement');
     Route::post('relocations/{relocation}/decision', [CustomerRelocationController::class, 'decision'])->name('relocations.decision');
 

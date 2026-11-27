@@ -6,7 +6,7 @@ import {
     ExternalLink,
     Inbox,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -42,48 +42,39 @@ export function NotificationBell({
             ? '/owner/notifications/mark-all-read'
             : '/notifications/mark-all-read';
 
-    // Fetch unread count periodically if not admin
+    const fetchUnreadCount = useCallback(async () => {
+        if (role === 'admin') return;
+
+        try {
+            const res = await fetch(countEndpoint, {
+                headers: { Accept: 'application/json' },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (typeof data.unread_count === 'number') {
+                    setUnreadCount(data.unread_count);
+                }
+            }
+        } catch {
+            // Ignore transient network glitches
+        }
+    }, [countEndpoint, role]);
+
+    // Fetch unread count immediately on mount and periodically if not admin
     useEffect(() => {
         if (role === 'admin') return;
 
-        const checkCount = async () => {
-            try {
-                const res = await fetch(countEndpoint, {
-                    headers: { Accept: 'application/json' },
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (typeof data.unread_count === 'number') {
-                        setUnreadCount(data.unread_count);
-                    }
-                }
-            } catch {
-                // Ignore network glitch
-            }
-        };
-
-        const interval = setInterval(checkCount, 30000);
+        void fetchUnreadCount();
+        const interval = setInterval(() => {
+            void fetchUnreadCount();
+        }, 30000);
         return () => clearInterval(interval);
-    }, [countEndpoint, role]);
+    }, [fetchUnreadCount, role]);
 
-    const handleOpen = async (open: boolean) => {
+    const handleOpen = (open: boolean) => {
         setIsOpen(open);
         if (open && role !== 'admin') {
-            try {
-                const res = await fetch(`${basePath}?filter=unread`, {
-                    headers: {
-                        Accept: 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                });
-                if (res.ok) {
-                    // If JSON was requested, or fallback to current state
-                }
-            } catch {
-                // Ignore
-            } finally {
-                // The inbox link remains available if the preview request fails.
-            }
+            void fetchUnreadCount();
         }
     };
 

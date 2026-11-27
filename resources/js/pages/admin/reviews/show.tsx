@@ -1,4 +1,4 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeft,
     ArrowRight,
@@ -12,6 +12,7 @@ import {
     Star,
     XCircle,
 } from 'lucide-react';
+import { useState } from 'react';
 import { StarRating } from '@/components/reviews/star-rating';
 import { PageHeader } from '@/components/shared/page-header';
 import {
@@ -121,38 +122,59 @@ function getReportSemanticStatus(status: string): SemanticStatus {
 }
 
 export default function AdminReviewShow({ review }: AdminReviewShowProps) {
-    const {
-        data: modData,
-        setData: setModData,
-        post: postModerate,
-        processing: submittingMod,
-        errors: modErrors,
-    } = useForm({
-        action: 'publish',
+    const [modData, setModDataState] = useState({
         reason: '',
         internal_notes: '',
     });
+    const [submittingMod, setSubmittingMod] = useState(false);
+    const [modErrors, setModErrors] = useState<Record<string, string>>({});
 
-    const {
-        setData: setRespModData,
-        post: postRespModerate,
-        processing: submittingRespMod,
-        errors: respModErrors,
-    } = useForm({
-        action: 'publish',
-        reason: '',
-    });
+    const [submittingRespMod, setSubmittingRespMod] = useState(false);
+    const [respModErrors, setRespModErrors] = useState<Record<string, string>>(
+        {},
+    );
+
+    const setModData = (key: 'reason' | 'internal_notes', value: string) => {
+        setModDataState((prev) => ({ ...prev, [key]: value }));
+    };
 
     const handleModerate = (
         action: 'publish' | 'reject' | 'hide' | 'restore',
     ) => {
-        setModData('action', action);
-        postModerate(`/admin/reviews/${review.id}/moderate`);
+        setSubmittingMod(true);
+        setModErrors({});
+        router.post(
+            `/admin/reviews/${review.id}/moderate`,
+            {
+                action,
+                reason: modData.reason,
+                internal_notes: modData.internal_notes,
+            },
+            {
+                preserveScroll: true,
+                onError: (errors) =>
+                    setModErrors(errors as Record<string, string>),
+                onFinish: () => setSubmittingMod(false),
+            },
+        );
     };
 
     const handleModerateResponse = (action: 'publish' | 'reject') => {
-        setRespModData('action', action);
-        postRespModerate(`/admin/reviews/${review.id}/moderate-response`);
+        setSubmittingRespMod(true);
+        setRespModErrors({});
+        router.post(
+            `/admin/reviews/${review.id}/moderate-response`,
+            {
+                action,
+                reason: modData.reason,
+            },
+            {
+                preserveScroll: true,
+                onError: (errors) =>
+                    setRespModErrors(errors as Record<string, string>),
+                onFinish: () => setSubmittingRespMod(false),
+            },
+        );
     };
 
     const categoryRatings = [

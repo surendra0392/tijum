@@ -67,7 +67,15 @@ class AdminMarketingCampaignController extends Controller
             'ends_at' => ['nullable', 'date'],
         ]);
 
-        $validated['slug'] = Str::slug($validated['slug'] ?: $validated['name']);
+        $baseSlug = Str::slug($validated['slug'] ?: $validated['name']);
+        $slug = $baseSlug !== '' ? $baseSlug : 'campaign-'.strtolower(Str::random(6));
+        $suffix = 2;
+        while (MarketingCampaign::query()->where('slug', $slug)->exists()) {
+            $slug = "{$baseSlug}-{$suffix}";
+            $suffix++;
+        }
+
+        $validated['slug'] = $slug;
         $validated['admin_id'] = auth('admin')->id();
 
         $campaign = MarketingCampaign::query()->create($validated);

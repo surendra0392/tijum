@@ -28,13 +28,13 @@ function formatDateSafe(val?: string | null): string {
     }
 }
 
-export default function CouponsPage({ coupons = [] }: Props) {
+export default function CouponsPage({ coupons }: Props) {
     const [copiedCode, setCopiedCode] = useState<string | null>(null);
     const [filter, setFilter] = useState<string>('all');
 
     const copyToClipboard = (code: string) => {
         if (typeof navigator !== 'undefined' && navigator.clipboard) {
-            navigator.clipboard.writeText(code);
+            void navigator.clipboard.writeText(code).catch(() => {});
             setCopiedCode(code);
             setTimeout(() => setCopiedCode(null), 2500);
         }
@@ -46,8 +46,8 @@ export default function CouponsPage({ coupons = [] }: Props) {
             return coupons.filter((c) => c.status === 'active');
         }
         if (
-            filter === 'hostel-pg' ||
-            filter === 'homestay' ||
+            filter === 'hostels-pg' ||
+            filter === 'homestays' ||
             filter === 'co-living'
         ) {
             return coupons.filter((c) => {
@@ -56,15 +56,48 @@ export default function CouponsPage({ coupons = [] }: Props) {
                 if (!cats || cats.length === 0) {
                     return true;
                 }
-                return cats.some(
-                    (cat) =>
-                        cat.toLowerCase().includes(filter.replace('-', '')) ||
-                        cat.toLowerCase().includes(filter),
-                );
+                const target = filter.toLowerCase();
+                return cats.some((cat) => {
+                    const normalized = cat.toLowerCase();
+                    return (
+                        normalized === target ||
+                        normalized.includes(target.replace(/s$/, ''))
+                    );
+                });
             });
         }
         return coupons;
     }, [coupons, filter]);
+
+    const formatDiscountBadge = (coupon: CouponCode): string => {
+        if (coupon.offer_type === 'percentage') {
+            return `${coupon.discount_percentage ?? 0}% OFF`;
+        }
+        if (coupon.offer_type === 'bonus_points') {
+            const pts =
+                (coupon as unknown as Record<string, unknown>).bonus_points ??
+                0;
+            return `+${Number(pts).toLocaleString()} PTS`;
+        }
+        if (coupon.offer_type === 'combined') {
+            const parts: string[] = [];
+            if (coupon.discount_percentage) {
+                parts.push(`${coupon.discount_percentage}% OFF`);
+            } else if (coupon.discount_amount_minor) {
+                parts.push(
+                    `₹${(coupon.discount_amount_minor / 100).toLocaleString()} OFF`,
+                );
+            }
+            const pts =
+                (coupon as unknown as Record<string, unknown>).bonus_points ??
+                0;
+            if (Number(pts) > 0) {
+                parts.push(`+${Number(pts).toLocaleString()} PTS`);
+            }
+            return parts.join(' + ') || 'SPECIAL OFFER';
+        }
+        return `₹${((coupon.discount_amount_minor ?? 0) / 100).toLocaleString()} OFF`;
+    };
 
     return (
         <>
@@ -91,8 +124,8 @@ export default function CouponsPage({ coupons = [] }: Props) {
                         {[
                             { key: 'all', label: 'All Coupons' },
                             { key: 'active', label: 'Active Now' },
-                            { key: 'hostel-pg', label: 'Hostels / PG' },
-                            { key: 'homestay', label: 'Homestays' },
+                            { key: 'hostels-pg', label: 'Hostels / PG' },
+                            { key: 'homestays', label: 'Homestays' },
                             { key: 'co-living', label: 'Co-Living' },
                         ].map((tab) => (
                             <button
@@ -136,10 +169,11 @@ export default function CouponsPage({ coupons = [] }: Props) {
                         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                             {filteredCoupons.map((coupon) => {
                                 const isPercentage =
-                                    coupon.offer_type === 'percentage';
-                                const discountLabel = isPercentage
-                                    ? `${coupon.discount_percentage}% OFF`
-                                    : `₹${((coupon.discount_amount_minor ?? 0) / 100).toLocaleString()} OFF`;
+                                    coupon.offer_type === 'percentage' ||
+                                    (coupon.offer_type === 'combined' &&
+                                        Boolean(coupon.discount_percentage));
+                                const discountLabel =
+                                    formatDiscountBadge(coupon);
 
                                 return (
                                     <div

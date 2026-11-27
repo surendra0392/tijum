@@ -19,8 +19,16 @@ class AdminCheckOutController extends Controller
 {
     public function index(Request $request): Response
     {
-        $today = CarbonImmutable::now()->toDateString();
-        $date = (string) $request->query('date', $today);
+        $today = CarbonImmutable::now('Asia/Kolkata')->toDateString();
+        $rawDate = $request->query('date');
+        $date = $today;
+        if (is_string($rawDate) && trim($rawDate) !== '') {
+            try {
+                $date = CarbonImmutable::parse($rawDate, 'Asia/Kolkata')->toDateString();
+            } catch (\Throwable) {
+                // Keep IST today fallback on malformed date query.
+            }
+        }
         $propertyId = $request->query('property_id') ? (int) $request->query('property_id') : null;
         $cityId = $request->query('city_id') ? (int) $request->query('city_id') : null;
         $status = (string) $request->query('status', 'all');

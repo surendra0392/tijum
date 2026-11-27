@@ -13,7 +13,8 @@ use App\Models\NotificationDelivery;
 use App\Models\NotificationWebhookEvent;
 use App\Models\Owner;
 use App\Models\User;
-use Illuminate\Support\Carbon;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Log;
 
 class WebhookProcessingService
@@ -61,7 +62,7 @@ class WebhookProcessingService
                 foreach ($statuses as $st) {
                     $wamid = $st['id'] ?? null;
                     $statusStr = $st['status'] ?? null;
-                    $timestamp = isset($st['timestamp']) ? Carbon::createFromTimestamp((int) $st['timestamp']) : now();
+                    $timestamp = isset($st['timestamp']) ? CarbonImmutable::createFromTimestamp((int) $st['timestamp']) : now();
 
                     if (! is_string($wamid) || ! is_string($statusStr)) {
                         continue;
@@ -169,7 +170,10 @@ class WebhookProcessingService
         return ['success' => true, 'message' => 'SMS webhook processed successfully.'];
     }
 
-    private function updateDeliveryFromWhatsAppStatus(string $wamid, string $statusStr, Carbon $timestamp, array $raw): void
+    /**
+     * @param  array<string, mixed>  $raw
+     */
+    private function updateDeliveryFromWhatsAppStatus(string $wamid, string $statusStr, CarbonInterface $timestamp, array $raw): void
     {
         /** @var NotificationDelivery|null $delivery */
         $delivery = NotificationDelivery::query()->where('provider_message_id', $wamid)->first();

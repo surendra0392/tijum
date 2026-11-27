@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Seo;
 
 use App\Models\BlogArticle;
+use App\Models\PlatformSetting;
 use App\Models\Property;
 use App\Models\SeoSetting;
 use Illuminate\Support\Str;
@@ -33,6 +34,11 @@ class SeoService
         $resolvedCanonical = $this->cleanCanonicalUrl($canonical ?: url()->current());
         $resolvedOgImage = $ogImage ? url($ogImage) : url($settings->default_og_image ?: self::DEFAULT_OG_IMAGE);
 
+        $googleVerification = $settings->google_site_verification
+            ?: (string) PlatformSetting::get('seo.google_site_verification', '');
+        $bingVerification = $settings->bing_site_verification
+            ?: (string) PlatformSetting::get('seo.bing_site_verification', '');
+
         return [
             'title' => $resolvedTitle,
             'description' => $resolvedDescription,
@@ -42,6 +48,8 @@ class SeoService
             'ogImage' => $resolvedOgImage,
             'ogSiteName' => $settings->site_name ?: 'TIJUM',
             'twitterCard' => 'summary_large_image',
+            'googleSiteVerification' => $googleVerification !== '' ? $googleVerification : null,
+            'bingSiteVerification' => $bingVerification !== '' ? $bingVerification : null,
             'structuredData' => $structuredData,
             'diagnostics' => [
                 'title_length' => mb_strlen($resolvedTitle),
@@ -111,7 +119,7 @@ class SeoService
                 }
 
                 // Strip default page=1 as it is canonical to the base URL
-                if ($lowerKey === 'page' && ((string) $value === '1' || (int) $value === 1)) {
+                if ($lowerKey === 'page' && is_scalar($value) && ((string) $value === '1' || (int) $value === 1)) {
                     unset($queryParams[$key]);
                 }
             }
@@ -136,7 +144,7 @@ class SeoService
             'name' => 'TIJUM',
             'url' => route('home'),
             'slogan' => 'Stay easy. Eat well. Spend less.',
-            'logo' => url('/favicon-64x64.png'),
+            'logo' => url('/pwa/icon-192x192.png'),
             'description' => 'Accommodation aggregation and booking marketplace connecting customers with verified Hostels/PG, Homestays, and Co-Living spaces with property-specific food flags.',
             'areaServed' => [
                 ['@type' => 'City', 'name' => 'Hyderabad'],
@@ -236,7 +244,7 @@ class SeoService
             'name' => 'TIJUM',
             'logo' => [
                 '@type' => 'ImageObject',
-                'url' => url('/favicon-64x64.png'),
+                'url' => url('/pwa/icon-192x192.png'),
             ],
         ];
 
@@ -302,11 +310,11 @@ class SeoService
         }
 
         // Include genuine rating summary if property has published reviews (BIS IS 19000 & Google Schema compliant)
-        if ($property->ratingSummary && $property->ratingSummary->total_published_reviews > 0) {
+        if ($property->ratingSummary && $property->ratingSummary->published_review_count > 0) {
             $schema['aggregateRating'] = [
                 '@type' => 'AggregateRating',
                 'ratingValue' => number_format((float) $property->ratingSummary->average_rating, 1),
-                'reviewCount' => $property->ratingSummary->total_published_reviews,
+                'reviewCount' => $property->ratingSummary->published_review_count,
                 'bestRating' => '5',
                 'worstRating' => '1',
             ];

@@ -68,14 +68,16 @@ export function HeroSection({ search, heroBanners = [] }: HeroSectionProps) {
                 clearProps: 'all',
             });
 
-            gsap.from('.hero-visual-item', {
-                opacity: 0,
-                scale: 0.98,
-                duration: 0.85,
-                delay: 0.12,
-                ease: 'power3.out',
-                clearProps: 'all',
-            });
+            if (window.innerWidth >= 1024) {
+                gsap.from('.hero-visual-item', {
+                    opacity: 0,
+                    scale: 0.98,
+                    duration: 0.85,
+                    delay: 0.12,
+                    ease: 'power3.out',
+                    clearProps: 'all',
+                });
+            }
 
             gsap.from('.hero-search-anim', {
                 opacity: 0,
@@ -93,13 +95,13 @@ export function HeroSection({ search, heroBanners = [] }: HeroSectionProps) {
     return (
         <section
             ref={heroRef}
-            className="relative z-20 bg-tijum-cream pt-8 pb-12 sm:pt-10 sm:pb-14 lg:pt-12 lg:pb-16"
+            className="relative z-20 bg-tijum-cream pt-5 pb-8 sm:pt-7 sm:pb-10 lg:pt-12 lg:pb-16"
         >
             <ResponsiveContainer width="wide" className="relative z-10">
-                <div className="grid items-center gap-8 lg:grid-cols-12 lg:gap-12">
+                <div className="grid items-center gap-0 lg:grid-cols-12 lg:gap-12">
                     {/* Left Editorial Column */}
-                    <div className="space-y-6 lg:col-span-6">
-                        <div className="hero-anim-item inline-flex items-center gap-2 rounded-full border border-tijum-surface bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-tijum-plum shadow-2xs">
+                    <div className="flex flex-col gap-4 sm:gap-5 lg:col-span-6 lg:gap-6">
+                        <div className="hero-anim-item hidden self-start items-center gap-2 rounded-full border border-tijum-surface bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-tijum-plum shadow-2xs lg:inline-flex">
                             <span className="size-2 rounded-full bg-tijum-coral" />
                             <span>
                                 Verified Stays · Hyderabad, Vijayawada, Guntur
@@ -148,7 +150,7 @@ export function HeroSection({ search, heroBanners = [] }: HeroSectionProps) {
                             </Link>
                         </div>
 
-                        <div className="hero-anim-item flex flex-wrap items-center gap-x-6 gap-y-2.5 border-t border-tijum-surface/85 pt-5 text-xs font-medium text-tijum-lavender sm:text-sm">
+                        <div className="hero-anim-item flex flex-wrap items-center gap-x-6 gap-y-2.5 border-t border-tijum-surface/85 pt-4 text-xs font-medium text-tijum-lavender sm:text-sm lg:pt-5">
                             <span className="inline-flex items-center gap-2">
                                 <UtensilsCrossed
                                     className="size-4 shrink-0 text-[#E05A47]"
@@ -173,8 +175,8 @@ export function HeroSection({ search, heroBanners = [] }: HeroSectionProps) {
                         </div>
                     </div>
 
-                    {/* Right Architectural Visual Column */}
-                    <div className="hero-visual-item relative lg:col-span-6">
+                    {/* Right Architectural Visual Column (desktop only to keep mobile hero compact) */}
+                    <div className="hero-visual-item relative hidden lg:col-span-6 lg:block">
                         <div className="relative overflow-hidden rounded-[28px] border border-tijum-surface/80 bg-tijum-surface shadow-tijum-soft">
                             <picture className="block">
                                 <source
@@ -262,7 +264,7 @@ export function HeroSection({ search, heroBanners = [] }: HeroSectionProps) {
                 {search && (
                     <div
                         id="home-search"
-                        className="hero-search-anim tijum-anchor-target relative z-30 mt-8 sm:mt-10"
+                        className="hero-search-anim tijum-anchor-target relative z-30 mt-5 sm:mt-7 lg:mt-10"
                     >
                         <SearchPanel
                             className="relative z-30 shadow-tijum-soft"

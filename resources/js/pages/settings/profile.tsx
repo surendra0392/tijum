@@ -205,7 +205,7 @@ export default function Profile({
                                 id="phone"
                                 label="Mobile / Phone number"
                                 required
-                                hint="Include country code for international numbers (e.g., +91 9876543210). Phone OTP verification launches in an upcoming phase."
+                                hint="Include country code for international numbers (e.g., +91 9876543210). Used for stay coordination and booking updates."
                                 error={form.errors.phone}
                             >
                                 {(a11y) => (
@@ -291,7 +291,7 @@ export default function Profile({
                             </div>
 
                             {mustVerifyEmail && !emailVerified && (
-                                <Form {...send()}>
+                                <Form {...send.form()}>
                                     {({ processing }) => (
                                         <Button
                                             type="submit"

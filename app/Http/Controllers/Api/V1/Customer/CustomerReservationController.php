@@ -18,7 +18,11 @@ use App\Models\User;
 use App\Services\ReservationQuoteService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
+use RuntimeException;
 use Throwable;
 
 class CustomerReservationController extends ApiController
@@ -43,14 +47,16 @@ class CustomerReservationController extends ApiController
             'stage' => ['nullable', Rule::in(['upcoming', 'awaiting_action', 'past', 'cancelled'])],
         ]);
 
+        $todayIst = now('Asia/Kolkata')->toDateString();
+
         match ($validated['stage'] ?? null) {
             'upcoming' => $query
                 ->where('status', ReservationStatus::Confirmed)
-                ->whereDate('checkout_date', '>=', now()->toDateString()),
+                ->whereDate('checkout_date', '>=', $todayIst),
             'awaiting_action' => $query->where('status', ReservationStatus::AwaitingPayment),
             'past' => $query
                 ->where('status', ReservationStatus::Confirmed)
-                ->whereDate('checkout_date', '<', now()->toDateString()),
+                ->whereDate('checkout_date', '<', $todayIst),
             'cancelled' => $query->whereIn('status', [ReservationStatus::Cancelled, ReservationStatus::Expired]),
             default => null,
         };
@@ -129,11 +135,29 @@ class CustomerReservationController extends ApiController
                 'Reservation created successfully. Please complete payment within 15 minutes to confirm.',
                 201
             );
-        } catch (Throwable $e) {
+        } catch (ValidationException $e) {
+            return $this->error(
+                $e->getMessage(),
+                'RESERVATION_CREATION_FAILED',
+                422,
+                $e->errors()
+            );
+        } catch (InvalidArgumentException|RuntimeException $e) {
             return $this->error(
                 $e->getMessage(),
                 'RESERVATION_CREATION_FAILED',
                 422
+            );
+        } catch (Throwable $e) {
+            Log::error('API reservation creation failed unexpectedly: '.$e->getMessage(), [
+                'exception' => $e,
+                'user_id' => $user->id,
+            ]);
+
+            return $this->error(
+                'Unable to create reservation right now. Please try again.',
+                'RESERVATION_CREATION_ERROR',
+                500
             );
         }
     }

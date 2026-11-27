@@ -91,7 +91,7 @@ export default function AdminEmailCampaignForm({
         if (!emailCampaign || !testEmail) return;
         setIsSendingTest(true);
         router.post(
-            `/admin/marketing/emails/${emailCampaign.id}/send-test`,
+            `/admin/marketing/emails/${emailCampaign.id}/test`,
             { test_email: testEmail },
             {
                 onFinish: () => {

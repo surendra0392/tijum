@@ -31,9 +31,12 @@ class AdminRelocationSubsidyController extends Controller
 
         $subsidies = $query->latest('id')->paginate(20)->withQueryString();
 
-        $all = PlatformRelocationSubsidy::all();
-        $totalSubsidized = (int) $all->where('status', RelocationSubsidyStatus::Approved)->sum('subsidy_amount_minor')
-            + (int) $all->where('status', RelocationSubsidyStatus::Funded)->sum('subsidy_amount_minor');
+        $agg = PlatformRelocationSubsidy::query()
+            ->selectRaw(
+                'COUNT(*) as total_count, COALESCE(SUM(CASE WHEN status IN (?, ?) THEN subsidy_amount_minor ELSE 0 END), 0) as total_subsidized_minor',
+                [RelocationSubsidyStatus::Approved->value, RelocationSubsidyStatus::Funded->value]
+            )
+            ->first();
 
         return Inertia::render('admin/relocations/subsidies', [
             'subsidies' => [
@@ -61,8 +64,8 @@ class AdminRelocationSubsidyController extends Controller
                 'total' => $subsidies->total(),
             ],
             'metrics' => [
-                'total_subsidized_minor' => $totalSubsidized,
-                'count' => $all->count(),
+                'total_subsidized_minor' => (int) ($agg->total_subsidized_minor ?? 0),
+                'count' => (int) ($agg->total_count ?? 0),
             ],
             'filters' => [
                 'status' => $request->query('status'),
@@ -75,6 +78,12 @@ class AdminRelocationSubsidyController extends Controller
         /** @var Admin $admin */
         $admin = $request->user('admin');
         abort_unless($admin->hasPermission('relocations.subsidies.manage'), 403);
+
+        if ($subsidy->status !== RelocationSubsidyStatus::PendingApproval) {
+            return back()->withErrors([
+                'subsidy' => 'Only subsidies awaiting approval can be approved.',
+            ]);
+        }
 
         $subsidy->forceFill([
             'status' => RelocationSubsidyStatus::Approved,

@@ -114,7 +114,7 @@ const performDomUpdate = (resolved: ResolvedAppearance): void => {
     if (metaThemeColor) {
         metaThemeColor.setAttribute(
             'content',
-            resolved === 'dark' ? '#1E131D' : '#FFF4EE',
+            resolved === 'dark' ? '#1E131D' : '#442F41',
         );
     }
 };

@@ -67,7 +67,9 @@ Route::prefix('v1')->group(function (): void {
         Route::get('blog/{slug}', [PublicContentController::class, 'blogShow'])->name('api.v1.public.blog.show');
         Route::get('faqs', [PublicContentController::class, 'faqs'])->name('api.v1.public.faqs');
         Route::get('banners', [PublicContentController::class, 'banners'])->name('api.v1.public.banners');
-        Route::post('contact', [PublicContentController::class, 'contact'])->name('api.v1.public.contact');
+        Route::post('contact', [PublicContentController::class, 'contact'])
+            ->middleware('throttle:5,1')
+            ->name('api.v1.public.contact');
     });
 
     // 2. Authentication: Separate Customer & Owner flows

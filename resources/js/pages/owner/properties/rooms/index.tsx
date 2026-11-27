@@ -32,10 +32,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { dashboard } from '@/routes/owner';
-import {
-    index as propertiesIndexRoute,
-    show as showPropertyRoute,
-} from '@/routes/owner/properties';
+import { index as propertiesIndexRoute } from '@/routes/owner/properties';
 import { index as roomTypesIndexRoute } from '@/routes/owner/properties/room-types';
 import {
     create as createRoomRoute,
@@ -554,7 +551,6 @@ RoomsIndex.layout = {
     breadcrumbs: [
         { title: 'Partner Overview', href: dashboard() },
         { title: 'My Properties', href: propertiesIndexRoute() },
-        { title: 'Property Overview', href: showPropertyRoute(1) },
-        { title: 'Physical Rooms', href: roomsIndexRoute(1) },
+        { title: 'Physical Rooms', href: '#' },
     ],
 };

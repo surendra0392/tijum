@@ -167,7 +167,7 @@ class ApprovePartnerSettlement
                         'amount' => '₹'.number_format($approved->net_settlement_amount_minor / 100, 2),
                         'period_start' => $approved->period_start->format('d M Y'),
                         'period_end' => $approved->period_end->format('d M Y'),
-                        'action_url' => url("/owner/settlements/{$approved->id}"),
+                        'action_url' => route('owner.settlements.show', $approved),
                     ],
                     related: $approved,
                     relatedReference: $approved->settlement_reference,

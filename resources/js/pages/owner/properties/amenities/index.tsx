@@ -26,11 +26,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes/owner';
-import {
-    index as propertiesIndexRoute,
-    show as showPropertyRoute,
-} from '@/routes/owner/properties';
-import { index as amenitiesIndexRoute } from '@/routes/owner/properties/amenities';
+import { index as propertiesIndexRoute } from '@/routes/owner/properties';
 import { index as roomTypesIndexRoute } from '@/routes/owner/properties/room-types';
 import type {
     AmenityAssignmentSummary,
@@ -111,13 +107,12 @@ export default function OwnerPropertyAmenitiesIndex({
 
     useEffect(() => {
         setSelectedByRoomType(initialRoomTypeMap);
-        if (
-            activeRoomTypeId === null ||
-            !roomTypes.some((rt) => rt.id === activeRoomTypeId)
-        ) {
-            setActiveRoomTypeId(roomTypes[0]?.id ?? null);
-        }
-    }, [initialRoomTypeMap, roomTypes, activeRoomTypeId]);
+        setActiveRoomTypeId((current) =>
+            current !== null && roomTypes.some((rt) => rt.id === current)
+                ? current
+                : (roomTypes[0]?.id ?? null),
+        );
+    }, [initialRoomTypeMap, roomTypes]);
 
     const groupedPropertyCategories = useMemo(
         () =>
@@ -775,7 +770,6 @@ OwnerPropertyAmenitiesIndex.layout = {
     breadcrumbs: [
         { title: 'Partner Overview', href: dashboard() },
         { title: 'My Properties', href: propertiesIndexRoute() },
-        { title: 'Property Overview', href: showPropertyRoute(1) },
-        { title: 'Amenities', href: amenitiesIndexRoute(1) },
+        { title: 'Amenities', href: '#' },
     ],
 };

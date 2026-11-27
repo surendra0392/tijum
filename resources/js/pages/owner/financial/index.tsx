@@ -315,7 +315,10 @@ export default function FinancialProfileIndex({ profile }: Props) {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="individual">
-                                        Individual / Proprietorship
+                                        Individual
+                                    </SelectItem>
+                                    <SelectItem value="proprietorship">
+                                        Sole Proprietorship
                                     </SelectItem>
                                     <SelectItem value="partnership">
                                         Partnership Firm
@@ -376,7 +379,7 @@ export default function FinancialProfileIndex({ profile }: Props) {
                                 <SelectContent>
                                     <SelectItem value="unregistered">
                                         Unregistered Supplier (Hostel / PG /
-                                        Homestay)
+                                        Homestay / Co-Living)
                                     </SelectItem>
                                     <SelectItem value="regular">
                                         Regular GST Registered Accommodation
@@ -576,9 +579,25 @@ export default function FinancialProfileIndex({ profile }: Props) {
                     )}
 
                     {isLocked && (
-                        <p className="flex items-center gap-1.5 rounded-lg border border-status-success-border bg-status-success-bg px-3 py-1.5 text-xs font-semibold text-status-success-fg">
-                            <CheckCircle2 className="size-4" />
-                            Profile Verified &amp; Locked for Live Settlements
+                        <p
+                            className={
+                                profile?.onboarding_status === 'active'
+                                    ? 'flex items-center gap-1.5 rounded-lg border border-status-success-border bg-status-success-bg px-3 py-1.5 text-xs font-semibold text-status-success-fg'
+                                    : 'flex items-center gap-1.5 rounded-lg border border-status-warning-border bg-status-warning-bg px-3 py-1.5 text-xs font-semibold text-status-warning-fg'
+                            }
+                        >
+                            {profile?.onboarding_status === 'active' ? (
+                                <>
+                                    <CheckCircle2 className="size-4" />
+                                    Profile Verified &amp; Locked for Live
+                                    Settlements
+                                </>
+                            ) : (
+                                <>
+                                    <Clock className="size-4" />
+                                    Under Verification Review &amp; Locked
+                                </>
+                            )}
                         </p>
                     )}
                 </div>

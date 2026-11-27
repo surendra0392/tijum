@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Public;
 
+use App\Enums\OwnerStatus;
 use App\Enums\PropertyGenderPolicy;
 use App\Enums\PropertyOperationalStatus;
 use App\Http\Controllers\Controller;
@@ -53,13 +54,16 @@ class CityLandingPageController extends Controller
             'Kitchen Standards and Operational Readiness Verified',
         ];
 
-        // Fetch genuine available properties in this city
+        // Fetch genuine available properties in this city (aligned with PropertySearchEligibility)
         $properties = Property::query()
             ->where('city_id', $city->id)
             ->where('status', PropertyOperationalStatus::Active)
             ->where('is_verified', true)
             ->where('booking_eligible', true)
-            ->with(['city', 'category', 'roomTypes', 'media', 'ratingSummary', 'amenityAssignments.amenity.category'])
+            ->where('food_provided', true)
+            ->whereHas('owner', static fn ($q) => $q->where('status', OwnerStatus::Active))
+            ->whereHas('category', static fn ($q) => $q->where('is_active', true))
+            ->with(['city', 'category', 'roomTypes' => fn ($q) => $q->where('is_active', true), 'media', 'ratingSummary', 'amenityAssignments.amenity.category'])
             ->take(24)
             ->get()
             ->map(function (Property $p) {
@@ -93,9 +97,9 @@ class CityLandingPageController extends Controller
                 $minWeekly = $p->roomTypes->where('weekly_rate_minor', '>', 0)->min('weekly_rate_minor');
                 $minMonthly = $p->roomTypes->where('monthly_rate_minor', '>', 0)->min('monthly_rate_minor');
 
-                $dailyPaise = $minDaily ?: ($minMonthly ? (int) round($minMonthly / 30) : ($minWeekly ? (int) round($minWeekly / 7) : 50000));
-                $weeklyPaise = $minWeekly ?: ($dailyPaise ? (int) ($dailyPaise * 7) : ($minMonthly ? (int) round($minMonthly / 4) : 350000));
-                $monthlyPaise = $minMonthly ?: ($dailyPaise ? (int) ($dailyPaise * 30) : 1500000);
+                $dailyPaise = $minDaily ? (int) $minDaily : ($minMonthly ? (int) round($minMonthly / 30) : ($minWeekly ? (int) round($minWeekly / 7) : null));
+                $weeklyPaise = $minWeekly ? (int) $minWeekly : null;
+                $monthlyPaise = $minMonthly ? (int) $minMonthly : null;
 
                 $reviewCount = (int) ($p->ratingSummary?->published_review_count ?? 0);
                 $avgRating = $reviewCount > 0 && $p->ratingSummary?->average_rating !== null
@@ -261,7 +265,7 @@ class CityLandingPageController extends Controller
                     ],
                 ],
             ],
-            default => [ // Visakhapatnam
+            'visakhapatnam' => [
                 'tagline' => 'The City of Destiny — Coastal industrial and educational leader',
                 'intro' => 'Visakhapatnam blends serene coastal living with thriving universities, IT parks, and heavy industrial centers. TIJUM features Hostels/PG, Homestays, and Co-Living spaces with property details, room options, and configured meal arrangements.',
                 'popular_neighborhoods' => [
@@ -278,6 +282,24 @@ class CityLandingPageController extends Controller
                     [
                         'question' => 'What if the food or room differs from the booking in Vizag?',
                         'answer' => 'TIJUM Customer Protection provides prompt problem reporting, alternative accommodation assistance, and fair refund support.',
+                    ],
+                ],
+            ],
+            default => [
+                'tagline' => "Verified Hostels/PG, Homestays & Co-Living in {$cityName}",
+                'intro' => "Explore transparent Hostels/PG, Homestays, and Co-Living accommodation across {$cityName} with property-specific room options, amenities, and upfront meal inclusions.",
+                'popular_neighborhoods' => [
+                    ['name' => "{$cityName} Central", 'description' => "Well-connected localities in {$cityName} close to campuses, offices, and transit hubs."],
+                    ['name' => 'Student & Coaching Corridors', 'description' => "Quiet residential areas in {$cityName} ideal for daily, weekly, and monthly stays."],
+                ],
+                'faqs' => [
+                    [
+                        'question' => "Is food included in {$cityName} bookings on TIJUM?",
+                        'answer' => "Search-eligible properties in {$cityName} provide food and display property-specific food flags for Breakfast, Lunch, and Dinner before you book.",
+                    ],
+                    [
+                        'question' => "What stay durations can I book in {$cityName}?",
+                        'answer' => "TIJUM supports daily, weekly, and monthly stay durations across Hostels/PG, Homestays, and Co-Living in {$cityName}.",
                     ],
                 ],
             ],

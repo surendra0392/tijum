@@ -54,6 +54,10 @@ class RazorpayRouteService
     public function createLinkedAccount(Owner $owner, OwnerFinancialProfile $profile): array
     {
         if (! $this->routeEnabled || blank($this->keyId) || str_contains($this->keyId, 'placeholder')) {
+            if (! app()->environment(['local', 'testing'])) {
+                throw new RuntimeException('Razorpay Route is disabled or unconfigured for linked account creation.');
+            }
+
             $mockId = 'acc_mock_'.strtolower(Str::random(14));
 
             return [
@@ -100,6 +104,10 @@ class RazorpayRouteService
     public function fetchLinkedAccount(string $accountId): array
     {
         if (! $this->routeEnabled || blank($this->keyId) || str_contains($this->keyId, 'placeholder')) {
+            if (! app()->environment(['local', 'testing'])) {
+                throw new RuntimeException('Razorpay Route is disabled or unconfigured for linked account lookup.');
+            }
+
             return [
                 'id' => $accountId,
                 'status' => 'activated',
@@ -211,6 +219,10 @@ class RazorpayRouteService
     public function createReversal(string $transferId, int $amountMinor, array $notes = []): array
     {
         if (! $this->routeEnabled || blank($this->keyId) || str_contains($this->keyId, 'placeholder')) {
+            if (! app()->environment(['local', 'testing'])) {
+                throw new RuntimeException('Razorpay Route is disabled or unconfigured for transfer reversals.');
+            }
+
             $mockRevId = 'rev_mock_'.strtolower(Str::random(14));
 
             return [
@@ -223,13 +235,21 @@ class RazorpayRouteService
             ];
         }
 
+        if (! $this->credentialsModeIsAllowed()) {
+            throw new RuntimeException('Live Razorpay credentials cannot be used while live payments are disabled.');
+        }
+
         $payload = [
             'amount' => $amountMinor,
             'currency' => 'INR',
             'notes' => $notes,
         ];
 
-        $response = $this->client()->post(self::BASE_URL."/transfers/{$transferId}/reversals", $payload);
+        // Reversal creation is non-idempotent; never auto-retry on network timeout.
+        $response = Http::withBasicAuth($this->keyId, $this->keySecret)
+            ->withoutRedirecting()
+            ->timeout(15)
+            ->post(self::BASE_URL.'/transfers/'.rawurlencode($transferId).'/reversals', $payload);
 
         if (! $response->successful()) {
             $error = $response->json('error.description') ?? 'Failed to create Route reversal.';

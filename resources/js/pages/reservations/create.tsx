@@ -5,11 +5,8 @@ import {
     CheckCircle2,
     Clock3,
     Coins,
-    Gift,
     Loader2,
-    Percent,
     ShieldCheck,
-    Sparkles,
     Tag,
     TicketPercent,
     UserCheck,
@@ -41,17 +38,37 @@ import type {
     ReservationQuote,
 } from '@/types';
 
+type AvailableCheckoutCoupon = {
+    code: string;
+    description: string;
+    discount_minor: number;
+    bonus_points?: number;
+    offer_type?: string;
+};
+
 type CreateReservationProps = {
     quote: ReservationQuote;
     customer: ReservationCustomerSnapshot;
     submissionToken: string;
-    availableCoupons?: CouponCode[];
+    availableCoupons?: Array<AvailableCheckoutCoupon | CouponCode>;
     loyaltyBalance?: {
         available_points: number;
+        max_redeemable_points?: number;
+        min_balance?: number;
+        max_percentage?: number;
+        redemption_rate_paise?: number;
         points_per_rupee?: number;
         max_redemption_percentage?: number;
     };
 };
+
+function getXsrfToken(): string | null {
+    if (typeof document === 'undefined') {
+        return null;
+    }
+    const match = document.cookie.match(/(^|;\s*)(XSRF-TOKEN)=([^;]*)/);
+    return match ? decodeURIComponent(match[3]) : null;
+}
 
 export default function CreateReservation({
     quote,
@@ -97,6 +114,11 @@ export default function CreateReservation({
 
     // Booking for myself vs Booking for another person
     const [bookingFor, setBookingFor] = useState<'self' | 'other'>('self');
+    const [selfPhone, setSelfPhone] = useState(
+        customer.phone
+            ? customer.phone.replace(/\D+/g, '').slice(-10)
+            : '',
+    );
     const [otherName, setOtherName] = useState('');
     const [otherPhone, setOtherPhone] = useState('');
     const [otherEmail, setOtherEmail] = useState('');
@@ -277,11 +299,16 @@ export default function CreateReservation({
         };
     }, [bookingFor, otherEmail]);
 
-    const isOtherContactValid =
-        bookingFor === 'self' ||
-        (nameValidation.status === 'valid' &&
-            phoneValidation.status === 'valid' &&
-            emailValidation.status === 'valid');
+    const hasValidSelfPhone =
+        Boolean(customer.phone && customer.phone.trim() !== '') ||
+        (/^[6-9]\d{9}$/.test(selfPhone) && !/^(\d)\1{9}$/.test(selfPhone));
+
+    const isContactValid =
+        bookingFor === 'self'
+            ? hasValidSelfPhone
+            : nameValidation.status === 'valid' &&
+              phoneValidation.status === 'valid' &&
+              emailValidation.status === 'valid';
 
     const meals = [
         quote.breakfast_included && 'Breakfast',
@@ -290,57 +317,67 @@ export default function CreateReservation({
     ].filter(Boolean);
 
     // Rewards & Coupons state
+    type AppliedCheckoutCoupon = {
+        code: string;
+        title: string;
+        discount_minor: number;
+        bonus_points?: number;
+        offer_type?: string;
+        discount_percentage?: number | null;
+        discount_amount_minor?: number | null;
+    };
+
     const [couponInput, setCouponInput] = useState('');
-    const [appliedCoupon, setAppliedCoupon] = useState<CouponCode | null>(null);
+    const [appliedCoupon, setAppliedCoupon] =
+        useState<AppliedCheckoutCoupon | null>(null);
     const [couponError, setCouponError] = useState<string | null>(null);
     const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
+    const subtotalMinor = quote.total_amount_minor;
     const availablePoints = loyaltyBalance?.available_points ?? 0;
-    const maxRedeemPercent = loyaltyBalance?.max_redemption_percentage ?? 20;
-    const maxRedeemablePoints = Math.min(
-        availablePoints,
-        Math.floor(((quote.total_amount_minor / 100) * maxRedeemPercent) / 100),
+    const redemptionRatePaise = Math.max(
+        1,
+        loyaltyBalance?.redemption_rate_paise ?? 100,
     );
+    const maxRedeemPercent =
+        loyaltyBalance?.max_percentage ??
+        loyaltyBalance?.max_redemption_percentage ??
+        20;
+    const minPointsBalance = loyaltyBalance?.min_balance ?? 0;
+    const computedMaxRedeemable =
+        availablePoints >= minPointsBalance
+            ? Math.min(
+                  availablePoints,
+                  Math.floor(
+                      ((subtotalMinor * maxRedeemPercent) / 100) /
+                          redemptionRatePaise,
+                  ),
+              )
+            : 0;
+    const maxRedeemablePoints =
+        loyaltyBalance?.max_redeemable_points ?? computedMaxRedeemable;
 
     const [usePoints, setUsePoints] = useState(false);
-    const [pointsToRedeem, setPointsToRedeem] = useState(
-        Math.min(availablePoints, maxRedeemablePoints),
-    );
+    const [pointsToRedeem, setPointsToRedeem] = useState(maxRedeemablePoints);
 
-    const subtotalMinor = quote.total_amount_minor;
-
-    // Coupon discount calculation
-    let couponDiscountMinor = 0;
-    if (appliedCoupon) {
-        if (appliedCoupon.offer_type === 'percentage') {
-            const calculated = Math.round(
-                (subtotalMinor * (appliedCoupon.discount_percentage ?? 0)) /
-                    100,
-            );
-            couponDiscountMinor = appliedCoupon.max_discount_minor
-                ? Math.min(calculated, appliedCoupon.max_discount_minor)
-                : calculated;
-        } else if (appliedCoupon.offer_type === 'fixed_amount') {
-            couponDiscountMinor = Math.min(
-                appliedCoupon.discount_amount_minor ?? 0,
-                subtotalMinor,
-            );
-        }
-    }
+    const couponDiscountMinor = appliedCoupon
+        ? Math.min(appliedCoupon.discount_minor, subtotalMinor)
+        : 0;
 
     const postCouponMinor = Math.max(0, subtotalMinor - couponDiscountMinor);
 
-    // Points discount calculation (1 point = 1 INR = 100 minor)
-    // Clamp to remaining balance after coupon discount to prevent over-redemption
-    const maxPointsForRemainingBalance = Math.floor(postCouponMinor / 100);
+    // Points discount calculation using server redemptionRatePaise
+    const maxPointsForRemainingBalance = Math.floor(
+        postCouponMinor / redemptionRatePaise,
+    );
+    const effectiveMaxPoints = Math.min(
+        maxRedeemablePoints,
+        maxPointsForRemainingBalance,
+    );
     const effectivePointsRedeemed = usePoints
-        ? Math.min(
-              pointsToRedeem,
-              maxRedeemablePoints,
-              maxPointsForRemainingBalance,
-          )
+        ? Math.min(pointsToRedeem, effectiveMaxPoints)
         : 0;
-    const pointsDiscountMinor = effectivePointsRedeemed * 100;
+    const pointsDiscountMinor = effectivePointsRedeemed * redemptionRatePaise;
 
     // Final total calculation
     const finalPayableMinor = Math.max(
@@ -358,122 +395,67 @@ export default function CreateReservation({
         setCouponError(null);
         setIsValidatingCoupon(true);
 
-        // Check against passed available coupons
-        const matched = availableCoupons.find(
-            (c) => c.code.toUpperCase() === code,
-        );
+        const xsrfToken = getXsrfToken();
 
-        if (matched) {
-            if (
-                matched.min_booking_amount_minor &&
-                subtotalMinor < matched.min_booking_amount_minor
-            ) {
-                setCouponError(
-                    `Minimum booking of ₹${(matched.min_booking_amount_minor / 100).toLocaleString()} required for this coupon.`,
-                );
-                setIsValidatingCoupon(false);
-                return;
-            }
-            setAppliedCoupon(matched);
-            setCouponInput('');
-            setIsValidatingCoupon(false);
-            return;
-        }
-
-        // Direct quote-promotions endpoint check
-        fetch('/api/v1/checkout/quote-promotions', {
+        fetch('/checkout/quote-promotions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
+                ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
             },
             body: JSON.stringify({
                 coupon_code: code,
                 subtotal_minor: subtotalMinor,
                 property_id: quote.property_id,
+                points_to_redeem: usePoints ? effectivePointsRedeemed : 0,
             }),
         })
-            .then((res) => {
-                if (res.ok) {
-                    return res.json();
+            .then(async (res) => {
+                const resData = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    const message =
+                        resData?.coupon_error ||
+                        resData?.message ||
+                        'Invalid or ineligible coupon code.';
+                    setCouponError(message);
+                    return;
                 }
-                throw new Error('Coupon not found');
-            })
-            .then((resData) => {
-                if (resData.applied_coupon) {
-                    setAppliedCoupon(resData.applied_coupon);
-                    setCouponInput('');
-                } else if (resData.coupon_error) {
+
+                if (resData?.coupon_error) {
                     setCouponError(resData.coupon_error);
-                } else {
+                    return;
+                }
+
+                if (resData?.applied_coupon) {
                     setAppliedCoupon({
-                        id: 'custom-' + code,
-                        code: code,
-                        title: `${code} Promo Discount`,
-                        description: 'Promotional discount applied at checkout',
-                        offer_type: code.includes('500')
-                            ? 'fixed_amount'
-                            : 'percentage',
-                        discount_percentage: code.includes('500') ? null : 10,
-                        discount_amount_minor: code.includes('500')
-                            ? 50000
-                            : null,
-                        funding_source: 'platform',
-                        valid_from: new Date().toISOString(),
-                        valid_to: new Date(Date.now() + 86400000).toISOString(),
-                        usage_count: 0,
-                        status: 'active',
+                        code: resData.applied_coupon.code ?? code,
+                        title:
+                            resData.applied_coupon.title ||
+                            resData.applied_coupon.description ||
+                            `${code} Promotional Offer`,
+                        discount_minor:
+                            Number(resData.coupon_discount_minor) || 0,
+                        bonus_points:
+                            Number(resData.applied_coupon.bonus_points) || 0,
+                        offer_type: resData.applied_coupon.offer_type,
+                        discount_percentage:
+                            resData.applied_coupon.discount_percentage,
+                        discount_amount_minor:
+                            resData.applied_coupon.discount_amount_minor,
                     });
                     setCouponInput('');
+                    return;
                 }
+
+                setCouponError(
+                    'Invalid or expired coupon code. Please verify and try again.',
+                );
             })
             .catch(() => {
-                // Fallback for demo codes
-                if (code === 'TIJUM10' || code === 'WELCOME10') {
-                    setAppliedCoupon({
-                        id: 1,
-                        code: code,
-                        title: '10% Welcome Discount',
-                        description: '10% off your stay up to ₹1,000',
-                        offer_type: 'percentage',
-                        discount_percentage: 10,
-                        max_discount_minor: 100000,
-                        funding_source: 'platform',
-                        valid_from: new Date().toISOString(),
-                        valid_to: new Date(Date.now() + 86400000).toISOString(),
-                        usage_count: 0,
-                        status: 'active',
-                    });
-                    setCouponInput('');
-                } else if (code === 'TIJUM500') {
-                    if (subtotalMinor < 200000) {
-                        setCouponError(
-                            'Minimum booking of ₹2,000 required for TIJUM500.',
-                        );
-                    } else {
-                        setAppliedCoupon({
-                            id: 2,
-                            code: 'TIJUM500',
-                            title: '₹500 Flat Discount',
-                            description: '₹500 off bookings over ₹2,000',
-                            offer_type: 'fixed_amount',
-                            discount_amount_minor: 50000,
-                            min_booking_amount_minor: 200000,
-                            funding_source: 'platform',
-                            valid_from: new Date().toISOString(),
-                            valid_to: new Date(
-                                Date.now() + 86400000,
-                            ).toISOString(),
-                            usage_count: 0,
-                            status: 'active',
-                        });
-                        setCouponInput('');
-                    }
-                } else {
-                    setCouponError(
-                        'Invalid or expired coupon code. Please verify and try again.',
-                    );
-                }
+                setCouponError(
+                    'Unable to validate coupon right now. Please try again.',
+                );
             })
             .finally(() => {
                 setIsValidatingCoupon(false);
@@ -723,26 +705,83 @@ export default function CreateReservation({
                                             <input
                                                 type="hidden"
                                                 name="contact_name"
-                                                value={
-                                                    customer.name || 'Guest'
-                                                }
-                                            />
-                                            <input
-                                                type="hidden"
-                                                name="contact_phone"
-                                                value={
-                                                    customer.phone ||
-                                                    '9876543210'
-                                                }
+                                                value={customer.name}
                                             />
                                             <input
                                                 type="hidden"
                                                 name="contact_email"
-                                                value={
-                                                    customer.email ||
-                                                    'guest@tijum.com'
-                                                }
+                                                value={customer.email}
                                             />
+                                            {customer.phone &&
+                                            customer.phone.trim() !== '' ? (
+                                                <input
+                                                    type="hidden"
+                                                    name="contact_phone"
+                                                    value={customer.phone}
+                                                />
+                                            ) : (
+                                                <div className="border-t border-tijum-surface/80 pt-4 dark:border-border">
+                                                    <FormField
+                                                        id="self_contact_phone"
+                                                        label="Your 10-digit mobile number"
+                                                        required
+                                                        error={
+                                                            errors.contact_phone ??
+                                                            (selfPhone !== '' &&
+                                                            !hasValidSelfPhone
+                                                                ? 'Enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.'
+                                                                : undefined)
+                                                        }
+                                                    >
+                                                        {(props) => (
+                                                            <div className="relative flex items-center">
+                                                                <span className="pointer-events-none absolute left-3.5 font-heading text-xs font-semibold text-tijum-plum-muted select-none">
+                                                                    +91
+                                                                </span>
+                                                                <Input
+                                                                    {...props}
+                                                                    name="contact_phone"
+                                                                    type="tel"
+                                                                    inputMode="numeric"
+                                                                    maxLength={
+                                                                        10
+                                                                    }
+                                                                    pattern="[6-9][0-9]{9}"
+                                                                    value={
+                                                                        selfPhone
+                                                                    }
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) =>
+                                                                        setSelfPhone(
+                                                                            e.target.value
+                                                                                .replace(
+                                                                                    /\D+/g,
+                                                                                    '',
+                                                                                )
+                                                                                .slice(
+                                                                                    0,
+                                                                                    10,
+                                                                                ),
+                                                                        )
+                                                                    }
+                                                                    placeholder="Enter your 10-digit mobile number"
+                                                                    autoComplete="tel-national"
+                                                                    required
+                                                                    className="pl-11 tabular-nums"
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </FormField>
+                                                    <p className="mt-1.5 text-xs text-muted-foreground">
+                                                        Your profile does not
+                                                        have a mobile number
+                                                        saved yet. Provide a
+                                                        reachable number for
+                                                        check-in coordination.
+                                                    </p>
+                                                </div>
+                                            )}
                                         </>
                                     ) : (
                                         <div className="grid gap-5 border-t border-tijum-surface/80 pt-5 sm:grid-cols-2 dark:border-border">
@@ -1046,8 +1085,16 @@ export default function CreateReservation({
                                                             >
                                                                 {appliedCoupon.offer_type ===
                                                                 'percentage'
-                                                                    ? `${appliedCoupon.discount_percentage}% OFF`
-                                                                    : `₹${((appliedCoupon.discount_amount_minor ?? 0) / 100).toLocaleString()} OFF`}
+                                                                    ? `${appliedCoupon.discount_percentage ?? 0}% OFF`
+                                                                    : appliedCoupon.offer_type ===
+                                                                        'bonus_points'
+                                                                      ? `+${(appliedCoupon.bonus_points ?? 0).toLocaleString()} PTS`
+                                                                      : appliedCoupon.discount_minor >
+                                                                          0
+                                                                        ? `₹${(appliedCoupon.discount_minor / 100).toLocaleString()} OFF`
+                                                                        : appliedCoupon.bonus_points
+                                                                          ? `+${appliedCoupon.bonus_points.toLocaleString()} PTS`
+                                                                          : 'APPLIED'}
                                                             </Badge>
                                                         </div>
                                                         <p className="text-[11px] text-emerald-800 dark:text-emerald-300/90">
@@ -1076,7 +1123,7 @@ export default function CreateReservation({
                                                     <Tag className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                                                     <Input
                                                         id="coupon_input"
-                                                        placeholder="Enter promo code (e.g. TIJUM10)"
+                                                        placeholder="Enter promo code"
                                                         value={couponInput}
                                                         onChange={(e) =>
                                                             setCouponInput(
@@ -1106,7 +1153,7 @@ export default function CreateReservation({
                                         )}
 
                                         {couponError && (
-                                            <p className="text-xs text-rose-600 dark:text-rose-400">
+                                            <p className="text-xs text-rose-600">
                                                 {couponError}
                                             </p>
                                         )}
@@ -1122,14 +1169,14 @@ export default function CreateReservation({
                                                         .slice(0, 3)
                                                         .map((c) => (
                                                             <button
-                                                                key={c.id}
+                                                                key={c.code}
                                                                 type="button"
                                                                 onClick={() =>
                                                                     handleApplyCoupon(
                                                                         c.code,
                                                                     )
                                                                 }
-                                                                className="cursor-pointer rounded-lg border border-dashed border-emerald-300 bg-white px-2.5 py-1 font-mono text-[11px] font-semibold text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-800 dark:bg-muted dark:text-emerald-300 dark:hover:bg-emerald-950/60"
+                                                                className="cursor-pointer rounded-lg border border-dashed border-emerald-300 bg-white px-2.5 py-1 font-mono text-[11px] font-semibold text-emerald-800 transition hover:bg-emerald-50"
                                                             >
                                                                 {c.code}
                                                             </button>
@@ -1143,19 +1190,27 @@ export default function CreateReservation({
                                         <div className="flex items-start justify-between">
                                             <label className="flex cursor-pointer items-start gap-3">
                                                 <Checkbox
+                                                    aria-label="Redeem TIJUM Loyalty Points"
                                                     checked={usePoints}
                                                     disabled={
                                                         availablePoints === 0 ||
-                                                        maxRedeemablePoints ===
-                                                            0
+                                                        effectiveMaxPoints === 0
                                                     }
                                                     onCheckedChange={(
                                                         checked,
-                                                    ) =>
-                                                        setUsePoints(
-                                                            checked === true,
-                                                        )
-                                                    }
+                                                    ) => {
+                                                        const enabled =
+                                                            checked === true;
+                                                        setUsePoints(enabled);
+                                                        if (
+                                                            enabled &&
+                                                            pointsToRedeem === 0
+                                                        ) {
+                                                            setPointsToRedeem(
+                                                                effectiveMaxPoints,
+                                                            );
+                                                        }
+                                                    }}
                                                 />
                                                 <span>
                                                     <span className="block font-heading text-sm font-semibold text-tijum-plum dark:text-foreground">
@@ -1171,9 +1226,13 @@ export default function CreateReservation({
                                                         · Max usable for this
                                                         stay:{' '}
                                                         <strong>
-                                                            {maxRedeemablePoints.toLocaleString()}{' '}
-                                                            pts (₹
-                                                            {maxRedeemablePoints.toLocaleString()}
+                                                            {effectiveMaxPoints.toLocaleString()}{' '}
+                                                            pts (
+                                                            {formatReservationMoney(
+                                                                effectiveMaxPoints *
+                                                                    redemptionRatePaise,
+                                                                quote.currency_code,
+                                                            )}
                                                             )
                                                         </strong>
                                                     </span>
@@ -1186,27 +1245,31 @@ export default function CreateReservation({
                                         </div>
 
                                         {usePoints &&
-                                            maxRedeemablePoints > 0 && (
+                                            effectiveMaxPoints > 0 && (
                                                 <div className="space-y-2 rounded-xl bg-white p-3.5 shadow-xs dark:bg-muted/40">
                                                     <div className="flex items-center justify-between text-xs">
                                                         <span className="text-muted-foreground">
                                                             Points to redeem:
                                                         </span>
-                                                        <span className="font-heading font-bold text-emerald-700 dark:text-emerald-400">
-                                                            {pointsToRedeem.toLocaleString()}{' '}
-                                                            pts = ₹
-                                                            {pointsToRedeem.toLocaleString()}{' '}
+                                                        <span className="font-heading font-bold text-emerald-700">
+                                                            {effectivePointsRedeemed.toLocaleString()}{' '}
+                                                            pts ={' '}
+                                                            {formatReservationMoney(
+                                                                pointsDiscountMinor,
+                                                                quote.currency_code,
+                                                            )}{' '}
                                                             discount
                                                         </span>
                                                     </div>
                                                     <input
                                                         type="range"
+                                                        aria-label="Loyalty points to redeem"
                                                         min="0"
-                                                        max={
-                                                            maxRedeemablePoints
+                                                        max={effectiveMaxPoints}
+                                                        step="1"
+                                                        value={
+                                                            effectivePointsRedeemed
                                                         }
-                                                        step="10"
-                                                        value={pointsToRedeem}
                                                         onChange={(e) =>
                                                             setPointsToRedeem(
                                                                 Number(
@@ -1220,7 +1283,7 @@ export default function CreateReservation({
                                                     <div className="flex justify-between text-[10px] text-muted-foreground">
                                                         <span>0 pts</span>
                                                         <span>
-                                                            {maxRedeemablePoints.toLocaleString()}{' '}
+                                                            {effectiveMaxPoints.toLocaleString()}{' '}
                                                             pts (Max)
                                                         </span>
                                                     </div>
@@ -1235,6 +1298,7 @@ export default function CreateReservation({
                                     <CardContent className="space-y-4 pt-1">
                                         <label className="flex cursor-pointer items-start gap-3">
                                             <Checkbox
+                                                aria-label="Request early check-in"
                                                 checked={earlyRequested}
                                                 onCheckedChange={(checked) =>
                                                     setEarlyRequested(
@@ -1335,7 +1399,7 @@ export default function CreateReservation({
 
                                         {appliedCoupon &&
                                             couponDiscountMinor > 0 && (
-                                                <div className="flex items-center justify-between text-xs text-emerald-700 dark:text-emerald-400">
+                                                <div className="flex items-center justify-between text-xs text-emerald-700">
                                                     <span className="flex items-center gap-1">
                                                         <TicketPercent className="size-3.5" />
                                                         <span>
@@ -1356,7 +1420,7 @@ export default function CreateReservation({
 
                                         {usePoints &&
                                             pointsDiscountMinor > 0 && (
-                                                <div className="flex items-center justify-between text-xs text-emerald-700 dark:text-emerald-400">
+                                                <div className="flex items-center justify-between text-xs text-emerald-700">
                                                     <span className="flex items-center gap-1">
                                                         <Coins className="size-3.5" />
                                                         <span>
@@ -1416,7 +1480,7 @@ export default function CreateReservation({
                                         disabled={
                                             processing ||
                                             Boolean(genderMismatchWarning) ||
-                                            !isOtherContactValid
+                                            !isContactValid
                                         }
                                     >
                                         {processing

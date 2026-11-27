@@ -327,7 +327,7 @@ export default function AdminPropertiesIndex({
 
                 <section
                     aria-label="Property verification queue metrics"
-                    className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+                    className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
                 >
                     <StatCard
                         label="Total Properties"

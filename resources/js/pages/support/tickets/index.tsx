@@ -1,19 +1,13 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    CheckCircle2,
-    Clock,
-    FileText,
     Headphones,
-    HelpCircle,
-    LifeBuoy,
     MessageSquare,
-    Phone,
     Plus,
     Shield,
-    ShieldAlert,
     ShieldCheck,
 } from 'lucide-react';
 import { useState } from 'react';
+import InputError from '@/components/input-error';
 import { EmptyState } from '@/components/shared/empty-state';
 import { PageHeader } from '@/components/shared/page-header';
 import { Pagination } from '@/components/shared/pagination';
@@ -103,6 +97,7 @@ export default function CustomerTicketsIndex({
     const [bookingRef, setBookingRef] = useState<string>('none');
     const [message, setMessage] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
     const handleFilterChange = (status: string) => {
         router.get(
@@ -117,6 +112,7 @@ export default function CustomerTicketsIndex({
         if (!subject.trim() || !message.trim()) return;
 
         setIsSubmitting(true);
+        setFormErrors({});
         router.post(
             '/support/tickets',
             {
@@ -132,6 +128,10 @@ export default function CustomerTicketsIndex({
                     setSubject('');
                     setMessage('');
                     setBookingRef('none');
+                    setFormErrors({});
+                },
+                onError: (errors) => {
+                    setFormErrors(errors as Record<string, string>);
                 },
                 onFinish: () => setIsSubmitting(false),
             },
@@ -415,6 +415,7 @@ export default function CustomerTicketsIndex({
                                 className="text-xs"
                                 required
                             />
+                            <InputError message={formErrors.subject} />
                         </div>
 
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -441,6 +442,7 @@ export default function CustomerTicketsIndex({
                                         ))}
                                     </SelectContent>
                                 </Select>
+                                <InputError message={formErrors.category} />
                             </div>
 
                             <div className="space-y-1.5">
@@ -469,6 +471,7 @@ export default function CustomerTicketsIndex({
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
+                                <InputError message={formErrors.priority} />
                             </div>
                         </div>
 
@@ -502,6 +505,9 @@ export default function CustomerTicketsIndex({
                                         ))}
                                     </SelectContent>
                                 </Select>
+                                <InputError
+                                    message={formErrors.booking_reference}
+                                />
                             </div>
                         )}
 
@@ -521,6 +527,7 @@ export default function CustomerTicketsIndex({
                                 className="text-xs"
                                 required
                             />
+                            <InputError message={formErrors.message} />
                         </div>
 
                         <DialogFooter className="gap-2 pt-2 sm:gap-0">

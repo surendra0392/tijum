@@ -12,6 +12,8 @@ use App\Models\ReservationRelocation;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class OwnerRelocationController extends Controller
 {
@@ -21,26 +23,46 @@ class OwnerRelocationController extends Controller
         abort_unless($owner instanceof Owner, 401);
         abort_if($relocation->destination_owner_id !== $owner->id, 403);
 
-        $decision = $request->input('decision'); // 'accept' or 'decline'
+        $validated = $request->validate([
+            'decision' => ['required', 'string', 'in:accept,decline'],
+        ]);
 
-        if ($decision === 'accept') {
-            $relocation->forceFill([
-                'destination_owner_accepted_at' => CarbonImmutable::now(),
-                'status' => RelocationStatus::Offered,
-            ])->save();
+        $decision = $validated['decision'];
 
-            if ($relocation->case !== null) {
-                $relocation->case->forceFill(['status' => CaseStatus::RelocationOffered])->save();
+        $statusMessage = DB::transaction(function () use ($relocation, $decision): string {
+            $locked = ReservationRelocation::query()
+                ->whereKey($relocation->id)
+                ->with('case')
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($locked->status !== RelocationStatus::Draft || $locked->isExpired()) {
+                throw ValidationException::withMessages([
+                    'decision' => 'This relocation request is no longer pending host confirmation or has expired.',
+                ]);
             }
 
-            return back()->with('status', 'Relocation guest acceptance confirmed. Offer is now visible to the customer.');
-        }
+            if ($decision === 'accept') {
+                $locked->forceFill([
+                    'destination_owner_accepted_at' => CarbonImmutable::now(),
+                    'status' => RelocationStatus::Offered,
+                ])->save();
 
-        $relocation->forceFill([
-            'status' => RelocationStatus::Declined,
-            'admin_notes' => 'Destination host declined relocation request.',
-        ])->save();
+                if ($locked->case !== null) {
+                    $locked->case->forceFill(['status' => CaseStatus::RelocationOffered])->save();
+                }
 
-        return back()->with('status', 'Relocation request declined.');
+                return 'Relocation guest acceptance confirmed. Offer is now visible to the customer.';
+            }
+
+            $locked->forceFill([
+                'status' => RelocationStatus::Declined,
+                'admin_notes' => 'Destination host declined relocation request.',
+            ])->save();
+
+            return 'Relocation request declined.';
+        });
+
+        return back()->with('status', $statusMessage);
     }
 }

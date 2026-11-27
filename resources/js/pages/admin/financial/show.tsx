@@ -113,11 +113,18 @@ export default function AdminFinancialProfileShow({ partner }: Props) {
         setActionLoading('reject');
         router.post(
             `/admin/partners/financial/${partner.id}/reject`,
-            { reason: trimmed },
+            { rejection_reason: trimmed },
             {
                 onSuccess: () => {
                     setRejectDialogOpen(false);
                     setRejectReason('');
+                },
+                onError: (errors) => {
+                    setRejectError(
+                        errors.rejection_reason ??
+                            errors.reason ??
+                            'Unable to reject financial profile.',
+                    );
                 },
                 onFinish: () => setActionLoading(null),
             },

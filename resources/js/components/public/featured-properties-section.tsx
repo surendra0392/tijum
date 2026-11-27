@@ -38,69 +38,14 @@ type FeaturedPropertiesSectionProps = {
     properties?: FeaturedPropertyData[];
 };
 
-const FALLBACK_PROPERTIES: FeaturedPropertyData[] = [
-    {
-        id: 101,
-        name: 'Madhapur Executive Co-Living',
-        slug: 'madhapur-executive-co-living',
-        locality: 'HITEC City',
-        gender_eligibility: 'Both',
-        city: { name: 'Hyderabad' },
-        category: { name: 'Co-Living' },
-        cover_image_url: '/images/public/hero-stay-600w.webp',
-        food_provided: true,
-        breakfast_included: true,
-        lunch_included: false,
-        dinner_included: true,
-        starting_price: 65000,
-        monthly_price: 1150000,
-        rating: null,
-        review_count: 0,
-    },
-    {
-        id: 102,
-        name: 'Brodipet Deluxe PG for Men',
-        slug: 'brodipet-deluxe-pg-men',
-        locality: 'Brodipet',
-        gender_eligibility: 'Male Only',
-        city: { name: 'Guntur' },
-        category: { name: 'Hostels/PG' },
-        cover_image_url: '/images/public/hero-stay-600w.webp',
-        food_provided: true,
-        breakfast_included: true,
-        lunch_included: true,
-        dinner_included: true,
-        starting_price: 45000,
-        monthly_price: 680000,
-        rating: null,
-        review_count: 0,
-    },
-    {
-        id: 103,
-        name: 'Benz Circle Heritage Homestay',
-        slug: 'benz-circle-heritage-homestay',
-        locality: 'Benz Circle',
-        gender_eligibility: 'Both',
-        city: { name: 'Vijayawada' },
-        category: { name: 'Homestays' },
-        cover_image_url: '/images/public/hero-stay-600w.webp',
-        food_provided: true,
-        breakfast_included: true,
-        lunch_included: false,
-        dinner_included: false,
-        starting_price: 80000,
-        monthly_price: 1400000,
-        rating: null,
-        review_count: 0,
-    },
-];
-
 export function FeaturedPropertiesSection({
     properties,
 }: FeaturedPropertiesSectionProps) {
-    const list =
-        properties && properties.length > 0 ? properties : FALLBACK_PROPERTIES;
-    const displayItems = list.slice(0, 3);
+    if (!properties || properties.length === 0) {
+        return null;
+    }
+
+    const displayItems = properties.slice(0, 3);
 
     return (
         <section

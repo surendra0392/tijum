@@ -110,6 +110,11 @@ export type ReservationDetail = ReservationSummary & {
     guest_gender: string;
     guest_composition: string;
     unit_rate_minor: number;
+    original_amount_minor?: number;
+    coupon_code?: string | null;
+    coupon_discount_minor?: number;
+    points_redeemed?: number;
+    points_discount_minor?: number;
     rate_unit_label: string;
     duration_type: 'daily' | 'weekly' | 'monthly';
     duration_quantity: number;

@@ -10,13 +10,17 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Protection\AddCaseMessageRequest;
 use App\Http\Requests\Protection\ReportProblemRequest;
 use App\Models\CustomerProtectionCase;
+use App\Models\CustomerProtectionCaseMessage;
+use App\Models\PlatformSetting;
 use App\Models\Reservation;
 use App\Models\User;
 use App\Services\ReservationData;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerProtectionCaseController extends Controller
 {
@@ -49,7 +53,7 @@ class CustomerProtectionCaseController extends Controller
 
         return Inertia::render('support/index', [
             'cases' => $cases,
-            'grievanceOfficer' => config('tijum.customer_protection.grievance_officer'),
+            'grievanceOfficer' => PlatformSetting::getGrievanceOfficer(),
         ]);
     }
 
@@ -76,7 +80,9 @@ class CustomerProtectionCaseController extends Controller
                 'sender_type' => $msg->sender_type,
                 'sender_name' => $msg->sender_name,
                 'message' => $msg->message,
-                'attachment_path' => $msg->attachment_path,
+                'attachment_path' => $msg->attachment_path
+                    ? route('support.cases.messages.attachment', ['case' => $case->case_reference, 'message' => $msg->id])
+                    : null,
                 'attachment_name' => $msg->attachment_name,
                 'created_at' => $msg->created_at->toISOString(),
             ])
@@ -128,7 +134,7 @@ class CustomerProtectionCaseController extends Controller
             'reservation' => $reservationData->detail($case->reservation, 'customer'),
             'messages' => $publicMessages,
             'relocations' => $activeRelocations,
-            'grievanceOfficer' => config('tijum.customer_protection.grievance_officer'),
+            'grievanceOfficer' => PlatformSetting::getGrievanceOfficer(),
         ]);
     }
 
@@ -160,6 +166,27 @@ class CustomerProtectionCaseController extends Controller
         return back()->with('status', 'Your message has been sent to TIJUM Support.');
     }
 
+    public function downloadAttachment(
+        Request $request,
+        CustomerProtectionCase $case,
+        CustomerProtectionCaseMessage $message,
+    ): StreamedResponse {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+        abort_if($case->user_id !== $user->id, 403);
+        abort_if($message->customer_protection_case_id !== $case->id || $message->is_internal_note, 404);
+        abort_if(! is_string($message->attachment_path) || $message->attachment_path === '', 404);
+
+        $diskName = (string) config('tijum.customer_protection.attachments.disk', 'local');
+        $disk = Storage::disk($diskName);
+        abort_unless($disk->exists($message->attachment_path), 404);
+
+        return $disk->download(
+            $message->attachment_path,
+            $message->attachment_name ?: basename($message->attachment_path),
+        );
+    }
+
     public function acknowledgement(Request $request, CustomerProtectionCase $case): Response
     {
         $user = $request->user();
@@ -184,7 +211,7 @@ class CustomerProtectionCaseController extends Controller
                 'property_name' => $case->reservation->snapshot_property_name ?? $case->property->name,
                 'city_name' => $case->property->city?->name,
             ],
-            'grievanceOfficer' => config('tijum.customer_protection.grievance_officer'),
+            'grievanceOfficer' => PlatformSetting::getGrievanceOfficer(),
         ]);
     }
 }

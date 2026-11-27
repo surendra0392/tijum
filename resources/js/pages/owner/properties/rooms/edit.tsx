@@ -3,15 +3,8 @@ import { PropertyStepNavigation } from '@/components/owner/properties/property-s
 import { RoomForm } from '@/components/owner/properties/room-form';
 import { PageHeader } from '@/components/shared/page-header';
 import { dashboard } from '@/routes/owner';
-import {
-    index as propertiesIndexRoute,
-    show as showPropertyRoute,
-} from '@/routes/owner/properties';
-import {
-    edit as editRoomRoute,
-    index as roomsIndexRoute,
-    update as updateRoomRoute,
-} from '@/routes/owner/properties/rooms';
+import { index as propertiesIndexRoute } from '@/routes/owner/properties';
+import { update as updateRoomRoute } from '@/routes/owner/properties/rooms';
 import type {
     PropertyRoomData,
     PropertyRoomStatus,
@@ -76,8 +69,6 @@ EditRoomPage.layout = {
     breadcrumbs: [
         { title: 'Partner Overview', href: dashboard() },
         { title: 'My Properties', href: propertiesIndexRoute() },
-        { title: 'Property Overview', href: showPropertyRoute(1) },
-        { title: 'Physical Rooms', href: roomsIndexRoute(1) },
-        { title: 'Edit Room', href: editRoomRoute([1, 1]) },
+        { title: 'Edit Room', href: '#' },
     ],
 };

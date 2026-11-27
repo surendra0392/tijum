@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\PropertyOperationalStatus;
 use App\Models\Admin;
 use App\Models\Owner;
 use App\Models\Property;
@@ -18,7 +19,9 @@ class PropertyAmenityPolicy
 
     public function createByOwner(Owner $owner, Property $property): bool
     {
-        return $property->owner_id === $owner->id && $owner->canPublishProperties();
+        return $property->owner_id === $owner->id
+            && $owner->canPublishProperties()
+            && $property->status !== PropertyOperationalStatus::Suspended;
     }
 
     public function viewByOwner(Owner $owner, PropertyAmenity $assignment): bool
@@ -34,6 +37,7 @@ class PropertyAmenityPolicy
 
         return $assignment->property?->owner_id === $owner->id
             && $owner->canPublishProperties()
+            && $assignment->property->status !== PropertyOperationalStatus::Suspended
             && $assignment->status->isEditableByOwner();
     }
 
@@ -43,6 +47,7 @@ class PropertyAmenityPolicy
 
         return $assignment->property?->owner_id === $owner->id
             && $owner->canPublishProperties()
+            && $assignment->property->status !== PropertyOperationalStatus::Suspended
             && $assignment->status->canSubmitByOwner();
     }
 

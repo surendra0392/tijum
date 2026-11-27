@@ -79,8 +79,8 @@ class AdminDashboardMetricsService
                 'Previous Month',
             ],
             'custom' => [
-                $customFrom ? CarbonImmutable::parse($customFrom, $this->timezone)->startOfDay() : $now->subDays(29)->startOfDay(),
-                $customTo ? CarbonImmutable::parse($customTo, $this->timezone)->endOfDay() : $now->endOfDay(),
+                $this->parseDateOrFallback($customFrom, $now->subDays(29))->startOfDay(),
+                $this->parseDateOrFallback($customTo, $now)->endOfDay(),
                 'Custom Range',
             ],
             default => [
@@ -89,6 +89,19 @@ class AdminDashboardMetricsService
                 'Last 30 Days',
             ],
         };
+    }
+
+    private function parseDateOrFallback(?string $value, CarbonImmutable $fallback): CarbonImmutable
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return $fallback;
+        }
+
+        try {
+            return CarbonImmutable::parse($value, $this->timezone);
+        } catch (\Throwable) {
+            return $fallback;
+        }
     }
 
     /**
@@ -211,8 +224,10 @@ class AdminDashboardMetricsService
                 });
             });
 
+        $startUtc = $start->utc();
+
         // Booked during period
-        $periodBookings = (clone $base)->whereBetween('created_at', [$start, $end]);
+        $periodBookings = (clone $base)->whereBetween('created_at', [$startUtc, $end]);
 
         // Stays occurring during period (check-in <= end and checkout >= start)
         $staysInPeriod = (clone $base)
@@ -245,6 +260,8 @@ class AdminDashboardMetricsService
         ?int $cityId = null,
         ?int $categoryId = null,
     ): array {
+        $startUtc = $start->utc();
+
         $paymentQuery = ReservationPayment::query()
             ->when($cityId !== null || $categoryId !== null, function (Builder $q) use ($cityId, $categoryId): void {
                 $q->whereHas('reservation.property', function (Builder $pq) use ($cityId, $categoryId): void {
@@ -259,11 +276,11 @@ class AdminDashboardMetricsService
 
         $captured = (clone $paymentQuery)
             ->where('status', PaymentStatus::Captured)
-            ->whereBetween('captured_at', [$start, $end]);
+            ->whereBetween('captured_at', [$startUtc, $end]);
 
         $failed = (clone $paymentQuery)
             ->where('status', PaymentStatus::Failed)
-            ->whereBetween('created_at', [$start, $end]);
+            ->whereBetween('created_at', [$startUtc, $end]);
 
         $refundsQuery = ReservationRefund::query()
             ->when($cityId !== null || $categoryId !== null, function (Builder $q) use ($cityId, $categoryId): void {
@@ -279,11 +296,11 @@ class AdminDashboardMetricsService
 
         $processedRefunds = (clone $refundsQuery)
             ->where('status', RefundStatus::Processed)
-            ->where(function (Builder $q) use ($start, $end): void {
-                $q->whereBetween('gateway_processed_at', [$start, $end])
-                    ->orWhere(function (Builder $sq) use ($start, $end): void {
+            ->where(function (Builder $q) use ($startUtc, $end): void {
+                $q->whereBetween('gateway_processed_at', [$startUtc, $end])
+                    ->orWhere(function (Builder $sq) use ($startUtc, $end): void {
                         $sq->whereNull('gateway_processed_at')
-                            ->whereBetween('created_at', [$start, $end]);
+                            ->whereBetween('created_at', [$startUtc, $end]);
                     });
             });
 
@@ -321,8 +338,10 @@ class AdminDashboardMetricsService
         ?int $cityId = null,
         ?int $categoryId = null,
     ): array {
+        $startUtc = $start->utc();
+
         $resQuery = Reservation::query()
-            ->whereBetween('created_at', [$start, $end])
+            ->whereBetween('created_at', [$startUtc, $end])
             ->when($cityId !== null || $categoryId !== null, function (Builder $q) use ($cityId, $categoryId): void {
                 $q->whereHas('property', function (Builder $pq) use ($cityId, $categoryId): void {
                     if ($cityId !== null) {
@@ -334,17 +353,16 @@ class AdminDashboardMetricsService
                 });
             });
 
-        $grossBookingValue = (int) ((clone $resQuery)->sum('total_amount_minor') ?? 0);
-
-        // Confirmed reservations establish contractual commission
+        // Confirmed reservations establish Gross Booking Value and contractual commission
         $confirmedQuery = (clone $resQuery)->where('status', ReservationStatus::Confirmed);
+        $grossBookingValue = (int) ((clone $confirmedQuery)->sum('total_amount_minor') ?? 0);
         $commissionEarned = (int) ((clone $confirmedQuery)->sum('commission_amount_minor') ?? 0);
         $commissionGst = (int) ((clone $confirmedQuery)->sum('commission_tax_amount_minor') ?? 0);
 
         // Captured payments in period
         $capturedAmount = (int) (ReservationPayment::query()
             ->where('status', PaymentStatus::Captured)
-            ->whereBetween('captured_at', [$start, $end])
+            ->whereBetween('captured_at', [$startUtc, $end])
             ->when($cityId !== null || $categoryId !== null, function (Builder $q) use ($cityId, $categoryId): void {
                 $q->whereHas('reservation.property', function (Builder $pq) use ($cityId, $categoryId): void {
                     if ($cityId !== null) {
@@ -363,22 +381,22 @@ class AdminDashboardMetricsService
         // Completed transfers via Razorpay Route
         $completedTransfers = (int) (ProviderTransfer::query()
             ->where('status', ProviderTransferStatus::Processed)
-            ->whereBetween('processed_at', [$start, $end])
+            ->whereBetween('processed_at', [$startUtc, $end])
             ->sum('amount_minor') ?? 0);
 
         // Platform relocation subsidies incurred
         $relocationSubsidies = (int) (PlatformRelocationSubsidy::query()
-            ->whereBetween('created_at', [$start, $end])
+            ->whereBetween('created_at', [$startUtc, $end])
             ->sum('subsidy_amount_minor') ?? 0);
 
         // Completed customer refunds
         $completedRefunds = (int) (ReservationRefund::query()
             ->where('status', RefundStatus::Processed)
-            ->where(function (Builder $q) use ($start, $end): void {
-                $q->whereBetween('gateway_processed_at', [$start, $end])
-                    ->orWhere(function (Builder $sq) use ($start, $end): void {
+            ->where(function (Builder $q) use ($startUtc, $end): void {
+                $q->whereBetween('gateway_processed_at', [$startUtc, $end])
+                    ->orWhere(function (Builder $sq) use ($startUtc, $end): void {
                         $sq->whereNull('gateway_processed_at')
-                            ->whereBetween('created_at', [$start, $end]);
+                            ->whereBetween('created_at', [$startUtc, $end]);
                     });
             })
             ->sum('amount_minor') ?? 0);
@@ -407,7 +425,8 @@ class AdminDashboardMetricsService
      */
     public function getCustomerProtectionMetrics(CarbonImmutable $start, CarbonImmutable $end, ?int $cityId = null): array
     {
-        $now = CarbonImmutable::now($this->timezone);
+        $nowUtc = CarbonImmutable::now('UTC');
+        $startUtc = $start->utc();
 
         $caseQuery = CustomerProtectionCase::query()
             ->when($cityId !== null, fn (Builder $q) => $q->whereHas('reservation.property', fn (Builder $pq) => $pq->where('city_id', $cityId)));
@@ -417,13 +436,13 @@ class AdminDashboardMetricsService
         $urgentCases = (clone $openCases)->where('priority', CasePriority::Urgent);
         $safetyCases = (clone $openCases)->where('category', CaseCategory::SafetyConcern);
 
-        // Overdue SLAs
+        // Overdue SLAs (unacknowledged open cases require immediate acknowledgement SLA attention)
         $overdueAcknowledgement = (clone $openCases)
             ->whereNull('acknowledged_at');
 
         $overdueResolution = (clone $openCases)
             ->whereNotNull('sla_due_at')
-            ->where('sla_due_at', '<', $now);
+            ->where('sla_due_at', '<', $nowUtc);
 
         // Pending relocation decisions
         $pendingRelocations = ReservationRelocation::query()
@@ -439,7 +458,7 @@ class AdminDashboardMetricsService
             'pending_relocations_count' => $pendingRelocations->count(),
             'resolved_in_period_count' => (clone $caseQuery)
                 ->where('status', CaseStatus::Resolved)
-                ->whereBetween('resolved_at', [$start, $end])
+                ->whereBetween('resolved_at', [$startUtc, $end])
                 ->count(),
         ];
     }
@@ -488,9 +507,11 @@ class AdminDashboardMetricsService
             if ($next->greaterThan($end)) {
                 $next = $end;
             }
+            $cursorUtc = $cursor->utc();
+            $nextUtc = $next->utc();
 
             $bookings = Reservation::query()
-                ->whereBetween('created_at', [$cursor, $next])
+                ->whereBetween('created_at', [$cursorUtc, $nextUtc])
                 ->when($cityId !== null || $categoryId !== null, function (Builder $q) use ($cityId, $categoryId): void {
                     $q->whereHas('property', function (Builder $pq) use ($cityId, $categoryId): void {
                         if ($cityId !== null) {
@@ -505,7 +526,7 @@ class AdminDashboardMetricsService
 
             $payments = (int) (ReservationPayment::query()
                 ->where('status', PaymentStatus::Captured)
-                ->whereBetween('captured_at', [$cursor, $next])
+                ->whereBetween('captured_at', [$cursorUtc, $nextUtc])
                 ->when($cityId !== null || $categoryId !== null, function (Builder $q) use ($cityId, $categoryId): void {
                     $q->whereHas('reservation.property', function (Builder $pq) use ($cityId, $categoryId): void {
                         if ($cityId !== null) {
@@ -519,7 +540,7 @@ class AdminDashboardMetricsService
                 ->sum('amount_minor') ?? 0);
 
             $commission = (int) (Reservation::query()
-                ->whereBetween('created_at', [$cursor, $next])
+                ->whereBetween('created_at', [$cursorUtc, $nextUtc])
                 ->where('status', ReservationStatus::Confirmed)
                 ->when($cityId !== null || $categoryId !== null, function (Builder $q) use ($cityId, $categoryId): void {
                     $q->whereHas('property', function (Builder $pq) use ($cityId, $categoryId): void {
@@ -554,6 +575,7 @@ class AdminDashboardMetricsService
      */
     public function getCityDistribution(CarbonImmutable $start, CarbonImmutable $end): array
     {
+        $startUtc = $start->utc();
         $cities = City::query()->orderBy('name')->get();
 
         $distribution = [];
@@ -567,13 +589,13 @@ class AdminDashboardMetricsService
 
             $resQuery = Reservation::query()
                 ->whereHas('property', fn (Builder $q) => $q->where('city_id', $city->id))
-                ->whereBetween('created_at', [$start, $end]);
+                ->whereBetween('created_at', [$startUtc, $end]);
 
             $bookingsCount = (clone $resQuery)->count();
 
             $payments = (int) (ReservationPayment::query()
                 ->where('status', PaymentStatus::Captured)
-                ->whereBetween('captured_at', [$start, $end])
+                ->whereBetween('captured_at', [$startUtc, $end])
                 ->whereHas('reservation.property', fn (Builder $q) => $q->where('city_id', $city->id))
                 ->sum('amount_minor') ?? 0);
 

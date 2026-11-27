@@ -51,8 +51,8 @@ function formatDateSafe(val?: string | null): string {
 export default function RewardsIndex({
     wallet,
     referral,
-    activeCoupons = [],
-    recentActivity = [],
+    activeCoupons,
+    recentActivity,
 }: Props) {
     const [copiedCode, setCopiedCode] = useState<string | null>(null);
     const [copiedLink, setCopiedLink] = useState(false);
@@ -64,9 +64,9 @@ export default function RewardsIndex({
             ? `${window.location.origin}/r/${referralCode}`
             : `https://tijum.com/r/${referralCode}`);
 
-    const copyToClipboard = (text: string, type: 'link' | string) => {
+    const copyToClipboard = (text: string, type: string) => {
         if (typeof navigator !== 'undefined' && navigator.clipboard) {
-            navigator.clipboard.writeText(text);
+            void navigator.clipboard.writeText(text).catch(() => {});
             if (type === 'link') {
                 setCopiedLink(true);
                 setTimeout(() => setCopiedLink(false), 2500);
@@ -254,9 +254,18 @@ export default function RewardsIndex({
                                         Your Referral Code &amp; Link
                                     </CardTitle>
                                     <CardDescription>
-                                        Give friends ₹250 worth of points on
-                                        their first stay, and you earn ₹250 when
-                                        they complete check-out.
+                                        Give friends{' '}
+                                        {(
+                                            referral?.referred_reward_points ??
+                                            250
+                                        ).toLocaleString()}{' '}
+                                        loyalty points on their first stay, and
+                                        you earn{' '}
+                                        {(
+                                            referral?.referrer_reward_points ??
+                                            250
+                                        ).toLocaleString()}{' '}
+                                        points when they complete check-out.
                                     </CardDescription>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -365,8 +374,30 @@ export default function RewardsIndex({
                                                 >
                                                     {coupon.offer_type ===
                                                     'percentage'
-                                                        ? `${coupon.discount_percentage}% OFF`
-                                                        : `₹${((coupon.discount_amount_minor ?? 0) / 100).toLocaleString()} OFF`}
+                                                        ? `${coupon.discount_percentage ?? 0}% OFF`
+                                                        : coupon.offer_type ===
+                                                            'bonus_points'
+                                                          ? `+${(coupon.bonus_points ?? 0).toLocaleString()} PTS`
+                                                          : coupon.offer_type ===
+                                                              'combined'
+                                                            ? [
+                                                                  coupon.discount_percentage
+                                                                      ? `${coupon.discount_percentage}% OFF`
+                                                                      : coupon.discount_amount_minor
+                                                                        ? `₹${(coupon.discount_amount_minor / 100).toLocaleString()} OFF`
+                                                                        : null,
+                                                                  coupon.bonus_points
+                                                                      ? `+${coupon.bonus_points.toLocaleString()} PTS`
+                                                                      : null,
+                                                              ]
+                                                                  .filter(
+                                                                      Boolean,
+                                                                  )
+                                                                  .join(
+                                                                      ' + ',
+                                                                  ) ||
+                                                              'SPECIAL OFFER'
+                                                            : `₹${((coupon.discount_amount_minor ?? 0) / 100).toLocaleString()} OFF`}
                                                 </Badge>
                                                 <span className="text-[10px] text-muted-foreground">
                                                     Valid until{' '}
@@ -567,7 +598,7 @@ export default function RewardsIndex({
                                 stay completion and checkout. Platform coupons
                                 never reduce partner payouts. See our{' '}
                                 <Link
-                                    href="/terms#rewards-and-coupons"
+                                    href="/terms#promotions-referrals-points"
                                     className="font-semibold text-tijum-plum underline decoration-tijum-coral/60 underline-offset-4 hover:text-tijum-coral dark:text-tijum-peach"
                                 >
                                     Terms of Service (Section 7)

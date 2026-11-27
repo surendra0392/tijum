@@ -1,7 +1,8 @@
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { ArrowRight, Mail, MailCheck } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
+import InputError from '@/components/input-error';
 import { ResponsiveContainer } from '@/components/shared/responsive-container';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,10 +10,13 @@ import { Label } from '@/components/ui/label';
 import { subscribe } from '@/routes/public/newsletter';
 
 export function NewsletterSection() {
+    const pageErrors =
+        (usePage().props.errors as Record<string, string> | undefined) ?? {};
     const [email, setEmail] = useState('');
     const [marketingConsent, setMarketingConsent] = useState(false);
     const [subscribed, setSubscribed] = useState(false);
     const [processing, setProcessing] = useState(false);
+    const [localError, setLocalError] = useState<string | null>(null);
 
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -21,6 +25,7 @@ export function NewsletterSection() {
         }
 
         setProcessing(true);
+        setLocalError(null);
         router.post(
             subscribe.url(),
             {
@@ -34,6 +39,14 @@ export function NewsletterSection() {
                     setSubscribed(true);
                     setEmail('');
                     setMarketingConsent(false);
+                },
+                onError: (errors) => {
+                    const firstError = Object.values(errors)[0];
+                    setLocalError(
+                        typeof firstError === 'string'
+                            ? firstError
+                            : 'Unable to subscribe with that email. Please check and try again.',
+                    );
                 },
                 onFinish: () => setProcessing(false),
             },
@@ -150,6 +163,13 @@ export function NewsletterSection() {
                                             booking updates are sent separately.
                                         </span>
                                     </label>
+                                    <InputError
+                                        message={
+                                            localError ??
+                                            pageErrors.email ??
+                                            pageErrors.marketing_consent
+                                        }
+                                    />
                                 </form>
                             )}
                         </div>

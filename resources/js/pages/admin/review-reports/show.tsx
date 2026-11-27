@@ -85,7 +85,8 @@ export default function AdminReviewReportShow({
     report,
 }: AdminReportShowProps) {
     const { data, setData, post, processing, errors } = useForm({
-        status: report.status,
+        status:
+            report.status === 'submitted' ? 'under_review' : report.status,
         resolution_reason: report.resolution_reason ?? '',
         resolution_notes: report.resolution_notes ?? '',
     });

@@ -150,6 +150,8 @@ class AdminCustomerSupportController extends Controller
                 'customer_email' => $ticket->user?->email,
                 'customer_phone' => $ticket->user?->phone,
                 'booking_reference' => $ticket->reservation?->booking_reference,
+                'reservation_status' => $ticket->reservation?->status->value,
+                'reservation_status_label' => $ticket->reservation?->status->label(),
                 'property_name' => $ticket->property?->name,
                 'city_name' => $ticket->property?->city?->name,
                 'assigned_admin_id' => $ticket->assigned_admin_id,

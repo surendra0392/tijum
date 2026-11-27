@@ -1,46 +1,33 @@
 import { Head, Link, router } from '@inertiajs/react';
-import type { LucideIcon } from 'lucide-react';
 import {
     Activity,
     AlertCircle,
-    AlertTriangle,
     ArrowDownRight,
-    ArrowUpRight,
     Building2,
     Calendar,
     CalendarCheck,
-    CheckCircle2,
     ChevronRight,
-    Clock,
     CreditCard,
     DollarSign,
     Download,
     FileSpreadsheet,
-    FileText,
     HelpCircle,
-    Info,
-    KeyRound,
-    Layers,
     LifeBuoy,
-    Lock,
     MapPin,
     Percent,
     Receipt,
-    RefreshCw,
     Search,
     Server,
     ShieldAlert,
     ShieldCheck,
-    SlidersHorizontal,
-    Sparkles,
     TrendingUp,
     UserCheck,
     Users,
     Wallet,
     X,
 } from 'lucide-react';
-import React, { useEffect, useRef, useState } from 'react';
-import AdminLayout from '@/layouts/admin-layout';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { StatCard } from '@/components/shared/info-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -297,15 +284,117 @@ interface AdminDashboardProps {
     };
 }
 
+function formatInr(minor: number): string {
+    return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 0,
+    }).format(minor / 100);
+}
+
+function resolveDefaultQueueTab(
+    capabilities: AdminDashboardProps['capabilities'],
+    queues: AdminDashboardProps['queues'],
+): string {
+    const candidates: Array<{
+        key: string;
+        visible: boolean;
+        count: number;
+    }> = [
+        {
+            key: 'protection',
+            visible: capabilities.canViewProtection,
+            count: queues.customer_protection.length,
+        },
+        {
+            key: 'properties',
+            visible: capabilities.canViewProperties,
+            count: queues.property_approval.length,
+        },
+        {
+            key: 'partners',
+            visible: capabilities.canViewPartners,
+            count: queues.partner_onboarding.length,
+        },
+        {
+            key: 'reservations',
+            visible: capabilities.canViewReservations,
+            count: queues.reservation_operations.length,
+        },
+        {
+            key: 'finance',
+            visible: capabilities.canViewFinance,
+            count: queues.financial_operations.length,
+        },
+        {
+            key: 'payments',
+            visible: capabilities.canViewFinance,
+            count: queues.payment_operations.length,
+        },
+    ];
+
+    const authorized = candidates.filter((c) => c.visible);
+    const firstNonEmpty = authorized.find((c) => c.count > 0);
+
+    return firstNonEmpty?.key ?? authorized[0]?.key ?? 'properties';
+}
+
+function QueueItemRow({
+    heading,
+    badges,
+    meta,
+    actionUrl,
+    actionLabel,
+}: {
+    heading: string | undefined;
+    badges?: ReactNode;
+    meta: ReactNode;
+    actionUrl: string;
+    actionLabel: string;
+}) {
+    return (
+        <div className="flex flex-col gap-3 rounded-xl border border-tijum-surface/80 bg-tijum-cream/35 p-3.5 transition-colors hover:border-tijum-coral/40 hover:bg-tijum-cream/65 sm:flex-row sm:items-center sm:justify-between dark:border-border dark:bg-muted/45 dark:hover:bg-muted/75">
+            <div className="min-w-0 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-heading text-sm font-semibold text-tijum-plum dark:text-foreground">
+                        {heading}
+                    </span>
+                    {badges}
+                </div>
+                <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
+                    {meta}
+                </p>
+            </div>
+
+            <Button
+                size="sm"
+                variant="outline"
+                asChild
+                className="shrink-0 text-xs font-semibold"
+            >
+                <Link href={actionUrl}>
+                    <span>{actionLabel}</span>
+                    <ChevronRight className="ml-1 size-3.5" />
+                </Link>
+            </Button>
+        </div>
+    );
+}
+
+function EmptyQueueState({ message }: { message: string }) {
+    return (
+        <div className="rounded-xl border border-dashed border-tijum-surface/90 bg-tijum-cream/35 py-7 text-center text-xs text-tijum-plum-muted dark:border-border dark:bg-muted/35 dark:text-muted-foreground">
+            {message}
+        </div>
+    );
+}
+
 export default function AdminDashboard({
     filters,
     filterMetadata,
     marketplaceOverview,
     reservationMetrics,
-    paymentMetrics,
     revenueBreakdown,
-    customerProtectionMetrics,
-    financialOperations,
     trends,
     cityDistribution,
     queues,
@@ -316,7 +405,6 @@ export default function AdminDashboard({
     securitySummary,
     capabilities,
 }: AdminDashboardProps) {
-    // Search state
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<Record<
         string,
@@ -331,7 +419,6 @@ export default function AdminDashboard({
     const [isSearching, setIsSearching] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
 
-    // Filter controls state
     const [selectedRange, setSelectedRange] = useState(filters.range);
     const [selectedCity, setSelectedCity] = useState(
         filters.city_id ? String(filters.city_id) : 'all',
@@ -342,7 +429,6 @@ export default function AdminDashboard({
     const [customFrom, setCustomFrom] = useState(filters.from ?? '');
     const [customTo, setCustomTo] = useState(filters.to ?? '');
 
-    // Debounced search
     useEffect(() => {
         if (searchQuery.trim().length < 2) {
             setSearchResults(null);
@@ -364,7 +450,6 @@ export default function AdminDashboard({
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
-    // Close search dropdown on click outside
     useEffect(() => {
         function handleClickOutside(e: MouseEvent) {
             if (
@@ -379,7 +464,6 @@ export default function AdminDashboard({
             document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Apply filters via Inertia visit
     const applyFilters = (
         newRange?: string,
         newCity?: string,
@@ -402,38 +486,43 @@ export default function AdminDashboard({
         );
     };
 
-    const formatCurrency = (minor: number) => {
-        return new Intl.NumberFormat('en-IN', {
-            style: 'currency',
-            currency: 'INR',
-            maximumFractionDigits: 0,
-        }).format(minor / 100);
-    };
-
-    // Calculate maximum trend value for scale
     const maxTrendBooking = Math.max(...trends.map((t) => t.bookings_count), 1);
-
     const hasSearchResults =
         searchResults &&
         Object.values(searchResults).some((arr) => arr.length > 0);
+    const defaultQueueTab = resolveDefaultQueueTab(capabilities, queues);
+
+    const totalAttentionCount =
+        (capabilities.canViewProtection
+            ? queues.customer_protection.length
+            : 0) +
+        (capabilities.canViewProperties ? queues.property_approval.length : 0) +
+        (capabilities.canViewPartners ? queues.partner_onboarding.length : 0) +
+        (capabilities.canViewReservations
+            ? queues.reservation_operations.length
+            : 0) +
+        (capabilities.canViewFinance
+            ? queues.financial_operations.length +
+              queues.payment_operations.length
+            : 0);
 
     return (
         <TooltipProvider>
-            <Head title="Operations Command Centre" />
+            <Head title="Operations Overview" />
 
-            <div className="space-y-6 pb-12">
-                {/* 1. Deep Plum Executive Command Hero + Global Search */}
-                <section className="relative overflow-hidden rounded-[24px] bg-tijum-plum p-6 text-tijum-cream shadow-tijum-soft sm:p-8 dark:border dark:border-border dark:bg-[#2b1b29]">
+            <div className="space-y-6 pb-10">
+                {/* 1. Executive Command Hero + Global Search + Quick Workspace Actions */}
+                <section className="relative overflow-hidden rounded-[24px] bg-tijum-plum p-6 text-tijum-cream shadow-tijum-soft sm:p-7 dark:border dark:border-border dark:bg-[#2b1b29]">
                     <div
                         className="pointer-events-none absolute -top-20 -right-16 size-64 rounded-full bg-tijum-coral/15 blur-3xl"
                         aria-hidden="true"
                     />
-                    <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="max-w-2xl space-y-2.5">
-                            <div className="flex flex-wrap items-center gap-2.5">
+                    <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="max-w-2xl space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 font-heading text-[11px] font-semibold tracking-[0.14em] text-tijum-peach uppercase">
-                                    <span className="inline-flex size-2 animate-pulse rounded-full bg-emerald-400" />
-                                    Marketplace Command Centre
+                                    <span className="inline-flex size-2 rounded-full bg-emerald-400" />
+                                    Admin Overview
                                 </span>
                                 <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 font-heading text-[11px] font-semibold text-tijum-cream">
                                     <ShieldCheck
@@ -448,7 +537,7 @@ export default function AdminDashboard({
                                     <span className="text-white/40">·</span>
                                     <span className="text-tijum-cream/80">
                                         {securitySummary.recoveryCodesRemaining}{' '}
-                                        recovery codes
+                                        codes
                                     </span>
                                 </span>
                             </div>
@@ -456,15 +545,71 @@ export default function AdminDashboard({
                             <h1 className="font-heading text-2xl font-bold tracking-tight text-white sm:text-3xl">
                                 Operations &amp; Administration
                             </h1>
-                            <p className="text-sm leading-relaxed text-tijum-cream/85">
-                                Central operational oversight across Hyderabad,
-                                Guntur, Vijayawada, and Visakhapatnam.
+                            <p className="text-sm text-tijum-cream/80">
+                                Marketplace oversight across Hyderabad, Guntur,
+                                Vijayawada, and Visakhapatnam.
                             </p>
+
+                            {/* Quick Role-Aware Jump Actions */}
+                            <div className="flex flex-wrap items-center gap-2 pt-1.5">
+                                {capabilities.canViewReservations && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        asChild
+                                        className="h-8 border-white/25 bg-white/10 text-xs text-tijum-cream hover:bg-white/20 hover:text-white"
+                                    >
+                                        <Link href="/admin/reservations">
+                                            <CalendarCheck className="size-3.5" />
+                                            <span>Bookings</span>
+                                        </Link>
+                                    </Button>
+                                )}
+                                {capabilities.canViewProperties && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        asChild
+                                        className="h-8 border-white/25 bg-white/10 text-xs text-tijum-cream hover:bg-white/20 hover:text-white"
+                                    >
+                                        <Link href="/admin/properties">
+                                            <Building2 className="size-3.5" />
+                                            <span>Properties</span>
+                                        </Link>
+                                    </Button>
+                                )}
+                                {capabilities.canViewFinance && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        asChild
+                                        className="h-8 border-white/25 bg-white/10 text-xs text-tijum-cream hover:bg-white/20 hover:text-white"
+                                    >
+                                        <Link href="/admin/settlements">
+                                            <Wallet className="size-3.5" />
+                                            <span>Settlements</span>
+                                        </Link>
+                                    </Button>
+                                )}
+                                {capabilities.canViewProtection && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        asChild
+                                        className="h-8 border-white/25 bg-white/10 text-xs text-tijum-cream hover:bg-white/20 hover:text-white"
+                                    >
+                                        <Link href="/admin/support/customers">
+                                            <LifeBuoy className="size-3.5" />
+                                            <span>Support Desk</span>
+                                        </Link>
+                                    </Button>
+                                )}
+                            </div>
                         </div>
 
-                        {/* Global Search Bar */}
+                        {/* Global Search */}
                         <div
-                            className="relative w-full lg:max-w-md"
+                            className="relative w-full lg:max-w-sm"
                             ref={searchRef}
                         >
                             <div className="relative">
@@ -474,7 +619,7 @@ export default function AdminDashboard({
                                 />
                                 <Input
                                     type="text"
-                                    placeholder="Search booking ref, case, partner, property..."
+                                    placeholder="Search booking, case, partner, property..."
                                     value={searchQuery}
                                     onChange={(e) =>
                                         setSearchQuery(e.target.value)
@@ -496,7 +641,6 @@ export default function AdminDashboard({
                                 )}
                             </div>
 
-                            {/* Search Results Dropdown */}
                             {searchQuery.trim().length >= 2 && (
                                 <div className="absolute top-full right-0 left-0 z-50 mt-2 max-h-96 overflow-y-auto rounded-2xl border border-tijum-surface/80 bg-white p-2 text-tijum-plum shadow-tijum-soft dark:border-border dark:bg-card dark:text-foreground">
                                     {isSearching ? (
@@ -570,11 +714,10 @@ export default function AdminDashboard({
                     </div>
                 </section>
 
-                {/* Filters & Export Toolbar */}
-                <Card className="py-4">
-                    <CardContent className="flex flex-wrap items-center justify-between gap-3 px-5">
+                {/* 2. Compact Filters & CSV Export Toolbar */}
+                <Card className="py-3.5">
+                    <CardContent className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5">
                         <div className="flex flex-wrap items-center gap-2.5">
-                            {/* Date Range Selector */}
                             <div className="flex items-center gap-1.5">
                                 <Calendar className="size-4 text-tijum-coral" />
                                 <Select
@@ -586,7 +729,7 @@ export default function AdminDashboard({
                                         }
                                     }}
                                 >
-                                    <SelectTrigger className="h-9.5 w-[145px] rounded-xl text-xs font-medium">
+                                    <SelectTrigger className="h-9 w-[140px] rounded-xl text-xs font-medium">
                                         <SelectValue placeholder="Date Range" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -612,7 +755,6 @@ export default function AdminDashboard({
                                 </Select>
                             </div>
 
-                            {/* Custom Date Inputs */}
                             {selectedRange === 'custom' && (
                                 <div className="flex flex-wrap items-center gap-1.5">
                                     <Input
@@ -621,7 +763,7 @@ export default function AdminDashboard({
                                         onChange={(e) =>
                                             setCustomFrom(e.target.value)
                                         }
-                                        className="h-9.5 w-36 rounded-xl text-xs"
+                                        className="h-9 w-36 rounded-xl text-xs"
                                     />
                                     <span className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
                                         to
@@ -632,20 +774,19 @@ export default function AdminDashboard({
                                         onChange={(e) =>
                                             setCustomTo(e.target.value)
                                         }
-                                        className="h-9.5 w-36 rounded-xl text-xs"
+                                        className="h-9 w-36 rounded-xl text-xs"
                                     />
                                     <Button
                                         size="sm"
                                         variant="outline"
                                         onClick={() => applyFilters('custom')}
-                                        className="h-9.5 text-xs"
+                                        className="h-9 text-xs"
                                     >
                                         Apply
                                     </Button>
                                 </div>
                             )}
 
-                            {/* City Filter */}
                             <div className="flex items-center gap-1.5">
                                 <MapPin className="size-4 text-tijum-coral" />
                                 <Select
@@ -655,7 +796,7 @@ export default function AdminDashboard({
                                         applyFilters(undefined, val);
                                     }}
                                 >
-                                    <SelectTrigger className="h-9.5 w-[135px] rounded-xl text-xs font-medium">
+                                    <SelectTrigger className="h-9 w-[132px] rounded-xl text-xs font-medium">
                                         <SelectValue placeholder="All Cities" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -674,7 +815,6 @@ export default function AdminDashboard({
                                 </Select>
                             </div>
 
-                            {/* Category Filter */}
                             <div className="flex items-center gap-1.5">
                                 <Building2 className="size-4 text-tijum-coral" />
                                 <Select
@@ -684,7 +824,7 @@ export default function AdminDashboard({
                                         applyFilters(undefined, undefined, val);
                                     }}
                                 >
-                                    <SelectTrigger className="h-9.5 w-[145px] rounded-xl text-xs font-medium">
+                                    <SelectTrigger className="h-9 w-[140px] rounded-xl text-xs font-medium">
                                         <SelectValue placeholder="All Categories" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -704,14 +844,10 @@ export default function AdminDashboard({
                             </div>
                         </div>
 
-                        {/* CSV Export & Actions */}
                         <div className="flex flex-wrap items-center gap-3">
                             <span className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                Period:{' '}
-                                <strong className="font-semibold text-tijum-plum dark:text-foreground">
-                                    {filterMetadata.period_start_formatted} –{' '}
-                                    {filterMetadata.period_end_formatted}
-                                </strong>
+                                {filterMetadata.period_start_formatted} –{' '}
+                                {filterMetadata.period_end_formatted}
                             </span>
 
                             <DropdownMenu>
@@ -719,7 +855,7 @@ export default function AdminDashboard({
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        className="h-9.5 gap-1.5 text-xs font-semibold"
+                                        className="h-9 gap-1.5 text-xs font-semibold"
                                     >
                                         <Download className="size-3.5 text-tijum-coral" />
                                         <span>Export CSV</span>
@@ -801,160 +937,74 @@ export default function AdminDashboard({
                     </CardContent>
                 </Card>
 
-                {/* 2. Primary Marketplace Overview KPI Cards */}
+                {/* 3. Primary Marketplace Overview KPIs */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card className="py-5">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="font-heading text-xs font-semibold tracking-wider text-tijum-plum-muted uppercase dark:text-muted-foreground">
-                                Active Properties
-                            </CardTitle>
-                            <span className="flex size-9 items-center justify-center rounded-xl border border-tijum-peach/80 bg-tijum-cream text-tijum-coral dark:border-tijum-coral/35 dark:bg-tijum-coral/15">
-                                <Building2 className="size-4" />
-                            </span>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="font-heading text-3xl font-bold tabular-nums text-tijum-plum dark:text-foreground">
-                                {marketplaceOverview.active_properties}
-                            </div>
-                            <div className="mt-2 flex items-center justify-between text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                <span>
-                                    Awaiting Review:{' '}
-                                    <strong className="text-tijum-plum dark:text-foreground">
-                                        {marketplaceOverview.pending_properties}
-                                    </strong>
-                                </span>
-                                {marketplaceOverview.suspended_properties >
-                                    0 && (
-                                    <span className="font-medium text-status-error-fg">
-                                        Suspended:{' '}
-                                        {
-                                            marketplaceOverview.suspended_properties
-                                        }
-                                    </span>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <StatCard
+                        label="Active Properties"
+                        value={marketplaceOverview.active_properties}
+                        helperText={
+                            marketplaceOverview.suspended_properties > 0
+                                ? `${marketplaceOverview.pending_properties} pending · ${marketplaceOverview.suspended_properties} suspended`
+                                : `${marketplaceOverview.pending_properties} awaiting review`
+                        }
+                        icon={Building2}
+                    />
 
-                    <Card className="py-5">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="font-heading text-xs font-semibold tracking-wider text-tijum-plum-muted uppercase dark:text-muted-foreground">
-                                Verified Partners
-                            </CardTitle>
-                            <span className="flex size-9 items-center justify-center rounded-xl border border-tijum-peach/80 bg-tijum-cream text-tijum-coral dark:border-tijum-coral/35 dark:bg-tijum-coral/15">
-                                <UserCheck className="size-4" />
-                            </span>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="font-heading text-3xl font-bold tabular-nums text-tijum-plum dark:text-foreground">
-                                {marketplaceOverview.verified_partners}
-                            </div>
-                            <div className="mt-2 flex items-center justify-between text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                <span>
-                                    Pending Verification:{' '}
-                                    <strong className="text-tijum-plum dark:text-foreground">
-                                        {marketplaceOverview.pending_partners}
-                                    </strong>
-                                </span>
-                                <Badge
-                                    variant="outline"
-                                    className="text-[10px]"
-                                >
-                                    Independent
-                                </Badge>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <StatCard
+                        label="Verified Partners"
+                        value={marketplaceOverview.verified_partners}
+                        helperText={`${marketplaceOverview.pending_partners} pending verification`}
+                        icon={UserCheck}
+                    />
 
-                    <Card className="py-5">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="font-heading text-xs font-semibold tracking-wider text-tijum-plum-muted uppercase dark:text-muted-foreground">
-                                Marketplace Guests
-                            </CardTitle>
-                            <span className="flex size-9 items-center justify-center rounded-xl border border-tijum-peach/80 bg-tijum-cream text-tijum-coral dark:border-tijum-coral/35 dark:bg-tijum-coral/15">
-                                <Users className="size-4" />
-                            </span>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="font-heading text-3xl font-bold tabular-nums text-tijum-plum dark:text-foreground">
-                                {marketplaceOverview.total_customers}
-                            </div>
-                            <div className="mt-2 flex items-center justify-between text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                <span>
-                                    Active / Verified:{' '}
-                                    <strong className="text-tijum-plum dark:text-foreground">
-                                        {marketplaceOverview.active_customers}
-                                    </strong>
-                                </span>
-                                <span className="text-[11px] font-medium text-status-success-fg">
-                                    KYC / Email Verified
-                                </span>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <StatCard
+                        label="Marketplace Guests"
+                        value={marketplaceOverview.total_customers}
+                        helperText={`${marketplaceOverview.active_customers} verified & active`}
+                        icon={Users}
+                    />
 
-                    <Card className="py-5">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="font-heading text-xs font-semibold tracking-wider text-tijum-plum-muted uppercase dark:text-muted-foreground">
-                                Reservations (Period)
-                            </CardTitle>
-                            <span className="flex size-9 items-center justify-center rounded-xl border border-tijum-peach/80 bg-tijum-cream text-tijum-coral dark:border-tijum-coral/35 dark:bg-tijum-coral/15">
-                                <CalendarCheck className="size-4" />
-                            </span>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="font-heading text-3xl font-bold tabular-nums text-tijum-plum dark:text-foreground">
-                                {reservationMetrics.new_in_period}
-                            </div>
-                            <div className="mt-2 flex items-center justify-between text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                <span className="font-medium text-status-success-fg">
-                                    Confirmed:{' '}
-                                    {reservationMetrics.confirmed_in_period}
-                                </span>
-                                <span>
-                                    Awaiting:{' '}
-                                    {reservationMetrics.awaiting_payment}
-                                </span>
-                                <span>
-                                    Cancelled:{' '}
-                                    {reservationMetrics.cancelled_in_period}
-                                </span>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <StatCard
+                        label="Reservations (Period)"
+                        value={reservationMetrics.new_in_period}
+                        helperText={`${reservationMetrics.confirmed_in_period} confirmed · ${reservationMetrics.awaiting_payment} awaiting · ${reservationMetrics.cancelled_in_period} cancelled`}
+                        icon={CalendarCheck}
+                    />
                 </div>
 
-                {/* 3. Operational Attention Queues (Core Command Centre) */}
+                {/* 4. Operational Attention Queues */}
                 <Card>
                     <CardHeader className="border-b border-tijum-surface/80 pb-4 dark:border-border">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                             <div>
-                                <CardTitle className="flex items-center gap-2 font-heading text-lg font-bold text-tijum-plum dark:text-foreground">
-                                    <AlertCircle className="size-5 text-tijum-coral" />
-                                    <span>Operational Attention Queues</span>
+                                <CardTitle className="flex items-center gap-2 font-heading text-base font-bold text-tijum-plum sm:text-lg dark:text-foreground">
+                                    <AlertCircle className="size-4.5 text-tijum-coral" />
+                                    <span>Attention Queues</span>
                                 </CardTitle>
                                 <CardDescription className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                    Pending tasks requiring administrator
-                                    review, verification, or customer
-                                    assistance.
+                                    Items requiring review, verification,
+                                    payout action, or guest support.
                                 </CardDescription>
                             </div>
+                            <Badge
+                                variant={
+                                    totalAttentionCount > 0
+                                        ? 'plum'
+                                        : 'outline'
+                                }
+                                className="text-xs tabular-nums"
+                            >
+                                {totalAttentionCount} pending
+                            </Badge>
                         </div>
                     </CardHeader>
 
-                    <CardContent className="p-4 sm:p-6">
-                        <Tabs
-                            defaultValue={
-                                queues.customer_protection.length > 0
-                                    ? 'protection'
-                                    : 'properties'
-                            }
-                            className="w-full"
-                        >
+                    <CardContent className="p-4 sm:p-5">
+                        <Tabs defaultValue={defaultQueueTab} className="w-full">
                             <TabsList
                                 variant="pill"
                                 label="Operational Attention Queues"
-                                className="mb-5"
+                                className="mb-4"
                             >
                                 {capabilities.canViewProtection && (
                                     <TabsTrigger
@@ -962,12 +1012,12 @@ export default function AdminDashboard({
                                         className="gap-1.5 text-xs"
                                     >
                                         <ShieldAlert className="size-3.5" />
-                                        <span>Customer Protection</span>
+                                        <span>Protection</span>
                                         {queues.customer_protection.length >
                                             0 && (
                                             <Badge
                                                 variant="plum"
-                                                className="ml-1 px-1.5 py-0 text-[10px]"
+                                                className="ml-0.5 px-1.5 py-0 text-[10px]"
                                             >
                                                 {
                                                     queues.customer_protection
@@ -984,12 +1034,12 @@ export default function AdminDashboard({
                                         className="gap-1.5 text-xs"
                                     >
                                         <Building2 className="size-3.5" />
-                                        <span>Property Approvals</span>
+                                        <span>Properties</span>
                                         {queues.property_approval.length >
                                             0 && (
                                             <Badge
                                                 variant="outline"
-                                                className="ml-1 px-1.5 py-0 text-[10px]"
+                                                className="ml-0.5 px-1.5 py-0 text-[10px]"
                                             >
                                                 {
                                                     queues.property_approval
@@ -1006,12 +1056,12 @@ export default function AdminDashboard({
                                         className="gap-1.5 text-xs"
                                     >
                                         <UserCheck className="size-3.5" />
-                                        <span>Partner Onboarding</span>
+                                        <span>Partners</span>
                                         {queues.partner_onboarding.length >
                                             0 && (
                                             <Badge
                                                 variant="outline"
-                                                className="ml-1 px-1.5 py-0 text-[10px]"
+                                                className="ml-0.5 px-1.5 py-0 text-[10px]"
                                             >
                                                 {
                                                     queues.partner_onboarding
@@ -1028,12 +1078,12 @@ export default function AdminDashboard({
                                         className="gap-1.5 text-xs"
                                     >
                                         <CalendarCheck className="size-3.5" />
-                                        <span>Reservations Oversight</span>
+                                        <span>Reservations</span>
                                         {queues.reservation_operations.length >
                                             0 && (
                                             <Badge
                                                 variant="outline"
-                                                className="ml-1 px-1.5 py-0 text-[10px]"
+                                                className="ml-0.5 px-1.5 py-0 text-[10px]"
                                             >
                                                 {
                                                     queues
@@ -1052,14 +1102,12 @@ export default function AdminDashboard({
                                             className="gap-1.5 text-xs"
                                         >
                                             <Wallet className="size-3.5" />
-                                            <span>
-                                                Settlements &amp; Transfers
-                                            </span>
+                                            <span>Settlements</span>
                                             {queues.financial_operations
                                                 .length > 0 && (
                                                 <Badge
                                                     variant="plum"
-                                                    className="ml-1 px-1.5 py-0 text-[10px]"
+                                                    className="ml-0.5 px-1.5 py-0 text-[10px]"
                                                 >
                                                     {
                                                         queues
@@ -1074,12 +1122,12 @@ export default function AdminDashboard({
                                             className="gap-1.5 text-xs"
                                         >
                                             <CreditCard className="size-3.5" />
-                                            <span>Payment Exceptions</span>
+                                            <span>Payments</span>
                                             {queues.payment_operations.length >
                                                 0 && (
                                                 <Badge
                                                     variant="outline"
-                                                    className="ml-1 px-1.5 py-0 text-[10px]"
+                                                    className="ml-0.5 px-1.5 py-0 text-[10px]"
                                                 >
                                                     {
                                                         queues
@@ -1093,31 +1141,23 @@ export default function AdminDashboard({
                                 )}
                             </TabsList>
 
-                            {/* Customer Protection Queue */}
                             {capabilities.canViewProtection && (
                                 <TabsContent
                                     value="protection"
                                     className="space-y-2.5"
                                 >
                                     {queues.customer_protection.length === 0 ? (
-                                        <div className="rounded-xl border border-dashed border-tijum-surface/90 bg-tijum-cream/35 py-8 text-center text-xs text-tijum-plum-muted dark:border-border dark:bg-muted/35 dark:text-muted-foreground">
-                                            Zero open customer protection or
-                                            grievance issues pending.
-                                        </div>
+                                        <EmptyQueueState message="Zero open customer protection or grievance issues pending." />
                                     ) : (
                                         queues.customer_protection.map(
                                             (item) => (
-                                                <div
+                                                <QueueItemRow
                                                     key={item.id}
-                                                    className="flex flex-col gap-3 rounded-xl border border-tijum-surface/80 bg-tijum-cream/35 p-4 transition-colors hover:border-tijum-coral/40 hover:bg-tijum-cream/65 sm:flex-row sm:items-center sm:justify-between dark:border-border dark:bg-muted/45 dark:hover:bg-muted/75"
-                                                >
-                                                    <div className="space-y-1">
-                                                        <div className="flex flex-wrap items-center gap-2">
-                                                            <span className="font-heading font-semibold text-tijum-plum dark:text-foreground">
-                                                                {
-                                                                    item.case_reference
-                                                                }
-                                                            </span>
+                                                    heading={
+                                                        item.case_reference
+                                                    }
+                                                    badges={
+                                                        <>
                                                             <Badge
                                                                 variant={
                                                                     item.priority ===
@@ -1140,173 +1180,79 @@ export default function AdminDashboard({
                                                                     Ack
                                                                 </Badge>
                                                             )}
-                                                        </div>
-                                                        <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                                            Guest:{' '}
-                                                            <strong className="text-tijum-plum dark:text-foreground">
-                                                                {
-                                                                    item.customer_name
-                                                                }
-                                                            </strong>{' '}
-                                                            • Property:{' '}
-                                                            {item.property_name}{' '}
-                                                            • Category:{' '}
-                                                            {
-                                                                item.category_label
-                                                            }
-                                                        </p>
-                                                    </div>
-
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        asChild
-                                                        className="shrink-0 text-xs font-semibold"
-                                                    >
-                                                        <Link
-                                                            href={
-                                                                item.action_url
-                                                            }
-                                                        >
-                                                            <span>
-                                                                Resolve Case
-                                                            </span>
-                                                            <ChevronRight className="ml-1 size-3.5" />
-                                                        </Link>
-                                                    </Button>
-                                                </div>
+                                                        </>
+                                                    }
+                                                    meta={`Guest: ${item.customer_name} · Property: ${item.property_name} · ${item.category_label}`}
+                                                    actionUrl={item.action_url}
+                                                    actionLabel="Resolve Case"
+                                                />
                                             ),
                                         )
                                     )}
                                 </TabsContent>
                             )}
 
-                            {/* Property Approvals Queue */}
                             {capabilities.canViewProperties && (
                                 <TabsContent
                                     value="properties"
                                     className="space-y-2.5"
                                 >
                                     {queues.property_approval.length === 0 ? (
-                                        <div className="rounded-xl border border-dashed border-tijum-surface/90 bg-tijum-cream/35 py-8 text-center text-xs text-tijum-plum-muted dark:border-border dark:bg-muted/35 dark:text-muted-foreground">
-                                            No properties currently awaiting
-                                            verification review.
-                                        </div>
+                                        <EmptyQueueState message="No properties currently awaiting verification review." />
                                     ) : (
                                         queues.property_approval.map((item) => (
-                                            <div
+                                            <QueueItemRow
                                                 key={item.id}
-                                                className="flex flex-col gap-3 rounded-xl border border-tijum-surface/80 bg-tijum-cream/35 p-4 transition-colors hover:border-tijum-coral/40 hover:bg-tijum-cream/65 sm:flex-row sm:items-center sm:justify-between dark:border-border dark:bg-muted/45 dark:hover:bg-muted/75"
-                                            >
-                                                <div className="space-y-1">
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <span className="font-heading font-semibold text-tijum-plum dark:text-foreground">
-                                                            {item.property_name}
-                                                        </span>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="text-[10px]"
-                                                        >
-                                                            {item.category} in{' '}
-                                                            {item.city}
-                                                        </Badge>
-                                                    </div>
-                                                    <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                                        Owner:{' '}
-                                                        {item.owner_name} •
-                                                        Submitted:{' '}
-                                                        {
-                                                            item.submitted_formatted
-                                                        }
-                                                    </p>
-                                                </div>
-
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    asChild
-                                                    className="shrink-0 text-xs font-semibold"
-                                                >
-                                                    <Link
-                                                        href={item.action_url}
+                                                heading={item.property_name}
+                                                badges={
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="text-[10px]"
                                                     >
-                                                        <span>
-                                                            Review Property
-                                                        </span>
-                                                        <ChevronRight className="ml-1 size-3.5" />
-                                                    </Link>
-                                                </Button>
-                                            </div>
+                                                        {item.category} ·{' '}
+                                                        {item.city}
+                                                    </Badge>
+                                                }
+                                                meta={`Owner: ${item.owner_name} · Submitted: ${item.submitted_formatted}`}
+                                                actionUrl={item.action_url}
+                                                actionLabel="Review Property"
+                                            />
                                         ))
                                     )}
                                 </TabsContent>
                             )}
 
-                            {/* Partner Onboarding Queue */}
                             {capabilities.canViewPartners && (
                                 <TabsContent
                                     value="partners"
                                     className="space-y-2.5"
                                 >
                                     {queues.partner_onboarding.length === 0 ? (
-                                        <div className="rounded-xl border border-dashed border-tijum-surface/90 bg-tijum-cream/35 py-8 text-center text-xs text-tijum-plum-muted dark:border-border dark:bg-muted/35 dark:text-muted-foreground">
-                                            No partner registrations or bank KYC
-                                            reviews pending.
-                                        </div>
+                                        <EmptyQueueState message="No partner registrations or bank KYC reviews pending." />
                                     ) : (
                                         queues.partner_onboarding.map(
                                             (item) => (
-                                                <div
+                                                <QueueItemRow
                                                     key={item.id}
-                                                    className="flex flex-col gap-3 rounded-xl border border-tijum-surface/80 bg-tijum-cream/35 p-4 transition-colors hover:border-tijum-coral/40 hover:bg-tijum-cream/65 sm:flex-row sm:items-center sm:justify-between dark:border-border dark:bg-muted/45 dark:hover:bg-muted/75"
-                                                >
-                                                    <div className="space-y-1">
-                                                        <div className="flex flex-wrap items-center gap-2">
-                                                            <span className="font-heading font-semibold text-tijum-plum dark:text-foreground">
-                                                                {item.name}
-                                                            </span>
-                                                            <Badge
-                                                                variant="plum"
-                                                                className="text-[10px]"
-                                                            >
-                                                                {item.badge}
-                                                            </Badge>
-                                                        </div>
-                                                        <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                                            {item.email} •{' '}
-                                                            {item.business_name}{' '}
-                                                            • Applied:{' '}
-                                                            {
-                                                                item.created_formatted
-                                                            }
-                                                        </p>
-                                                    </div>
-
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        asChild
-                                                        className="shrink-0 text-xs font-semibold"
-                                                    >
-                                                        <Link
-                                                            href={
-                                                                item.action_url
-                                                            }
+                                                    heading={item.name}
+                                                    badges={
+                                                        <Badge
+                                                            variant="plum"
+                                                            className="text-[10px]"
                                                         >
-                                                            <span>
-                                                                Verify Partner
-                                                            </span>
-                                                            <ChevronRight className="ml-1 size-3.5" />
-                                                        </Link>
-                                                    </Button>
-                                                </div>
+                                                            {item.badge}
+                                                        </Badge>
+                                                    }
+                                                    meta={`${item.email} · ${item.business_name} · Applied: ${item.created_formatted}`}
+                                                    actionUrl={item.action_url}
+                                                    actionLabel="Verify Partner"
+                                                />
                                             ),
                                         )
                                     )}
                                 </TabsContent>
                             )}
 
-                            {/* Reservations Queue */}
                             {capabilities.canViewReservations && (
                                 <TabsContent
                                     value="reservations"
@@ -1314,24 +1260,17 @@ export default function AdminDashboard({
                                 >
                                     {queues.reservation_operations.length ===
                                     0 ? (
-                                        <div className="rounded-xl border border-dashed border-tijum-surface/90 bg-tijum-cream/35 py-8 text-center text-xs text-tijum-plum-muted dark:border-border dark:bg-muted/35 dark:text-muted-foreground">
-                                            All reservations are currently in
-                                            steady state.
-                                        </div>
+                                        <EmptyQueueState message="All reservations are currently in steady state." />
                                     ) : (
                                         queues.reservation_operations.map(
                                             (item) => (
-                                                <div
+                                                <QueueItemRow
                                                     key={item.id}
-                                                    className="flex flex-col gap-3 rounded-xl border border-tijum-surface/80 bg-tijum-cream/35 p-4 transition-colors hover:border-tijum-coral/40 hover:bg-tijum-cream/65 sm:flex-row sm:items-center sm:justify-between dark:border-border dark:bg-muted/45 dark:hover:bg-muted/75"
-                                                >
-                                                    <div className="space-y-1">
-                                                        <div className="flex flex-wrap items-center gap-2">
-                                                            <span className="font-heading font-semibold text-tijum-plum dark:text-foreground">
-                                                                {
-                                                                    item.booking_reference
-                                                                }
-                                                            </span>
+                                                    heading={
+                                                        item.booking_reference
+                                                    }
+                                                    badges={
+                                                        <>
                                                             <Badge
                                                                 variant="outline"
                                                                 className="text-[10px]"
@@ -1349,43 +1288,18 @@ export default function AdminDashboard({
                                                                     Required
                                                                 </Badge>
                                                             )}
-                                                        </div>
-                                                        <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                                            Guest:{' '}
-                                                            {item.guest_name} •
-                                                            Property:{' '}
-                                                            {item.property_name}{' '}
-                                                            ({item.city}) •
-                                                            Stay:{' '}
-                                                            {item.stay_dates}
-                                                        </p>
-                                                    </div>
-
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        asChild
-                                                        className="shrink-0 text-xs font-semibold"
-                                                    >
-                                                        <Link
-                                                            href={
-                                                                item.action_url
-                                                            }
-                                                        >
-                                                            <span>
-                                                                View Booking
-                                                            </span>
-                                                            <ChevronRight className="ml-1 size-3.5" />
-                                                        </Link>
-                                                    </Button>
-                                                </div>
+                                                        </>
+                                                    }
+                                                    meta={`Guest: ${item.guest_name} · ${item.property_name} (${item.city}) · ${item.stay_dates}`}
+                                                    actionUrl={item.action_url}
+                                                    actionLabel="View Booking"
+                                                />
                                             ),
                                         )
                                     )}
                                 </TabsContent>
                             )}
 
-                            {/* Settlements Queue */}
                             {capabilities.canViewFinance && (
                                 <TabsContent
                                     value="finance"
@@ -1393,141 +1307,64 @@ export default function AdminDashboard({
                                 >
                                     {queues.financial_operations.length ===
                                     0 ? (
-                                        <div className="rounded-xl border border-dashed border-tijum-surface/90 bg-tijum-cream/35 py-8 text-center text-xs text-tijum-plum-muted dark:border-border dark:bg-muted/35 dark:text-muted-foreground">
-                                            No partner settlements awaiting
-                                            approval or release.
-                                        </div>
+                                        <EmptyQueueState message="No partner settlements awaiting approval or release." />
                                     ) : (
                                         queues.financial_operations.map(
                                             (item) => (
-                                                <div
+                                                <QueueItemRow
                                                     key={item.id}
-                                                    className="flex flex-col gap-3 rounded-xl border border-tijum-surface/80 bg-tijum-cream/35 p-4 transition-colors hover:border-tijum-coral/40 hover:bg-tijum-cream/65 sm:flex-row sm:items-center sm:justify-between dark:border-border dark:bg-muted/45 dark:hover:bg-muted/75"
-                                                >
-                                                    <div className="space-y-1">
-                                                        <div className="flex flex-wrap items-center gap-2">
-                                                            <span className="font-heading font-semibold text-tijum-plum dark:text-foreground">
-                                                                {item.reference}
-                                                            </span>
-                                                            <Badge
-                                                                variant={
-                                                                    item.type ===
-                                                                    'failed_transfer'
-                                                                        ? 'destructive'
-                                                                        : 'plum'
-                                                                }
-                                                                className="text-[10px]"
-                                                            >
-                                                                {item.title}
-                                                            </Badge>
-                                                        </div>
-                                                        <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                                            Partner:{' '}
-                                                            <strong className="text-tijum-plum dark:text-foreground">
-                                                                {
-                                                                    item.partner_name
-                                                                }
-                                                            </strong>{' '}
-                                                            • Amount:{' '}
-                                                            <strong className="tabular-nums text-tijum-plum dark:text-foreground">
-                                                                {
-                                                                    item.amount_formatted
-                                                                }
-                                                            </strong>
-                                                        </p>
-                                                    </div>
-
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        asChild
-                                                        className="shrink-0 text-xs font-semibold"
-                                                    >
-                                                        <Link
-                                                            href={
-                                                                item.action_url
+                                                    heading={item.reference}
+                                                    badges={
+                                                        <Badge
+                                                            variant={
+                                                                item.type ===
+                                                                'failed_transfer'
+                                                                    ? 'destructive'
+                                                                    : 'plum'
                                                             }
+                                                            className="text-[10px]"
                                                         >
-                                                            <span>
-                                                                Manage
-                                                                Settlement
-                                                            </span>
-                                                            <ChevronRight className="ml-1 size-3.5" />
-                                                        </Link>
-                                                    </Button>
-                                                </div>
+                                                            {item.title}
+                                                        </Badge>
+                                                    }
+                                                    meta={`Partner: ${item.partner_name} · Amount: ${item.amount_formatted}`}
+                                                    actionUrl={item.action_url}
+                                                    actionLabel="Manage Settlement"
+                                                />
                                             ),
                                         )
                                     )}
                                 </TabsContent>
                             )}
 
-                            {/* Payment Exceptions Queue */}
                             {capabilities.canViewFinance && (
                                 <TabsContent
                                     value="payments"
                                     className="space-y-2.5"
                                 >
                                     {queues.payment_operations.length === 0 ? (
-                                        <div className="rounded-xl border border-dashed border-tijum-surface/90 bg-tijum-cream/35 py-8 text-center text-xs text-tijum-plum-muted dark:border-border dark:bg-muted/35 dark:text-muted-foreground">
-                                            Zero failed customer payments or
-                                            refund exceptions.
-                                        </div>
+                                        <EmptyQueueState message="Zero failed customer payments or refund exceptions." />
                                     ) : (
                                         queues.payment_operations.map(
                                             (item) => (
-                                                <div
+                                                <QueueItemRow
                                                     key={item.id}
-                                                    className="flex flex-col gap-3 rounded-xl border border-tijum-surface/80 bg-tijum-cream/35 p-4 transition-colors hover:border-tijum-coral/40 hover:bg-tijum-cream/65 sm:flex-row sm:items-center sm:justify-between dark:border-border dark:bg-muted/45 dark:hover:bg-muted/75"
-                                                >
-                                                    <div className="space-y-1">
-                                                        <div className="flex flex-wrap items-center gap-2">
-                                                            <span className="font-heading font-semibold text-tijum-plum dark:text-foreground">
-                                                                {item.title}
-                                                            </span>
-                                                            <Badge
-                                                                variant="destructive"
-                                                                className="text-[10px]"
-                                                            >
-                                                                {item.type ===
-                                                                'failed_refund'
-                                                                    ? 'Refund Failed'
-                                                                    : 'Payment Failed'}
-                                                            </Badge>
-                                                        </div>
-                                                        <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                                            Amount:{' '}
-                                                            <strong className="tabular-nums text-tijum-plum dark:text-foreground">
-                                                                {
-                                                                    item.amount_formatted
-                                                                }
-                                                            </strong>{' '}
-                                                            • Customer:{' '}
-                                                            {item.customer_name}{' '}
-                                                            • Reason:{' '}
-                                                            {item.reason}
-                                                        </p>
-                                                    </div>
-
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        asChild
-                                                        className="shrink-0 text-xs font-semibold"
-                                                    >
-                                                        <Link
-                                                            href={
-                                                                item.action_url
-                                                            }
+                                                    heading={item.title}
+                                                    badges={
+                                                        <Badge
+                                                            variant="destructive"
+                                                            className="text-[10px]"
                                                         >
-                                                            <span>
-                                                                Inspect
-                                                                Transaction
-                                                            </span>
-                                                            <ChevronRight className="ml-1 size-3.5" />
-                                                        </Link>
-                                                    </Button>
-                                                </div>
+                                                            {item.type ===
+                                                            'failed_refund'
+                                                                ? 'Refund Failed'
+                                                                : 'Payment Failed'}
+                                                        </Badge>
+                                                    }
+                                                    meta={`Amount: ${item.amount_formatted} · Customer: ${item.customer_name} · ${item.reason}`}
+                                                    actionUrl={item.action_url}
+                                                    actionLabel="Inspect Transaction"
+                                                />
                                             ),
                                         )
                                     )}
@@ -1537,177 +1374,77 @@ export default function AdminDashboard({
                     </CardContent>
                 </Card>
 
-                {/* 4. Financial Transparency & Marketplace Revenue (Finance & SuperAdmin only) */}
+                {/* 5. Financial Overview (Finance & SuperAdmin only) */}
                 {capabilities.canViewFinance && revenueBreakdown && (
-                    <div className="space-y-4">
-                        <Card className="border-l-4 border-l-tijum-coral py-4">
-                            <CardContent className="flex items-start gap-3 px-5">
-                                <Info className="mt-0.5 size-5 shrink-0 text-tijum-coral" />
-                                <div className="space-y-1 text-xs leading-relaxed text-tijum-plum dark:text-foreground">
-                                    <strong className="font-heading font-bold">
-                                        Marketplace Revenue Transparency:
-                                    </strong>{' '}
+                    <section
+                        aria-label="Financial overview"
+                        className="space-y-3"
+                    >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <h2 className="font-heading text-sm font-bold tracking-wide text-tijum-plum uppercase dark:text-foreground">
+                                Financial Overview
+                            </h2>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="inline-flex cursor-help items-center gap-1.5 text-xs text-tijum-plum-muted dark:text-muted-foreground">
+                                        <HelpCircle className="size-3.5 text-tijum-coral" />
+                                        <span>
+                                            Escrow &amp; Commission Disclosure
+                                        </span>
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-sm text-xs">
                                     {
                                         revenueBreakdown.definition_notes
                                             .revenue_disclosure
                                     }{' '}
-                                    All funds collected from guests flow into
-                                    Razorpay RBI-regulated escrow, and net host
-                                    payouts are settled via approved linked
-                                    accounts.
-                                </div>
-                            </CardContent>
-                        </Card>
+                                    Customer payments flow into RBI-regulated
+                                    escrow and net payouts settle to verified
+                                    partner accounts.
+                                </TooltipContent>
+                            </Tooltip>
+                        </div>
 
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                            {/* Gross Customer Booking Value */}
-                            <Card className="py-5">
-                                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                    <div className="flex items-center gap-1.5">
-                                        <CardTitle className="font-heading text-xs font-semibold tracking-wider text-tijum-plum-muted uppercase dark:text-muted-foreground">
-                                            Gross Booking Value
-                                        </CardTitle>
-                                        <Tooltip>
-                                            <TooltipTrigger>
-                                                <HelpCircle className="size-3.5 text-tijum-plum-muted dark:text-muted-foreground" />
-                                            </TooltipTrigger>
-                                            <TooltipContent className="max-w-xs text-xs">
-                                                Total price of accommodation
-                                                booked by guests in the selected
-                                                period. This is NOT platform
-                                                revenue.
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </div>
-                                    <DollarSign className="size-4 text-tijum-plum-muted dark:text-muted-foreground" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="font-heading text-2xl font-bold tabular-nums text-tijum-plum dark:text-foreground">
-                                        {formatCurrency(
-                                            revenueBreakdown.gross_booking_value_minor,
-                                        )}
-                                    </div>
-                                    <p className="mt-1 text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                        Customer Escrow Receipts:{' '}
-                                        {formatCurrency(
-                                            revenueBreakdown.captured_payment_amount_minor,
-                                        )}
-                                    </p>
-                                </CardContent>
-                            </Card>
-
-                            {/* TIJUM Commission Earned */}
-                            <Card className="py-5 ring-1 ring-tijum-coral/35 dark:ring-tijum-coral/40">
-                                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                    <div className="flex items-center gap-1.5">
-                                        <CardTitle className="font-heading text-xs font-semibold tracking-wider text-tijum-coral uppercase">
-                                            TIJUM Platform Revenue
-                                        </CardTitle>
-                                        <Tooltip>
-                                            <TooltipTrigger>
-                                                <HelpCircle className="size-3.5 text-tijum-coral" />
-                                            </TooltipTrigger>
-                                            <TooltipContent className="max-w-xs text-xs">
-                                                Contractual marketplace
-                                                commission earned on confirmed
-                                                &amp; completed guest stays.
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </div>
-                                    <Percent className="size-4 text-tijum-coral" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="font-heading text-2xl font-bold tabular-nums text-tijum-plum dark:text-foreground">
-                                        {formatCurrency(
-                                            revenueBreakdown.commission_earned_minor,
-                                        )}
-                                    </div>
-                                    <p className="mt-1 text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                        +18% Commission GST:{' '}
-                                        {formatCurrency(
-                                            revenueBreakdown.commission_gst_minor,
-                                        )}
-                                    </p>
-                                </CardContent>
-                            </Card>
-
-                            {/* Net Partner Payable */}
-                            <Card className="py-5">
-                                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                    <div className="flex items-center gap-1.5">
-                                        <CardTitle className="font-heading text-xs font-semibold tracking-wider text-tijum-plum-muted uppercase dark:text-muted-foreground">
-                                            Net Partner Payable
-                                        </CardTitle>
-                                        <Tooltip>
-                                            <TooltipTrigger>
-                                                <HelpCircle className="size-3.5 text-tijum-plum-muted dark:text-muted-foreground" />
-                                            </TooltipTrigger>
-                                            <TooltipContent className="max-w-xs text-xs">
-                                                Accommodation payout due to
-                                                partners after contractual
-                                                commission, GST, and Section
-                                                393(1) TDS withholdings.
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </div>
-                                    <Wallet className="size-4 text-tijum-plum-muted dark:text-muted-foreground" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="font-heading text-2xl font-bold tabular-nums text-tijum-plum dark:text-foreground">
-                                        {formatCurrency(
-                                            revenueBreakdown.net_partner_payable_minor,
-                                        )}
-                                    </div>
-                                    <p className="mt-1 text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                        Completed Transfers:{' '}
-                                        {formatCurrency(
-                                            revenueBreakdown.completed_transfers_minor,
-                                        )}
-                                    </p>
-                                </CardContent>
-                            </Card>
-
-                            {/* Subsidies & Refunds */}
-                            <Card className="py-5">
-                                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                    <div className="flex items-center gap-1.5">
-                                        <CardTitle className="font-heading text-xs font-semibold tracking-wider text-tijum-plum-muted uppercase dark:text-muted-foreground">
-                                            Refunds &amp; Subsidies
-                                        </CardTitle>
-                                        <Tooltip>
-                                            <TooltipTrigger>
-                                                <HelpCircle className="size-3.5 text-tijum-plum-muted dark:text-muted-foreground" />
-                                            </TooltipTrigger>
-                                            <TooltipContent className="max-w-xs text-xs">
-                                                Customer refunds processed plus
-                                                TIJUM platform price-guarantee
-                                                relocation subsidies incurred.
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </div>
-                                    <Receipt className="size-4 text-tijum-plum-muted dark:text-muted-foreground" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="font-heading text-2xl font-bold tabular-nums text-tijum-plum dark:text-foreground">
-                                        {formatCurrency(
-                                            revenueBreakdown.completed_refunds_minor,
-                                        )}
-                                    </div>
-                                    <p className="mt-1 text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                        Relocation Subsidies:{' '}
-                                        {formatCurrency(
-                                            revenueBreakdown.relocation_subsidies_minor,
-                                        )}
-                                    </p>
-                                </CardContent>
-                            </Card>
+                            <StatCard
+                                label="Gross Booking Value"
+                                value={formatInr(
+                                    revenueBreakdown.gross_booking_value_minor,
+                                )}
+                                helperText={`Escrow receipts: ${formatInr(revenueBreakdown.captured_payment_amount_minor)}`}
+                                icon={DollarSign}
+                            />
+                            <StatCard
+                                label="TIJUM Platform Revenue"
+                                value={formatInr(
+                                    revenueBreakdown.commission_earned_minor,
+                                )}
+                                helperText={`+18% GST: ${formatInr(revenueBreakdown.commission_gst_minor)}`}
+                                icon={Percent}
+                                className="ring-1 ring-tijum-coral/35 dark:ring-tijum-coral/40"
+                            />
+                            <StatCard
+                                label="Net Partner Payable"
+                                value={formatInr(
+                                    revenueBreakdown.net_partner_payable_minor,
+                                )}
+                                helperText={`Transferred: ${formatInr(revenueBreakdown.completed_transfers_minor)}`}
+                                icon={Wallet}
+                            />
+                            <StatCard
+                                label="Refunds & Subsidies"
+                                value={formatInr(
+                                    revenueBreakdown.completed_refunds_minor,
+                                )}
+                                helperText={`Relocation subsidies: ${formatInr(revenueBreakdown.relocation_subsidies_minor)}`}
+                                icon={Receipt}
+                            />
                         </div>
-                    </div>
+                    </section>
                 )}
 
-                {/* 5. Performance Trends & City Distribution */}
+                {/* 6. Booking Trends & City Distribution */}
                 <div className="grid gap-6 lg:grid-cols-3">
-                    {/* Activity Trends Visualizer */}
                     <Card className="lg:col-span-2">
                         <CardHeader className="pb-3">
                             <div className="flex items-center justify-between">
@@ -1730,12 +1467,12 @@ export default function AdminDashboard({
 
                         <CardContent>
                             {trends.length === 0 ? (
-                                <div className="py-12 text-center text-xs text-tijum-plum-muted dark:text-muted-foreground">
+                                <div className="py-10 text-center text-xs text-tijum-plum-muted dark:text-muted-foreground">
                                     No booking activity recorded for this
                                     period.
                                 </div>
                             ) : (
-                                <div className="space-y-4">
+                                <div className="space-y-3">
                                     <div className="flex h-36 items-end gap-1.5 border-b border-tijum-surface/80 pt-6 pb-2 dark:border-border">
                                         {trends.map((point) => {
                                             const heightPct = Math.round(
@@ -1772,7 +1509,6 @@ export default function AdminDashboard({
                                     </div>
                                     <div className="flex justify-between text-[10px] text-tijum-plum-muted dark:text-muted-foreground">
                                         <span>{trends[0]?.formatted_date}</span>
-                                        <span>Mid-period</span>
                                         <span>
                                             {
                                                 trends[trends.length - 1]
@@ -1785,7 +1521,6 @@ export default function AdminDashboard({
                         </CardContent>
                     </Card>
 
-                    {/* Launch Cities Distribution */}
                     <Card>
                         <CardHeader className="pb-3">
                             <CardTitle className="flex items-center gap-2 font-heading text-base font-bold text-tijum-plum dark:text-foreground">
@@ -1793,15 +1528,15 @@ export default function AdminDashboard({
                                 <span>City Distribution</span>
                             </CardTitle>
                             <CardDescription className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                Activity across launch cities.
+                                Activity across operating cities.
                             </CardDescription>
                         </CardHeader>
 
-                        <CardContent className="space-y-3">
+                        <CardContent className="space-y-2.5">
                             {cityDistribution.map((city) => (
                                 <div
                                     key={city.city_id}
-                                    className="rounded-xl border border-tijum-surface/80 bg-tijum-cream/35 p-3.5 dark:border-border dark:bg-muted/45"
+                                    className="rounded-xl border border-tijum-surface/80 bg-tijum-cream/35 p-3 dark:border-border dark:bg-muted/45"
                                 >
                                     <div className="flex items-center justify-between">
                                         <span className="font-heading text-sm font-semibold text-tijum-plum dark:text-foreground">
@@ -1814,7 +1549,7 @@ export default function AdminDashboard({
                                             {city.active_properties} stays
                                         </Badge>
                                     </div>
-                                    <div className="mt-2 flex items-center justify-between text-xs text-tijum-plum-muted dark:text-muted-foreground">
+                                    <div className="mt-1.5 flex items-center justify-between text-xs text-tijum-plum-muted dark:text-muted-foreground">
                                         <span>
                                             Bookings:{' '}
                                             <strong className="tabular-nums text-tijum-plum dark:text-foreground">
@@ -1824,7 +1559,7 @@ export default function AdminDashboard({
                                         <span>
                                             Volume:{' '}
                                             <strong className="tabular-nums text-tijum-plum dark:text-foreground">
-                                                {formatCurrency(
+                                                {formatInr(
                                                     city.payments_amount_minor,
                                                 )}
                                             </strong>
@@ -1836,24 +1571,18 @@ export default function AdminDashboard({
                     </Card>
                 </div>
 
-                {/* 6. Activity Feed & System Health Side-by-Side */}
+                {/* 7. Recent Activity & System Health */}
                 <div className="grid gap-6 lg:grid-cols-3">
-                    {/* Real Domain Activity Feed */}
                     <Card className="lg:col-span-2">
                         <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="flex items-center gap-2 font-heading text-base font-bold text-tijum-plum dark:text-foreground">
-                                    <Activity className="size-4 text-tijum-coral" />
-                                    <span>Recent Operational Activity</span>
-                                </CardTitle>
-                                <span className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                    Real domain events
-                                </span>
-                            </div>
+                            <CardTitle className="flex items-center gap-2 font-heading text-base font-bold text-tijum-plum dark:text-foreground">
+                                <Activity className="size-4 text-tijum-coral" />
+                                <span>Recent Activity</span>
+                            </CardTitle>
                         </CardHeader>
 
                         <CardContent>
-                            <div className="max-h-[380px] space-y-2.5 overflow-y-auto pr-1">
+                            <div className="max-h-[360px] space-y-2.5 overflow-y-auto pr-1">
                                 {recentActivities.length === 0 ? (
                                     <div className="py-8 text-center text-xs text-tijum-plum-muted dark:text-muted-foreground">
                                         No recent marketplace activities.
@@ -1862,9 +1591,9 @@ export default function AdminDashboard({
                                     recentActivities.map((act) => (
                                         <div
                                             key={act.id}
-                                            className="flex items-start justify-between gap-3 rounded-xl border border-tijum-surface/80 bg-tijum-cream/30 p-3.5 transition-colors hover:border-tijum-coral/40 hover:bg-tijum-cream/60 dark:border-border dark:bg-muted/40 dark:hover:bg-muted/70"
+                                            className="flex items-start justify-between gap-3 rounded-xl border border-tijum-surface/80 bg-tijum-cream/30 p-3 transition-colors hover:border-tijum-coral/40 hover:bg-tijum-cream/60 dark:border-border dark:bg-muted/40 dark:hover:bg-muted/70"
                                         >
-                                            <div className="space-y-1">
+                                            <div className="min-w-0 space-y-1">
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <span className="text-xs font-semibold text-tijum-plum dark:text-foreground">
                                                         {act.title}
@@ -1879,15 +1608,10 @@ export default function AdminDashboard({
                                                 <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
                                                     {act.description}
                                                 </p>
-                                                <div className="flex items-center gap-2 text-[10px] text-tijum-plum-muted dark:text-muted-foreground">
-                                                    <span>
-                                                        Actor: {act.actor_label}
-                                                    </span>
-                                                    <span>•</span>
-                                                    <span>
-                                                        {act.created_formatted}
-                                                    </span>
-                                                </div>
+                                                <p className="text-[10px] text-tijum-plum-muted dark:text-muted-foreground">
+                                                    {act.actor_label} ·{' '}
+                                                    {act.created_formatted}
+                                                </p>
                                             </div>
 
                                             <Button
@@ -1907,7 +1631,6 @@ export default function AdminDashboard({
                         </CardContent>
                     </Card>
 
-                    {/* System & Scheduled Operations Health */}
                     <Card>
                         <CardHeader className="pb-3">
                             <div className="flex items-center justify-between">
@@ -1931,12 +1654,11 @@ export default function AdminDashboard({
                                 </Badge>
                             </div>
                             <CardDescription className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                Automated queues, schedulers &amp; webhooks.
+                                Queues, schedulers &amp; payment gateways.
                             </CardDescription>
                         </CardHeader>
 
-                        <CardContent className="space-y-3">
-                            {/* Queue Worker Status */}
+                        <CardContent className="space-y-2.5">
                             <div className="space-y-1 rounded-xl border border-tijum-surface/80 bg-tijum-cream/35 p-3 dark:border-border dark:bg-muted/45">
                                 <div className="flex items-center justify-between text-xs">
                                     <span className="font-semibold text-tijum-plum dark:text-foreground">
@@ -1957,12 +1679,11 @@ export default function AdminDashboard({
                                     </span>
                                 </div>
                                 <p className="text-[11px] text-tijum-plum-muted dark:text-muted-foreground">
-                                    Pending tasks in queue:{' '}
+                                    Pending tasks:{' '}
                                     {systemHealth.queue.pending_jobs_count}
                                 </p>
                             </div>
 
-                            {/* Webhooks Processing */}
                             <div className="space-y-1 rounded-xl border border-tijum-surface/80 bg-tijum-cream/35 p-3 dark:border-border dark:bg-muted/45">
                                 <div className="flex items-center justify-between text-xs">
                                     <span className="font-semibold text-tijum-plum dark:text-foreground">
@@ -1983,17 +1704,16 @@ export default function AdminDashboard({
                                 </div>
                                 <p className="text-[11px] text-tijum-plum-muted dark:text-muted-foreground">
                                     Processed:{' '}
-                                    {systemHealth.webhooks.processed_count} •
+                                    {systemHealth.webhooks.processed_count} ·
                                     Pending:{' '}
                                     {systemHealth.webhooks.pending_count}
                                 </p>
                             </div>
 
-                            {/* Scheduler Heartbeat */}
                             <div className="space-y-1 rounded-xl border border-tijum-surface/80 bg-tijum-cream/35 p-3 dark:border-border dark:bg-muted/45">
                                 <div className="flex items-center justify-between text-xs">
                                     <span className="font-semibold text-tijum-plum dark:text-foreground">
-                                        Scheduler Heartbeat
+                                        Scheduler
                                     </span>
                                     <span
                                         className={
@@ -2014,11 +1734,10 @@ export default function AdminDashboard({
                                 </p>
                             </div>
 
-                            {/* Provider Settlement Gateway */}
                             <div className="space-y-1 rounded-xl border border-tijum-surface/80 bg-tijum-cream/35 p-3 dark:border-border dark:bg-muted/45">
                                 <div className="flex items-center justify-between text-xs">
                                     <span className="font-semibold text-tijum-plum dark:text-foreground">
-                                        Razorpay Route Payouts
+                                        Razorpay Route
                                     </span>
                                     <span className="font-mono text-[11px] text-tijum-plum-muted dark:text-muted-foreground">
                                         {systemHealth.providers.gateway_mode.toUpperCase()}{' '}
@@ -2026,7 +1745,7 @@ export default function AdminDashboard({
                                     </span>
                                 </div>
                                 <p className="text-[11px] text-tijum-plum-muted dark:text-muted-foreground">
-                                    Route Transfers:{' '}
+                                    Transfers:{' '}
                                     {systemHealth.providers.route_enabled
                                         ? 'Enabled'
                                         : 'Gated (Safe)'}
@@ -2040,15 +1759,6 @@ export default function AdminDashboard({
     );
 }
 
-AdminDashboard.layout = (page: React.ReactNode) => (
-    <AdminLayout
-        breadcrumbs={[
-            {
-                title: 'Operations Dashboard',
-                href: '/admin/dashboard',
-            },
-        ]}
-    >
-        {page}
-    </AdminLayout>
-);
+AdminDashboard.layout = {
+    breadcrumbs: [{ title: 'Overview', href: '/admin/dashboard' }],
+};

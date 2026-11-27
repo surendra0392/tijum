@@ -1,51 +1,10 @@
 import { Link, usePage } from '@inertiajs/react';
-import { clearPwaUserCaches } from '@/lib/pwa';
-import type { LucideIcon } from 'lucide-react';
 import {
-    ArrowRightLeft,
-    Bell,
-    BookOpen,
-    Building2,
-    CalendarCheck,
-    ChevronRight,
-    ChevronsUpDown,
-    Coins,
-    CreditCard,
-    DoorClosed,
-    DoorOpen,
     ExternalLink,
-    FileText,
-    Flag,
-    FolderTree,
-    Gift,
-    Globe,
-    Headphones,
-    HelpCircle,
-    Image as ImageIcon,
-    LayoutDashboard,
-    Layers,
-    LifeBuoy,
     Lock,
     LogOut,
-    MailCheck,
-    MapPin,
-    Megaphone,
-    Percent,
-    Receipt,
-    RefreshCw,
-    Send,
-    Settings,
-    ShieldAlert,
     ShieldCheck,
-    SlidersHorizontal,
-    Sparkles,
-    Star,
-    Target,
-    TicketPercent,
     User,
-    UserCheck,
-    Users,
-    Wallet,
 } from 'lucide-react';
 import {
     createContext,
@@ -55,6 +14,16 @@ import {
     useState,
     type PropsWithChildren,
 } from 'react';
+import {
+    ADMIN_WORKSPACES,
+    deriveFallbackAdminBreadcrumbs,
+    getWorkspaceHref,
+    getWorkspaceLabel,
+    isWorkspaceActive,
+    resolveActiveAdminWorkspace,
+    type AdminWorkspaceDefinition,
+} from '@/components/admin/admin-navigation';
+import { AdminSectionTabs } from '@/components/admin/admin-section-tabs';
 import { AppContent } from '@/components/app-content';
 import { AppShell } from '@/components/app-shell';
 import { Breadcrumbs } from '@/components/breadcrumbs';
@@ -64,11 +33,6 @@ import { StatusBadge } from '@/components/shared/status-badge';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -80,22 +44,18 @@ import {
 import {
     Sidebar,
     SidebarContent,
+    SidebarFooter,
     SidebarGroup,
+    SidebarGroupLabel,
     SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarTrigger,
-    useSidebar,
 } from '@/components/ui/sidebar';
 import { useInitials } from '@/hooks/use-initials';
-import { cn } from '@/lib/utils';
+import { clearPwaUserCaches } from '@/lib/pwa';
 import { dashboard, logout } from '@/routes/admin';
-import { index as amenitiesIndex } from '@/routes/admin/amenities';
-import { index as partnersIndex } from '@/routes/admin/partners';
-import { index as pricingIndex } from '@/routes/admin/pricing';
-import { index as propertiesIndex } from '@/routes/admin/properties';
-import { index as reservationsIndex } from '@/routes/admin/reservations';
 import { setup as twoFactorSetup } from '@/routes/admin/two-factor';
 import type { AdminRole, BreadcrumbItem } from '@/types';
 
@@ -103,8 +63,13 @@ type AdminLayoutProps = PropsWithChildren<{
     breadcrumbs?: BreadcrumbItem[];
 }>;
 
+type ScopedBreadcrumbs = {
+    url: string;
+    items: BreadcrumbItem[];
+};
+
 type BreadcrumbContextValue = {
-    setBreadcrumbs: (items: BreadcrumbItem[]) => void;
+    setNestedBreadcrumbs: (scoped: ScopedBreadcrumbs | null) => void;
 };
 
 const AdminLayoutContext = createContext<boolean>(false);
@@ -112,853 +77,168 @@ const AdminBreadcrumbContext = createContext<BreadcrumbContextValue | null>(
     null,
 );
 
-type PlannedAdminSection = {
-    label: string;
-    roles: AdminRole[];
-    items: { title: string; icon: LucideIcon }[];
-};
-
-type AdminNavItem = {
-    label: string;
-    href: string;
-    icon: LucideIcon;
-    active: boolean;
-};
-
-type AdminNavSection = {
-    key: string;
-    label: string;
-    icon: LucideIcon;
-    visible: boolean;
-    items: AdminNavItem[];
-};
-
-function AdminSidebarBody({
-    dashboardAccessible,
-    dashboardActive,
-    sections,
-    plannedSections,
-}: {
-    dashboardAccessible: boolean;
-    dashboardActive: boolean;
-    sections: AdminNavSection[];
-    plannedSections: PlannedAdminSection[];
-}) {
-    const { state, setOpen } = useSidebar();
-    const isCollapsed = state === 'collapsed';
-
-    const activeSectionKey = useMemo(
-        () =>
-            sections.find(
-                (section) =>
-                    section.visible && section.items.some((i) => i.active),
-            )?.key ?? null,
-        [sections],
-    );
-
-    const [openSection, setOpenSection] = useState<string | null>(
-        activeSectionKey,
-    );
+function NestedAdminBreadcrumbBridge({
+    breadcrumbs,
+    children,
+}: AdminLayoutProps) {
+    const parentBreadcrumbContext = useContext(AdminBreadcrumbContext);
+    const { url } = usePage();
 
     useEffect(() => {
-        if (activeSectionKey) {
-            setOpenSection(activeSectionKey);
+        if (!parentBreadcrumbContext) {
+            return;
         }
-    }, [activeSectionKey]);
 
-    const visibleSections = sections.filter(
-        (section) => section.visible && section.items.length > 0,
-    );
+        parentBreadcrumbContext.setNestedBreadcrumbs({
+            url,
+            items: breadcrumbs ?? [],
+        });
+
+        return () => {
+            parentBreadcrumbContext.setNestedBreadcrumbs(null);
+        };
+    }, [parentBreadcrumbContext, breadcrumbs, url]);
+
+    return <>{children}</>;
+}
+
+function AdminWorkspaceList({
+    label,
+    workspaces,
+    role,
+    currentUrl,
+    dashboardAccessible,
+}: {
+    label: string;
+    workspaces: AdminWorkspaceDefinition[];
+    role: AdminRole | undefined;
+    currentUrl: string;
+    dashboardAccessible: boolean;
+}) {
+    if (workspaces.length === 0) {
+        return null;
+    }
 
     return (
-        <SidebarContent className="gap-1.5 px-2 py-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {/* Pinned Command Dashboard */}
-            <SidebarGroup className="p-0">
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        {dashboardAccessible ? (
-                            <SidebarMenuButton
-                                asChild
-                                isActive={dashboardActive}
-                                tooltip={{ children: 'Dashboard' }}
-                            >
-                                <Link href={dashboard.url()}>
-                                    <LayoutDashboard aria-hidden="true" />
-                                    <span>Dashboard</span>
-                                </Link>
-                            </SidebarMenuButton>
-                        ) : (
-                            <SidebarMenuButton
-                                disabled
-                                aria-disabled="true"
-                                tooltip={{
-                                    children:
-                                        'Complete TOTP setup to unlock Dashboard',
-                                }}
-                                className="cursor-not-allowed opacity-60"
-                            >
-                                <Lock aria-hidden="true" />
-                                <span>Dashboard (TOTP Locked)</span>
-                            </SidebarMenuButton>
-                        )}
-                    </SidebarMenuItem>
-                </SidebarMenu>
-            </SidebarGroup>
+        <SidebarGroup className="px-2 py-1">
+            <SidebarGroupLabel className="text-[10px] font-semibold tracking-[0.14em] text-tijum-peach/80 uppercase">
+                {label}
+            </SidebarGroupLabel>
+            <SidebarMenu className="space-y-0.5">
+                {workspaces.map((workspace) => {
+                    const Icon = workspace.icon;
+                    const workspaceLabel = getWorkspaceLabel(workspace, role);
+                    const isOverview = workspace.key === 'overview';
 
-            {/* Accordion Domain Sections (Single-open keeps height compact without scrollbar) */}
-            <div className="space-y-1">
-                {visibleSections.map((section) => {
-                    const SectionIcon = section.icon;
-                    const hasActiveChild = section.items.some((i) => i.active);
-                    const isOpen = openSection === section.key;
+                    if (isOverview && !dashboardAccessible) {
+                        return (
+                            <SidebarMenuItem key={workspace.key}>
+                                <SidebarMenuButton
+                                    disabled
+                                    aria-disabled="true"
+                                    tooltip={{
+                                        children:
+                                            'Complete TOTP setup to unlock Admin Console',
+                                    }}
+                                    className="cursor-not-allowed opacity-60"
+                                >
+                                    <Lock aria-hidden="true" />
+                                    <span>Overview (TOTP Locked)</span>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                        );
+                    }
+
+                    const href = getWorkspaceHref(workspace, role);
+                    const active = isWorkspaceActive(workspace, currentUrl);
 
                     return (
-                        <Collapsible
-                            key={section.key}
-                            open={isOpen}
-                            onOpenChange={(nextOpen) => {
-                                if (isCollapsed) {
-                                    setOpen(true);
-                                    setOpenSection(section.key);
-                                    return;
-                                }
-                                setOpenSection(nextOpen ? section.key : null);
-                            }}
-                        >
-                            <SidebarGroup className="p-0">
-                                <SidebarMenu>
-                                    <SidebarMenuItem>
-                                        <CollapsibleTrigger asChild>
-                                            <SidebarMenuButton
-                                                type="button"
-                                                tooltip={{
-                                                    children: section.label,
-                                                }}
-                                                className={cn(
-                                                    'h-8.5 w-full justify-between rounded-lg px-2.5 text-xs font-semibold tracking-wide transition-colors',
-                                                    isOpen || hasActiveChild
-                                                        ? 'bg-white/10 text-white'
-                                                        : 'text-tijum-cream/80 hover:bg-white/8 hover:text-white',
-                                                )}
-                                            >
-                                                <span className="flex min-w-0 items-center gap-2">
-                                                    <SectionIcon
-                                                        className={cn(
-                                                            'size-4 shrink-0',
-                                                            hasActiveChild
-                                                                ? 'text-tijum-coral'
-                                                                : 'text-tijum-peach/90',
-                                                        )}
-                                                        aria-hidden="true"
-                                                    />
-                                                    <span className="truncate font-heading group-data-[collapsible=icon]:hidden">
-                                                        {section.label}
-                                                    </span>
-                                                </span>
-                                                <span className="flex shrink-0 items-center gap-1.5 group-data-[collapsible=icon]:hidden">
-                                                    {hasActiveChild &&
-                                                        !isOpen && (
-                                                            <span
-                                                                className="size-1.5 rounded-full bg-tijum-coral"
-                                                                aria-hidden="true"
-                                                            />
-                                                        )}
-                                                    <ChevronRight
-                                                        className={cn(
-                                                            'size-3.5 text-tijum-peach/80 transition-transform duration-200',
-                                                            isOpen &&
-                                                                'rotate-90 text-white',
-                                                        )}
-                                                        aria-hidden="true"
-                                                    />
-                                                </span>
-                                            </SidebarMenuButton>
-                                        </CollapsibleTrigger>
-                                    </SidebarMenuItem>
-                                </SidebarMenu>
-
-                                <CollapsibleContent>
-                                    <SidebarMenu className="mt-1 ml-2.5 space-y-0.5 border-l border-white/12 pl-2 group-data-[collapsible=icon]:ml-0 group-data-[collapsible=icon]:border-l-0 group-data-[collapsible=icon]:pl-0">
-                                        {section.items.map((item) => {
-                                            const ItemIcon = item.icon;
-                                            return (
-                                                <SidebarMenuItem
-                                                    key={item.label}
-                                                >
-                                                    <SidebarMenuButton
-                                                        asChild
-                                                        size="sm"
-                                                        isActive={item.active}
-                                                        tooltip={{
-                                                            children:
-                                                                item.label,
-                                                        }}
-                                                    >
-                                                        <Link href={item.href}>
-                                                            <ItemIcon aria-hidden="true" />
-                                                            <span>
-                                                                {item.label}
-                                                            </span>
-                                                        </Link>
-                                                    </SidebarMenuButton>
-                                                </SidebarMenuItem>
-                                            );
-                                        })}
-                                    </SidebarMenu>
-                                </CollapsibleContent>
-                            </SidebarGroup>
-                        </Collapsible>
+                        <SidebarMenuItem key={workspace.key}>
+                            <SidebarMenuButton
+                                asChild
+                                isActive={active}
+                                tooltip={{ children: workspaceLabel }}
+                            >
+                                <Link href={href}>
+                                    <Icon aria-hidden="true" />
+                                    <span>{workspaceLabel}</span>
+                                </Link>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
                     );
                 })}
-            </div>
-
-            {plannedSections.length > 0 && (
-                <div className="space-y-2 pt-1 group-data-[collapsible=icon]:hidden">
-                    {plannedSections.map((section) => (
-                        <SidebarGroup key={section.label} className="p-0">
-                            <div className="px-2.5 py-1 text-[11px] font-semibold tracking-wider text-tijum-peach/85 uppercase">
-                                {section.label}
-                            </div>
-                            <SidebarMenu>
-                                {section.items.map((item) => (
-                                    <SidebarMenuItem key={item.title}>
-                                        <SidebarMenuButton
-                                            disabled
-                                            aria-disabled="true"
-                                            tooltip={{ children: item.title }}
-                                            className="cursor-default justify-between gap-2 text-tijum-cream/70 opacity-75"
-                                        >
-                                            <span className="inline-flex min-w-0 flex-1 items-center gap-2">
-                                                <item.icon
-                                                    className="size-4 shrink-0"
-                                                    aria-hidden="true"
-                                                />
-                                                <span
-                                                    className="truncate"
-                                                    title={item.title}
-                                                >
-                                                    {item.title}
-                                                </span>
-                                            </span>
-                                            <Badge
-                                                variant="outline"
-                                                className="ml-auto shrink-0 border-white/25 bg-transparent px-1.5 py-0 text-[10px] text-tijum-peach"
-                                            >
-                                                Planned
-                                            </Badge>
-                                        </SidebarMenuButton>
-                                    </SidebarMenuItem>
-                                ))}
-                            </SidebarMenu>
-                        </SidebarGroup>
-                    ))}
-                </div>
-            )}
-        </SidebarContent>
+            </SidebarMenu>
+        </SidebarGroup>
     );
 }
 
-const plannedAdminSections: PlannedAdminSection[] = [];
-
-export default function AdminLayout({
-    children,
-    breadcrumbs = [],
-}: AdminLayoutProps) {
-    const isNested = useContext(AdminLayoutContext);
-    const parentBreadcrumbContext = useContext(AdminBreadcrumbContext);
-
-    useEffect(() => {
-        if (
-            isNested &&
-            parentBreadcrumbContext &&
-            breadcrumbs &&
-            breadcrumbs.length > 0
-        ) {
-            parentBreadcrumbContext.setBreadcrumbs(breadcrumbs);
-        }
-    }, [isNested, parentBreadcrumbContext, breadcrumbs]);
-
-    if (isNested) {
-        return <>{children}</>;
-    }
-
-    const [customBreadcrumbs, setCustomBreadcrumbs] =
-        useState<BreadcrumbItem[]>(breadcrumbs);
-
-    useEffect(() => {
-        if (breadcrumbs && breadcrumbs.length > 0) {
-            setCustomBreadcrumbs(breadcrumbs);
-        }
-    }, [breadcrumbs]);
-
+function AdminLayoutShell({ children, breadcrumbs = [] }: AdminLayoutProps) {
     const page = usePage();
     const admin = page.props.auth?.admin;
     const getInitials = useInitials();
 
+    const [nestedBreadcrumbs, setNestedBreadcrumbs] =
+        useState<ScopedBreadcrumbs | null>(null);
+
     const dashboardAccessible = Boolean(admin?.two_factor_enabled);
     const adminRole: AdminRole | undefined = admin?.role;
-    const canViewPartners = Boolean(
-        dashboardAccessible &&
-        admin &&
-        (admin.permissions.includes('*') ||
-            admin.permissions.includes('partners.view')),
-    );
-    const canViewProperties = Boolean(
-        dashboardAccessible &&
-        admin &&
-        (admin.permissions.includes('*') ||
-            admin.permissions.includes('properties.view')),
-    );
-    const canViewAmenities = Boolean(
-        dashboardAccessible &&
-        admin &&
-        (admin.permissions.includes('*') ||
-            admin.permissions.includes('amenities.view')),
-    );
-    const canViewPricing = Boolean(
-        dashboardAccessible &&
-        admin &&
-        (admin.permissions.includes('*') ||
-            admin.permissions.includes('pricing.view')),
-    );
-    const canViewReservations = Boolean(
-        dashboardAccessible &&
-        admin &&
-        (admin.permissions.includes('*') ||
-            admin.permissions.includes('bookings.view') ||
-            admin.permissions.includes('bookings.manage')),
-    );
-    const canViewFinance = Boolean(
-        dashboardAccessible &&
-        admin &&
-        (admin.permissions.includes('*') ||
-            admin.permissions.includes('settlements.view') ||
-            admin.permissions.includes('partners.financial.view')),
-    );
-    const canViewReviews = Boolean(
-        dashboardAccessible &&
-        admin &&
-        (admin.permissions.includes('*') ||
-            admin.permissions.includes('reviews.view')),
-    );
-    const canViewReviewReports = Boolean(
-        dashboardAccessible &&
-        admin &&
-        (admin.permissions.includes('*') ||
-            admin.permissions.includes('review_reports.view')),
-    );
-    const canViewContent = Boolean(
-        dashboardAccessible &&
-        admin &&
-        (admin.permissions.includes('*') ||
-            admin.permissions.includes('content.view')),
-    );
-    const canViewSeo = Boolean(
-        dashboardAccessible &&
-        admin &&
-        (admin.permissions.includes('*') ||
-            admin.permissions.includes('seo.view')),
-    );
-    const canViewMarketing = Boolean(
-        dashboardAccessible &&
-        admin &&
-        (admin.permissions.includes('*') ||
-            admin.permissions.includes('marketing.view')),
-    );
-    const canViewRewards = Boolean(
-        dashboardAccessible &&
-        admin &&
-        (admin.permissions.includes('*') ||
-            admin.permissions.includes('rewards.view') ||
-            admin.permissions.includes('marketing.view') ||
-            admin.permissions.includes('operations.view')),
-    );
-    const canViewOperations = Boolean(
-        dashboardAccessible &&
-        admin &&
-        (admin.permissions.includes('*') ||
-            admin.permissions.includes('operations.manage') ||
-            admin.permissions.includes('bookings.manage') ||
-            admin.permissions.includes('bookings.view') ||
-            adminRole === 'super_admin' ||
-            adminRole === 'operations' ||
-            adminRole === 'customer_support'),
-    );
-    const canViewSupport = Boolean(
-        dashboardAccessible &&
-        admin &&
-        (admin.permissions.includes('*') ||
-            admin.permissions.includes('support.manage') ||
-            adminRole === 'super_admin' ||
-            adminRole === 'customer_support' ||
-            adminRole === 'operations'),
-    );
-    const canManageSystem = Boolean(
-        dashboardAccessible && admin && adminRole === 'super_admin',
+
+    const visibleWorkspaces = useMemo(() => {
+        if (!adminRole) {
+            return [];
+        }
+
+        if (!dashboardAccessible) {
+            return ADMIN_WORKSPACES.filter((w) => w.key === 'overview');
+        }
+
+        return ADMIN_WORKSPACES.filter((workspace) =>
+            workspace.sidebarRoles.includes(adminRole),
+        );
+    }, [adminRole, dashboardAccessible]);
+
+    const operationsWorkspaces = useMemo(
+        () => visibleWorkspaces.filter((w) => w.group === 'operations'),
+        [visibleWorkspaces],
     );
 
-    const systemNavItems = [
-        {
-            label: 'Admin Accounts',
-            href: '/admin/system/admins',
-            icon: Users,
-            active: page.url.startsWith('/admin/system/admins'),
-        },
-        {
-            label: 'Roles & Permissions',
-            href: '/admin/system/roles',
-            icon: Settings,
-            active: page.url.startsWith('/admin/system/roles'),
-        },
-        {
-            label: 'Cities',
-            href: '/admin/system/cities',
-            icon: MapPin,
-            active: page.url.startsWith('/admin/system/cities'),
-        },
-        {
-            label: 'Categories',
-            href: '/admin/system/categories',
-            icon: Layers,
-            active: page.url.startsWith('/admin/system/categories'),
-        },
-        {
-            label: 'Platform Settings',
-            href: '/admin/system/settings',
-            icon: SlidersHorizontal,
-            active: page.url.startsWith('/admin/system/settings'),
-        },
-    ];
+    const platformWorkspaces = useMemo(
+        () => visibleWorkspaces.filter((w) => w.group === 'platform'),
+        [visibleWorkspaces],
+    );
 
-    const rewardsNavItems = [
-        {
-            label: 'Rewards Overview',
-            href: '/admin/rewards',
-            icon: Sparkles,
-            active: page.url === '/admin/rewards',
-        },
-        {
-            label: 'Campaigns & Coupons',
-            href: '/admin/rewards/campaigns',
-            icon: TicketPercent,
-            active: page.url.startsWith('/admin/rewards/campaigns'),
-        },
-        {
-            label: 'Loyalty Points',
-            href: '/admin/rewards/points',
-            icon: Coins,
-            active: page.url.startsWith('/admin/rewards/points'),
-        },
-        {
-            label: 'Referrals & Fraud',
-            href: '/admin/rewards/referrals',
-            icon: Users,
-            active: page.url.startsWith('/admin/rewards/referrals'),
-        },
-    ];
+    const activeWorkspace = useMemo(
+        () =>
+            dashboardAccessible
+                ? resolveActiveAdminWorkspace(page.url, adminRole)
+                : null,
+        [dashboardAccessible, page.url, adminRole],
+    );
 
-    const contentNavItems = [
-        {
-            label: 'CMS Pages',
-            href: '/admin/content/pages',
-            icon: FileText,
-            active: page.url.startsWith('/admin/content/pages'),
-        },
-        {
-            label: 'Blog Articles',
-            href: '/admin/content/blog',
-            icon: BookOpen,
-            active: page.url.startsWith('/admin/content/blog'),
-        },
-        {
-            label: 'Categories',
-            href: '/admin/content/categories',
-            icon: FolderTree,
-            active: page.url.startsWith('/admin/content/categories'),
-        },
-        {
-            label: 'Authors',
-            href: '/admin/content/authors',
-            icon: UserCheck,
-            active: page.url.startsWith('/admin/content/authors'),
-        },
-        {
-            label: 'FAQs',
-            href: '/admin/content/faqs',
-            icon: HelpCircle,
-            active: page.url.startsWith('/admin/content/faqs'),
-        },
-        {
-            label: 'Media Library',
-            href: '/admin/content/media',
-            icon: ImageIcon,
-            active: page.url.startsWith('/admin/content/media'),
-        },
-    ];
+    const resolvedBreadcrumbs = useMemo(() => {
+        if (
+            nestedBreadcrumbs &&
+            nestedBreadcrumbs.url === page.url &&
+            nestedBreadcrumbs.items.length > 0
+        ) {
+            return nestedBreadcrumbs.items;
+        }
 
-    const seoNavItems = [
-        {
-            label: 'SEO Overview',
-            href: '/admin/seo',
-            icon: Globe,
-            active: page.url === '/admin/seo',
-        },
-        {
-            label: 'Redirect Manager',
-            href: '/admin/seo/redirects',
-            icon: ArrowRightLeft,
-            active: page.url.startsWith('/admin/seo/redirects'),
-        },
-        {
-            label: 'Sitemap Status',
-            href: '/admin/seo/sitemap',
-            icon: Layers,
-            active: page.url.startsWith('/admin/seo/sitemap'),
-        },
-    ];
+        if (breadcrumbs.length > 0) {
+            return breadcrumbs;
+        }
 
-    const marketingNavItems = [
-        {
-            label: 'Marketing Overview',
-            href: '/admin/marketing',
-            icon: Megaphone,
-            active: page.url === '/admin/marketing',
-        },
-        {
-            label: 'Campaigns',
-            href: '/admin/marketing/campaigns',
-            icon: Target,
-            active: page.url.startsWith('/admin/marketing/campaigns'),
-        },
-        {
-            label: 'Banners',
-            href: '/admin/marketing/banners',
-            icon: Sparkles,
-            active: page.url.startsWith('/admin/marketing/banners'),
-        },
-        {
-            label: 'Subscribers',
-            href: '/admin/marketing/subscribers',
-            icon: MailCheck,
-            active: page.url.startsWith('/admin/marketing/subscribers'),
-        },
-        {
-            label: 'Email Campaigns',
-            href: '/admin/marketing/emails',
-            icon: Send,
-            active: page.url.startsWith('/admin/marketing/emails'),
-        },
-    ];
+        return deriveFallbackAdminBreadcrumbs(page.url, adminRole);
+    }, [nestedBreadcrumbs, breadcrumbs, page.url, adminRole]);
 
-    const financeNavItems = [
-        {
-            label: 'Partner Settlements',
-            href: '/admin/settlements',
-            icon: Wallet,
-            active: page.url.startsWith('/admin/settlements'),
-        },
-        {
-            label: 'Commission Agreements',
-            href: '/admin/partner-commissions',
-            icon: Percent,
-            active: page.url.startsWith('/admin/partner-commissions'),
-        },
-        {
-            label: 'Partner Bank & KYC',
-            href: '/admin/partners/financial',
-            icon: Building2,
-            active: page.url.startsWith('/admin/partners/financial'),
-        },
-        {
-            label: 'Relocation Subsidies',
-            href: '/admin/relocation-subsidies',
-            icon: Receipt,
-            active: page.url.startsWith('/admin/relocation-subsidies'),
-        },
-        {
-            label: 'Reconciliation',
-            href: '/admin/financial-reconciliation',
-            icon: RefreshCw,
-            active: page.url.startsWith('/admin/financial-reconciliation'),
-        },
-    ];
-    const adminSections: AdminNavSection[] = [
-        {
-            key: 'overview',
-            label: 'Overview & Oversight',
-            icon: ShieldCheck,
-            visible: true,
-            items: [
-                {
-                    label: 'Two-Factor Security',
-                    href: twoFactorSetup.url(),
-                    icon: ShieldCheck,
-                    active: page.url.startsWith(twoFactorSetup.url()),
-                },
-                ...(canViewAmenities
-                    ? [
-                          {
-                              label: 'Amenities',
-                              href: amenitiesIndex.url(),
-                              icon: Sparkles,
-                              active: page.url.startsWith(
-                                  amenitiesIndex.url(),
-                              ),
-                          },
-                      ]
-                    : []),
-                ...(canViewPricing
-                    ? [
-                          {
-                              label: 'Pricing & Availability',
-                              href: pricingIndex.url(),
-                              icon: Percent,
-                              active: page.url.startsWith(pricingIndex.url()),
-                          },
-                      ]
-                    : []),
-                ...(canViewReservations
-                    ? [
-                          {
-                              label: 'Reservations',
-                              href: reservationsIndex.url(),
-                              icon: CalendarCheck,
-                              active: page.url.startsWith(
-                                  reservationsIndex.url(),
-                              ),
-                          },
-                          {
-                              label: 'Payments',
-                              href: '/admin/payments',
-                              icon: CreditCard,
-                              active: page.url.startsWith('/admin/payments'),
-                          },
-                      ]
-                    : []),
-                ...(canViewReviews
-                    ? [
-                          {
-                              label: 'Customer Reviews',
-                              href: '/admin/reviews',
-                              icon: Star,
-                              active: page.url.startsWith('/admin/reviews'),
-                          },
-                      ]
-                    : []),
-                ...(canViewReviewReports
-                    ? [
-                          {
-                              label: 'Review Reports',
-                              href: '/admin/review-reports',
-                              icon: Flag,
-                              active: page.url.startsWith(
-                                  '/admin/review-reports',
-                              ),
-                          },
-                      ]
-                    : []),
-                ...(canViewReservations
-                    ? [
-                          {
-                              label: 'Notifications',
-                              href: '/admin/notifications',
-                              icon: Bell,
-                              active: page.url.startsWith(
-                                  '/admin/notifications',
-                              ),
-                          },
-                      ]
-                    : []),
-            ],
-        },
-        {
-            key: 'operations',
-            label: 'Marketplace Operations',
-            icon: DoorOpen,
-            visible: canViewOperations,
-            items: [
-                {
-                    label: 'Check-ins',
-                    href: '/admin/operations/check-ins',
-                    icon: DoorOpen,
-                    active: page.url.startsWith('/admin/operations/check-ins'),
-                },
-                {
-                    label: 'Check-outs',
-                    href: '/admin/operations/check-outs',
-                    icon: DoorClosed,
-                    active: page.url.startsWith('/admin/operations/check-outs'),
-                },
-                {
-                    label: 'Stay Grievances & Claims',
-                    href: '/admin/customer-cases',
-                    icon: ShieldAlert,
-                    active: page.url.startsWith('/admin/customer-cases'),
-                },
-                {
-                    label: 'Alternative Accommodation',
-                    href: '/admin/relocations',
-                    icon: Layers,
-                    active: page.url.startsWith('/admin/relocations'),
-                },
-            ],
-        },
-        {
-            key: 'partners',
-            label: 'Partner Verification',
-            icon: UserCheck,
-            visible: canViewPartners,
-            items: [
-                {
-                    label: 'Partner Verification',
-                    href: partnersIndex.url(),
-                    icon: UserCheck,
-                    active:
-                        page.url.startsWith(partnersIndex.url()) &&
-                        !page.url.includes('status=approved') &&
-                        !page.url.includes('status=rejected') &&
-                        !page.url.startsWith('/admin/partners/financial'),
-                },
-                {
-                    label: 'Verified Partners',
-                    href: partnersIndex.url({
-                        query: { status: 'approved' },
-                    }),
-                    icon: ShieldCheck,
-                    active: page.url.includes('status=approved'),
-                },
-                {
-                    label: 'Rejected Applications',
-                    href: partnersIndex.url({
-                        query: { status: 'rejected' },
-                    }),
-                    icon: ShieldAlert,
-                    active: page.url.includes('status=rejected'),
-                },
-            ],
-        },
-        {
-            key: 'properties',
-            label: 'Property Management',
-            icon: Building2,
-            visible: canViewProperties,
-            items: [
-                {
-                    label: 'All Properties',
-                    href: propertiesIndex.url(),
-                    icon: Building2,
-                    active:
-                        page.url.startsWith(propertiesIndex.url()) &&
-                        !page.url.includes('verification_status=') &&
-                        !page.url.includes('operational_status='),
-                },
-                {
-                    label: 'Property Verification',
-                    href: propertiesIndex.url({
-                        query: { verification_status: 'submitted' },
-                    }),
-                    icon: ShieldCheck,
-                    active: page.url.includes('verification_status=submitted'),
-                },
-                {
-                    label: 'Approved Properties',
-                    href: propertiesIndex.url({
-                        query: { verification_status: 'approved' },
-                    }),
-                    icon: Building2,
-                    active: page.url.includes('verification_status=approved'),
-                },
-                {
-                    label: 'Rejected Properties',
-                    href: propertiesIndex.url({
-                        query: { verification_status: 'rejected' },
-                    }),
-                    icon: ShieldAlert,
-                    active: page.url.includes('verification_status=rejected'),
-                },
-                {
-                    label: 'Suspended Properties',
-                    href: propertiesIndex.url({
-                        query: { operational_status: 'suspended' },
-                    }),
-                    icon: Lock,
-                    active: page.url.includes('operational_status=suspended'),
-                },
-            ],
-        },
-        {
-            key: 'finance',
-            label: 'Finance & Settlements',
-            icon: Wallet,
-            visible: canViewFinance,
-            items: financeNavItems,
-        },
-        {
-            key: 'content',
-            label: 'Content Management',
-            icon: BookOpen,
-            visible: canViewContent,
-            items: contentNavItems,
-        },
-        {
-            key: 'seo',
-            label: 'SEO Management',
-            icon: Globe,
-            visible: canViewSeo,
-            items: seoNavItems,
-        },
-        {
-            key: 'marketing',
-            label: 'Marketing',
-            icon: Megaphone,
-            visible: canViewMarketing,
-            items: marketingNavItems,
-        },
-        {
-            key: 'rewards',
-            label: 'Rewards & Loyalty',
-            icon: Gift,
-            visible: canViewRewards,
-            items: rewardsNavItems,
-        },
-        {
-            key: 'system',
-            label: 'System Management',
-            icon: SlidersHorizontal,
-            visible: canManageSystem,
-            items: systemNavItems,
-        },
-        {
-            key: 'support',
-            label: 'Support Desk',
-            icon: LifeBuoy,
-            visible: canViewSupport,
-            items: [
-                {
-                    label: 'Customer Support',
-                    href: '/admin/support/customers',
-                    icon: Headphones,
-                    active: page.url.startsWith('/admin/support/customers'),
-                },
-                {
-                    label: 'Partner Support',
-                    href: '/admin/support/partners',
-                    icon: LifeBuoy,
-                    active: page.url.startsWith('/admin/support/partners'),
-                },
-            ],
-        },
-    ];
-
-    const visiblePlannedSections = plannedAdminSections.filter((section) =>
-        adminRole ? section.roles.includes(adminRole) : false,
+    const breadcrumbContextValue = useMemo<BreadcrumbContextValue>(
+        () => ({ setNestedBreadcrumbs }),
+        [],
     );
 
     return (
         <AdminLayoutContext.Provider value={true}>
-            <AdminBreadcrumbContext.Provider
-                value={{ setBreadcrumbs: setCustomBreadcrumbs }}
-            >
+            <AdminBreadcrumbContext.Provider value={breadcrumbContextValue}>
                 <AppShell
                     variant="sidebar"
                     className="tijum-admin tijum-admin-theme min-h-svh w-full overflow-x-clip"
@@ -996,14 +276,57 @@ export default function AdminLayout({
                             </SidebarMenu>
                         </SidebarHeader>
 
-                        <AdminSidebarBody
-                            dashboardAccessible={dashboardAccessible}
-                            dashboardActive={page.url.startsWith(
-                                dashboard.url(),
+                        <SidebarContent className="gap-1 py-1.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                            <AdminWorkspaceList
+                                label="Operations"
+                                workspaces={operationsWorkspaces}
+                                role={adminRole}
+                                currentUrl={page.url}
+                                dashboardAccessible={dashboardAccessible}
+                            />
+
+                            {!dashboardAccessible && (
+                                <SidebarGroup className="px-2 py-1">
+                                    <SidebarMenu>
+                                        <SidebarMenuItem>
+                                            <SidebarMenuButton
+                                                asChild
+                                                isActive={page.url.startsWith(
+                                                    twoFactorSetup.url(),
+                                                )}
+                                                tooltip={{
+                                                    children:
+                                                        'Two-Factor Security Setup',
+                                                }}
+                                            >
+                                                <Link
+                                                    href={twoFactorSetup.url()}
+                                                >
+                                                    <ShieldCheck aria-hidden="true" />
+                                                    <span>
+                                                        Two-Factor Security
+                                                    </span>
+                                                </Link>
+                                            </SidebarMenuButton>
+                                        </SidebarMenuItem>
+                                    </SidebarMenu>
+                                </SidebarGroup>
                             )}
-                            sections={adminSections}
-                            plannedSections={visiblePlannedSections}
-                        />
+
+                            <AdminWorkspaceList
+                                label="Growth & Platform"
+                                workspaces={platformWorkspaces}
+                                role={adminRole}
+                                currentUrl={page.url}
+                                dashboardAccessible={dashboardAccessible}
+                            />
+                        </SidebarContent>
+
+                        <SidebarFooter className="gap-1 border-t border-white/10 py-3">
+                            <p className="px-2 font-heading text-[10px] font-semibold tracking-[0.14em] text-tijum-peach/75 uppercase group-data-[collapsible=icon]:hidden">
+                                Stay easy · Eat well · Spend less
+                            </p>
+                        </SidebarFooter>
                     </Sidebar>
 
                     <AppContent
@@ -1014,11 +337,7 @@ export default function AdminLayout({
                             <div className="flex min-w-0 items-center gap-2.5">
                                 <SidebarTrigger className="-ml-1 text-tijum-plum dark:text-foreground" />
                                 <Breadcrumbs
-                                    breadcrumbs={
-                                        customBreadcrumbs.length > 0
-                                            ? customBreadcrumbs
-                                            : undefined
-                                    }
+                                    breadcrumbs={resolvedBreadcrumbs}
                                 />
                             </div>
 
@@ -1031,7 +350,10 @@ export default function AdminLayout({
                                     title="Explore Live Marketplace"
                                     aria-label="Explore Live Marketplace"
                                 >
-                                    <ExternalLink className="size-4" aria-hidden="true" />
+                                    <ExternalLink
+                                        className="size-4"
+                                        aria-hidden="true"
+                                    />
                                 </a>
                                 <ThemeToggle />
                                 <NotificationBell role="admin" />
@@ -1144,7 +466,9 @@ export default function AdminLayout({
                                                     href={logout.url()}
                                                     method="post"
                                                     as="button"
-                                                    onClick={() => clearPwaUserCaches()}
+                                                    onClick={() =>
+                                                        clearPwaUserCaches()
+                                                    }
                                                     className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl p-2 text-xs font-medium text-status-error-fg transition-colors hover:bg-status-error-bg/70"
                                                     data-test="admin-logout-button"
                                                 >
@@ -1163,6 +487,14 @@ export default function AdminLayout({
 
                         <div className="flex flex-1 flex-col justify-between">
                             <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+                                {activeWorkspace &&
+                                    activeWorkspace.visibleTabs.length > 1 && (
+                                        <AdminSectionTabs
+                                            items={activeWorkspace.visibleTabs}
+                                            ariaLabel={`${getWorkspaceLabel(activeWorkspace.workspace, adminRole)} navigation`}
+                                            className="mb-6"
+                                        />
+                                    )}
                                 {children}
                             </main>
 
@@ -1175,5 +507,26 @@ export default function AdminLayout({
                 </AppShell>
             </AdminBreadcrumbContext.Provider>
         </AdminLayoutContext.Provider>
+    );
+}
+
+export default function AdminLayout({
+    children,
+    breadcrumbs = [],
+}: AdminLayoutProps) {
+    const isNested = useContext(AdminLayoutContext);
+
+    if (isNested) {
+        return (
+            <NestedAdminBreadcrumbBridge breadcrumbs={breadcrumbs}>
+                {children}
+            </NestedAdminBreadcrumbBridge>
+        );
+    }
+
+    return (
+        <AdminLayoutShell breadcrumbs={breadcrumbs}>
+            {children}
+        </AdminLayoutShell>
     );
 }

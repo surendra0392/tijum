@@ -60,7 +60,7 @@ class DashboardController extends Controller
                 ? sprintf('Partner verification status: %s (properties stay locked until partner approval)', $application->status->label())
                 : 'Partner verification application not yet submitted',
             OwnerStatus::Active => $propertiesCount === 0
-                ? 'Partner approved — ready to register your first hostel, PG, or homestay property'
+                ? 'Partner approved — ready to register your first hostel/PG, homestay, or co-living property'
                 : sprintf('%d property registered (%d independently verified by TIJUM)', $propertiesCount, $verifiedPropertiesCount),
             OwnerStatus::Rejected => 'Partner account rejected',
             OwnerStatus::Suspended => 'Partner operations suspended',
@@ -188,7 +188,7 @@ class DashboardController extends Controller
             if ($propertiesCount === 0) {
                 return [
                     'title' => 'Register your first accommodation property',
-                    'description' => 'Your partner account is approved. Add an Independent Hostel, PG Accommodation, or Homestay, configure AC/Non-AC room types, list physical rooms, upload photos, and submit for property verification.',
+                    'description' => 'Your partner account is approved. Add an Independent Hostel/PG, Homestay, or Co-Living property, configure AC/Non-AC room types, list physical rooms, upload photos, and submit for property verification.',
                     'actionLabel' => 'Add First Property',
                     'actionHref' => route('owner.properties.create'),
                 ];

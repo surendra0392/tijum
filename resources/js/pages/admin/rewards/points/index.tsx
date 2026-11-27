@@ -666,12 +666,7 @@ export default function AdminPointsIndex({ config, ledger = [] }: Props) {
                                     </TableHeader>
                                     <TableBody>
                                         {pagedLedger.map((item) => {
-                                            const isCredit =
-                                                item.transaction_type.startsWith(
-                                                    'earned',
-                                                ) ||
-                                                item.transaction_type ===
-                                                    'manual_credit';
+                                            const isCredit = item.points > 0;
                                             return (
                                                 <TableRow key={item.id}>
                                                     <TableCell className="pl-6 text-xs whitespace-nowrap text-tijum-plum-muted tabular-nums dark:text-muted-foreground">
@@ -680,10 +675,11 @@ export default function AdminPointsIndex({ config, ledger = [] }: Props) {
                                                         ).toLocaleString()}
                                                     </TableCell>
                                                     <TableCell className="font-heading text-xs font-semibold text-tijum-plum capitalize dark:text-foreground">
-                                                        {item.transaction_type.replace(
-                                                            '_',
-                                                            ' ',
-                                                        )}
+                                                        {item.type_label ??
+                                                            item.transaction_type.replaceAll(
+                                                                '_',
+                                                                ' ',
+                                                            )}
                                                     </TableCell>
                                                     <TableCell className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
                                                         {item.description}

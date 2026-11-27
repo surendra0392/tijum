@@ -712,10 +712,9 @@ export default function OwnerReservationShow({
 
                                     <InputError
                                         message={
-                                            allocationForm.errors.allocations ??
-                                            allocationForm.errors[
-                                                'allocations.0.allocated_quantity'
-                                            ]
+                                            Object.values(
+                                                allocationForm.errors,
+                                            ).find(Boolean) ?? undefined
                                         }
                                     />
 

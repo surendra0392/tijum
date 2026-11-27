@@ -1,4 +1,4 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     AlertCircle,
     ArrowLeft,
@@ -71,7 +71,7 @@ interface AdminCaseDetailProps {
         sender_type: 'customer' | 'owner' | 'admin' | 'system';
         sender_name: string;
         message: string;
-        attachment_path?: string | null;
+        attachment_url?: string | null;
         attachment_name?: string | null;
         is_internal_note: boolean;
         created_at: string;
@@ -158,18 +158,7 @@ export default function AdminCaseShow({
         attachment: null,
     });
 
-    // Form for updating case status, priority, assignment
-    const statusForm = useForm<{
-        status?: string;
-        priority?: string;
-        assigned_admin_id?: string;
-    }>({
-        status: ticket.status,
-        priority: ticket.priority,
-        assigned_admin_id: ticket.assigned_admin_id
-            ? String(ticket.assigned_admin_id)
-            : 'unassigned',
-    });
+    const [statusError, setStatusError] = useState<string | null>(null);
 
     // Form for formal resolution
     const resolveForm = useForm<{
@@ -201,11 +190,28 @@ export default function AdminCaseShow({
         key: 'status' | 'priority' | 'assigned_admin_id',
         val: string,
     ) => {
-        statusForm.setData(key, val);
-        statusForm.patch(
+        setStatusError(null);
+        const payload =
+            key === 'assigned_admin_id'
+                ? {
+                      assigned_admin_id:
+                          val === 'unassigned' ? null : Number(val),
+                  }
+                : { [key]: val };
+
+        router.patch(
             `/admin/customer-cases/${ticket.case_reference}/status`,
+            payload,
             {
                 preserveScroll: true,
+                onError: (errors) => {
+                    const first = Object.values(errors)[0];
+                    setStatusError(
+                        typeof first === 'string'
+                            ? first
+                            : 'Unable to update case status.',
+                    );
+                },
             },
         );
     };
@@ -461,6 +467,14 @@ export default function AdminCaseShow({
                                 >
                                     Lifecycle Status
                                 </Label>
+                                {statusError && (
+                                    <p
+                                        role="alert"
+                                        className="text-xs font-medium text-status-error-fg"
+                                    >
+                                        {statusError}
+                                    </p>
+                                )}
                                 <Select
                                     value={ticket.status}
                                     onValueChange={(val) =>
@@ -951,7 +965,7 @@ export default function AdminCaseShow({
                                                 {msg.message}
                                             </p>
 
-                                            {msg.attachment_path && (
+                                            {msg.attachment_url && (
                                                 <div
                                                     className={cn(
                                                         'mt-2 border-t pt-2',
@@ -964,7 +978,7 @@ export default function AdminCaseShow({
                                                 >
                                                     <a
                                                         href={
-                                                            msg.attachment_path
+                                                            msg.attachment_url
                                                         }
                                                         target="_blank"
                                                         rel="noopener noreferrer"

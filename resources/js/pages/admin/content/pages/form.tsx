@@ -15,7 +15,7 @@ import {
     Save,
     Trash2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import InputError from '@/components/input-error';
 import { ConfirmationDialog } from '@/components/shared/confirmation-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -111,6 +111,29 @@ export default function AdminContentPageForm({ page, statuses }: Props) {
     const [restoringRevision, setRestoringRevision] =
         useState<ContentPageRevision | null>(null);
     const [isRestoring, setIsRestoring] = useState(false);
+
+    useEffect(() => {
+        if (!page) {
+            return;
+        }
+        setData({
+            title: page.title || '',
+            internal_name: page.internal_name || '',
+            slug: page.slug || '',
+            summary: page.summary || '',
+            content_blocks: (page.content_blocks || []) as ContentBlock[],
+            featured_image: page.featured_image || '',
+            status: page.status || 'draft',
+            scheduled_for: formatDateTimeLocal(page.scheduled_for),
+            seo_title: page.seo_title || '',
+            seo_description: page.seo_description || '',
+            canonical_override: page.canonical_override || '',
+            robots_directive: page.robots_directive || 'index, follow',
+            og_image: page.og_image || '',
+            change_notes: '',
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [page?.id, page?.updated_at]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();

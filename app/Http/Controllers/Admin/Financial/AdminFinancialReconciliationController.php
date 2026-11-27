@@ -23,17 +23,21 @@ class AdminFinancialReconciliationController extends Controller
         $exceptions = $reconciliationService->getUnreconciledExceptions();
         $ledgerAudit = $reconciliationService->getLedgerAuditSummary();
 
-        $allSettlements = PartnerSettlement::all();
-        $totalSettled = (int) $allSettlements->where('status', SettlementStatus::Settled)->sum('net_settlement_amount_minor');
-        $totalCommission = (int) $allSettlements->sum('commission_amount_minor');
-        $totalTaxDeductions = (int) $allSettlements->sum('statutory_deductions_minor');
+        $agg = PartnerSettlement::query()
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN status = ? THEN net_settlement_amount_minor ELSE 0 END), 0) as total_settled_minor, '.
+                'COALESCE(SUM(commission_amount_minor), 0) as total_commission_minor, '.
+                'COALESCE(SUM(statutory_deductions_minor), 0) as total_tax_deductions_minor',
+                [SettlementStatus::Settled->value]
+            )
+            ->first();
 
         return Inertia::render('admin/reconciliation/index', [
             'exceptions' => $exceptions,
             'summary' => [
-                'total_settled_minor' => $totalSettled,
-                'total_commission_minor' => $totalCommission,
-                'total_tax_deductions_minor' => $totalTaxDeductions,
+                'total_settled_minor' => (int) ($agg->total_settled_minor ?? 0),
+                'total_commission_minor' => (int) ($agg->total_commission_minor ?? 0),
+                'total_tax_deductions_minor' => (int) ($agg->total_tax_deductions_minor ?? 0),
                 'unreconciled_count' => $exceptions->count(),
             ],
             'ledger_audit' => $ledgerAudit,
@@ -90,8 +94,8 @@ class AdminFinancialReconciliationController extends Controller
                 ->chunk(100, function ($settlements) use ($handle): void {
                     foreach ($settlements as $s) {
                         fputcsv($handle, [
-                            $s->settlement_reference,
-                            $s->owner->name,
+                            $this->sanitizeCsvCell($s->settlement_reference),
+                            $this->sanitizeCsvCell($s->owner->name),
                             $s->period_start->toDateString(),
                             $s->period_end->toDateString(),
                             number_format($s->gross_booking_value_minor / 100, 2, '.', ''),
@@ -101,7 +105,7 @@ class AdminFinancialReconciliationController extends Controller
                             number_format($s->refund_adjustments_minor / 100, 2, '.', ''),
                             number_format($s->net_settlement_amount_minor / 100, 2, '.', ''),
                             $s->status->label(),
-                            $s->provider_transfer_id ?? 'N/A',
+                            $this->sanitizeCsvCell($s->provider_transfer_id ?? 'N/A'),
                             $s->settled_at?->toIso8601String() ?? 'N/A',
                         ]);
                     }
@@ -112,5 +116,14 @@ class AdminFinancialReconciliationController extends Controller
             'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
+    }
+
+    private function sanitizeCsvCell(?string $value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        return in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true) ? "'".$value : $value;
     }
 }

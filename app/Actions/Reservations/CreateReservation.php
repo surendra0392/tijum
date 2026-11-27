@@ -218,7 +218,7 @@ class CreateReservation
                                 'checkout_date' => $saved->checkout_date->format('d M Y'),
                                 'payment_deadline' => ($saved->payment_deadline_at?->setTimezone($tz)->format('H:i').' IST'),
                                 'amount' => '₹'.number_format($saved->total_amount_minor / 100, 2),
-                                'action_url' => url("/reservations/{$saved->id}"),
+                                'action_url' => route('reservations.show', $saved),
                             ],
                             related: $saved,
                             relatedReference: $saved->booking_reference

@@ -92,21 +92,31 @@ class SitemapService
             ];
         }
 
-        // 3. City landing pages
+        // 3. City landing pages (canonical /stays-in-{slug})
         $activeCities = City::query()->where('is_active', true)->get();
         foreach ($activeCities as $city) {
             $urls[] = [
-                'loc' => url("/hostels-in-{$city->slug}"),
+                'loc' => route('public.cities.stays', ['citySlug' => $city->slug]),
                 'lastmod' => $city->updated_at?->toIso8601String() ?: $now,
                 'changefreq' => 'daily',
                 'priority' => '0.9',
             ];
         }
 
-        // 3. Published CMS Pages (excluding slugs that duplicate static pages)
+        // 4. Published CMS Pages (excluding noindex pages and slugs that duplicate core static routes)
+        $reservedStaticSlugs = [
+            'about', 'contact', 'terms', 'privacy', 'faqs', 'how-it-works',
+            'become-a-partner', 'grievance-redressal', 'review-policy',
+        ];
         $cmsPages = ContentPage::query()->published()->get();
         foreach ($cmsPages as $page) {
-            // Check if page has custom canonical or public page route
+            if (in_array(strtolower((string) $page->slug), $reservedStaticSlugs, true)) {
+                continue;
+            }
+            if (str_contains(strtolower($page->robots_directive), 'noindex')) {
+                continue;
+            }
+
             $pageUrl = url("/p/{$page->slug}");
             $urls[] = [
                 'loc' => $pageUrl,
@@ -116,7 +126,7 @@ class SitemapService
             ];
         }
 
-        // 4. Published Blog Articles
+        // 5. Published Blog Articles
         $articles = BlogArticle::query()->published()->latest('published_at')->get();
         foreach ($articles as $article) {
             $urls[] = [
@@ -127,7 +137,7 @@ class SitemapService
             ];
         }
 
-        // 5. Active Blog Categories with published articles
+        // 6. Active Blog Categories with published articles
         $categories = BlogCategory::query()->active()->whereHas('articles', static function ($q): void {
             $q->published();
         })->get();
@@ -140,20 +150,37 @@ class SitemapService
             ];
         }
 
-        // 6. Eligible Public Property Details
+        // 7. Eligible Public Property Details (canonical /stays/{citySlug}/{slug})
         $properties = Property::query()
+            ->with('city')
             ->where('status', PropertyOperationalStatus::Active->value)
             ->where('is_verified', true)
             ->where('booking_eligible', true)
             ->whereNotNull('approved_at')
+            ->where('food_provided', true)
+            ->where(static function ($q): void {
+                $q->where('breakfast_included', true)
+                    ->orWhere('lunch_included', true)
+                    ->orWhere('dinner_included', true);
+            })
+            ->whereHas('city', static function ($q): void {
+                $q->where('is_active', true);
+            })
+            ->whereHas('category', static function ($q): void {
+                $q->where('is_active', true);
+            })
             ->whereHas('owner', static function ($q): void {
                 $q->where('status', OwnerStatus::Active->value);
             })
             ->get();
 
         foreach ($properties as $prop) {
+            $loc = $prop->city !== null
+                ? route('public.properties.seo', ['citySlug' => $prop->city->slug, 'property' => $prop->slug])
+                : route('public.properties.show', ['property' => $prop->slug]);
+
             $urls[] = [
-                'loc' => route('public.properties.show', ['property' => $prop->slug]),
+                'loc' => $loc,
                 'lastmod' => $prop->updated_at?->toIso8601String() ?: $now,
                 'changefreq' => 'daily',
                 'priority' => '0.8',

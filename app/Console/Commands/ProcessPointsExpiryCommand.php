@@ -8,6 +8,7 @@ use App\Enums\PointsTransactionStatus;
 use App\Enums\PointsTransactionType;
 use App\Models\CustomerPointsLedger;
 use App\Models\CustomerPointsWallet;
+use App\Models\RewardsSetting;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,7 @@ class ProcessPointsExpiryCommand extends Command
     public function handle(): int
     {
         $now = CarbonImmutable::now();
+        $ratePaise = max(1, (int) RewardsSetting::get('points_redemption_rate_paise', 100));
 
         $expiredEntries = CustomerPointsLedger::query()
             ->where('status', PointsTransactionStatus::Available)
@@ -40,37 +42,42 @@ class ProcessPointsExpiryCommand extends Command
         $totalExpired = 0;
 
         foreach ($byUser as $userId => $entries) {
-            DB::transaction(function () use ($userId, $entries, &$totalExpired): void {
+            DB::transaction(function () use ($userId, $entries, $ratePaise, &$totalExpired): void {
                 /** @var CustomerPointsWallet|null $wallet */
                 $wallet = CustomerPointsWallet::query()
                     ->lockForUpdate()
                     ->where('user_id', $userId)
                     ->first();
 
-                if ($wallet === null) {
+                if ($wallet === null || $wallet->available_points <= 0) {
                     return;
                 }
 
+                // Never expire points that are currently backing active reserved checkout holds.
+                $remainingCap = $wallet->available_points;
                 $userExpiredPoints = 0;
                 $consumedIds = [];
 
                 foreach ($entries as $entry) {
+                    if ($remainingCap <= 0) {
+                        break;
+                    }
+
                     /** @var CustomerPointsLedger|null $lockedEntry */
                     $lockedEntry = CustomerPointsLedger::query()->lockForUpdate()->find($entry->id);
                     if ($lockedEntry !== null && $lockedEntry->points_remaining > 0) {
-                        $pts = $lockedEntry->points_remaining;
+                        $pts = min($lockedEntry->points_remaining, $remainingCap);
                         $userExpiredPoints += $pts;
+                        $remainingCap -= $pts;
                         $consumedIds[] = ['entry_id' => $lockedEntry->id, 'points_expired' => $pts];
-                        $lockedEntry->update(['points_remaining' => 0]);
+                        $lockedEntry->decrement('points_remaining', $pts);
                     }
                 }
 
                 if ($userExpiredPoints > 0) {
-                    $deduct = min($userExpiredPoints, $wallet->available_points);
-                    $wallet->decrement('available_points', $deduct);
+                    $wallet->decrement('available_points', $userExpiredPoints);
                     $wallet->increment('expired_points', $userExpiredPoints);
-
-                    $ratePaise = 100;
+                    $wallet->refresh();
 
                     CustomerPointsLedger::create([
                         'user_id' => $userId,

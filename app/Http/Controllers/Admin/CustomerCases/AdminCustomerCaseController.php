@@ -13,12 +13,15 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Protection\AddCaseMessageRequest;
 use App\Models\Admin;
 use App\Models\CustomerProtectionCase;
+use App\Models\CustomerProtectionCaseMessage;
 use App\Services\ReservationData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminCustomerCaseController extends Controller
 {
@@ -121,7 +124,12 @@ class AdminCustomerCaseController extends Controller
             'sender_type' => $msg->sender_type,
             'sender_name' => $msg->sender_name,
             'message' => $msg->message,
-            'attachment_path' => $msg->attachment_path,
+            'attachment_url' => is_string($msg->attachment_path) && $msg->attachment_path !== ''
+                ? route('admin.customer-cases.messages.attachment', [
+                    'case' => $case->case_reference,
+                    'message' => $msg->id,
+                ])
+                : null,
             'attachment_name' => $msg->attachment_name,
             'is_internal_note' => (bool) $msg->is_internal_note,
             'created_at' => $msg->created_at->toISOString(),
@@ -228,5 +236,26 @@ class AdminCustomerCaseController extends Controller
         ]));
 
         return back()->with('status', 'Case marked as resolved.');
+    }
+
+    public function downloadAttachment(
+        Request $request,
+        CustomerProtectionCase $case,
+        CustomerProtectionCaseMessage $message,
+    ): StreamedResponse {
+        $admin = $request->user('admin');
+        abort_unless($admin instanceof Admin, 401);
+        abort_if($message->customer_protection_case_id !== $case->id, 404);
+        abort_if(! is_string($message->attachment_path) || $message->attachment_path === '', 404);
+
+        $diskName = (string) config('tijum.customer_protection.attachments.disk', 'local');
+        $disk = Storage::disk($diskName);
+        abort_unless($disk->exists($message->attachment_path), 404);
+
+        return $disk->download(
+            $message->attachment_path,
+            $message->attachment_name ?: basename($message->attachment_path),
+            ['X-Content-Type-Options' => 'nosniff'],
+        );
     }
 }

@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\ReservationData;
 use App\Services\Rewards\LoyaltyPointsService;
 use App\Services\Rewards\ReferralService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -58,7 +59,7 @@ class DashboardController extends Controller
         $activeStayModel = (clone $reservationQuery)
             ->where('status', ReservationStatus::Confirmed->value)
             ->whereNull('checked_out_at')
-            ->whereDate('checkout_date', '>=', now()->toDateString())
+            ->whereDate('checkout_date', '>=', CarbonImmutable::now('Asia/Kolkata')->toDateString())
             ->with(['property', 'roomType', 'successfulPayment', 'review'])
             ->orderBy('check_in_date')
             ->first();
@@ -67,6 +68,7 @@ class DashboardController extends Controller
 
         $wallet = $pointsService->getOrCreateWallet($user);
         $referralProfile = $referralService->getOrCreateProfile($user);
+        $redemptionRatePaise = max(1, (int) RewardsSetting::get('points_redemption_rate_paise', 100));
 
         return Inertia::render('dashboard', [
             'customer' => $user->toCustomerAccountArray(),
@@ -102,7 +104,7 @@ class DashboardController extends Controller
             ],
             'wallet' => [
                 'available_points' => $wallet->available_points,
-                'estimated_inr_value' => $wallet->available_points * 1.0,
+                'estimated_inr_value' => round(($wallet->available_points * $redemptionRatePaise) / 100, 2),
             ],
             'recentReservations' => $recentReservations,
             'status' => $request->session()->get('status'),

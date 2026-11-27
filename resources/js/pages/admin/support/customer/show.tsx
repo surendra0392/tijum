@@ -71,6 +71,8 @@ interface AdminCustomerTicketDetailProps {
         customer_email?: string | null;
         customer_phone?: string | null;
         booking_reference?: string | null;
+        reservation_status?: string | null;
+        reservation_status_label?: string | null;
         property_name?: string | null;
         city_name?: string | null;
         assigned_admin_id?: number | null;
@@ -735,12 +737,14 @@ export default function AdminCustomerSupportShow({
                                     >
                                         {ticket.booking_reference}
                                     </Link>
-                                    <Badge
-                                        variant="outline"
-                                        className="text-[10px]"
-                                    >
-                                        Confirmed
-                                    </Badge>
+                                    {ticket.reservation_status_label && (
+                                        <Badge
+                                            variant="outline"
+                                            className="text-[10px]"
+                                        >
+                                            {ticket.reservation_status_label}
+                                        </Badge>
+                                    )}
                                 </div>
                                 {ticket.property_name && (
                                     <p className="font-heading font-semibold text-tijum-plum dark:text-foreground">

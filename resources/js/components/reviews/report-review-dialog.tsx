@@ -119,7 +119,7 @@ export function ReportReviewDialog({
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="my-4 flex items-start gap-2 rounded-lg border border-tijum-peach/30 bg-tijum-peach/15 p-3 text-xs text-tijum-plum">
+                    <div className="my-4 flex items-start gap-2 rounded-lg border border-tijum-peach/40 bg-tijum-peach/15 p-3 text-xs text-tijum-plum dark:border-tijum-coral/35 dark:bg-tijum-coral/10 dark:text-foreground">
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-tijum-coral" />
                         <div>
                             <strong className="font-semibold">

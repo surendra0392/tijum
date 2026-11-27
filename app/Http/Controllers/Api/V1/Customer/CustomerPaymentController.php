@@ -14,6 +14,10 @@ use App\Models\Reservation;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
+use RuntimeException;
 use Throwable;
 
 class CustomerPaymentController extends ApiController
@@ -49,8 +53,17 @@ class CustomerPaymentController extends ApiController
             $orderPayload = $action->execute($reservation, $user, $idempotencyKey);
 
             return $this->success($orderPayload, 'Payment order initiated successfully.');
-        } catch (Throwable $e) {
+        } catch (ValidationException $e) {
+            return $this->error($e->getMessage(), 'PAYMENT_INITIATION_FAILED', 422, $e->errors());
+        } catch (InvalidArgumentException|RuntimeException $e) {
             return $this->error($e->getMessage(), 'PAYMENT_INITIATION_FAILED', 422);
+        } catch (Throwable $e) {
+            Log::error('API payment initiation failed unexpectedly: '.$e->getMessage(), [
+                'exception' => $e,
+                'booking_reference' => $reference,
+            ]);
+
+            return $this->error('Unable to initiate payment right now. Please try again.', 'PAYMENT_INITIATION_ERROR', 500);
         }
     }
 
@@ -90,8 +103,17 @@ class CustomerPaymentController extends ApiController
                     ? 'Payment received. Your reservation requires manual review.'
                     : 'Payment verified successfully. Reservation is confirmed.'
             );
-        } catch (Throwable $e) {
+        } catch (ValidationException $e) {
+            return $this->error($e->getMessage(), 'PAYMENT_VERIFICATION_FAILED', 422, $e->errors());
+        } catch (InvalidArgumentException|RuntimeException $e) {
             return $this->error($e->getMessage(), 'PAYMENT_VERIFICATION_FAILED', 422);
+        } catch (Throwable $e) {
+            Log::error('API payment verification failed unexpectedly: '.$e->getMessage(), [
+                'exception' => $e,
+                'booking_reference' => $reference,
+            ]);
+
+            return $this->error('Unable to verify payment right now. Please check your booking status shortly.', 'PAYMENT_VERIFICATION_ERROR', 500);
         }
     }
 

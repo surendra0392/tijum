@@ -46,11 +46,16 @@ class SettlementCalculationService
             ->whereIn('property_id', $propertyIds)
             ->where('status', ReservationStatus::Confirmed)
             ->where('requires_refund_review', false)
-            ->whereHas('payments', function (Builder $query): void {
-                $query->whereIn('status', [
-                    PaymentStatus::Captured,
-                    PaymentStatus::PartiallyRefunded,
-                ]);
+            ->where(function (Builder $query): void {
+                $query->whereHas('payments', function (Builder $payQuery): void {
+                    $payQuery->whereIn('status', [
+                        PaymentStatus::Captured,
+                        PaymentStatus::PartiallyRefunded,
+                    ]);
+                })->orWhere(function (Builder $zeroPayQuery): void {
+                    $zeroPayQuery->where('total_amount_minor', 0)
+                        ->whereRaw('COALESCE(original_amount_minor, 0) > COALESCE(coupon_property_share_minor, 0)');
+                });
             })
             // Exclude already settled items
             ->whereDoesntHave('settlementItems', function (Builder $query): void {
@@ -82,12 +87,12 @@ class SettlementCalculationService
 
         // Filter by StayTimingPolicy standard checkout time (08:00 AM IST) + hold hours
         return $reservations->filter(function (Reservation $reservation) use ($now, $holdHours): bool {
-            // Exclude reservations that have been fully refunded
+            // Exclude paid reservations that have been fully refunded (zero-payable platform-funded stays have total_amount_minor = 0)
             $processedRefunds = (int) $reservation->refunds
                 ->where('status', RefundStatus::Processed)
                 ->sum('amount_minor');
 
-            if ($processedRefunds >= $reservation->total_amount_minor) {
+            if ($reservation->total_amount_minor > 0 && $processedRefunds >= $reservation->total_amount_minor) {
                 return false;
             }
 
@@ -179,8 +184,8 @@ class SettlementCalculationService
                 ->where('status', RefundStatus::Processed)
                 ->sum('amount_minor');
 
-            // Tax evaluation for this line
-            $resTax = $this->taxService->evaluateTaxes($owner, $profile, $bookingGross, $date);
+            // Tax evaluation for this line (exclude this already-confirmed reservation to avoid double-counting FY turnover)
+            $resTax = $this->taxService->evaluateTaxes($owner, $profile, $bookingGross, $date, excludeReservationId: $reservation->id);
             $tdsAmount = $resTax['tds_amount_minor'];
 
             // Preserve signed net payable so refund/commission deficits are never silently hidden

@@ -302,7 +302,7 @@ export default function AdminPartnersIndex({
 
                 <section
                     aria-label="Partner verification queue metrics"
-                    className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+                    className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
                 >
                     <StatCard label="Total" value={stats.total} icon={Inbox} />
                     <StatCard

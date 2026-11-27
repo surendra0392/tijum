@@ -74,7 +74,7 @@ class SendScheduledNotificationRemindersCommand extends Command
                     'booking_reference' => $res->booking_reference,
                     'property_name' => $res->property->name,
                     'payment_deadline' => $res->payment_deadline_at?->setTimezone($now->getTimezone())->format('H:i').' IST',
-                    'action_url' => url("/reservations/{$res->id}"),
+                    'action_url' => route('reservations.show', $res),
                 ],
                 related: $res,
                 relatedReference: $res->booking_reference,
@@ -123,7 +123,7 @@ class SendScheduledNotificationRemindersCommand extends Command
                     'check_in_date' => $res->check_in_date->format('d M Y'),
                     'check_in_time' => $checkInTime,
                     'contact_information' => $contactInfo,
-                    'action_url' => url("/reservations/{$res->id}"),
+                    'action_url' => route('reservations.show', $res),
                 ],
                 related: $res,
                 relatedReference: $res->booking_reference,
@@ -141,7 +141,7 @@ class SendScheduledNotificationRemindersCommand extends Command
                         'check_in_date' => $res->check_in_date->format('d M Y'),
                         'guest_count' => (string) $res->guest_count,
                         'room_type' => $res->snapshot_room_type_name ?: $res->roomType->name,
-                        'action_url' => url("/owner/reservations/{$res->id}"),
+                        'action_url' => route('owner.reservations.show', $res),
                     ],
                     related: $res,
                     relatedReference: $res->booking_reference,
@@ -174,7 +174,7 @@ class SendScheduledNotificationRemindersCommand extends Command
                 continue;
             }
 
-            $reviewUrl = url("/reservations/{$res->id}/reviews/create");
+            $reviewUrl = route('reservations.review.create', $res);
 
             $dispatcher->dispatch(
                 eventType: 'review.invitation',

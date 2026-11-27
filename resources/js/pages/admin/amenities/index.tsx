@@ -1187,6 +1187,7 @@ export default function AdminAmenitiesIndex({
                                             <div className="grid gap-2 sm:grid-cols-2">
                                                 <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-tijum-surface/80 bg-card px-3 py-2 text-xs font-medium text-tijum-plum dark:border-border dark:text-foreground">
                                                     <Checkbox
+                                                        aria-label="Customer visible"
                                                         checked={
                                                             amenityForm.data
                                                                 .is_customer_visible
@@ -1204,6 +1205,7 @@ export default function AdminAmenitiesIndex({
                                                 </label>
                                                 <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-tijum-surface/80 bg-card px-3 py-2 text-xs font-medium text-tijum-plum dark:border-border dark:text-foreground">
                                                     <Checkbox
+                                                        aria-label="Requires review"
                                                         checked={
                                                             amenityForm.data
                                                                 .requires_review
@@ -1219,6 +1221,7 @@ export default function AdminAmenitiesIndex({
                                                 </label>
                                                 <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-tijum-surface/80 bg-card px-3 py-2 text-xs font-medium text-tijum-plum dark:border-border dark:text-foreground">
                                                     <Checkbox
+                                                        aria-label="Active"
                                                         checked={
                                                             amenityForm.data
                                                                 .is_active

@@ -118,7 +118,7 @@ export default function CustomerNotificationsIndex({
                                 <span
                                     className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                                         filter === 'unread'
-                                            ? 'bg-white text-tijum-plum dark:text-tijum-coral'
+                                            ? 'bg-white text-tijum-plum dark:bg-tijum-plum dark:text-tijum-cream'
                                             : 'bg-tijum-coral text-white'
                                     }`}
                                 >
@@ -231,13 +231,18 @@ export default function CustomerNotificationsIndex({
                                                                         href={
                                                                             actionUrl
                                                                         }
-                                                                        onClick={() => {
+                                                                        onClick={(
+                                                                            event,
+                                                                        ) => {
                                                                             if (
                                                                                 isUnread
-                                                                            )
+                                                                            ) {
+                                                                                event.preventDefault();
                                                                                 markAsRead(
                                                                                     notification.id,
+                                                                                    actionUrl,
                                                                                 );
+                                                                            }
                                                                         }}
                                                                         className="inline-flex items-center gap-1 font-semibold text-tijum-plum underline decoration-tijum-coral/60 underline-offset-4 hover:text-tijum-coral dark:text-tijum-peach"
                                                                     >

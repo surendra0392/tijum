@@ -24,6 +24,11 @@ export default function ReservationReceipt({
     };
 
     const payment = reservation.payment_summary;
+    const isZeroPayablePromotional =
+        reservation.total_amount_minor === 0 && !payment;
+    const hasDiscounts =
+        (reservation.coupon_discount_minor ?? 0) > 0 ||
+        (reservation.points_discount_minor ?? 0) > 0;
 
     return (
         <div className="py-8 text-tijum-plum dark:text-foreground print:bg-white print:py-0 print:text-neutral-950">
@@ -81,7 +86,9 @@ export default function ReservationReceipt({
                         <div className="text-right">
                             <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-heading text-xs font-semibold text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/50 dark:text-emerald-300 print:border-emerald-200 print:bg-emerald-50 print:text-emerald-800">
                                 <CheckCircle2 className="size-3.5" />
-                                Payment Captured
+                                {isZeroPayablePromotional
+                                    ? 'Confirmed · Covered by Rewards'
+                                    : 'Payment Captured'}
                             </span>
                             <h1 className="mt-2 font-mono text-xl font-bold tracking-tight text-tijum-plum dark:text-foreground print:text-neutral-950">
                                 {reservation.booking_reference}
@@ -210,46 +217,114 @@ export default function ReservationReceipt({
                                     Payment Gateway
                                 </span>
                                 <span className="font-medium text-tijum-plum capitalize dark:text-foreground">
-                                    {payment?.gateway || 'Razorpay'}
+                                    {isZeroPayablePromotional
+                                        ? 'TIJUM Promotions / Loyalty Points'
+                                        : payment?.gateway || 'Razorpay'}
                                 </span>
                             </div>
-                            <div className="flex justify-between">
-                                <span className="text-tijum-plum-muted dark:text-muted-foreground">
-                                    Gateway Order ID
-                                </span>
-                                <span className="font-mono text-tijum-plum dark:text-foreground">
-                                    {payment?.gateway_order_id || '—'}
-                                </span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-tijum-plum-muted dark:text-muted-foreground">
-                                    Payment Transaction ID
-                                </span>
-                                <span className="font-mono font-medium text-tijum-plum dark:text-foreground">
-                                    {payment?.gateway_payment_id || '—'}
-                                </span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-tijum-plum-muted dark:text-muted-foreground">
-                                    Payment Method
-                                </span>
-                                <span className="text-tijum-plum capitalize dark:text-foreground">
-                                    {payment?.payment_method || 'Online'}
-                                </span>
-                            </div>
-                            {payment?.captured_at && (
+                            {!isZeroPayablePromotional && (
+                                <>
+                                    <div className="flex justify-between">
+                                        <span className="text-tijum-plum-muted dark:text-muted-foreground">
+                                            Gateway Order ID
+                                        </span>
+                                        <span className="font-mono text-tijum-plum dark:text-foreground">
+                                            {payment?.gateway_order_id || '—'}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-tijum-plum-muted dark:text-muted-foreground">
+                                            Payment Transaction ID
+                                        </span>
+                                        <span className="font-mono font-medium text-tijum-plum dark:text-foreground">
+                                            {payment?.gateway_payment_id || '—'}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-tijum-plum-muted dark:text-muted-foreground">
+                                            Payment Method
+                                        </span>
+                                        <span className="text-tijum-plum capitalize dark:text-foreground">
+                                            {payment?.payment_method ||
+                                                'Online'}
+                                        </span>
+                                    </div>
+                                </>
+                            )}
+                            {(payment?.captured_at ||
+                                (isZeroPayablePromotional &&
+                                    reservation.confirmed_at)) && (
                                 <div className="flex justify-between">
                                     <span className="text-tijum-plum-muted dark:text-muted-foreground">
-                                        Payment Captured At
+                                        {isZeroPayablePromotional
+                                            ? 'Confirmed At'
+                                            : 'Payment Captured At'}
                                     </span>
                                     <span className="text-tijum-plum dark:text-foreground">
                                         {new Date(
-                                            payment.captured_at,
+                                            (payment?.captured_at ??
+                                                reservation.confirmed_at)!,
                                         ).toLocaleString('en-IN')}
                                     </span>
                                 </div>
                             )}
                         </div>
+
+                        {hasDiscounts && (
+                            <div className="mt-4 space-y-1.5 border-t border-tijum-surface/70 pt-3 text-xs dark:border-border">
+                                {reservation.original_amount_minor != null && (
+                                    <div className="flex justify-between">
+                                        <span className="text-tijum-plum-muted dark:text-muted-foreground">
+                                            Accommodation Subtotal
+                                        </span>
+                                        <span className="font-medium tabular-nums text-tijum-plum dark:text-foreground">
+                                            {formatPrice(
+                                                reservation.original_amount_minor,
+                                                reservation.currency_code,
+                                            )}
+                                        </span>
+                                    </div>
+                                )}
+                                {(reservation.coupon_discount_minor ?? 0) >
+                                    0 && (
+                                    <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+                                        <span>
+                                            Coupon Discount
+                                            {reservation.coupon_code
+                                                ? ` (${reservation.coupon_code})`
+                                                : ''}
+                                        </span>
+                                        <span className="font-semibold tabular-nums">
+                                            -
+                                            {formatPrice(
+                                                reservation.coupon_discount_minor ??
+                                                    0,
+                                                reservation.currency_code,
+                                            )}
+                                        </span>
+                                    </div>
+                                )}
+                                {(reservation.points_discount_minor ?? 0) >
+                                    0 && (
+                                    <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+                                        <span>
+                                            Loyalty Points Redeemed
+                                            {reservation.points_redeemed
+                                                ? ` (${reservation.points_redeemed.toLocaleString()} pts)`
+                                                : ''}
+                                        </span>
+                                        <span className="font-semibold tabular-nums">
+                                            -
+                                            {formatPrice(
+                                                reservation.points_discount_minor ??
+                                                    0,
+                                                reservation.currency_code,
+                                            )}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <div className="mt-6 flex items-center justify-between rounded-xl border border-tijum-surface/80 bg-tijum-cream/70 p-4 dark:border-border dark:bg-muted/45 print:border-neutral-200 print:bg-neutral-100">
                             <div>

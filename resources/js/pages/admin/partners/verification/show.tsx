@@ -309,7 +309,7 @@ export default function AdminPartnerVerificationShow({
                         <AlertDescription>
                             Owner account {application.owner.name} is now
                             Active. Individual properties will still require
-                            separate property verification in Phase 06.
+                            separate property verification before going live.
                         </AlertDescription>
                     </Alert>
                 )}

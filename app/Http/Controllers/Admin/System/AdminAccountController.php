@@ -87,11 +87,16 @@ class AdminAccountController extends Controller
     {
         $this->resolveAdmin($request);
 
+        $passwordRules = ['required', 'string', Password::defaults()];
+        if ($request->has('password_confirmation')) {
+            $passwordRules[] = 'confirmed';
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:admins,email'],
             'role' => ['required', Rule::enum(AdminRole::class)],
-            'password' => ['required', 'string', Password::defaults()],
+            'password' => $passwordRules,
         ]);
 
         Admin::create([
@@ -109,12 +114,17 @@ class AdminAccountController extends Controller
     {
         $currentAdmin = $this->resolveAdmin($request);
 
+        $passwordRules = ['nullable', 'string', Password::defaults()];
+        if ($request->filled('password') && $request->has('password_confirmation')) {
+            $passwordRules[] = 'confirmed';
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('admins', 'email')->ignore($admin->id)],
             'role' => ['required', Rule::enum(AdminRole::class)],
             'is_active' => ['required', 'boolean'],
-            'password' => ['nullable', 'string', Password::defaults()],
+            'password' => $passwordRules,
         ]);
 
         // Safety: Cannot deactivate own account or demote self from SuperAdmin

@@ -146,7 +146,9 @@ class OwnerCaseController extends ApiController
                 'sender_type' => $m->sender_type,
                 'sender_name' => $m->sender_name,
                 'message' => $m->message,
-                'attachment_url' => $m->attachment_path ? url('storage/'.$m->attachment_path) : null,
+                'attachment_url' => $m->attachment_path
+                    ? route('owner.complaints.messages.attachment', ['case' => $case->case_reference, 'message' => $m->id])
+                    : null,
                 'created_at' => $m->created_at->toIso8601String(),
             ])->values()->all();
 
@@ -202,7 +204,7 @@ class OwnerCaseController extends ApiController
 
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:3000'],
-            'attachment' => ['nullable', 'file', 'max:10240'],
+            'attachment' => ['nullable', 'file', 'max:5120', 'mimes:jpeg,jpg,png,webp,pdf'],
         ]);
 
         try {

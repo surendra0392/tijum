@@ -1,10 +1,8 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
     CalendarClock,
     CheckCircle2,
     Clock,
-    DoorClosed,
-    DoorOpen,
     IndianRupee,
     RotateCcw,
     Search,
@@ -29,8 +27,6 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatReservationMoney } from '@/lib/reservation-format';
-import { index as checkInsIndex } from '@/routes/admin/operations/check-ins';
-import { index as checkOutsIndex } from '@/routes/admin/operations/check-outs';
 import { index, show } from '@/routes/admin/reservations';
 import type {
     ReservationListPayload,
@@ -142,28 +138,6 @@ export default function AdminReservationIndex({
                         <Badge variant="outline" className="tabular-nums">
                             {reservations.meta.total} matching
                         </Badge>
-                    </>
-                }
-                actions={
-                    <>
-                        <Button asChild variant="outline" size="sm">
-                            <Link href={checkInsIndex().url}>
-                                <DoorOpen
-                                    className="size-4"
-                                    aria-hidden="true"
-                                />
-                                <span>Check-ins Desk</span>
-                            </Link>
-                        </Button>
-                        <Button asChild variant="outline" size="sm">
-                            <Link href={checkOutsIndex().url}>
-                                <DoorClosed
-                                    className="size-4"
-                                    aria-hidden="true"
-                                />
-                                <span>Check-outs Desk</span>
-                            </Link>
-                        </Button>
                     </>
                 }
             />

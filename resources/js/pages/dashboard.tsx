@@ -6,7 +6,6 @@ import {
     Check,
     CheckCircle2,
     Coins,
-    Compass,
     Copy,
     FileText,
     Gift,
@@ -128,6 +127,9 @@ export default function Dashboard({
 
     const emailVerified = accountOverview.emailVerified;
     const phoneAdded = accountOverview.phoneAdded;
+    const phoneVerified = accountOverview.phoneVerified;
+    const referrerReward = referral?.referrer_reward ?? 250;
+    const referredReward = referral?.referred_reward ?? 250;
     const twoFactorLabel = !securitySummary.twoFactorSupported
         ? 'Unavailable'
         : securitySummary.twoFactorEnabled
@@ -145,14 +147,14 @@ export default function Dashboard({
 
     const handleCopyCode = () => {
         if (!referralCode) return;
-        navigator.clipboard.writeText(referralCode);
+        void navigator.clipboard.writeText(referralCode).catch(() => {});
         setCopiedCode(true);
         setTimeout(() => setCopiedCode(false), 2000);
     };
 
     const handleCopyLink = () => {
         if (!shareUrl) return;
-        navigator.clipboard.writeText(shareUrl);
+        void navigator.clipboard.writeText(shareUrl).catch(() => {});
         setCopiedLink(true);
         setTimeout(() => setCopiedLink(false), 2000);
     };
@@ -308,7 +310,7 @@ export default function Dashboard({
                                     unlock all protected features.
                                 </p>
                                 <div className="flex flex-wrap items-center gap-3">
-                                    <Form {...send()}>
+                                    <Form {...send.form()}>
                                         {({ processing }) => (
                                             <Button
                                                 type="submit"
@@ -498,14 +500,18 @@ export default function Dashboard({
                                             </span>
                                             <StatusBadge
                                                 status={
-                                                    phoneAdded
-                                                        ? 'pending'
-                                                        : 'neutral'
+                                                    phoneVerified
+                                                        ? 'verified'
+                                                        : phoneAdded
+                                                          ? 'pending'
+                                                          : 'neutral'
                                                 }
                                                 label={
-                                                    phoneAdded
-                                                        ? 'Not verified'
-                                                        : 'Optional'
+                                                    phoneVerified
+                                                        ? 'Verified'
+                                                        : phoneAdded
+                                                          ? 'Not verified'
+                                                          : 'Optional'
                                                 }
                                             />
                                         </dd>
@@ -595,12 +601,18 @@ export default function Dashboard({
                                         </span>
                                         <StatusBadge
                                             status={
-                                                phoneAdded ? 'info' : 'warning'
+                                                phoneVerified
+                                                    ? 'verified'
+                                                    : phoneAdded
+                                                      ? 'info'
+                                                      : 'warning'
                                             }
                                             label={
-                                                phoneAdded
-                                                    ? 'Added · Not verified'
-                                                    : 'Required · Not added'
+                                                phoneVerified
+                                                    ? 'Verified'
+                                                    : phoneAdded
+                                                      ? 'Added · Not verified'
+                                                      : 'Required · Not added'
                                             }
                                         />
                                     </li>
@@ -738,16 +750,18 @@ export default function Dashboard({
                                     </span>
                                 </div>
                                 <h2 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                                    Invite friends to TIJUM &amp; earn ₹500 stay
-                                    credits
+                                    Invite friends to TIJUM &amp; earn{' '}
+                                    {referrerReward.toLocaleString()} stay
+                                    points
                                 </h2>
                                 <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
-                                    Give friends 250 welcome points on signup.
-                                    When they complete their first verified stay
-                                    at any verified hostel, PG, or homestay, you
-                                    earn{' '}
+                                    Give friends{' '}
+                                    {referredReward.toLocaleString()} welcome
+                                    points on signup. When they complete their
+                                    first verified stay at any Hostels/PG,
+                                    Homestays, or Co-Living space, you earn{' '}
                                     <strong className="font-semibold text-tijum-plum dark:text-tijum-peach">
-                                        500 points (₹500 value)
+                                        {referrerReward.toLocaleString()} points
                                     </strong>{' '}
                                     towards your next booking.
                                 </p>

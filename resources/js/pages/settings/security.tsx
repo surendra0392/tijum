@@ -146,7 +146,7 @@ export default function Security(props: Props) {
                             }}
                             className="max-w-xl space-y-5"
                         >
-                            {({ errors, processing }) => (
+                            {({ errors, processing, recentlySuccessful }) => (
                                 <>
                                     <FormField
                                         id="current_password"
@@ -207,7 +207,7 @@ export default function Security(props: Props) {
                                         )}
                                     </FormField>
 
-                                    <div className="pt-1">
+                                    <div className="flex items-center gap-3 pt-1">
                                         <Button
                                             type="submit"
                                             loading={processing}
@@ -215,6 +215,14 @@ export default function Security(props: Props) {
                                         >
                                             Update Password
                                         </Button>
+                                        {recentlySuccessful && (
+                                            <p
+                                                role="status"
+                                                className="text-sm font-medium text-emerald-700 dark:text-emerald-400"
+                                            >
+                                                Password updated.
+                                            </p>
+                                        )}
                                     </div>
                                 </>
                             )}

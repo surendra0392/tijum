@@ -4,7 +4,6 @@ import {
     Coins,
     Plus,
     ShieldAlert,
-    SlidersHorizontal,
     TicketPercent,
     Users,
     Wallet,
@@ -99,26 +98,15 @@ export default function AdminRewardsDashboard({
                         </>
                     }
                     actions={
-                        <>
-                            <Button asChild size="sm" variant="outline">
-                                <Link href="/admin/rewards/points">
-                                    <SlidersHorizontal
-                                        className="size-3.5"
-                                        aria-hidden="true"
-                                    />
-                                    <span>Points Config</span>
-                                </Link>
-                            </Button>
-                            <Button asChild size="sm" variant="default">
-                                <Link href="/admin/rewards/campaigns/create">
-                                    <Plus
-                                        className="size-3.5"
-                                        aria-hidden="true"
-                                    />
-                                    <span>Create Campaign</span>
-                                </Link>
-                            </Button>
-                        </>
+                        <Button asChild size="sm" variant="default">
+                            <Link href="/admin/rewards/campaigns/create">
+                                <Plus
+                                    className="size-3.5"
+                                    aria-hidden="true"
+                                />
+                                <span>Create Campaign</span>
+                            </Link>
+                        </Button>
                     }
                 />
 
@@ -358,7 +346,13 @@ export default function AdminRewardsDashboard({
                                                     {c.offer_type ===
                                                     'percentage'
                                                         ? `${c.discount_percentage}% off`
-                                                        : `₹${((c.discount_amount_minor ?? 0) / 100).toLocaleString()} off`}
+                                                        : c.offer_type ===
+                                                            'fixed_amount'
+                                                          ? `₹${((c.discount_amount_minor ?? 0) / 100).toLocaleString()} off`
+                                                          : c.offer_type.replaceAll(
+                                                                '_',
+                                                                ' ',
+                                                            )}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge
@@ -478,10 +472,11 @@ export default function AdminRewardsDashboard({
                                                         ).toLocaleString()}
                                                     </TableCell>
                                                     <TableCell className="font-heading text-xs font-semibold text-tijum-plum capitalize dark:text-foreground">
-                                                        {a.transaction_type.replace(
-                                                            '_',
-                                                            ' ',
-                                                        )}
+                                                        {a.type_label ??
+                                                            a.transaction_type.replaceAll(
+                                                                '_',
+                                                                ' ',
+                                                            )}
                                                     </TableCell>
                                                     <TableCell className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
                                                         {a.description}

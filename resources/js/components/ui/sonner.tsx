@@ -1,12 +1,14 @@
 import { Toaster as Sonner, type ToasterProps } from 'sonner';
+import { useAppearance } from '@/hooks/use-appearance';
 import { useFlashToast } from '@/hooks/use-flash-toast';
 
 function Toaster({ ...props }: ToasterProps) {
     useFlashToast();
+    const { resolvedAppearance } = useAppearance();
 
     return (
         <Sonner
-            theme="light"
+            theme={resolvedAppearance === 'dark' ? 'dark' : 'light'}
             className="toaster group"
             position="bottom-right"
             style={

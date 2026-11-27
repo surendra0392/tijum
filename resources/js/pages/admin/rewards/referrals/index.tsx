@@ -110,7 +110,9 @@ export default function AdminReferralsIndex({
     ) => {
         router.post(
             `/admin/rewards/referrals/${caseId}/${action}`,
-            {},
+            action === 'disqualify'
+                ? { reason: 'Disqualified via admin anti-fraud review.' }
+                : {},
             { preserveScroll: true },
         );
     };

@@ -63,16 +63,27 @@ class CouponValidationService
         }
 
         // Campaign availability check
-        if (! $coupon->campaign->isAvailable()) {
+        if ($coupon->campaign !== null && ! $coupon->campaign->isAvailable()) {
             return $this->invalid('This promotional campaign is no longer available.');
         }
 
-        // Global usage limit check
-        if ($coupon->total_usage_limit !== null && $coupon->total_used_count >= $coupon->total_usage_limit) {
-            return $this->invalid('This coupon has reached its maximum redemption limit.');
+        // Global usage limit check (committed redemptions + active unexpired holds)
+        if ($coupon->total_usage_limit !== null) {
+            $activeGlobalHolds = CouponHold::query()
+                ->where('coupon_code_id', $coupon->id)
+                ->where('status', 'active')
+                ->where('expires_at', '>', $now)
+                ->when($reservation !== null, fn ($q) => $q->where(function ($sub) use ($reservation): void {
+                    $sub->whereNull('reservation_id')->orWhere('reservation_id', '!=', $reservation->id);
+                }))
+                ->count();
+
+            if (($coupon->total_used_count + $activeGlobalHolds) >= $coupon->total_usage_limit) {
+                return $this->invalid('This coupon has reached its maximum redemption limit.');
+            }
         }
 
-        // Per-user usage limit check (completed redemptions + active holds)
+        // Per-user usage limit check (completed redemptions + active unexpired holds)
         $userRedemptionsCount = CouponRedemption::query()
             ->where('coupon_code_id', $coupon->id)
             ->where('user_id', $user->id)
@@ -84,7 +95,9 @@ class CouponValidationService
             ->where('user_id', $user->id)
             ->where('status', 'active')
             ->where('expires_at', '>', $now)
-            ->when($reservation !== null, fn ($q) => $q->where('reservation_id', '!=', $reservation->id))
+            ->when($reservation !== null, fn ($q) => $q->where(function ($sub) use ($reservation): void {
+                $sub->whereNull('reservation_id')->orWhere('reservation_id', '!=', $reservation->id);
+            }))
             ->count();
 
         if (($userRedemptionsCount + $activeHoldsCount) >= $coupon->per_user_limit) {

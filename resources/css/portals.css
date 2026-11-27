@@ -164,11 +164,17 @@
 }
 
 /* Card and surface elevation in Dark Mode */
-.dark .tijum-customer .bg-white,
-.dark .tijum-owner .bg-white,
-.dark .tijum-admin .bg-white,
-.dark .tijum-admin-theme .bg-white {
+.dark .tijum-customer .bg-white:not(.tijum-preview-light),
+.dark .tijum-owner .bg-white:not(.tijum-preview-light),
+.dark .tijum-admin .bg-white:not(.tijum-preview-light),
+.dark .tijum-admin-theme .bg-white:not(.tijum-preview-light) {
     background-color: var(--card);
+}
+
+.dark .tijum-admin-theme .tijum-preview-light,
+.dark .tijum-admin .tijum-preview-light {
+    background-color: #ffffff;
+    color: #442f41;
 }
 
 .dark .tijum-customer .bg-white\/95,

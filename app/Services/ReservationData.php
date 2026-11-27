@@ -140,6 +140,11 @@ class ReservationData
             'unit_rate_minor' => $reservation->unit_rate_minor,
             'rate_unit' => $reservation->rate_unit->value,
             'rate_unit_label' => $reservation->rate_unit->label(),
+            'original_amount_minor' => $reservation->original_amount_minor,
+            'coupon_code' => $reservation->coupon_code,
+            'coupon_discount_minor' => (int) ($reservation->coupon_discount_minor ?? 0),
+            'points_redeemed' => (int) ($reservation->points_redeemed ?? 0),
+            'points_discount_minor' => (int) ($reservation->points_discount_minor ?? 0),
             'duration_type' => $reservation->duration_type,
             'duration_quantity' => $reservation->duration_quantity,
             'total_stay_days' => $reservation->total_stay_days,
@@ -368,7 +373,7 @@ class ReservationData
             $base['can_pay'] = $reservation->status === ReservationStatus::AwaitingPayment
                 && ($reservation->payment_deadline_at === null || $reservation->payment_deadline_at->isFuture());
             $base['can_view_receipt'] = $reservation->status === ReservationStatus::Confirmed
-                && $reservation->successfulPayment !== null;
+                && ($reservation->successfulPayment !== null || $reservation->total_amount_minor === 0);
 
             return $base;
         }

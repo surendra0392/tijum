@@ -23,12 +23,14 @@ class AdminNotificationProviderController extends Controller
 
         $whatsappToken = (string) config('tijum.notifications.channels.whatsapp.access_token', '');
         $whatsappPhoneId = (string) config('tijum.notifications.channels.whatsapp.phone_number_id', '');
-        $whatsappWabaId = (string) config('tijum.notifications.channels.whatsapp.business_account_id', '');
-        $whatsappWebhookSecret = (string) config('tijum.notifications.channels.whatsapp.webhook_app_secret', '');
+        $whatsappWabaId = (string) config('tijum.notifications.channels.whatsapp.waba_id', '');
+        $whatsappWebhookSecret = (string) config('tijum.notifications.channels.whatsapp.app_secret', '');
+        $whatsappIsSimulation = (string) config('tijum.notifications.channels.whatsapp.mode', 'test') !== 'live';
 
         $smsAuthKey = (string) config('tijum.notifications.channels.sms.auth_key', '');
         $smsSenderId = (string) config('tijum.notifications.channels.sms.sender_id', 'TIJUMS');
-        $smsEntityId = (string) config('tijum.notifications.channels.sms.dlt_entity_id', '');
+        $smsEntityId = (string) config('tijum.notifications.channels.sms.dlt_pe_id', '');
+        $smsIsSimulation = (string) config('tijum.notifications.channels.sms.mode', 'test') !== 'live';
 
         $smtpHealth = $smtpVerifier->getHealthStatus();
         $lastTestEmail = $smtpVerifier->getLastTestDetails();
@@ -82,11 +84,11 @@ class AdminNotificationProviderController extends Controller
                 'is_enabled' => (bool) config('tijum.notifications.channels.sms.enabled', false),
                 'driver' => config('tijum.notifications.channels.sms.provider', 'msg91'),
                 'sender_id' => $smsSenderId,
-                'is_simulation' => (bool) config('tijum.notifications.channels.sms.simulation', true),
+                'is_simulation' => $smsIsSimulation,
                 'has_credentials' => $smsAuthKey !== '',
                 'has_dlt_entity' => $smsEntityId !== '',
                 'status' => (bool) config('tijum.notifications.channels.sms.enabled', false)
-                    ? ((bool) config('tijum.notifications.channels.sms.simulation', true) ? 'simulation' : 'operational')
+                    ? ($smsIsSimulation ? 'simulation' : 'operational')
                     : 'disabled_by_config',
                 'description' => 'TRAI / Telecom DLT compliant service SMS with mandatory Entity ID and registered 6-character header.',
                 'features' => [
@@ -103,11 +105,11 @@ class AdminNotificationProviderController extends Controller
                 'driver' => 'meta_graph_api',
                 'phone_number_id' => $whatsappPhoneId !== '' ? substr($whatsappPhoneId, 0, 4).'***'.substr($whatsappPhoneId, -4) : 'Not configured',
                 'business_account_id' => $whatsappWabaId !== '' ? substr($whatsappWabaId, 0, 4).'***'.substr($whatsappWabaId, -4) : 'Not configured',
-                'is_simulation' => (bool) config('tijum.notifications.channels.whatsapp.simulation', true),
+                'is_simulation' => $whatsappIsSimulation,
                 'has_access_token' => $whatsappToken !== '',
                 'has_webhook_secret' => $whatsappWebhookSecret !== '',
                 'status' => (bool) config('tijum.notifications.channels.whatsapp.enabled', false)
-                    ? ((bool) config('tijum.notifications.channels.whatsapp.simulation', true) ? 'simulation' : 'operational')
+                    ? ($whatsappIsSimulation ? 'simulation' : 'operational')
                     : 'disabled_by_config',
                 'description' => 'Official Meta WhatsApp Business Cloud API with pre-approved Meta Utility templates.',
                 'features' => [
@@ -126,7 +128,7 @@ class AdminNotificationProviderController extends Controller
             ->get()
             ->map(fn (NotificationWebhookEvent $w): array => [
                 'id' => $w->id,
-                'channel' => $w->provider === 'msg91' ? 'sms' : $w->provider,
+                'channel' => $w->provider === 'msg91' ? 'sms' : (in_array($w->provider, ['meta_whatsapp', 'meta_cloud_api'], true) ? 'whatsapp' : $w->provider),
                 'event_type' => $w->event_type,
                 'provider_message_id' => $w->provider_message_id ?? '—',
                 'status' => $w->error_message !== null ? 'failed' : ($w->processed ? 'processed' : 'received'),
@@ -137,7 +139,7 @@ class AdminNotificationProviderController extends Controller
 
         $webhookStats = [
             'total_24h' => NotificationWebhookEvent::query()->where('created_at', '>=', now()->subDay())->count(),
-            'whatsapp_24h' => NotificationWebhookEvent::query()->where('provider', 'whatsapp')->where('created_at', '>=', now()->subDay())->count(),
+            'whatsapp_24h' => NotificationWebhookEvent::query()->whereIn('provider', ['whatsapp', 'meta_whatsapp', 'meta_cloud_api'])->where('created_at', '>=', now()->subDay())->count(),
             'sms_24h' => NotificationWebhookEvent::query()->whereIn('provider', ['sms', 'msg91'])->where('created_at', '>=', now()->subDay())->count(),
             'failed_24h' => NotificationWebhookEvent::query()->whereNotNull('error_message')->where('created_at', '>=', now()->subDay())->count(),
         ];

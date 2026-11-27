@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Admin\System;
 
 use App\Http\Controllers\Controller;
 use App\Models\Admin;
+use App\Models\SeoSetting;
 use App\Services\Security\HtmlSanitizer;
 use App\Services\Settings\PlatformSettingsService;
 use Illuminate\Http\JsonResponse;
@@ -209,6 +210,15 @@ class AdminPlatformSettingController extends Controller
             $service->set('seo.google_site_verification', $validated['google_site_verification'] ?? '', 'seo', 'Google Search Console Verification Token', $admin->id, false, true, 'string', $ip, $ua);
             $service->set('seo.bing_site_verification', $validated['bing_site_verification'] ?? '', 'seo', 'Bing Webmaster Tools Verification Token', $admin->id, false, true, 'string', $ip, $ua);
             $service->set('seo.sitemap_enabled', (bool) $validated['sitemap_enabled'], 'seo', 'Dynamic XML Sitemap Generation Enabled', $admin->id, false, true, 'boolean', $ip, $ua);
+
+            SeoSetting::current()->update([
+                'site_name' => $validated['og_site_name'],
+                'default_meta_description' => $validated['default_meta_description'],
+                'default_robots' => $validated['robots_directive'],
+                'google_site_verification' => $validated['google_site_verification'] ?? null,
+                'bing_site_verification' => $validated['bing_site_verification'] ?? null,
+                'updated_by_admin_id' => $admin->id,
+            ]);
 
             return back()->with('status', 'SEO and search engine configurations updated successfully.');
         }

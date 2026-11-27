@@ -10,6 +10,7 @@ use App\Models\BlogArticle;
 use App\Models\ContentFaq;
 use App\Models\ContentPage;
 use App\Models\MarketingBanner;
+use App\Models\PlatformSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,8 +19,8 @@ class PublicContentController extends ApiController
     public function page(string $slug): JsonResponse
     {
         $page = ContentPage::query()
+            ->published()
             ->where('slug', $slug)
-            ->where('status', 'published')
             ->first();
 
         if ($page === null) {
@@ -40,8 +41,7 @@ class PublicContentController extends ApiController
     public function blogIndex(): JsonResponse
     {
         $articles = BlogArticle::query()
-            ->where('status', 'published')
-            ->where('published_at', '<=', now())
+            ->published()
             ->with(['author', 'category'])
             ->latest('published_at')
             ->paginate(10);
@@ -61,8 +61,8 @@ class PublicContentController extends ApiController
     public function blogShow(string $slug): JsonResponse
     {
         $article = BlogArticle::query()
+            ->published()
             ->where('slug', $slug)
-            ->where('status', 'published')
             ->with(['author', 'category'])
             ->first();
 
@@ -116,11 +116,19 @@ class PublicContentController extends ApiController
 
         $subjectLabels = [
             'booking' => 'Stay / Booking Assistance',
-            'partner' => 'List a Hostel, PG or Homestay',
+            'partner' => 'List a Hostel/PG, Homestay, or Co-Living',
             'general' => 'General Inquiry or Feedback',
         ];
 
-        $whatsappRaw = (string) config('tijum.contact.whatsapp_raw', '918142334033');
+        $supportEmail = trim((string) PlatformSetting::get('general.support_email', ''))
+            ?: (string) config('tijum.contact.email', 'support@tijum.com');
+        $whatsappDesk = trim((string) PlatformSetting::get('general.support_phone', ''))
+            ?: (string) config('tijum.contact.whatsapp', '8142334033');
+        $whatsappDigits = preg_replace('/\D+/', '', $whatsappDesk);
+        $whatsappRaw = (is_string($whatsappDigits) && $whatsappDigits !== '')
+            ? (strlen($whatsappDigits) === 10 ? '91'.$whatsappDigits : $whatsappDigits)
+            : (string) config('tijum.contact.whatsapp_raw', '918142334033');
+
         $whatsappText = urlencode(
             "Hi TIJUM Support,\n"
             ."Name: {$validated['name']}\n"
@@ -138,8 +146,8 @@ class PublicContentController extends ApiController
             'subject_label' => $subjectLabels[$validated['subject']],
             'whatsapp_url' => $whatsappUrl,
             'channels' => [
-                'support_email' => config('tijum.contact.email', 'support@tijum.com'),
-                'whatsapp_desk' => config('tijum.contact.whatsapp', '8142334033'),
+                'support_email' => $supportEmail,
+                'whatsapp_desk' => $whatsappDesk,
             ],
         ], 'Thank you for reaching out! Our team will contact you shortly.');
     }

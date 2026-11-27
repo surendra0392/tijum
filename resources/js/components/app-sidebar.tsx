@@ -1,7 +1,6 @@
 import { Link } from '@inertiajs/react';
 import {
     Bell,
-    BookOpen,
     CalendarClock,
     Coins,
     Compass,
@@ -33,7 +32,7 @@ import { useCurrentUrl } from '@/hooks/use-current-url';
 import { dashboard, home } from '@/routes';
 import { edit as appearanceEdit } from '@/routes/appearance';
 import { edit as profileEdit } from '@/routes/profile';
-import { faqs, howItWorks } from '@/routes/public';
+import { faqs } from '@/routes/public';
 import { index as reservationsIndex } from '@/routes/reservations';
 import { edit as securityEdit } from '@/routes/security';
 import type { NavItem } from '@/types';

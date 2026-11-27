@@ -152,8 +152,9 @@ export function OperatingCitySelector({
 
                     <p className="rounded-xl border border-tijum-surface/80 bg-tijum-cream/55 px-4 py-3 text-xs leading-relaxed text-tijum-plum-muted dark:border-border dark:bg-muted/45 dark:text-muted-foreground">
                         Selected operating cities reflect where your partner
-                        account plans to onboard stays. Individual properties
-                        remain subject to dedicated verification in Phase 06.
+                        account plans to onboard stays. Each individual property
+                        undergoes dedicated property verification before going
+                        live.
                     </p>
                 </CardContent>
 

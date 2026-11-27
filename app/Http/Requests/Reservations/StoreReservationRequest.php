@@ -57,11 +57,23 @@ class StoreReservationRequest extends FormRequest
 
         if (($bookingFor === 'self' || ($bookingFor === null && $noContactProvided)) && $this->user() instanceof User) {
             $user = $this->user();
+            $rawPhone = $user->phone ?: ($this->filled('contact_phone') ? (string) $this->input('contact_phone') : null);
+            $normalizedPhone = null;
+
+            if ($rawPhone !== null) {
+                $trimmed = trim($rawPhone);
+                $digits = preg_replace('/\D+/', '', $trimmed) ?? '';
+                if (strlen($digits) === 12 && str_starts_with($digits, '91')) {
+                    $digits = substr($digits, 2);
+                }
+                $normalizedPhone = $digits !== '' ? $digits : $trimmed;
+            }
+
             $this->merge([
                 'booking_for' => $bookingFor ?? 'self',
                 'contact_name' => $user->name,
                 'contact_email' => $user->email,
-                'contact_phone' => $user->phone ?: '9876543210',
+                'contact_phone' => $normalizedPhone ?? '',
             ]);
         } elseif ($bookingFor === 'other' && $this->has('contact_phone')) {
             $digits = preg_replace('/\D+/', '', (string) $this->input('contact_phone')) ?? '';

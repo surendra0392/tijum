@@ -7,7 +7,6 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Public\PropertySearchRequest;
 use App\Models\Amenity;
-use App\Models\City;
 use App\Services\PropertySearchEligibility;
 use App\Services\PropertySearchService;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -27,16 +26,32 @@ class PropertySearchController extends Controller
         $filters = $hasIntent ? $request->searchFilters() : $this->defaultFilters();
 
         if (! $hasIntent) {
-            // Merge any user-entered partial parameters (e.g. city link, category button)
+            // Merge any user-entered partial parameters (e.g. category browse, Explore filters, pagination)
             $partial = $request->all();
-            foreach (['city', 'locality', 'lat', 'lng', 'check_in', 'duration_type', 'duration_count', 'guests', 'min_rating', 'min_price', 'max_price', 'sort'] as $k) {
+            foreach (['city', 'locality', 'lat', 'lng', 'check_in', 'duration_type', 'duration_count', 'guests', 'min_rating', 'min_price', 'max_price', 'sort', 'gender_preference', 'page'] as $k) {
                 if (array_key_exists($k, $partial) && $partial[$k] !== null && $partial[$k] !== '') {
-                    $filters[$k] = $partial[$k];
+                    $filters[$k] = match ($k) {
+                        'page' => max(1, (int) $partial[$k]),
+                        'min_price', 'max_price', 'duration_count', 'guests' => (int) $partial[$k],
+                        'min_rating', 'lat', 'lng' => (float) $partial[$k],
+                        default => $partial[$k],
+                    };
                 }
             }
-            if (isset($partial['category']) && $partial['category'] !== '') {
-                $cats = is_array($partial['category']) ? $partial['category'] : explode(',', (string) $partial['category']);
-                $filters['category'] = array_values(array_map('intval', array_filter($cats, 'is_numeric')));
+            if (array_key_exists('early_check_in', $partial)) {
+                $filters['early_check_in'] = (bool) $partial['early_check_in'];
+            }
+            foreach (['category', 'sharing_capacity', 'amenities'] as $intListKey) {
+                if (isset($partial[$intListKey]) && $partial[$intListKey] !== '') {
+                    $items = is_array($partial[$intListKey]) ? $partial[$intListKey] : explode(',', (string) $partial[$intListKey]);
+                    $filters[$intListKey] = array_values(array_map('intval', array_filter($items, 'is_numeric')));
+                }
+            }
+            foreach (['ac', 'food_meals'] as $strListKey) {
+                if (isset($partial[$strListKey]) && $partial[$strListKey] !== '') {
+                    $items = is_array($partial[$strListKey]) ? $partial[$strListKey] : explode(',', (string) $partial[$strListKey]);
+                    $filters[$strListKey] = array_values(array_filter(array_map('strval', $items), static fn (string $v): bool => $v !== ''));
+                }
             }
         }
 
@@ -80,6 +95,13 @@ class PropertySearchController extends Controller
         $cityName = $meta['city']['name'] ?? null;
         $title = $cityName ? 'Search stays in '.$cityName.' | TIJUM' : 'Search Accommodation | TIJUM';
         $description = 'Find food-inclusive hostels, PG accommodation, and homestays across TIJUM launch cities with transparent pricing and facilities.';
+        $canonicalUrl = route('public.search');
+        if (! $hasIntent && count($filters['category'] ?? []) === 1) {
+            $matchedCategory = collect($categories)->firstWhere('id', (int) $filters['category'][0]);
+            if (is_array($matchedCategory) && ! empty($matchedCategory['slug'])) {
+                $canonicalUrl = route('public.search', ['category' => $matchedCategory['slug']]);
+            }
+        }
 
         return Inertia::render('public/search/index', [
             'filters' => $filters,
@@ -96,7 +118,7 @@ class PropertySearchController extends Controller
             'amenities' => $amenities,
             'timing' => $meta['timing'],
             'durations' => $meta['durations'],
-            'seo' => $this->buildSeo($title, $description),
+            'seo' => $this->buildSeo($title, $description, $canonicalUrl),
         ]);
     }
 
@@ -133,12 +155,12 @@ class PropertySearchController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function buildSeo(string $title, string $description): array
+    private function buildSeo(string $title, string $description, ?string $canonical = null): array
     {
         return [
             'title' => $title,
             'description' => $description,
-            'canonical' => route('public.search'),
+            'canonical' => $canonical ?? route('public.search'),
             'ogType' => 'website',
             'ogImage' => url('/images/public/og-tijum-cover.jpg'),
             'structuredData' => [

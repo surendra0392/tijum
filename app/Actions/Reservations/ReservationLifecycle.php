@@ -263,7 +263,7 @@ class ReservationLifecycle
                     'check_in_time' => $checkInTime,
                     'checkout_time' => $checkoutTime,
                     'amount' => $amountFormatted,
-                    'action_url' => url("/reservations/{$confirmed->id}"),
+                    'action_url' => route('reservations.show', $confirmed),
                 ],
                 related: $confirmed,
                 relatedReference: $confirmed->booking_reference
@@ -281,7 +281,7 @@ class ReservationLifecycle
                         'payment_reference' => $paymentReference,
                         'payment_method' => $paymentMethod,
                         'captured_at' => $capturedAtFormatted,
-                        'action_url' => url("/reservations/{$confirmed->id}"),
+                        'action_url' => route('reservations.show', $confirmed),
                     ],
                     related: $confirmed,
                     relatedReference: $confirmed->booking_reference,
@@ -322,7 +322,7 @@ class ReservationLifecycle
                         'checkout_date' => $checkoutDateFormatted,
                         'guest_count' => (string) $confirmed->guest_count,
                         'amount' => $amountFormatted,
-                        'action_url' => url("/owner/reservations/{$confirmed->id}"),
+                        'action_url' => route('owner.reservations.show', $confirmed),
                     ],
                     related: $confirmed,
                     relatedReference: $confirmed->booking_reference
@@ -339,7 +339,7 @@ class ReservationLifecycle
                             'amount' => $amountFormatted,
                             'payment_reference' => $paymentReference,
                             'captured_at' => $capturedAtFormatted,
-                            'action_url' => url("/owner/reservations/{$confirmed->id}"),
+                            'action_url' => route('owner.reservations.show', $confirmed),
                         ],
                         related: $confirmed,
                         relatedReference: $confirmed->booking_reference,
@@ -369,7 +369,7 @@ class ReservationLifecycle
                         'exception_type' => 'Captured Payment Requires Review',
                         'error_description' => $reason.' Manual refund review required.',
                         'created_at' => now()->setTimezone($this->timing->timezone())->format('d M Y, H:i T'),
-                        'action_url' => url("/admin/reservations/{$reservation->id}"),
+                        'action_url' => route('admin.reservations.show', $reservation),
                     ],
                     related: $reservation,
                     relatedReference: $reservation->booking_reference,
@@ -416,8 +416,11 @@ class ReservationLifecycle
                     ->where('status', 'active')
                     ->get()
                     ->each(fn (PointsReservationHold $h) => app(LoyaltyPointsService::class)->releaseHold($h));
-            } catch (\Throwable) {
-                // Handled safely
+            } catch (\Throwable $e) {
+                Log::error('Failed to release promotional holds on reservation expiry: '.$e->getMessage(), [
+                    'exception' => $e,
+                    'reservation_id' => $locked->id,
+                ]);
             }
 
             $saved = $locked->fresh() ?? $locked;
@@ -437,7 +440,7 @@ class ReservationLifecycle
                             'booking_reference' => $saved->booking_reference,
                             'property_name' => $saved->property->name,
                             'expired_at' => ($saved->expired_at ?? now())->setTimezone($this->timing->timezone())->format('d M Y, H:i T'),
-                            'action_url' => url("/reservations/{$saved->id}"),
+                            'action_url' => route('reservations.show', $saved),
                         ],
                         related: $saved,
                         relatedReference: $saved->booking_reference,
@@ -538,21 +541,25 @@ class ReservationLifecycle
                 ]);
             }
 
-            // Promotions rollback on cancellation:
+            // Promotions rollback on cancellation (handles both paid and zero-payable confirmed reservations):
             try {
-                if (! $hasCapturedPayment) {
-                    CouponHold::query()
-                        ->where('reservation_id', $locked->id)
-                        ->where('status', 'active')
-                        ->get()
-                        ->each(fn (CouponHold $h) => app(CouponRedemptionService::class)->releaseHold($h));
+                CouponHold::query()
+                    ->where('reservation_id', $locked->id)
+                    ->where('status', 'active')
+                    ->get()
+                    ->each(fn (CouponHold $h) => app(CouponRedemptionService::class)->releaseHold($h));
 
-                    PointsReservationHold::query()
-                        ->where('reservation_id', $locked->id)
-                        ->where('status', 'active')
-                        ->get()
-                        ->each(fn (PointsReservationHold $h) => app(LoyaltyPointsService::class)->releaseHold($h));
-                } else {
+                PointsReservationHold::query()
+                    ->where('reservation_id', $locked->id)
+                    ->where('status', 'active')
+                    ->get()
+                    ->each(fn (PointsReservationHold $h) => app(LoyaltyPointsService::class)->releaseHold($h));
+
+                $hadCommittedPromotions = $previousStatus === ReservationStatus::Confirmed
+                    || $hasCapturedPayment
+                    || CouponRedemption::query()->where('reservation_id', $locked->id)->where('is_reverted', false)->exists();
+
+                if ($hadCommittedPromotions) {
                     app(LoyaltyPointsService::class)->reversePendingPoints($locked, $reason ?? 'Reservation cancelled');
                     app(LoyaltyPointsService::class)->refundRedeemedPoints($locked, $reason ?? 'Reservation cancelled');
 
@@ -562,8 +569,11 @@ class ReservationLifecycle
                         app(CouponRedemptionService::class)->revertRedemption($redemption, $reason ?? 'Reservation cancelled');
                     }
                 }
-            } catch (\Throwable) {
-                // Handled safely
+            } catch (\Throwable $e) {
+                Log::error('Failed to roll back promotions on reservation cancellation: '.$e->getMessage(), [
+                    'exception' => $e,
+                    'reservation_id' => $locked->id,
+                ]);
             }
 
             $saved = $locked->fresh() ?? $locked;
@@ -591,7 +601,7 @@ class ReservationLifecycle
                             'cancellation_reason' => $cancellationReason,
                             'cancelled_at' => $cancelledAt,
                             'refund_status' => $refundStatus,
-                            'action_url' => url("/reservations/{$saved->id}"),
+                            'action_url' => route('reservations.show', $saved),
                         ],
                         related: $saved,
                         relatedReference: $saved->booking_reference,
@@ -609,7 +619,7 @@ class ReservationLifecycle
                                 'cancelled_at' => $cancelledAt,
                                 'cancellation_reason' => $cancellationReason,
                                 'inventory_release_status' => 'Room inventory released',
-                                'action_url' => url("/owner/reservations/{$saved->id}"),
+                                'action_url' => route('owner.reservations.show', $saved),
                             ],
                             related: $saved,
                             relatedReference: $saved->booking_reference,

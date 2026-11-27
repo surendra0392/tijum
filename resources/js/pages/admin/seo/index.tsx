@@ -53,7 +53,7 @@ export default function AdminSeoIndex({ settings, stats }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        form.put('/admin/seo/settings');
+        form.post('/admin/seo/settings');
     };
 
     return (
@@ -70,28 +70,6 @@ export default function AdminSeoIndex({ settings, stats }: Props) {
                     eyebrow="Technical SEO & Indexing"
                     title="Search Engine Optimization (SEO)"
                     description="Technical SEO health, organic indexing configuration, meta tag standards, and webmaster verifications."
-                    actions={
-                        <>
-                            <Button asChild variant="outline" size="sm">
-                                <Link href="/admin/seo/sitemap">
-                                    <FileText
-                                        className="size-3.5"
-                                        aria-hidden="true"
-                                    />
-                                    <span>Inspect Sitemap URLs</span>
-                                </Link>
-                            </Button>
-                            <Button asChild variant="outline" size="sm">
-                                <Link href="/admin/seo/redirects">
-                                    <ArrowRightLeft
-                                        className="size-3.5"
-                                        aria-hidden="true"
-                                    />
-                                    <span>Manage 301/302 Redirects</span>
-                                </Link>
-                            </Button>
-                        </>
-                    }
                 />
 
                 {/* Health & Metrics Cards */}

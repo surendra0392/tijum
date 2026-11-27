@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Property;
 use App\Services\PropertyPublicData;
 use App\Services\PropertySearchEligibility;
+use App\Services\Seo\SeoService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,10 +21,28 @@ class PropertyDetailController extends Controller
     public function __construct(
         private readonly PropertyPublicData $publicData,
         private readonly PropertySearchEligibility $eligibility,
+        private readonly SeoService $seoService,
     ) {}
+
+    public function showBySeo(Request $request, string $citySlug, Property $property): Response|RedirectResponse
+    {
+        return $this->renderProperty($request, $property, $citySlug);
+    }
+
+    public function show(Request $request, Property $property): Response|RedirectResponse
+    {
+        return $this->renderProperty($request, $property, null);
+    }
 
     public function __invoke(Request $request, Property $property, ?string $citySlug = null): Response|RedirectResponse
     {
+        return $this->renderProperty($request, $property, $citySlug);
+    }
+
+    private function renderProperty(Request $request, Property $property, ?string $citySlug = null): Response|RedirectResponse
+    {
+        $property->loadMissing(['city', 'ratingSummary']);
+
         if ($citySlug !== null && $property->city && $property->city->slug !== $citySlug) {
             return redirect()->route('public.properties.seo', [
                 'citySlug' => $property->city->slug,
@@ -47,13 +66,13 @@ class PropertyDetailController extends Controller
 
         return Inertia::render('public/properties/show', [
             'property' => $detail,
-            'seo' => [
-                'title' => $title,
-                'description' => $description,
-                'canonical' => $canonical,
-                'ogType' => 'website',
-                'ogImage' => $ogImage,
-                'structuredData' => [
+            'seo' => $this->seoService->buildPayload(
+                title: $title,
+                description: $description,
+                canonical: $canonical,
+                ogType: 'website',
+                ogImage: $ogImage,
+                structuredData: [
                     '@context' => 'https://schema.org',
                     '@graph' => [
                         [
@@ -65,22 +84,10 @@ class PropertyDetailController extends Controller
                                 ['@type' => 'ListItem', 'position' => 4, 'name' => $property->name, 'item' => $canonical],
                             ],
                         ],
-                        [
-                            '@type' => 'LodgingBusiness',
-                            'name' => $property->name,
-                            'description' => $description,
-                            'url' => $canonical,
-                            'image' => $ogImage,
-                            'address' => [
-                                '@type' => 'PostalAddress',
-                                'addressLocality' => $property->locality,
-                                'addressRegion' => $property->city !== null ? $property->city->state : $property->state,
-                                'addressCountry' => 'IN',
-                            ],
-                        ],
+                        $this->seoService->lodgingBusinessSchema($property, $canonical, $description, $ogImage),
                     ],
                 ],
-            ],
+            ),
         ]);
     }
 

@@ -10,8 +10,8 @@ use App\Enums\PropertyAvailabilityBlockScope;
 use App\Enums\PropertyAvailabilityBlockStatus;
 use App\Enums\PropertyAvailabilityBlockType;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Owner\Availability\CancelPropertyAvailabilityBlockRequest;
-use App\Http\Requests\Owner\Availability\CreatePropertyAvailabilityBlockRequest;
+use App\Http\Requests\Admin\Availability\CancelAdminAvailabilityRestrictionRequest;
+use App\Http\Requests\Admin\Availability\CreateAdminAvailabilityRestrictionRequest;
 use App\Models\Admin;
 use App\Models\Owner;
 use App\Models\Property;
@@ -136,7 +136,7 @@ class AdminPricingController extends Controller
     }
 
     public function storeRestriction(
-        CreatePropertyAvailabilityBlockRequest $request,
+        CreateAdminAvailabilityRestrictionRequest $request,
         Property $property,
         CreatePropertyAvailabilityBlock $createBlock,
     ): RedirectResponse {
@@ -151,7 +151,7 @@ class AdminPricingController extends Controller
     }
 
     public function cancelRestriction(
-        CancelPropertyAvailabilityBlockRequest $request,
+        CancelAdminAvailabilityRestrictionRequest $request,
         Property $property,
         PropertyAvailabilityBlock $block,
         CancelPropertyAvailabilityBlock $cancelBlock,

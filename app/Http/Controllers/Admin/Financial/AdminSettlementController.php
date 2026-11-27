@@ -35,14 +35,31 @@ class AdminSettlementController extends Controller
 
         $settlements = $query->latest('id')->paginate(20)->withQueryString();
 
-        $all = PartnerSettlement::all();
+        $agg = PartnerSettlement::query()
+            ->selectRaw(
+                'COALESCE(SUM(CASE WHEN status = ? THEN net_settlement_amount_minor ELSE 0 END), 0) as total_settled_minor, '.
+                'COALESCE(SUM(CASE WHEN status = ? THEN net_settlement_amount_minor ELSE 0 END), 0) as total_approved_minor, '.
+                'COALESCE(SUM(CASE WHEN status IN (?, ?) THEN net_settlement_amount_minor ELSE 0 END), 0) as total_draft_minor, '.
+                'COALESCE(SUM(CASE WHEN status = ? THEN net_settlement_amount_minor ELSE 0 END), 0) as total_failed_minor, '.
+                'COALESCE(SUM(commission_amount_minor), 0) as total_commission_minor, '.
+                'COALESCE(SUM(statutory_deductions_minor), 0) as total_tax_deducted_minor',
+                [
+                    SettlementStatus::Settled->value,
+                    SettlementStatus::Approved->value,
+                    SettlementStatus::Draft->value,
+                    SettlementStatus::PendingApproval->value,
+                    SettlementStatus::Failed->value,
+                ]
+            )
+            ->first();
+
         $metrics = [
-            'total_settled_minor' => (int) $all->where('status', SettlementStatus::Settled)->sum('net_settlement_amount_minor'),
-            'total_approved_minor' => (int) $all->where('status', SettlementStatus::Approved)->sum('net_settlement_amount_minor'),
-            'total_draft_minor' => (int) $all->whereIn('status', [SettlementStatus::Draft, SettlementStatus::PendingApproval])->sum('net_settlement_amount_minor'),
-            'total_failed_minor' => (int) $all->where('status', SettlementStatus::Failed)->sum('net_settlement_amount_minor'),
-            'total_commission_minor' => (int) $all->sum('commission_amount_minor'),
-            'total_tax_deducted_minor' => (int) $all->sum('statutory_deductions_minor'),
+            'total_settled_minor' => (int) ($agg->total_settled_minor ?? 0),
+            'total_approved_minor' => (int) ($agg->total_approved_minor ?? 0),
+            'total_draft_minor' => (int) ($agg->total_draft_minor ?? 0),
+            'total_failed_minor' => (int) ($agg->total_failed_minor ?? 0),
+            'total_commission_minor' => (int) ($agg->total_commission_minor ?? 0),
+            'total_tax_deducted_minor' => (int) ($agg->total_tax_deducted_minor ?? 0),
         ];
 
         return Inertia::render('admin/settlements/index', [
@@ -293,16 +310,16 @@ class AdminSettlementController extends Controller
             fputcsv($file, ['Billing Period', sprintf('%s to %s', $settlement->period_start->toDateString(), $settlement->period_end->toDateString())]);
             fputcsv($file, ['Settlement Status', $settlement->status->label()]);
             fputcsv($file, ['Settled At', $settlement->settled_at?->format('Y-m-d H:i:s') ?? 'Pending Transfer']);
-            fputcsv($file, ['Partner Name', $settlement->owner->name]);
-            fputcsv($file, ['Partner Email', $settlement->owner->email]);
-            fputcsv($file, ['Partner Legal Name', $settlement->financialProfile?->legal_business_name ?? 'N/A']);
-            fputcsv($file, ['Partner PAN', $settlement->financialProfile?->pan_number ?? 'N/A']);
-            fputcsv($file, ['Partner GSTIN', $settlement->financialProfile?->gstin ?? 'N/A']);
-            fputcsv($file, ['Bank IFSC', $settlement->financialProfile?->bank_ifsc ?? 'N/A']);
-            fputcsv($file, ['Bank Account (Masked)', $settlement->financialProfile?->bank_account_number_masked ?? 'N/A']);
-            fputcsv($file, ['Razorpay Account ID', $settlement->financialProfile?->razorpay_account_id ?? 'N/A']);
-            fputcsv($file, ['Provider Transfer ID', $settlement->provider_transfer_id ?? 'N/A']);
-            fputcsv($file, ['Provider Status', $settlement->provider_status ?? 'N/A']);
+            fputcsv($file, ['Partner Name', $this->sanitizeCsvCell($settlement->owner->name)]);
+            fputcsv($file, ['Partner Email', $this->sanitizeCsvCell($settlement->owner->email)]);
+            fputcsv($file, ['Partner Legal Name', $this->sanitizeCsvCell($settlement->financialProfile?->legal_business_name ?? 'N/A')]);
+            fputcsv($file, ['Partner PAN', $this->sanitizeCsvCell($settlement->financialProfile?->pan_number ?? 'N/A')]);
+            fputcsv($file, ['Partner GSTIN', $this->sanitizeCsvCell($settlement->financialProfile?->gstin ?? 'N/A')]);
+            fputcsv($file, ['Bank IFSC', $this->sanitizeCsvCell($settlement->financialProfile?->bank_ifsc ?? 'N/A')]);
+            fputcsv($file, ['Bank Account (Masked)', $this->sanitizeCsvCell($settlement->financialProfile?->bank_account_number_masked ?? 'N/A')]);
+            fputcsv($file, ['Razorpay Account ID', $this->sanitizeCsvCell($settlement->financialProfile?->razorpay_account_id ?? 'N/A')]);
+            fputcsv($file, ['Provider Transfer ID', $this->sanitizeCsvCell($settlement->provider_transfer_id ?? 'N/A')]);
+            fputcsv($file, ['Provider Status', $this->sanitizeCsvCell($settlement->provider_status ?? 'N/A')]);
             fputcsv($file, []);
 
             fputcsv($file, ['FINANCIAL TOTALS (INR)']);
@@ -331,8 +348,8 @@ class AdminSettlementController extends Controller
 
             foreach ($settlement->items as $item) {
                 fputcsv($file, [
-                    $item->reservation->booking_reference,
-                    $item->reservation->property?->name ?? 'N/A',
+                    $this->sanitizeCsvCell($item->reservation->booking_reference),
+                    $this->sanitizeCsvCell($item->reservation->property?->name ?? 'N/A'),
                     $item->reservation->check_in_date->toDateString().' – '.$item->reservation->checkout_date->toDateString(),
                     $item->item_type->label(),
                     number_format($item->gross_amount_minor / 100, 2, '.', ''),
@@ -340,7 +357,7 @@ class AdminSettlementController extends Controller
                     number_format($item->commission_tax_amount_minor / 100, 2, '.', ''),
                     number_format($item->tax_deduction_minor / 100, 2, '.', ''),
                     number_format($item->net_payable_minor / 100, 2, '.', ''),
-                    $item->notes ?? '',
+                    $this->sanitizeCsvCell($item->notes ?? ''),
                 ]);
             }
 
@@ -348,5 +365,14 @@ class AdminSettlementController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    private function sanitizeCsvCell(?string $value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        return in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true) ? "'".$value : $value;
     }
 }

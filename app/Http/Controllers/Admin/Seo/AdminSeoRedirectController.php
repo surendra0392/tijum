@@ -51,13 +51,8 @@ class AdminSeoRedirectController extends Controller
             return back()->with('error', 'Source path and destination URL cannot be identical (prevents redirect loop).');
         }
 
-        // Open redirect check
-        if (str_starts_with($destination, 'http://') || str_starts_with($destination, 'https://')) {
-            $appHost = parse_url(config('app.url'), PHP_URL_HOST);
-            $destHost = parse_url($destination, PHP_URL_HOST);
-            if ($appHost && $destHost && ! hash_equals($appHost, $destHost)) {
-                return back()->with('error', 'Redirecting to external arbitrary domains is prohibited to protect marketplace users.');
-            }
+        if (! $this->isSafeRedirectDestination($destination)) {
+            return back()->with('error', 'Redirecting to external arbitrary domains or unsafe URLs is prohibited to protect marketplace users.');
         }
 
         if (SeoRedirect::query()->where('source_path', $source)->exists()) {
@@ -89,6 +84,10 @@ class AdminSeoRedirectController extends Controller
             return back()->with('error', 'Source path and destination cannot be identical.');
         }
 
+        if (! $this->isSafeRedirectDestination($destination)) {
+            return back()->with('error', 'Redirecting to external arbitrary domains or unsafe URLs is prohibited to protect marketplace users.');
+        }
+
         $redirect->update([
             'destination_url' => $destination,
             'http_status' => (int) $validated['http_status'],
@@ -103,5 +102,27 @@ class AdminSeoRedirectController extends Controller
         $redirect->delete();
 
         return back()->with('success', 'Redirect rule deleted.');
+    }
+
+    private function isSafeRedirectDestination(string $destination): bool
+    {
+        if ($destination === '' || str_contains($destination, "\r") || str_contains($destination, "\n")) {
+            return false;
+        }
+
+        // Allow strictly single-leading-slash relative paths (reject protocol-relative //evil.com or /\)
+        if (str_starts_with($destination, '/')) {
+            return ! str_starts_with($destination, '//') && ! str_starts_with($destination, '/\\');
+        }
+
+        $scheme = strtolower((string) parse_url($destination, PHP_URL_SCHEME));
+        if (! in_array($scheme, ['http', 'https'], true)) {
+            return false;
+        }
+
+        $appHost = strtolower((string) parse_url((string) config('app.url'), PHP_URL_HOST));
+        $destHost = strtolower((string) parse_url($destination, PHP_URL_HOST));
+
+        return $appHost !== '' && $destHost !== '' && hash_equals($appHost, $destHost);
     }
 }

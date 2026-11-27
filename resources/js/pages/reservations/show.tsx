@@ -551,7 +551,7 @@ export default function ReservationShow({
                                         onClick={() =>
                                             setShowReportModal(!showReportModal)
                                         }
-                                        className="border-tijum-coral/40 text-tijum-plum hover:bg-tijum-coral/10 dark:border-tijum-coral/40 dark:text-tijum-peach dark:hover:bg-tijum-coral/15"
+                                        className="border-tijum-coral/40 text-tijum-plum hover:bg-tijum-coral/10"
                                     >
                                         <LifeBuoy
                                             className="size-4 text-tijum-coral"
@@ -729,7 +729,7 @@ export default function ReservationShow({
                                     </div>
                                     <Link
                                         href={`/my-support/${reservation.cases[0].case_reference}`}
-                                        className="inline-flex items-center gap-1 self-end text-xs font-semibold text-tijum-plum underline underline-offset-4 hover:text-tijum-coral sm:self-auto dark:text-tijum-peach dark:hover:text-tijum-coral"
+                                        className="inline-flex items-center gap-1 self-end text-xs font-semibold text-tijum-plum underline underline-offset-4 hover:text-tijum-coral sm:self-auto"
                                     >
                                         <span>View Support Progress</span>
                                         <ArrowRight
@@ -1111,7 +1111,7 @@ export default function ReservationShow({
                             <Card className="border-tijum-peach/70 bg-tijum-peach/15 py-5 dark:border-tijum-coral/40 dark:bg-tijum-coral/10">
                                 <CardContent className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                                     <div className="space-y-1">
-                                        <div className="flex items-center gap-2 text-xs font-bold tracking-wide text-tijum-plum uppercase dark:text-tijum-peach">
+                                        <div className="flex items-center gap-2 text-xs font-bold tracking-wide text-tijum-plum uppercase">
                                             <Star
                                                 className="size-4 fill-tijum-coral text-tijum-coral"
                                                 aria-hidden="true"
@@ -1404,11 +1404,18 @@ export default function ReservationShow({
                                         </span>
                                         <div className="min-w-0">
                                             <CardTitle className="font-heading text-base font-bold text-tijum-plum dark:text-foreground">
-                                                Payment confirmed
+                                                {reservation.total_amount_minor ===
+                                                    0 &&
+                                                !reservation.payment_summary
+                                                    ? 'Booking confirmed'
+                                                    : 'Payment confirmed'}
                                             </CardTitle>
                                             <p className="mt-0.5 text-xs text-tijum-plum-muted dark:text-muted-foreground">
-                                                Your stay is verified and locked
-                                                in.
+                                                {reservation.total_amount_minor ===
+                                                    0 &&
+                                                !reservation.payment_summary
+                                                    ? 'Covered in full by applied promotions and loyalty points.'
+                                                    : 'Your stay is verified and locked in.'}
                                             </p>
                                         </div>
                                     </div>
@@ -1504,6 +1511,65 @@ export default function ReservationShow({
                                     label="Duration"
                                     value={reservation.duration_label}
                                 />
+                                {((reservation.coupon_discount_minor ?? 0) >
+                                    0 ||
+                                    (reservation.points_discount_minor ?? 0) >
+                                        0) && (
+                                    <div className="space-y-2 border-t border-tijum-surface/70 pt-3 text-xs dark:border-border">
+                                        {reservation.original_amount_minor !=
+                                            null && (
+                                            <div className="flex items-center justify-between text-tijum-plum-muted dark:text-muted-foreground">
+                                                <span>
+                                                    Accommodation subtotal
+                                                </span>
+                                                <span className="font-semibold tabular-nums text-tijum-plum dark:text-foreground">
+                                                    {formatAmount(
+                                                        reservation.original_amount_minor,
+                                                        reservation.currency_code,
+                                                    )}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {(reservation.coupon_discount_minor ??
+                                            0) > 0 && (
+                                            <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400">
+                                                <span>
+                                                    Coupon discount
+                                                    {reservation.coupon_code
+                                                        ? ` (${reservation.coupon_code})`
+                                                        : ''}
+                                                </span>
+                                                <span className="font-semibold tabular-nums">
+                                                    -
+                                                    {formatAmount(
+                                                        reservation.coupon_discount_minor ??
+                                                            0,
+                                                        reservation.currency_code,
+                                                    )}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {(reservation.points_discount_minor ??
+                                            0) > 0 && (
+                                            <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400">
+                                                <span>
+                                                    Loyalty points
+                                                    {reservation.points_redeemed
+                                                        ? ` (${reservation.points_redeemed.toLocaleString()} pts)`
+                                                        : ''}
+                                                </span>
+                                                <span className="font-semibold tabular-nums">
+                                                    -
+                                                    {formatAmount(
+                                                        reservation.points_discount_minor ??
+                                                            0,
+                                                        reservation.currency_code,
+                                                    )}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                                 <div className="border-t border-tijum-surface/80 pt-3.5 dark:border-border">
                                     <PriceRow
                                         label={

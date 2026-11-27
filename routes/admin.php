@@ -149,6 +149,9 @@ Route::prefix('admin')
                     Route::get('/', [AdminCustomerCaseController::class, 'index'])->name('index');
                     Route::get('{case:case_reference}', [AdminCustomerCaseController::class, 'show'])->name('show');
                     Route::post('{case:case_reference}/messages', [AdminCustomerCaseController::class, 'storeMessage'])->name('messages.store');
+                    Route::get('{case:case_reference}/messages/{message}/attachment', [AdminCustomerCaseController::class, 'downloadAttachment'])
+                        ->whereNumber('message')
+                        ->name('messages.attachment');
                     Route::patch('{case:case_reference}/status', [AdminCustomerCaseController::class, 'updateStatus'])->name('status');
                     Route::post('{case:case_reference}/resolve', [AdminCustomerCaseController::class, 'resolve'])->name('resolve');
                 });
@@ -252,7 +255,9 @@ Route::prefix('admin')
                     Route::get('pages/{page}/edit', [AdminContentPageController::class, 'edit'])->name('pages.edit');
                     Route::put('pages/{page}', [AdminContentPageController::class, 'update'])->name('pages.update');
                     Route::delete('pages/{page}', [AdminContentPageController::class, 'destroy'])->name('pages.destroy');
-                    Route::post('pages/{page}/revisions/{revision}/restore', [AdminContentPageController::class, 'restoreRevision'])->name('pages.revisions.restore');
+                    Route::post('pages/{page}/revisions/{revision}/restore', [AdminContentPageController::class, 'restoreRevision'])
+                        ->scopeBindings()
+                        ->name('pages.revisions.restore');
 
                     // Blog Articles
                     Route::get('blog', [AdminBlogArticleController::class, 'index'])->name('blog.index');
@@ -545,6 +550,7 @@ Route::prefix('admin')
 
                     // Referrals
                     Route::get('referrals', [AdminReferralController::class, 'index'])->name('referrals.index');
+                    Route::post('referrals/{referral}/clear', [AdminReferralController::class, 'clear'])->name('referrals.clear');
                     Route::post('referrals/{referral}/disqualify', [AdminReferralController::class, 'disqualify'])->name('referrals.disqualify');
                     Route::post('referrals/profiles/{profile}/toggle-block', [AdminReferralController::class, 'toggleProfileBlock'])->name('referrals.toggle-block');
 

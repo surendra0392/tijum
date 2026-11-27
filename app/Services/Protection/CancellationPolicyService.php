@@ -57,7 +57,7 @@ class CancellationPolicyService
             'version' => 'historical',
             'name' => 'Historical Booking Terms',
             'is_historical' => true,
-            'summary' => 'Reserved under Phase 12/13 marketplace terms prior to policy versioning.',
+            'summary' => 'Reserved under earlier marketplace baseline terms prior to policy versioning.',
             'customer_explanation' => 'This reservation was confirmed under earlier marketplace baseline terms. If you experience an issue or need to cancel, your case is reviewed directly by TIJUM administration without penalty deduction.',
             'cancellation_terms' => [
                 'customer_cancellation' => 'Discretionary cancellation requests are reviewed individually by TIJUM customer operations.',

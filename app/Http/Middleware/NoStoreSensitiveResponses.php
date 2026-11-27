@@ -54,6 +54,10 @@ class NoStoreSensitiveResponses
             'my-support*',
             'rewards*',
             'wishlist*',
+            'customer/*',
+            'reviews*',
+            'relocations*',
+            'properties/*/reserve',
             'reservations*',
             'payments*',
             'checkout*',
@@ -61,6 +65,7 @@ class NoStoreSensitiveResponses
             'owner/*',
             'admin',
             'admin/*',
+            'api/v1/auth/*',
             'api/v1/customer/*',
             'api/v1/owner/*'
         );

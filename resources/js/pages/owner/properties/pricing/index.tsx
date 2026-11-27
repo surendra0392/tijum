@@ -1,6 +1,7 @@
 ﻿import { Head, router, useForm } from '@inertiajs/react';
 import { ArrowRight } from 'lucide-react';
 import type { FormEvent } from 'react';
+import InputError from '@/components/input-error';
 import { PropertyStepNavigation } from '@/components/owner/properties/property-step-navigation';
 import { PageHeader } from '@/components/shared/page-header';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -24,10 +25,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { dashboard } from '@/routes/owner';
-import {
-    index as propertiesIndexRoute,
-    show as propertyShowRoute,
-} from '@/routes/owner/properties';
+import { index as propertiesIndexRoute } from '@/routes/owner/properties';
 import pricingRoutes from '@/routes/owner/properties/pricing';
 import type {
     AvailabilityBlockPortal,
@@ -234,6 +232,7 @@ export default function OwnerPropertyPricing({
                         <CardContent className="space-y-4">
                             <label className="flex items-center gap-2 text-sm font-medium text-tijum-plum dark:text-foreground">
                                 <Checkbox
+                                    aria-label="Food provided at this property"
                                     checked={form.data.food_provided}
                                     onCheckedChange={(v) =>
                                         form.setData(
@@ -261,6 +260,7 @@ export default function OwnerPropertyPricing({
                                         className="flex items-center gap-2 rounded-xl border border-tijum-surface/70 bg-tijum-cream/25 px-3 py-2.5 text-sm text-tijum-plum dark:border-border dark:bg-muted/35 dark:text-foreground"
                                     >
                                         <Checkbox
+                                            aria-label={label}
                                             checked={form.data[key]}
                                             onCheckedChange={(v) =>
                                                 form.setData(key, v === true)
@@ -484,6 +484,19 @@ export default function OwnerPropertyPricing({
                                     );
                                 })
                             )}
+                            {Object.values(form.errors).filter(Boolean).length >
+                                0 && (
+                                <Alert variant="destructive">
+                                    <AlertTitle>
+                                        Could not save pricing
+                                    </AlertTitle>
+                                    <AlertDescription>
+                                        {Object.values(form.errors)
+                                            .filter(Boolean)
+                                            .join(' ')}
+                                    </AlertDescription>
+                                </Alert>
+                            )}
                             <div className="flex gap-2">
                                 <Button
                                     type="submit"
@@ -511,6 +524,19 @@ export default function OwnerPropertyPricing({
                             onSubmit={submitBlock}
                             className="grid gap-3 rounded-xl border border-tijum-surface p-3 sm:grid-cols-2 lg:grid-cols-3 dark:border-border dark:bg-muted/25"
                         >
+                            {Object.values(blockForm.errors).filter(Boolean)
+                                .length > 0 && (
+                                <Alert
+                                    variant="destructive"
+                                    className="sm:col-span-2 lg:col-span-3"
+                                >
+                                    <AlertDescription>
+                                        {Object.values(blockForm.errors)
+                                            .filter(Boolean)
+                                            .join(' ')}
+                                    </AlertDescription>
+                                </Alert>
+                            )}
                             <div className="space-y-1">
                                 <Label>Scope</Label>
                                 <Select
@@ -518,6 +544,7 @@ export default function OwnerPropertyPricing({
                                     onValueChange={(v) =>
                                         blockForm.setData('scope', v)
                                     }
+                                    disabled={!canManage}
                                 >
                                     <SelectTrigger>
                                         <SelectValue />
@@ -541,6 +568,7 @@ export default function OwnerPropertyPricing({
                                     onValueChange={(v) =>
                                         blockForm.setData('block_type', v)
                                     }
+                                    disabled={!canManage}
                                 >
                                     <SelectTrigger>
                                         <SelectValue />
@@ -570,6 +598,7 @@ export default function OwnerPropertyPricing({
                                                 v,
                                             )
                                         }
+                                        disabled={!canManage}
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select room type" />
@@ -585,6 +614,12 @@ export default function OwnerPropertyPricing({
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    <InputError
+                                        message={
+                                            blockForm.errors
+                                                .property_room_type_id
+                                        }
+                                    />
                                 </div>
                             )}
                             {blockForm.data.scope === 'room' && (
@@ -598,6 +633,7 @@ export default function OwnerPropertyPricing({
                                                 v,
                                             )
                                         }
+                                        disabled={!canManage}
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select room" />
@@ -616,6 +652,11 @@ export default function OwnerPropertyPricing({
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    <InputError
+                                        message={
+                                            blockForm.errors.property_room_id
+                                        }
+                                    />
                                 </div>
                             )}
                             <div className="space-y-1">
@@ -623,6 +664,7 @@ export default function OwnerPropertyPricing({
                                 <Input
                                     id="block-start"
                                     type="date"
+                                    disabled={!canManage}
                                     value={blockForm.data.start_date}
                                     onChange={(e) =>
                                         blockForm.setData(
@@ -631,12 +673,16 @@ export default function OwnerPropertyPricing({
                                         )
                                     }
                                 />
+                                <InputError
+                                    message={blockForm.errors.start_date}
+                                />
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="block-end">End date</Label>
                                 <Input
                                     id="block-end"
                                     type="date"
+                                    disabled={!canManage}
                                     value={blockForm.data.end_date}
                                     onChange={(e) =>
                                         blockForm.setData(
@@ -645,6 +691,9 @@ export default function OwnerPropertyPricing({
                                         )
                                     }
                                 />
+                                <InputError
+                                    message={blockForm.errors.end_date}
+                                />
                             </div>
                             <div className="space-y-1 sm:col-span-2 lg:col-span-3">
                                 <Label htmlFor="block-reason">
@@ -652,6 +701,7 @@ export default function OwnerPropertyPricing({
                                 </Label>
                                 <Input
                                     id="block-reason"
+                                    disabled={!canManage}
                                     value={blockForm.data.reason}
                                     onChange={(e) =>
                                         blockForm.setData(
@@ -660,6 +710,7 @@ export default function OwnerPropertyPricing({
                                         )
                                     }
                                 />
+                                <InputError message={blockForm.errors.reason} />
                             </div>
                             <div className="sm:col-span-2 lg:col-span-3">
                                 <Button
@@ -745,6 +796,6 @@ OwnerPropertyPricing.layout = {
     breadcrumbs: [
         { title: 'Partner Overview', href: dashboard() },
         { title: 'My Properties', href: propertiesIndexRoute() },
-        { title: 'Pricing & Availability', href: propertyShowRoute(1) },
+        { title: 'Pricing & Availability', href: '#' },
     ],
 };

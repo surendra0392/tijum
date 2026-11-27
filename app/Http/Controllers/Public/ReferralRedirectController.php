@@ -25,26 +25,42 @@ class ReferralRedirectController extends Controller
             ->where('is_blocked', false)
             ->first();
 
-        // Attach cookie for 30 days
-        $cookie = Cookie::make('tijum_referral_code', $normalizedCode, 60 * 24 * 30);
+        if ($profile === null) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This referral link is invalid or no longer active.',
+                ], 404);
+            }
+
+            return redirect()->route($request->user() ? 'customer.rewards.index' : 'register')
+                ->with('error', 'This referral link is invalid or no longer active.');
+        }
+
+        // Attach cookie for 30 days only for verified active referral codes
+        $cookie = Cookie::make('tijum_referral_code', $profile->referral_code, 60 * 24 * 30);
 
         if ($request->wantsJson()) {
             return response()->json([
-                'success' => $profile !== null,
-                'referral_code' => $normalizedCode,
-                'referrer_name' => $profile?->user->name ?? 'A TIJUM Member',
+                'success' => true,
+                'referral_code' => $profile->referral_code,
+                'referrer_name' => $profile->user->name,
             ])->withCookie($cookie);
         }
 
         // If user is already logged in, redirect to rewards page
         if ($request->user()) {
             return redirect()->route('customer.rewards.index')
-                ->with('status', "Referral code {$normalizedCode} registered.")
+                ->with('status', "Referral code {$profile->referral_code} noted. Referral bonuses apply to new customer registrations.")
                 ->withCookie($cookie);
         }
 
+        $referredPoints = (int) RewardsSetting::get('referral_referred_reward_points', 250);
+        $ratePaise = max(1, (int) RewardsSetting::get('points_redemption_rate_paise', 100));
+        $rewardInr = number_format(($referredPoints * $ratePaise) / 100, 0);
+
         return redirect()->route('register')
-            ->with('status', "You were invited by {$profile?->user?->name}! Register to claim your ₹250 welcome rewards points on your first completed stay.")
+            ->with('status', "You were invited by {$profile->user->name}! Register to earn {$referredPoints} welcome points (worth ₹{$rewardInr}) upon your first completed stay.")
             ->withCookie($cookie);
     }
 

@@ -31,11 +31,13 @@ class RelocationMatchingService
         $checkout = $reservation->checkout_date->toDateString();
         $quantity = $reservation->quantity;
 
-        // Query properties in the same city with active operational status and food provided
+        // Query verified, booking-eligible properties in the same city with active operational status and food provided
         $candidateProperties = Property::query()
             ->where('city_id', $cityId)
             ->where('id', '!=', $reservation->property_id)
             ->where('status', PropertyOperationalStatus::Active->value)
+            ->where('is_verified', true)
+            ->where('booking_eligible', true)
             ->where('food_provided', true)
             ->with(['city', 'category', 'roomTypes.rooms'])
             ->get();
@@ -59,6 +61,17 @@ class RelocationMatchingService
                     continue;
                 }
 
+                // Calculate alternative price in integer paise (skip if rate for duration type is missing/zero)
+                $alternativePriceMinor = $this->calculateStayPrice(
+                    $roomType,
+                    $reservation->duration_type,
+                    $reservation->duration_quantity,
+                    $quantity,
+                );
+                if ($alternativePriceMinor === null || $alternativePriceMinor <= 0) {
+                    continue;
+                }
+
                 // Check authoritative capacity over the entire stay interval
                 $stayCapacity = $this->availability->stayCapacity(
                     $roomType,
@@ -70,14 +83,6 @@ class RelocationMatchingService
                 if (! $stayCapacity['available']) {
                     continue;
                 }
-
-                // Calculate alternative price in integer paise
-                $alternativePriceMinor = $this->calculateStayPrice(
-                    $roomType,
-                    $reservation->duration_type,
-                    $reservation->duration_quantity,
-                    $quantity,
-                );
 
                 // Price difference: original - alternative.
                 // Positive => alternative is cheaper, customer receives refund for the difference.
@@ -129,13 +134,17 @@ class RelocationMatchingService
         string $durationType,
         int $durationQuantity,
         int $quantity,
-    ): int {
+    ): ?int {
         $unitRate = match ($durationType) {
-            'monthly' => (int) $roomType->monthly_rate_minor,
-            'weekly' => (int) $roomType->weekly_rate_minor,
-            default => (int) $roomType->daily_rate_minor,
+            'monthly' => $roomType->monthly_rate_minor,
+            'weekly' => $roomType->weekly_rate_minor,
+            default => $roomType->daily_rate_minor,
         };
 
-        return $unitRate * $durationQuantity * $quantity;
+        if ($unitRate === null || (int) $unitRate <= 0) {
+            return null;
+        }
+
+        return (int) $unitRate * $durationQuantity * $quantity;
     }
 }

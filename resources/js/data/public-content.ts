@@ -577,8 +577,8 @@ export function createFullFaqGroups(timing: StayTimingData): FaqGroup[] {
                 {
                     id: 'phone-email-auth',
                     question:
-                        'Can I sign in or reset my password with my mobile number?',
-                    answer: 'Yes. TIJUM supports signing in with either your registered mobile number or your email address. You can also reset your password and receive verified SMS notifications directly to your phone.',
+                        'Can I sign in with my mobile number or email address?',
+                    answer: 'Yes. TIJUM supports signing in with either your registered mobile number or your email address, and you can reset your password anytime using your registered account details.',
                 },
                 {
                     id: 'wishlist-and-compare',
@@ -604,15 +604,9 @@ export function createFullFaqGroups(timing: StayTimingData): FaqGroup[] {
                     answer: 'You can filter search results by gender eligibility: Men, Women, or Any/All. This helps students, female professionals, and male travelers find gender-segregated or co-ed spaces that match their stay requirements.',
                 },
                 {
-                    id: 'map-view-search',
-                    question:
-                        'How do I explore properties on the interactive Map View?',
-                    answer: 'Toggle the Map View button on the search page or city explore page. You will see an interactive map with custom TIJUM price markers alongside the property cards, allowing you to browse neighborhoods, distances, and transit hubs visually.',
-                },
-                {
                     id: 'other-categories-faq',
                     question: 'Are hotels or serviced apartments offered?',
-                    answer: 'Not in Phase 1. TIJUM is purposefully focused on affordable Hostels/PG, Homestays, and Co-Living accommodations where daily food-inclusive stays deliver the clearest value.',
+                    answer: 'No. TIJUM is purposefully focused on affordable Hostels/PG, Homestays, and Co-Living accommodations where daily food-inclusive stays deliver the clearest value.',
                 },
                 {
                     id: 'amenities-transparency',

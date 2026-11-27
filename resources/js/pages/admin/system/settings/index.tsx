@@ -398,7 +398,7 @@ function getBackdropClasses(mode: AssetBackdropMode): string {
         return 'bg-[repeating-conic-gradient(#e5e7eb_0%_25%,#ffffff_0%_50%)] bg-[length:16px_16px] dark:bg-[repeating-conic-gradient(#3b2839_0%_25%,#281a27_0%_50%)]';
     }
 
-    return 'bg-white text-tijum-plum';
+    return 'tijum-preview-light bg-white text-tijum-plum';
 }
 
 function SectionCardHeader({

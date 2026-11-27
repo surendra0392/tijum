@@ -1,13 +1,11 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import {
     Activity,
     AlertCircle,
-    ArrowLeft,
     Check,
     CheckCircle2,
     Clock,
     Database,
-    Layers,
     Mail,
     MessageSquare,
     RefreshCw,
@@ -283,28 +281,6 @@ export default function AdminNotificationProvidersIndex({
                     eyebrow="Gateway Health & Compliance"
                     title="Channel Gateways & Provider Readiness"
                     description="Health, server SMTP diagnostics, simulation controls, and regulatory compliance status."
-                    actions={
-                        <>
-                            <Button asChild variant="outline" size="sm">
-                                <Link href="/admin/notifications">
-                                    <ArrowLeft
-                                        className="size-3.5"
-                                        aria-hidden="true"
-                                    />
-                                    <span>Back to Deliveries</span>
-                                </Link>
-                            </Button>
-                            <Button asChild variant="outline" size="sm">
-                                <Link href="/admin/notifications/templates">
-                                    <Layers
-                                        className="size-3.5 text-tijum-coral"
-                                        aria-hidden="true"
-                                    />
-                                    <span>Template Registry</span>
-                                </Link>
-                            </Button>
-                        </>
-                    }
                 />
 
                 {/* Global Kill Switch Banner */}

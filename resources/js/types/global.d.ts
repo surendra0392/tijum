@@ -12,6 +12,7 @@ declare module '@inertiajs/core' {
             name: string;
             auth: Auth;
             wishlistIds?: number[];
+            publicCities?: Array<{ name: string; slug: string }>;
             sidebarOpen: boolean;
             pwa?: {
                 webPushEnabled: boolean;

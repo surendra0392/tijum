@@ -239,6 +239,24 @@ class PlatformSetting extends Model
     }
 
     /**
+     * Resolve grievance officer details by merging admin-managed PlatformSetting values with config defaults.
+     *
+     * @return array{name: string, designation: string, email: string, phone: string, address: string, sla_acknowledgement_hours: int, sla_resolution_days: int}
+     */
+    public static function getGrievanceOfficer(): array
+    {
+        return [
+            'name' => (string) static::get('grievance.officer_name', config('tijum.customer_protection.grievance_officer.name', 'TIJUM Grievance Redressal Cell')),
+            'designation' => (string) static::get('grievance.officer_designation', config('tijum.customer_protection.grievance_officer.designation', 'Grievance Officer')),
+            'email' => (string) static::get('grievance.officer_email', config('tijum.customer_protection.grievance_officer.email', 'grievance@tijum.com')),
+            'phone' => (string) static::get('grievance.officer_phone', config('tijum.customer_protection.grievance_officer.phone', '+91 40 6828 0000')),
+            'address' => (string) static::get('grievance.officer_address', config('tijum.customer_protection.grievance_officer.address', 'TIJUM Marketplace Pvt. Ltd., Level 4, Cyber Gateway, HITEC City, Hyderabad, Telangana 500081, India')),
+            'sla_acknowledgement_hours' => (int) static::get('grievance.sla_acknowledgement_hours', config('tijum.customer_protection.sla.acknowledgement_hours', 48)),
+            'sla_resolution_days' => (int) static::get('grievance.sla_resolution_days', config('tijum.customer_protection.sla.resolution_days', 30)),
+        ];
+    }
+
+    /**
      * Mask a secret string for safe Admin UI display.
      */
     public static function maskSecret(?string $value): string
@@ -269,7 +287,7 @@ class PlatformSetting extends Model
         $rawRazorpayWebhook = (string) static::get('integrations.razorpay_webhook_secret', config('tijum.payments.razorpay.webhook_secret', ''));
         $rawWhatsappToken = (string) static::get('integrations.whatsapp_access_token', config('tijum.notifications.channels.whatsapp.access_token', ''));
         $rawSmsAuth = (string) static::get('integrations.sms_auth_key', config('tijum.notifications.channels.sms.auth_key', ''));
-        $rawMapsKey = (string) static::get('integrations.google_maps_api_key', config('tijum.maps.api_key', ''));
+        $rawMapsKey = (string) static::get('integrations.google_maps_api_key', config('services.google.maps_api_key', ''));
         $rawExpoToken = (string) static::get('integrations.expo_access_token', config('tijum.notifications.channels.push.expo_token', ''));
 
         return [
@@ -321,7 +339,7 @@ class PlatformSetting extends Model
                 'razorpay_webhook_secret_masked' => static::maskSecret($rawRazorpayWebhook),
                 'whatsapp_phone_number_id' => (string) static::get('integrations.whatsapp_phone_number_id', config('tijum.notifications.channels.whatsapp.phone_number_id', '')),
                 'whatsapp_access_token_masked' => static::maskSecret($rawWhatsappToken),
-                'whatsapp_business_account_id' => (string) static::get('integrations.whatsapp_business_account_id', config('tijum.notifications.channels.whatsapp.business_account_id', '')),
+                'whatsapp_business_account_id' => (string) static::get('integrations.whatsapp_business_account_id', config('tijum.notifications.channels.whatsapp.waba_id', '')),
                 'sms_provider' => (string) static::get('integrations.sms_provider', config('tijum.notifications.channels.sms.provider', 'msg91')),
                 'sms_auth_key_masked' => static::maskSecret($rawSmsAuth),
                 'sms_sender_id' => (string) static::get('integrations.sms_sender_id', config('tijum.notifications.channels.sms.sender_id', 'TIJUMS')),

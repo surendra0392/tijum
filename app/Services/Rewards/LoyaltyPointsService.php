@@ -122,21 +122,34 @@ class LoyaltyPointsService
                 ->lockForUpdate()
                 ->firstOrCreate(['user_id' => $user->id]);
 
-            if ($wallet->available_points < $pointsToRedeem) {
-                throw new RuntimeException('Insufficient available points balance.');
-            }
+            $now = CarbonImmutable::now();
 
-            // Release any existing active hold for this user
+            // Release expired holds (and any active hold for this exact reservation) without stealing live unexpired holds.
             $existingHolds = PointsReservationHold::query()
                 ->where('user_id', $user->id)
                 ->where('status', 'active')
+                ->where(function ($query) use ($reservation, $now): void {
+                    $query->where('expires_at', '<=', $now);
+                    if ($reservation !== null) {
+                        $query->orWhere('reservation_id', $reservation->id);
+                    }
+                })
                 ->lockForUpdate()
                 ->get();
 
             foreach ($existingHolds as $existing) {
-                $wallet->increment('available_points', $existing->points_held);
-                $wallet->decrement('reserved_points', $existing->points_held);
+                $pointsToReturn = min($existing->points_held, $wallet->reserved_points);
+                if ($pointsToReturn > 0) {
+                    $wallet->increment('available_points', $pointsToReturn);
+                    $wallet->decrement('reserved_points', $pointsToReturn);
+                }
                 $existing->update(['status' => 'released']);
+            }
+
+            $wallet->refresh();
+
+            if ($wallet->available_points < $pointsToRedeem) {
+                throw new RuntimeException('Insufficient available points balance.');
             }
 
             // Move points from available to reserved
@@ -340,7 +353,7 @@ class LoyaltyPointsService
         if ($reservation->status !== ReservationStatus::Confirmed
             || $reservation->checked_in_at === null
             || $reservation->checked_out_at === null
-            || $reservation->checkout_date->startOfDay()->isFuture()
+            || CarbonImmutable::parse($reservation->checkout_date->toDateString(), 'Asia/Kolkata')->startOfDay()->isFuture()
             || $reservation->requires_refund_review) {
             return false;
         }

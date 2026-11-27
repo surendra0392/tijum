@@ -10,6 +10,7 @@ use App\Models\Owner;
 use App\Models\Reservation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class ReservationCheckInOutController extends Controller
 {
@@ -19,6 +20,12 @@ class ReservationCheckInOutController extends Controller
         $res = $this->ownedReservation($owner, $reservation);
 
         abort_unless($res->status === ReservationStatus::Confirmed, 422, 'Only confirmed reservations can be checked in.');
+
+        if ($res->checked_in_at !== null || $res->checked_out_at !== null) {
+            throw ValidationException::withMessages([
+                'reservation' => 'This guest has already been checked in or checked out.',
+            ]);
+        }
 
         $validated = $request->validate([
             'notes' => ['nullable', 'string', 'max:1000'],
@@ -36,6 +43,12 @@ class ReservationCheckInOutController extends Controller
 
         abort_unless($res->status === ReservationStatus::Confirmed, 422, 'Only confirmed reservations can be checked out.');
         abort_unless($res->checked_in_at !== null, 422, 'Guest must be checked in before marking check-out.');
+
+        if ($res->checked_out_at !== null) {
+            throw ValidationException::withMessages([
+                'reservation' => 'This guest has already been checked out.',
+            ]);
+        }
 
         $validated = $request->validate([
             'notes' => ['nullable', 'string', 'max:1000'],

@@ -105,7 +105,7 @@ class AdminCampaignController extends Controller
             'property_ids' => ['nullable', 'array'],
         ]);
 
-        $admin = $request->user();
+        $admin = $request->user('admin');
 
         $campaign = PromotionalCampaign::create([
             'campaign_reference' => 'CMP-'.date('Y').'-'.strtoupper(Str::random(6)),
@@ -114,8 +114,8 @@ class AdminCampaignController extends Controller
             'description' => $validated['description'] ?? null,
             'type' => $validated['type'],
             'status' => CampaignStatus::Active,
-            'starts_at' => $validated['starts_at'] ? CarbonImmutable::parse($validated['starts_at']) : null,
-            'ends_at' => $validated['ends_at'] ? CarbonImmutable::parse($validated['ends_at']) : null,
+            'starts_at' => ! empty($validated['starts_at']) ? CarbonImmutable::parse($validated['starts_at']) : null,
+            'ends_at' => ! empty($validated['ends_at']) ? CarbonImmutable::parse($validated['ends_at']) : null,
             'budget_minor' => isset($validated['budget_inr']) ? (int) ($validated['budget_inr'] * 100) : null,
             'created_by_admin_id' => $admin?->id,
         ]);
@@ -156,6 +156,19 @@ class AdminCampaignController extends Controller
             ->latest('id')
             ->paginate(20);
 
+        $statsRow = CouponRedemption::query()
+            ->leftJoin('reservations', 'reservations.id', '=', 'coupon_redemptions.reservation_id')
+            ->whereHas('couponCode', fn ($q) => $q->where('campaign_id', $campaign->id))
+            ->where('coupon_redemptions.is_reverted', false)
+            ->selectRaw(
+                'COUNT(*) as total_redemptions, '.
+                'COALESCE(SUM(coupon_redemptions.discount_amount_minor), 0) as total_discount_minor, '.
+                'COALESCE(SUM(coupon_redemptions.platform_funded_amount_minor), 0) as platform_funded_minor, '.
+                'COALESCE(SUM(coupon_redemptions.property_funded_amount_minor), 0) as property_funded_minor, '.
+                'COALESCE(SUM(COALESCE(reservations.original_amount_minor, reservations.total_amount_minor, 0)), 0) as total_gmv_minor'
+            )
+            ->first();
+
         return Inertia::render('admin/rewards/campaigns/show', [
             'campaign' => [
                 'id' => $campaign->id,
@@ -176,12 +189,23 @@ class AdminCampaignController extends Controller
                     'offer_type' => $c->offer_type->label(),
                     'discount_amount_minor' => $c->discount_amount_minor,
                     'discount_percentage' => $c->discount_percentage,
+                    'max_discount_amount_minor' => $c->max_discount_amount_minor,
+                    'min_booking_amount_minor' => $c->min_booking_amount_minor,
+                    'min_stay_days' => $c->min_stay_days,
                     'bonus_points' => $c->bonus_points,
-                    'funding_source' => $c->funding_source->label(),
+                    'funding_source' => $c->funding_source->value,
+                    'funding_source_label' => $c->funding_source->label(),
                     'total_used_count' => $c->total_used_count,
                     'total_usage_limit' => $c->total_usage_limit,
                     'is_active' => $c->is_active,
                 ])->all(),
+            ],
+            'stats' => [
+                'total_redemptions' => (int) ($statsRow->total_redemptions ?? 0),
+                'total_discount_minor' => (int) ($statsRow->total_discount_minor ?? 0),
+                'platform_funded_minor' => (int) ($statsRow->platform_funded_minor ?? 0),
+                'property_funded_minor' => (int) ($statsRow->property_funded_minor ?? 0),
+                'total_gmv_minor' => (int) ($statsRow->total_gmv_minor ?? 0),
             ],
             'redemptions' => [
                 'data' => collect($redemptions->items())->map(fn (CouponRedemption $r) => [
@@ -189,6 +213,9 @@ class AdminCampaignController extends Controller
                     'coupon_code' => $r->couponCode !== null ? $r->couponCode->code : 'N/A',
                     'customer_name' => $r->user !== null ? $r->user->name : 'Guest',
                     'booking_reference' => $r->reservation !== null ? $r->reservation->booking_reference : 'N/A',
+                    'booking_amount_minor' => $r->reservation !== null
+                        ? (int) ($r->reservation->original_amount_minor ?? $r->reservation->total_amount_minor)
+                        : 0,
                     'discount_minor' => $r->discount_amount_minor,
                     'platform_share_minor' => $r->platform_funded_amount_minor,
                     'property_share_minor' => $r->property_funded_amount_minor,

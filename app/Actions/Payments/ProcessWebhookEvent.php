@@ -344,7 +344,7 @@ class ProcessWebhookEvent
                             'property_name' => $reservation->snapshot_property_name ?: $property->name,
                             'amount' => '₹'.number_format(($payment->amount_minor ?: $reservation->total_amount_minor) / 100, 2),
                             'failure_reason' => Str::limit($errorDescription, 180),
-                            'action_url' => url("/reservations/{$reservation->id}"),
+                            'action_url' => route('reservations.show', $reservation),
                         ],
                         related: $reservation,
                         relatedReference: $reservation->booking_reference,

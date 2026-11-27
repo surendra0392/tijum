@@ -1,5 +1,5 @@
 /* eslint-disable no-restricted-globals */
-const CACHE_VERSION = '2026-11-17-v1';
+const CACHE_VERSION = '2026-11-27-v3';
 const STATIC_CACHE = `tijum-static-${CACHE_VERSION}`;
 const RUNTIME_STATIC_CACHE = `tijum-assets-${CACHE_VERSION}`;
 const ACTIVE_CACHES = [STATIC_CACHE, RUNTIME_STATIC_CACHE];
@@ -10,6 +10,8 @@ const PRECACHE_URLS = [
     '/manifest.webmanifest',
     '/pwa/icon-192x192.png',
     '/pwa/icon-512x512.png',
+    '/pwa/icon-maskable-192x192.png',
+    '/pwa/icon-maskable-512x512.png',
     '/apple-touch-icon.png',
     '/brand/icons/tijum-symbol.png',
 ];
@@ -31,6 +33,9 @@ const SENSITIVE_PATH_PREFIXES = [
     '/my-support',
     '/rewards',
     '/wishlist',
+    '/customer',
+    '/reviews',
+    '/relocations',
     '/reservations',
     '/payments',
     '/checkout',
@@ -44,6 +49,10 @@ const SENSITIVE_PATH_PREFIXES = [
 ];
 
 function isSensitivePath(pathname) {
+    if (/^\/properties\/[^/]+\/reserve(?:\/|$)/.test(pathname)) {
+        return true;
+    }
+
     return SENSITIVE_PATH_PREFIXES.some(
         (prefix) => pathname === prefix || pathname.startsWith(prefix + '/') || (prefix.endsWith('/') && pathname.startsWith(prefix)),
     );
@@ -56,14 +65,19 @@ function isImmutableStaticAsset(pathname) {
         pathname.startsWith('/brand/') ||
         pathname.startsWith('/images/public/') ||
         pathname === '/offline.html' ||
-        pathname === '/manifest.webmanifest' ||
         pathname === '/apple-touch-icon.png' ||
         pathname === '/favicon.ico' ||
         pathname === '/favicon.png' ||
+        pathname === '/favicon-dark.png' ||
+        pathname === '/favicon-light.png' ||
         pathname === '/favicon-16x16.png' ||
         pathname === '/favicon-32x32.png' ||
         pathname === '/favicon-48x48.png'
     );
+}
+
+function isManifestRequest(pathname) {
+    return pathname === '/manifest.webmanifest' || pathname === '/site.webmanifest';
 }
 
 self.addEventListener('install', (event) => {
@@ -160,6 +174,25 @@ self.addEventListener('fetch', (event) => {
                 }),
             );
         }
+        return;
+    }
+
+    // Web app manifests: Network-First with cache fallback so icon & splash metadata updates propagate promptly
+    if (isManifestRequest(url.pathname)) {
+        event.respondWith(
+            fetch(request)
+                .then((response) => {
+                    if (response && response.status === 200 && response.type === 'basic') {
+                        const clone = response.clone();
+                        caches.open(STATIC_CACHE).then((cache) => cache.put(request, clone));
+                    }
+                    return response;
+                })
+                .catch(async () => {
+                    const cached = await caches.match(request);
+                    return cached || Response.error();
+                }),
+        );
         return;
     }
 

@@ -42,7 +42,7 @@ function formatDateSafe(val?: string | null): string {
     }
 }
 
-export default function ReferralsPage({ profile, invites = [] }: Props) {
+export default function ReferralsPage({ profile, invites }: Props) {
     const [copiedCode, setCopiedCode] = useState(false);
     const [copiedLink, setCopiedLink] = useState(false);
     const [page, setPage] = useState(1);
@@ -55,17 +55,19 @@ export default function ReferralsPage({ profile, invites = [] }: Props) {
     );
 
     const referralCode = profile?.referral_code ?? 'TIJUMGUEST';
+    const referrerRewardPoints = profile?.referrer_reward_points ?? 250;
+    const referredRewardPoints = profile?.referred_reward_points ?? 250;
     const shareUrl =
         profile?.share_url ||
         (typeof window !== 'undefined'
             ? `${window.location.origin}/r/${referralCode}`
             : `https://tijum.com/r/${referralCode}`);
 
-    const shareMessage = `Hey! I stay with TIJUM for verified Hostels/PG, Homestays, and Co-Living. Use my invite link to get ₹250 worth of loyalty points on your first stay: ${shareUrl}`;
+    const shareMessage = `Hey! I stay with TIJUM for verified Hostels/PG, Homestays, and Co-Living. Use my invite link to get ${referredRewardPoints.toLocaleString()} loyalty points on your first stay: ${shareUrl}`;
 
     const handleCopy = (text: string, type: 'code' | 'link') => {
         if (typeof navigator !== 'undefined' && navigator.clipboard) {
-            navigator.clipboard.writeText(text);
+            void navigator.clipboard.writeText(text).catch(() => {});
             if (type === 'code') {
                 setCopiedCode(true);
                 setTimeout(() => setCopiedCode(false), 2500);
@@ -89,7 +91,7 @@ export default function ReferralsPage({ profile, invites = [] }: Props) {
     const shareEmail = () => {
         if (typeof window !== 'undefined') {
             window.open(
-                `mailto:?subject=${encodeURIComponent('Join TIJUM & get ₹250 stay credits')}&body=${encodeURIComponent(shareMessage)}`,
+                `mailto:?subject=${encodeURIComponent(`Join TIJUM & get ${referredRewardPoints} stay points`)}&body=${encodeURIComponent(shareMessage)}`,
                 '_blank',
             );
         }
@@ -121,14 +123,17 @@ export default function ReferralsPage({ profile, invites = [] }: Props) {
                                 <span>Referral Programme</span>
                             </div>
                             <h1 className="font-heading text-2xl font-bold tracking-tight text-tijum-cream sm:text-4xl">
-                                Give ₹250. Get ₹250.
+                                Give {referredRewardPoints.toLocaleString()} pts.
+                                Get {referrerRewardPoints.toLocaleString()} pts.
                             </h1>
                             <p className="text-sm leading-relaxed text-tijum-cream/80 sm:text-base">
                                 Invite friends to TIJUM. When they complete their
                                 first verified stay in any Hostels/PG,
-                                Homestays, or Co-Living space, both of you
-                                receive 250 loyalty points directly in your
-                                Rewards Wallet.
+                                Homestays, or Co-Living space, they receive{' '}
+                                {referredRewardPoints.toLocaleString()} points
+                                and you receive{' '}
+                                {referrerRewardPoints.toLocaleString()} points
+                                directly in your Rewards Wallet.
                             </p>
                         </div>
 
@@ -347,7 +352,10 @@ export default function ReferralsPage({ profile, invites = [] }: Props) {
                                 </h3>
                                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                                     As soon as their stay completes and checkout
-                                    is confirmed, both of you receive 250
+                                    is confirmed, you receive{' '}
+                                    {referrerRewardPoints.toLocaleString()}{' '}
+                                    points and your friend receives{' '}
+                                    {referredRewardPoints.toLocaleString()}{' '}
                                     points.
                                 </p>
                             </div>
@@ -402,23 +410,21 @@ export default function ReferralsPage({ profile, invites = [] }: Props) {
                                         </thead>
                                         <tbody className="divide-y divide-tijum-surface/60 text-foreground dark:divide-border">
                                             {pagedInvites.map((invite) => {
-                                                const friendName =
+                                                const rawReferredName = (
+                                                    invite as unknown as Record<
+                                                        string,
+                                                        unknown
+                                                    >
+                                                ).referred_name;
+                                                const friendName: string =
                                                     invite.friend_name ||
-                                                    (
-                                                        invite as unknown as Record<
-                                                            string,
-                                                            unknown
-                                                        >
-                                                    ).referred_name ||
+                                                    (typeof rawReferredName ===
+                                                    'string'
+                                                        ? rawReferredName
+                                                        : '') ||
                                                     'Friend';
                                                 const emailMasked =
                                                     invite.friend_email_masked ||
-                                                    (
-                                                        invite as unknown as Record<
-                                                            string,
-                                                            unknown
-                                                        >
-                                                    ).referred_email ||
                                                     '—';
                                                 const pointsVal =
                                                     invite.points_awarded ??
@@ -428,7 +434,7 @@ export default function ReferralsPage({ profile, invites = [] }: Props) {
                                                             unknown
                                                         >
                                                     ).reward_points ??
-                                                    250;
+                                                    referrerRewardPoints;
 
                                                 return (
                                                     <tr
@@ -438,9 +444,7 @@ export default function ReferralsPage({ profile, invites = [] }: Props) {
                                                         <td className="py-3.5 pr-4 pl-6 font-medium whitespace-nowrap text-foreground">
                                                             <div>
                                                                 <p className="font-semibold">
-                                                                    {String(
-                                                                        friendName,
-                                                                    )}
+                                                                    {friendName}
                                                                 </p>
                                                                 <p className="text-[11px] text-muted-foreground">
                                                                     {String(

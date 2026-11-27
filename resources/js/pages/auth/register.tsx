@@ -26,6 +26,8 @@ import { store } from '@/routes/register';
 
 type Props = {
     passwordRules: string;
+    initialReferralCode?: string;
+    status?: string;
 };
 
 type ReferralValidationState = {
@@ -35,8 +37,15 @@ type ReferralValidationState = {
     rewardPoints?: number;
 } | null;
 
-export default function Register({ passwordRules }: Props) {
+export default function Register({
+    passwordRules,
+    initialReferralCode,
+    status,
+}: Props) {
     const getInitialReferralCode = (): string => {
+        if (initialReferralCode && initialReferralCode.trim() !== '') {
+            return initialReferralCode.trim().toUpperCase();
+        }
         if (typeof window === 'undefined') return '';
         const searchParams = new URLSearchParams(window.location.search);
         const queryRef = searchParams.get('ref');
@@ -171,6 +180,19 @@ export default function Register({ passwordRules }: Props) {
                     Create account
                 </Link>
             </div>
+
+            {status && (
+                <div
+                    role="status"
+                    className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-2.5 text-xs font-medium text-amber-900"
+                >
+                    <AlertCircle
+                        className="mt-0.5 size-4 shrink-0 text-amber-600"
+                        aria-hidden="true"
+                    />
+                    <span>{status}</span>
+                </div>
+            )}
 
             <Form
                 {...store.form()}

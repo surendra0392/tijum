@@ -141,7 +141,7 @@ class BlogController extends Controller
     public function category(string $slug): Response
     {
         /** @var BlogCategory $category */
-        $category = BlogCategory::query()->where('slug', $slug)->firstOrFail();
+        $category = BlogCategory::query()->active()->where('slug', $slug)->firstOrFail();
 
         $articles = BlogArticle::query()
             ->published()

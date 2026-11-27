@@ -37,15 +37,17 @@ class AdminReportExportController extends Controller
         $customTo = $request->query('to');
 
         [$start, $end] = $this->metricsService->resolveDateRange($range, $customFrom, $customTo);
+        $startUtc = $start->utc();
+        $endUtc = $end->utc();
 
         return match ($report) {
-            'reservations' => $this->exportReservations($admin, $start, $end, $cityId),
-            'payments' => $this->exportPayments($admin, $start, $end, $cityId),
-            'refunds' => $this->exportRefunds($admin, $start, $end, $cityId),
-            'customer-cases' => $this->exportCustomerCases($admin, $start, $end, $cityId),
-            'settlements' => $this->exportSettlements($admin, $start, $end),
-            'partner-commissions' => $this->exportCommissions($admin, $start, $end),
-            'reconciliation-exceptions' => $this->exportReconciliationExceptions($admin, $start, $end),
+            'reservations' => $this->exportReservations($admin, $startUtc, $endUtc, $cityId),
+            'payments' => $this->exportPayments($admin, $startUtc, $endUtc, $cityId),
+            'refunds' => $this->exportRefunds($admin, $startUtc, $endUtc, $cityId),
+            'customer-cases' => $this->exportCustomerCases($admin, $startUtc, $endUtc, $cityId),
+            'settlements' => $this->exportSettlements($admin, $startUtc, $endUtc),
+            'partner-commissions' => $this->exportCommissions($admin, $startUtc, $endUtc),
+            'reconciliation-exceptions' => $this->exportReconciliationExceptions($admin, $startUtc, $endUtc),
             default => abort(400, 'Unsupported report type requested.'),
         };
     }
@@ -196,7 +198,7 @@ class AdminReportExportController extends Controller
         $query = CustomerProtectionCase::query()
             ->whereBetween('created_at', [$start, $end])
             ->when($cityId !== null, fn (Builder $q) => $q->whereHas('reservation.property', fn (Builder $pq) => $pq->where('city_id', $cityId)))
-            ->with(['reservation.property.city'])
+            ->with(['user', 'reservation.property.city'])
             ->latest('created_at');
 
         $headers = [
@@ -382,7 +384,7 @@ class AdminReportExportController extends Controller
         }
 
         $firstChar = substr($value, 0, 1);
-        if (in_array($firstChar, ['=', '+', '-', '@'], true)) {
+        if (in_array($firstChar, ['=', '+', '-', '@', "\t", "\r"], true)) {
             return "'".$value;
         }
 

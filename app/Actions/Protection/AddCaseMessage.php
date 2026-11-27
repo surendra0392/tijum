@@ -65,6 +65,12 @@ class AddCaseMessage
         $caseMessage = DB::transaction(function () use ($case, $sender, $senderType, $message, $isInternal, $data): CustomerProtectionCaseMessage {
             $lockedCase = CustomerProtectionCase::query()->whereKey($case->id)->lockForUpdate()->firstOrFail();
 
+            if (! $isInternal && in_array($lockedCase->status, [CaseStatus::Resolved, CaseStatus::Closed], true)) {
+                throw ValidationException::withMessages([
+                    'message' => 'This case is already '.$lockedCase->status->label().' and cannot accept new public replies.',
+                ]);
+            }
+
             $attachment = $data['attachment'] ?? null;
             $attachmentPath = null;
             $attachmentName = null;

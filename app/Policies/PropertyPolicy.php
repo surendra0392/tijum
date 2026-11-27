@@ -81,7 +81,9 @@ class PropertyPolicy
 
     public function manageRoomOperationsByOwner(Owner $owner, Property $property): bool
     {
-        return $property->owner_id === $owner->id && $owner->canPublishProperties();
+        return $property->owner_id === $owner->id
+            && $owner->canPublishProperties()
+            && $property->status !== PropertyOperationalStatus::Suspended;
     }
 
     public function startAmendmentByOwner(Owner $owner, Property $property): bool

@@ -72,6 +72,9 @@ void createInertiaApp({
 // Initialize TIJUM light-first theme and PWA runtime on client boot
 initializeTheme();
 initPwaClient();
+if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('tijum:app-ready'));
+}
 
 let hadAuthenticatedActor = false;
 router.on('success', (event) => {

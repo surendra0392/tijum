@@ -21,7 +21,7 @@ type ConfirmationDialogProps = {
     confirmLabel?: string;
     cancelLabel?: string;
     tone?: 'default' | 'destructive';
-    variant?: 'default' | 'destructive' | string;
+    variant?: string;
     loading?: boolean;
     onConfirm: () => void;
 };

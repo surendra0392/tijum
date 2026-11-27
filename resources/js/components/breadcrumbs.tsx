@@ -2,7 +2,6 @@ import { Link, usePage, type InertiaLinkProps } from '@inertiajs/react';
 import { ChevronRight, Home } from 'lucide-react';
 import { Fragment, useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import type { BreadcrumbItem as BreadcrumbItemType } from '@/types';
 
 export interface BreadcrumbEntry {
     title?: string;
@@ -26,8 +25,30 @@ export type BreadcrumbsProps = {
     items?: BreadcrumbEntry[];
     tone?: 'dark' | 'light';
     showHome?: boolean;
+    showSchema?: boolean;
     className?: string;
 };
+
+const PRIVATE_PORTAL_PREFIXES = [
+    '/admin',
+    '/owner',
+    '/dashboard',
+    '/settings',
+    '/reservations',
+    '/rewards',
+    '/my-support',
+    '/support',
+    '/notifications',
+    '/wishlist',
+    '/reviews',
+    '/customer',
+    '/login',
+    '/register',
+    '/forgot-password',
+    '/reset-password',
+    '/two-factor-challenge',
+    '/email',
+];
 
 const SEGMENT_LABELS: Record<string, string> = {
     owner: 'Partner Overview',
@@ -166,6 +187,7 @@ export function Breadcrumbs({
     items,
     tone = 'dark',
     showHome,
+    showSchema = true,
     className,
 }: BreadcrumbsProps) {
     const page = usePage();
@@ -189,36 +211,51 @@ export function Breadcrumbs({
         return null;
     }
 
-    // Build Schema.org BreadcrumbList JSON-LD
-    const schemaData = {
-        '@context': 'https://schema.org',
-        '@type': 'BreadcrumbList',
-        itemListElement: normalizedItems.map((item, index) => {
-            const hrefStr = getHrefString(item.href);
-            return {
-                '@type': 'ListItem',
-                position: index + 1,
-                name: item.title,
-                item: hrefStr
-                    ? hrefStr.startsWith('http')
-                        ? hrefStr
-                        : `https://tijum.com${hrefStr}`
-                    : undefined,
-            };
-        }),
-    };
+    const cleanPath = page.url.split('?')[0].split('#')[0];
+    const isPrivateRoute = PRIVATE_PORTAL_PREFIXES.some(
+        (prefix) => cleanPath === prefix || cleanPath.startsWith(`${prefix}/`),
+    );
+    const hasServerSeoSchema = Boolean(
+        (page.props as { seo?: { structuredData?: unknown } }).seo?.structuredData,
+    );
+    const shouldRenderSchema = showSchema !== false && !isPrivateRoute && !hasServerSeoSchema;
+    const origin =
+        typeof window !== 'undefined' ? window.location.origin : 'https://tijum.com';
+
+    // Build Schema.org BreadcrumbList JSON-LD only when public & not already emitted server-side
+    const schemaData = shouldRenderSchema
+        ? {
+              '@context': 'https://schema.org',
+              '@type': 'BreadcrumbList',
+              itemListElement: normalizedItems.map((item, index) => {
+                  const hrefStr = getHrefString(item.href);
+                  return {
+                      '@type': 'ListItem',
+                      position: index + 1,
+                      name: item.title,
+                      item: hrefStr
+                          ? hrefStr.startsWith('http')
+                              ? hrefStr
+                              : `${origin}${hrefStr}`
+                          : undefined,
+                  };
+              }),
+          }
+        : null;
 
     return (
         <nav
             aria-label="Breadcrumb"
             className={cn('flex items-center text-xs sm:text-sm', className)}
         >
-            <script
-                type="application/ld+json"
-                dangerouslySetInnerHTML={{
-                    __html: JSON.stringify(schemaData).replaceAll('<', '\\u003c'),
-                }}
-            />
+            {schemaData && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{
+                        __html: JSON.stringify(schemaData).replaceAll('<', '\\u003c'),
+                    }}
+                />
+            )}
             <ol className="flex flex-wrap items-center gap-1.5 leading-none">
                 {showHome && normalizedItems[0]?.title !== 'Home' && (
                     <li className="flex items-center gap-1.5">

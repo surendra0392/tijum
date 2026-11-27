@@ -765,6 +765,7 @@ export default function PropertyDetailPage({
                                             <ReviewCard
                                                 key={review.id}
                                                 review={review}
+                                                canReport={isAuthenticated}
                                             />
                                         ))}
                                     </div>

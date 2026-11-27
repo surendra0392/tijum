@@ -66,7 +66,7 @@ class AdminGlobalSearchService
                 'id' => $r->id,
                 'title' => $r->booking_reference,
                 'subtitle' => "{$r->contact_name} • {$r->property?->name} ({$r->status->label()})",
-                'url' => "/admin/reservations/{$r->id}",
+                'url' => route('admin.reservations.show', $r),
                 'badge' => $r->status->label(),
             ])->all();
         }
@@ -75,7 +75,7 @@ class AdminGlobalSearchService
         if ($canViewSupport) {
             $cases = CustomerProtectionCase::query()
                 ->where('case_reference', 'like', "%{$clean}%")
-                ->orWhere('grievance_reference', 'like', "%{$clean}%")
+                ->orWhere('description', 'like', "%{$clean}%")
                 ->orWhereHas('user', fn ($q) => $q->where('name', 'like', "%{$clean}%"))
                 ->with('user')
                 ->limit(5)
@@ -129,6 +129,7 @@ class AdminGlobalSearchService
         // 5. Partners
         if ($canViewPartners) {
             $partners = Owner::query()
+                ->with('latestVerificationApplication')
                 ->where('name', 'like', "%{$clean}%")
                 ->orWhere('email', 'like', "%{$clean}%")
                 ->orWhere('phone', 'like', "%{$clean}%")
@@ -139,7 +140,9 @@ class AdminGlobalSearchService
                 'id' => $o->id,
                 'title' => $o->name,
                 'subtitle' => "{$o->email} • {$o->phone}",
-                'url' => "/admin/partners/{$o->id}",
+                'url' => $o->latestVerificationApplication !== null
+                    ? route('admin.partners.show', $o->latestVerificationApplication)
+                    : route('admin.partners.index', ['search' => $o->email]),
                 'badge' => $o->status->label(),
             ])->all();
         }
@@ -176,7 +179,7 @@ class AdminGlobalSearchService
                 'id' => $u->id,
                 'title' => $u->name,
                 'subtitle' => "{$u->email} • {$u->phone}",
-                'url' => "/admin/reservations?customer={$u->id}",
+                'url' => "/admin/reservations?user_id={$u->id}",
                 'badge' => $u->email_verified_at ? 'Verified' : 'Unverified',
             ])->all();
         }

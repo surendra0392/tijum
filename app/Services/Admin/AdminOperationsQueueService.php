@@ -17,6 +17,7 @@ use App\Enums\SettlementStatus;
 use App\Models\CustomerProtectionCase;
 use App\Models\Owner;
 use App\Models\PartnerSettlement;
+use App\Models\PlatformSetting;
 use App\Models\PropertyReview;
 use App\Models\PropertyVerificationApplication;
 use App\Models\ProviderTransfer;
@@ -66,13 +67,16 @@ class AdminOperationsQueueService
             ->orWhereHas('financialProfile', function (Builder $q): void {
                 $q->where('onboarding_status', FinancialOnboardingStatus::Submitted);
             })
-            ->with(['businessProfile', 'financialProfile'])
+            ->with(['businessProfile', 'financialProfile', 'latestVerificationApplication'])
             ->latest()
             ->limit(10)
             ->get();
 
         return $owners->map(function (Owner $owner): array {
             $hasFinancialPending = $owner->financialProfile?->onboarding_status === FinancialOnboardingStatus::Submitted;
+            $partnerUrl = $owner->latestVerificationApplication !== null
+                ? route('admin.partners.show', $owner->latestVerificationApplication)
+                : route('admin.partners.index');
 
             return [
                 'id' => $owner->id,
@@ -85,7 +89,7 @@ class AdminOperationsQueueService
                 'badge' => $hasFinancialPending ? 'Bank Review' : 'Identity Review',
                 'created_at' => $owner->created_at?->toIso8601String(),
                 'created_formatted' => $owner->created_at?->format('d M, H:i'),
-                'action_url' => $hasFinancialPending ? "/admin/partners/financial/{$owner->id}" : "/admin/partners/{$owner->id}",
+                'action_url' => $hasFinancialPending ? route('admin.partners.financial.show', $owner) : $partnerUrl,
             ];
         })->values()->all();
     }
@@ -145,7 +149,7 @@ class AdminOperationsQueueService
 
         $now = CarbonImmutable::now($this->timezone);
 
-        return $reservations->map(function (Reservation $res) use ($now): array {
+        return array_values($reservations->map(function (Reservation $res) use ($now): array {
             $isAwaitingPayment = $res->status === ReservationStatus::AwaitingPayment;
             $isDeadlineClose = $isAwaitingPayment && $res->payment_deadline_at && $res->payment_deadline_at->diffInMinutes($now, false) > -30;
 
@@ -154,15 +158,15 @@ class AdminOperationsQueueService
                 'booking_reference' => $res->booking_reference,
                 'property_name' => $res->property?->name ?? 'Property',
                 'city' => $res->property?->city?->name ?? 'City',
-                'guest_name' => $res->guest_name ?? $res->user?->name ?? 'Guest',
+                'guest_name' => $res->contact_name ?: $res->user?->name ?? 'Guest',
                 'stay_dates' => "{$res->check_in_date->format('d M')} - {$res->checkout_date->format('d M')}",
                 'status' => $res->status->value,
                 'status_label' => $res->status->label(),
                 'is_urgent' => $isDeadlineClose || $res->status === ReservationStatus::Cancelled,
                 'deadline_formatted' => $res->payment_deadline_at?->format('H:i, d M'),
-                'action_url' => "/admin/reservations/{$res->id}",
+                'action_url' => route('admin.reservations.show', $res),
             ];
-        })->values()->all();
+        })->all());
     }
 
     /**
@@ -173,6 +177,8 @@ class AdminOperationsQueueService
     public function getCustomerProtectionQueue(): array
     {
         $now = CarbonImmutable::now($this->timezone);
+        $ackHours = max(1, (int) PlatformSetting::get('grievance.sla_acknowledgement_hours', config('tijum.customer_protection.sla.acknowledgement_hours', 48)));
+        $ackCutoff = $now->subHours($ackHours);
 
         $cases = CustomerProtectionCase::query()
             ->whereNotIn('status', [CaseStatus::Resolved, CaseStatus::Closed])
@@ -182,8 +188,8 @@ class AdminOperationsQueueService
             ->limit(10)
             ->get();
 
-        return $cases->map(function (CustomerProtectionCase $case): array {
-            $isAckOverdue = $case->acknowledged_at === null;
+        return $cases->map(function (CustomerProtectionCase $case) use ($ackCutoff): array {
+            $isAckOverdue = $case->acknowledged_at === null && $case->created_at->lt($ackCutoff);
             $isResolutionOverdue = $case->isOverdue();
 
             return [
@@ -248,7 +254,7 @@ class AdminOperationsQueueService
                 'amount_minor' => $payment->amount_minor,
                 'amount_formatted' => '₹'.number_format($payment->amount_minor / 100, 2),
                 'customer_name' => $payment->reservation?->user?->name ?? 'Guest',
-                'reason' => $payment->error_description ?? 'Payment declined or aborted',
+                'reason' => $payment->failure_description ?? 'Payment declined or aborted',
                 'action_url' => "/admin/payments/{$payment->id}",
             ];
         }

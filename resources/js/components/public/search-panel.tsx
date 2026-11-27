@@ -86,7 +86,21 @@ type SearchPanelProps = {
     className?: string;
 };
 
-const TODAY_ISO = new Date().toISOString().split('T')[0];
+function todayIstIso(): string {
+    try {
+        return new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Kolkata',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).format(new Date());
+    } catch {
+        return new Date().toISOString().split('T')[0];
+    }
+}
+
+const MAX_GUESTS = 20;
+const MAX_DURATION_COUNT = 30;
 
 export function SearchPanel({
     cities,
@@ -354,11 +368,8 @@ export function SearchPanel({
         });
     };
 
-    const maxDuration = useMemo(() => {
-        if (durationType === 'weekly') return 52;
-        if (durationType === 'monthly') return 36;
-        return 365;
-    }, [durationType]);
+    const maxDuration = MAX_DURATION_COUNT;
+    const minCheckInDate = defaults.check_in || todayIstIso();
 
     const durationUnitSuffix = useMemo(() => {
         if (durationType === 'weekly') {
@@ -474,7 +485,7 @@ export function SearchPanel({
                         id={`${id}-checkin`}
                         name="check_in"
                         type="date"
-                        min={TODAY_ISO}
+                        min={minCheckInDate}
                         value={checkIn}
                         onChange={(e) => setCheckIn(e.target.value)}
                         className="box-border h-12 w-full cursor-pointer rounded-xl border border-tijum-surface bg-white px-3 text-sm font-medium text-tijum-plum transition-all duration-150 outline-none focus:border-tijum-coral focus:ring-2 focus:ring-tijum-coral/25"
@@ -588,7 +599,7 @@ export function SearchPanel({
                                 id={`${id}-guests`}
                                 type="number"
                                 min="1"
-                                max="30"
+                                max={MAX_GUESTS}
                                 value={guests}
                                 onChange={(e) => {
                                     const v = parseInt(e.target.value, 10);
@@ -596,7 +607,10 @@ export function SearchPanel({
                                         String(
                                             isNaN(v)
                                                 ? 1
-                                                : Math.max(1, Math.min(v, 30)),
+                                                : Math.max(
+                                                      1,
+                                                      Math.min(v, MAX_GUESTS),
+                                                  ),
                                         ),
                                     );
                                 }}
@@ -619,13 +633,13 @@ export function SearchPanel({
                                 setGuests((prev) =>
                                     String(
                                         Math.min(
-                                            30,
+                                            MAX_GUESTS,
                                             (parseInt(prev, 10) || 1) + 1,
                                         ),
                                     ),
                                 )
                             }
-                            disabled={(parseInt(guests, 10) || 1) >= 30}
+                            disabled={(parseInt(guests, 10) || 1) >= MAX_GUESTS}
                             aria-label="Increase guests"
                             className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-tijum-plum transition-colors hover:bg-tijum-cream hover:text-tijum-coral active:scale-95 disabled:pointer-events-none disabled:opacity-30"
                         >

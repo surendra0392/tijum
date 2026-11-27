@@ -101,6 +101,13 @@ class CustomerPaymentController extends Controller
 
         $reservation->loadMissing(['payments', 'successfulPayment', 'property', 'roomType']);
 
+        abort_unless(
+            $reservation->status === ReservationStatus::Confirmed
+                && ($reservation->successfulPayment !== null || $reservation->total_amount_minor === 0),
+            404,
+            'Receipt is only available for confirmed paid reservations.',
+        );
+
         return Inertia::render('reservations/receipt', [
             'reservation' => $reservationData->detail($reservation, 'customer'),
         ]);

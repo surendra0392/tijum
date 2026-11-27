@@ -1,25 +1,21 @@
 import { Link } from '@inertiajs/react';
 import {
     Building2,
-    Compass,
     Layers,
     MapPin,
     Minus,
     Navigation,
     Plus,
     RotateCcw,
-    Star,
-    Utensils,
     X,
 } from 'lucide-react';
 import type {
     MouseEvent as ReactMouseEvent,
     TouchEvent as ReactTouchEvent,
 } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import BrandLogo, { TIJUM_BRAND_ASSETS } from '@/components/brand/brand-logo';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { TIJUM_BRAND_ASSETS } from '@/components/brand/brand-logo';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { show as propertyShow } from '@/routes/public/properties';
 import type { SearchResultCard } from '@/types/public-search';
@@ -202,7 +198,7 @@ export function SearchMap({
     const unmappedCount = properties.length - markers.length;
 
     // Tile calculations based on center and zoom
-    const { tiles, centerPixel, topLeft } = useMemo(() => {
+    const { tiles, topLeft } = useMemo(() => {
         const cp = project(center.lat, center.lng, zoom);
         const tlX = cp.x - dimensions.width / 2;
         const tlY = cp.y - dimensions.height / 2;

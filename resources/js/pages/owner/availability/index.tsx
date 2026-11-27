@@ -1,14 +1,12 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import {
     AlertCircle,
-    Ban,
     BedDouble,
     Building2,
     Calendar,
     CalendarDays,
     Check,
     CheckCircle2,
-    Clock,
     DollarSign,
     Plus,
     RefreshCw,
@@ -16,6 +14,7 @@ import {
     Utensils,
 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
+import InputError from '@/components/input-error';
 import { PageHeader } from '@/components/shared/page-header';
 import { Pagination } from '@/components/shared/pagination';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -160,6 +159,11 @@ export default function OwnerAvailabilityIndex({
         })),
     });
 
+    const activeBlocksCount = availabilityBlocks.filter(
+        (b) => b.status === 'active',
+    ).length;
+    const pricingErrorList = Object.values(pricingForm.errors).filter(Boolean);
+
     // Block creation form
     const [blocksPage, setBlocksPage] = useState(1);
     const blocksPageSize = 10;
@@ -183,6 +187,7 @@ export default function OwnerAvailabilityIndex({
         end_date: '',
         reason: '',
     });
+    const blockErrorList = Object.values(blockForm.errors).filter(Boolean);
 
     const handlePropertyChange = (propertyIdStr: string) => {
         router.get(
@@ -439,7 +444,7 @@ export default function OwnerAvailabilityIndex({
                             Active Blocks / Holds
                         </CardDescription>
                         <CardTitle className="font-heading text-2xl font-bold tabular-nums text-tijum-coral">
-                            {availabilityBlocks.length}
+                            {activeBlocksCount}
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4 pt-1">
@@ -489,8 +494,7 @@ export default function OwnerAvailabilityIndex({
                         <TabsTrigger value="blocks" className="gap-2">
                             <CalendarDays className="size-4" />
                             <span>
-                                Availability Blocks ({availabilityBlocks.length}
-                                )
+                                Availability Blocks ({activeBlocksCount})
                             </span>
                         </TabsTrigger>
                     </TabsList>
@@ -502,6 +506,7 @@ export default function OwnerAvailabilityIndex({
                         <DialogTrigger asChild>
                             <Button
                                 variant="outline"
+                                disabled={!canManage}
                                 className="border-tijum-coral text-tijum-coral hover:bg-tijum-coral hover:text-white dark:border-tijum-coral/70 dark:text-tijum-peach dark:hover:bg-tijum-coral dark:hover:text-white"
                             >
                                 <Plus className="mr-2 size-4" /> Block Dates /
@@ -522,6 +527,14 @@ export default function OwnerAvailabilityIndex({
                                 </DialogHeader>
 
                                 <div className="space-y-4 py-4">
+                                    {blockErrorList.length > 0 && (
+                                        <Alert variant="destructive">
+                                            <AlertCircle className="size-4" />
+                                            <AlertDescription>
+                                                {blockErrorList.join(' ')}
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
                                     <div className="space-y-2">
                                         <Label htmlFor="block-scope">
                                             Block Scope
@@ -531,6 +544,7 @@ export default function OwnerAvailabilityIndex({
                                             onValueChange={(v) =>
                                                 blockForm.setData('scope', v)
                                             }
+                                            disabled={!canManage}
                                         >
                                             <SelectTrigger id="block-scope">
                                                 <SelectValue />
@@ -566,6 +580,7 @@ export default function OwnerAvailabilityIndex({
                                                         v,
                                                     )
                                                 }
+                                                disabled={!canManage}
                                             >
                                                 <SelectTrigger id="block-room-type">
                                                     <SelectValue placeholder="Choose Room Type" />
@@ -583,6 +598,12 @@ export default function OwnerAvailabilityIndex({
                                                     ))}
                                                 </SelectContent>
                                             </Select>
+                                            <InputError
+                                                message={
+                                                    blockForm.errors
+                                                        .property_room_type_id
+                                                }
+                                            />
                                         </div>
                                     )}
 
@@ -602,6 +623,7 @@ export default function OwnerAvailabilityIndex({
                                                         v,
                                                     )
                                                 }
+                                                disabled={!canManage}
                                             >
                                                 <SelectTrigger id="block-room">
                                                     <SelectValue placeholder="Choose Room" />
@@ -620,6 +642,12 @@ export default function OwnerAvailabilityIndex({
                                                     ))}
                                                 </SelectContent>
                                             </Select>
+                                            <InputError
+                                                message={
+                                                    blockForm.errors
+                                                        .property_room_id
+                                                }
+                                            />
                                         </div>
                                     )}
 
@@ -635,6 +663,7 @@ export default function OwnerAvailabilityIndex({
                                                     v,
                                                 )
                                             }
+                                            disabled={!canManage}
                                         >
                                             <SelectTrigger id="block-type">
                                                 <SelectValue />
@@ -660,6 +689,7 @@ export default function OwnerAvailabilityIndex({
                                             <Input
                                                 id="block-start"
                                                 type="date"
+                                                disabled={!canManage}
                                                 value={
                                                     blockForm.data.start_date
                                                 }
@@ -671,6 +701,11 @@ export default function OwnerAvailabilityIndex({
                                                 }
                                                 required
                                             />
+                                            <InputError
+                                                message={
+                                                    blockForm.errors.start_date
+                                                }
+                                            />
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="block-end">
@@ -679,6 +714,7 @@ export default function OwnerAvailabilityIndex({
                                             <Input
                                                 id="block-end"
                                                 type="date"
+                                                disabled={!canManage}
                                                 value={blockForm.data.end_date}
                                                 onChange={(e) =>
                                                     blockForm.setData(
@@ -687,6 +723,11 @@ export default function OwnerAvailabilityIndex({
                                                     )
                                                 }
                                                 required
+                                            />
+                                            <InputError
+                                                message={
+                                                    blockForm.errors.end_date
+                                                }
                                             />
                                         </div>
                                     </div>
@@ -698,6 +739,7 @@ export default function OwnerAvailabilityIndex({
                                         <Textarea
                                             id="block-notes"
                                             rows={2}
+                                            disabled={!canManage}
                                             placeholder="e.g. AC unit repair, wall painting, host family visit"
                                             value={blockForm.data.reason}
                                             onChange={(e) =>
@@ -706,6 +748,9 @@ export default function OwnerAvailabilityIndex({
                                                     e.target.value,
                                                 )
                                             }
+                                        />
+                                        <InputError
+                                            message={blockForm.errors.reason}
                                         />
                                     </div>
                                 </div>
@@ -720,7 +765,9 @@ export default function OwnerAvailabilityIndex({
                                     </Button>
                                     <Button
                                         type="submit"
-                                        disabled={blockForm.processing}
+                                        disabled={
+                                            !canManage || blockForm.processing
+                                        }
                                         className="bg-tijum-coral hover:bg-tijum-coral/90"
                                     >
                                         {blockForm.processing
@@ -755,6 +802,8 @@ export default function OwnerAvailabilityIndex({
                                 <div className="flex items-center space-x-2">
                                     <Checkbox
                                         id="food_provided"
+                                        aria-label="Food or meals provided at this property"
+                                        disabled={!canManage}
                                         checked={pricingForm.data.food_provided}
                                         onCheckedChange={(c) =>
                                             pricingForm.setData(
@@ -776,6 +825,8 @@ export default function OwnerAvailabilityIndex({
                                         <div className="flex items-center space-x-2">
                                             <Checkbox
                                                 id="bf_inc"
+                                                aria-label="Breakfast Included"
+                                                disabled={!canManage}
                                                 checked={
                                                     pricingForm.data
                                                         .breakfast_included
@@ -797,6 +848,8 @@ export default function OwnerAvailabilityIndex({
                                         <div className="flex items-center space-x-2">
                                             <Checkbox
                                                 id="ln_inc"
+                                                aria-label="Lunch Included"
+                                                disabled={!canManage}
                                                 checked={
                                                     pricingForm.data
                                                         .lunch_included
@@ -818,6 +871,8 @@ export default function OwnerAvailabilityIndex({
                                         <div className="flex items-center space-x-2">
                                             <Checkbox
                                                 id="dn_inc"
+                                                aria-label="Dinner Included"
+                                                disabled={!canManage}
                                                 checked={
                                                     pricingForm.data
                                                         .dinner_included
@@ -861,7 +916,18 @@ export default function OwnerAvailabilityIndex({
                                     duration is not offered.
                                 </CardDescription>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="space-y-4">
+                                {pricingErrorList.length > 0 && (
+                                    <Alert variant="destructive">
+                                        <AlertCircle className="size-4" />
+                                        <AlertTitle>
+                                            Could not save rates
+                                        </AlertTitle>
+                                        <AlertDescription>
+                                            {pricingErrorList.join(' ')}
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
                                 <div className="divide-y divide-tijum-surface/80 dark:divide-border">
                                     {roomTypes.map((rt) => {
                                         const formRow =
@@ -1104,6 +1170,7 @@ export default function OwnerAvailabilityIndex({
                                 </p>
                                 <Button
                                     variant="outline"
+                                    disabled={!canManage}
                                     onClick={() => setBlockModalOpen(true)}
                                     className="mt-2"
                                 >
@@ -1167,7 +1234,16 @@ export default function OwnerAvailabilityIndex({
                                         </div>
 
                                         <div className="flex items-center gap-2">
-                                            {block.status === 'active' ? (
+                                            {block.status === 'active' &&
+                                            block.is_admin_restriction ? (
+                                                <Badge
+                                                    variant="destructive"
+                                                    className="text-xs"
+                                                >
+                                                    Admin Restriction
+                                                </Badge>
+                                            ) : block.status === 'active' &&
+                                              canManage ? (
                                                 <Button
                                                     variant="outline"
                                                     size="sm"

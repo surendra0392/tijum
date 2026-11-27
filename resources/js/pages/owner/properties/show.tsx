@@ -47,7 +47,6 @@ import { dashboard } from '@/routes/owner';
 import {
     edit as editPropertyRoute,
     index as propertiesIndexRoute,
-    show as showPropertyRoute,
 } from '@/routes/owner/properties';
 import {
     cancel as cancelAmendmentRoute,
@@ -969,6 +968,6 @@ OwnerPropertyShow.layout = {
     breadcrumbs: [
         { title: 'Partner Overview', href: dashboard() },
         { title: 'My Properties', href: propertiesIndexRoute() },
-        { title: 'Property Overview', href: showPropertyRoute(1) },
+        { title: 'Property Overview', href: '#' },
     ],
 };

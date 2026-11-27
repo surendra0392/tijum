@@ -25,9 +25,15 @@ class OwnerFrontDeskController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'property_reference', 'address_line_1']);
 
-        $selectedDate = $request->input('date')
-            ? CarbonImmutable::parse($request->input('date'), 'Asia/Kolkata')->toDateString()
-            : CarbonImmutable::now('Asia/Kolkata')->toDateString();
+        $rawDate = $request->input('date');
+        $selectedDate = CarbonImmutable::now('Asia/Kolkata')->toDateString();
+        if (is_string($rawDate) && trim($rawDate) !== '') {
+            try {
+                $selectedDate = CarbonImmutable::parse($rawDate, 'Asia/Kolkata')->toDateString();
+            } catch (\Throwable) {
+                // Fall back to today's IST date on malformed query input.
+            }
+        }
 
         $selectedPropertyId = $request->integer('property_id') ?: null;
         $activeTab = $request->input('tab', 'arrivals');
@@ -179,7 +185,7 @@ class OwnerFrontDeskController extends Controller
             'total_amount_rupees' => number_format($res->total_amount_minor / 100, 2),
             'allocated_rooms' => $res->allocations->map(fn ($a) => [
                 'room_id' => $a->property_room_id,
-                'room_number' => $a->room->room_number,
+                'room_number' => $a->room->room_number ?: 'Unassigned',
                 'floor_number' => $a->room->floor_number,
                 'allocated_quantity' => $a->allocated_quantity,
             ])->values()->all(),

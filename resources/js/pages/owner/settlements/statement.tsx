@@ -184,7 +184,8 @@ export default function SettlementStatement({ settlement }: Props) {
                     <h3 className="mb-3 font-heading text-sm font-bold text-tijum-plum dark:text-foreground print:text-neutral-900">
                         Fulfilled Booking Summary
                     </h3>
-                    <table className="w-full border-collapse border border-tijum-surface text-left tabular-nums dark:border-border print:border-neutral-300">
+                    <div className="overflow-x-auto print:overflow-visible">
+                        <table className="w-full min-w-[640px] border-collapse border border-tijum-surface text-left tabular-nums dark:border-border print:min-w-0 print:border-neutral-300">
                         <thead className="bg-tijum-cream/55 font-heading text-[10px] font-semibold tracking-wider text-tijum-plum uppercase dark:bg-muted/55 dark:text-foreground print:bg-neutral-100 print:text-neutral-700">
                             <tr>
                                 <th className="border border-tijum-surface p-2.5 dark:border-border print:border-neutral-300">
@@ -288,6 +289,7 @@ export default function SettlementStatement({ settlement }: Props) {
                             </tr>
                         </tfoot>
                     </table>
+                    </div>
                 </div>
 
                 {/* Net Settlement Summary Box */}

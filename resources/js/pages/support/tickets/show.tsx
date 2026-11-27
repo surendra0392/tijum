@@ -1,24 +1,14 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    AlertTriangle,
     ArrowLeft,
-    Building2,
-    Calendar,
     CheckCircle2,
-    Clock,
-    FileText,
-    Headphones,
-    HelpCircle,
-    LifeBuoy,
-    Lock,
-    MapPin,
     MessageSquare,
     Send,
-    Shield,
     ShieldCheck,
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
+import InputError from '@/components/input-error';
 import { PageHeader } from '@/components/shared/page-header';
 import { ResponsiveContainer } from '@/components/shared/responsive-container';
 import { Badge } from '@/components/ui/badge';
@@ -78,6 +68,7 @@ export default function CustomerTicketShow({
     grievanceOfficer,
 }: CustomerTicketShowProps) {
     const [replyText, setReplyText] = useState('');
+    const [replyError, setReplyError] = useState<string | null>(null);
     const [isSending, setIsSending] = useState(false);
     const [closeModalOpen, setCloseModalOpen] = useState(false);
     const [isClosing, setIsClosing] = useState(false);
@@ -87,12 +78,24 @@ export default function CustomerTicketShow({
         if (!replyText.trim()) return;
 
         setIsSending(true);
+        setReplyError(null);
         router.post(
             `/support/tickets/${ticket.ticket_reference}/messages`,
             { message: replyText },
             {
                 preserveScroll: true,
-                onSuccess: () => setReplyText(''),
+                onSuccess: () => {
+                    setReplyText('');
+                    setReplyError(null);
+                },
+                onError: (errors) => {
+                    const first = Object.values(errors)[0];
+                    setReplyError(
+                        typeof first === 'string'
+                            ? first
+                            : 'Unable to send reply. Please check your message.',
+                    );
+                },
                 onFinish: () => setIsSending(false),
             },
         );
@@ -279,6 +282,7 @@ export default function CustomerTicketShow({
                                     className="resize-none text-xs"
                                     required
                                 />
+                                <InputError message={replyError ?? undefined} />
 
                                 <div className="flex justify-end pt-1">
                                     <Button

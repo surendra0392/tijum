@@ -72,7 +72,7 @@ export default function DeleteUser() {
                         </DialogDescription>
 
                         <Form
-                            {...ProfileController.destroy()}
+                            {...ProfileController.destroy.form()}
                             options={{
                                 preserveScroll: true,
                             }}

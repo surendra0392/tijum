@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertCircle,
     ArrowDownLeft,
@@ -114,15 +114,30 @@ export default function PointsWalletPage({ wallet, ledger }: Props) {
         return entries;
     }, [entries, filter]);
 
+    const isServerPaginated =
+        !Array.isArray(ledger) && (ledger?.last_page ?? 1) > 1;
     const totalClientPages = Math.max(
         1,
         Math.ceil(filteredEntries.length / pageSize),
     );
     const safePage = Math.min(page, totalClientPages);
-    const pagedEntries = filteredEntries.slice(
-        (safePage - 1) * pageSize,
-        safePage * pageSize,
-    );
+    const pagedEntries = isServerPaginated
+        ? filteredEntries
+        : filteredEntries.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+    const handlePageChange = (nextPage: number) => {
+        if (isServerPaginated) {
+            router.get(
+                '/rewards/points',
+                { page: nextPage },
+                { preserveScroll: true },
+            );
+            return;
+        }
+        setPage(nextPage);
+    };
+
+    const maxRedemptionPercentage = wallet?.max_redemption_percentage ?? 20;
 
     const totalEarned =
         wallet?.total_earned_points ??
@@ -181,7 +196,8 @@ export default function PointsWalletPage({ wallet, ledger }: Props) {
                                     </span>
                                 </div>
                                 <p className="mt-2 text-[11px] text-muted-foreground">
-                                    Redeem up to 20% on any stay checkout.
+                                    Redeem up to {maxRedemptionPercentage}% on
+                                    any stay checkout.
                                 </p>
                             </CardContent>
                         </Card>
@@ -471,32 +487,48 @@ export default function PointsWalletPage({ wallet, ledger }: Props) {
                                 </div>
                                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-tijum-surface/80 bg-tijum-cream/25 px-6 py-3.5 text-xs text-tijum-plum-muted tabular-nums dark:border-border dark:bg-muted/20 dark:text-muted-foreground">
                                     <span>
-                                        Showing {(safePage - 1) * pageSize + 1}–
-                                        {Math.min(
-                                            safePage * pageSize,
-                                            filteredEntries.length,
-                                        )}{' '}
-                                        of {filteredEntries.length} transaction
-                                        {filteredEntries.length === 1
-                                            ? ''
-                                            : 's'}
+                                        {isServerPaginated && !Array.isArray(ledger) ? (
+                                            <>
+                                                Showing {pagedEntries.length} of{' '}
+                                                {ledger.total ??
+                                                    filteredEntries.length}{' '}
+                                                transaction
+                                                {(ledger.total ??
+                                                    filteredEntries.length) ===
+                                                1
+                                                    ? ''
+                                                    : 's'}
+                                            </>
+                                        ) : (
+                                            <>
+                                                Showing{' '}
+                                                {(safePage - 1) * pageSize + 1}–
+                                                {Math.min(
+                                                    safePage * pageSize,
+                                                    filteredEntries.length,
+                                                )}{' '}
+                                                of {filteredEntries.length}{' '}
+                                                transaction
+                                                {filteredEntries.length === 1
+                                                    ? ''
+                                                    : 's'}
+                                            </>
+                                        )}
                                     </span>
                                     <Pagination
                                         currentPage={
-                                            !Array.isArray(ledger) &&
-                                            ledger?.last_page &&
-                                            ledger.last_page > 1
+                                            isServerPaginated &&
+                                            !Array.isArray(ledger)
                                                 ? (ledger.current_page ?? 1)
                                                 : safePage
                                         }
                                         totalPages={
-                                            !Array.isArray(ledger) &&
-                                            ledger?.last_page &&
-                                            ledger.last_page > 1
-                                                ? ledger.last_page
+                                            isServerPaginated &&
+                                            !Array.isArray(ledger)
+                                                ? (ledger.last_page ?? 1)
                                                 : totalClientPages
                                         }
-                                        onPageChange={setPage}
+                                        onPageChange={handlePageChange}
                                     />
                                 </div>
                             </div>
@@ -525,9 +557,10 @@ export default function PointsWalletPage({ wallet, ledger }: Props) {
                                     How is the rupee conversion calculated?
                                 </p>
                                 <p className="mt-1">
-                                    Points convert at the platform rate (1 point
-                                    = ₹1) towards your accommodation total,
-                                    capped at 20% of subtotal per booking.
+                                    Points convert at the platform rate towards
+                                    your accommodation total, capped at{' '}
+                                    {maxRedemptionPercentage}% of subtotal per
+                                    booking.
                                 </p>
                             </div>
                         </div>

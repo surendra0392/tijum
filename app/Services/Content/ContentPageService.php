@@ -28,7 +28,13 @@ class ContentPageService
             ? $this->sanitizer->sanitizeBlocks($data['content_blocks'])
             : [];
 
-        $slug = Str::slug((string) ($data['slug'] ?: $data['title']));
+        $baseSlug = Str::slug((string) ($data['slug'] ?: $data['title'])) ?: 'page';
+        $slug = $baseSlug;
+        $suffix = 2;
+        while (ContentPage::query()->where('slug', $slug)->exists()) {
+            $slug = "{$baseSlug}-{$suffix}";
+            $suffix++;
+        }
         $status = ContentStatus::from((string) ($data['status'] ?? 'draft'));
         $publishedAt = $status === ContentStatus::Published ? now() : null;
 
@@ -147,6 +153,8 @@ class ContentPageService
         ContentPageRevision $revision,
         Admin $admin,
     ): ContentPage {
+        abort_unless($revision->content_page_id === $page->id, 404);
+
         $page->update([
             'title' => $revision->title,
             'content_blocks' => $revision->content_blocks,

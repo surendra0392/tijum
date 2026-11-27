@@ -25,8 +25,8 @@ export default function OwnerForgotPassword({
                     <KeyRound className="size-4" aria-hidden="true" />
                 </span>
                 <p className="text-xs leading-relaxed text-tijum-plum-muted">
-                    Enter the business email registered with your partner
-                    account to receive a secure reset link.
+                    Enter the business email or registered mobile number for
+                    your partner account to receive a secure reset link.
                 </p>
             </div>
 
@@ -45,7 +45,7 @@ export default function OwnerForgotPassword({
                                 htmlFor="email"
                                 className="text-[13px] font-semibold text-tijum-plum"
                             >
-                                Partner email address
+                                Partner email or mobile number
                             </Label>
                             <div className="relative">
                                 <Mail
@@ -54,12 +54,12 @@ export default function OwnerForgotPassword({
                                 />
                                 <Input
                                     id="email"
-                                    type="email"
+                                    type="text"
                                     name="email"
                                     required
                                     autoFocus
-                                    autoComplete="email"
-                                    placeholder="partner@property.in"
+                                    autoComplete="username"
+                                    placeholder="partner@property.in or 9876543210"
                                     className="bg-tijum-cream/25 pl-10 focus-visible:bg-white"
                                     aria-invalid={Boolean(errors.email)}
                                     aria-describedby={
@@ -108,7 +108,7 @@ export default function OwnerForgotPassword({
 OwnerForgotPassword.authMeta = {
     title: 'Reset partner password',
     description:
-        'Enter your partner email address to receive password recovery instructions.',
+        'Enter your partner email address or registered mobile number to receive password recovery instructions.',
 };
 
 OwnerForgotPassword.layout = OwnerForgotPassword.authMeta;

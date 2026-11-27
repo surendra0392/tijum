@@ -31,28 +31,33 @@ class ContentBlockSanitizer
             $cleanedData = match ($type) {
                 'hero' => [
                     'badge' => isset($data['badge']) ? strip_tags((string) $data['badge']) : null,
-                    'title' => strip_tags((string) ($data['title'] ?? '')),
-                    'subtitle' => strip_tags((string) ($data['subtitle'] ?? '')),
+                    'title' => strip_tags((string) ($data['title'] ?? $data['headline'] ?? '')),
+                    'subtitle' => strip_tags((string) ($data['subtitle'] ?? $data['subheadline'] ?? '')),
                     'cta_text' => isset($data['cta_text']) ? strip_tags((string) $data['cta_text']) : null,
                     'cta_url' => isset($data['cta_url']) ? $this->sanitizeUrl((string) $data['cta_url']) : null,
                     'background_image' => isset($data['background_image']) ? $this->sanitizeUrl((string) $data['background_image']) : null,
                 ],
                 'text' => [
-                    'heading' => isset($data['heading']) ? strip_tags((string) $data['heading']) : null,
+                    'heading' => (isset($data['heading']) || isset($data['title']))
+                        ? strip_tags((string) ($data['heading'] ?? $data['title']))
+                        : null,
                     'body' => $this->sanitizeHtml((string) ($data['body'] ?? $data['text'] ?? $data['html'] ?? '')),
                     'text' => $this->sanitizeHtml((string) ($data['text'] ?? $data['body'] ?? $data['html'] ?? '')),
                 ],
                 'image_text' => [
-                    'heading' => strip_tags((string) ($data['heading'] ?? '')),
-                    'body' => $this->sanitizeHtml((string) ($data['body'] ?? '')),
+                    'heading' => strip_tags((string) ($data['heading'] ?? $data['title'] ?? '')),
+                    'body' => $this->sanitizeHtml((string) ($data['body'] ?? $data['text'] ?? '')),
                     'image_url' => $this->sanitizeUrl((string) ($data['image_url'] ?? '')),
                     'image_alt' => strip_tags((string) ($data['image_alt'] ?? '')),
-                    'image_position' => in_array($data['image_position'] ?? 'left', ['left', 'right'], true) ? $data['image_position'] : 'left',
+                    'image_position' => in_array($data['image_position'] ?? $data['layout'] ?? 'left', ['left', 'right'], true)
+                        ? (string) ($data['image_position'] ?? $data['layout'])
+                        : 'left',
                     'cta_text' => isset($data['cta_text']) ? strip_tags((string) $data['cta_text']) : null,
                     'cta_url' => isset($data['cta_url']) ? $this->sanitizeUrl((string) $data['cta_url']) : null,
                 ],
                 'feature_grid' => [
-                    'heading' => strip_tags((string) ($data['heading'] ?? '')),
+                    'heading' => strip_tags((string) ($data['heading'] ?? $data['title'] ?? '')),
+                    'subtitle' => isset($data['subtitle']) ? strip_tags((string) $data['subtitle']) : null,
                     'items' => array_map(static fn (array $item): array => [
                         'title' => strip_tags((string) ($item['title'] ?? '')),
                         'description' => strip_tags((string) ($item['description'] ?? '')),
@@ -60,7 +65,7 @@ class ContentBlockSanitizer
                     ], is_array($data['items'] ?? null) ? $data['items'] : []),
                 ],
                 'benefits' => [
-                    'heading' => strip_tags((string) ($data['heading'] ?? '')),
+                    'heading' => strip_tags((string) ($data['heading'] ?? $data['title'] ?? '')),
                     'items' => array_map(static fn (array $item): array => [
                         'title' => strip_tags((string) ($item['title'] ?? '')),
                         'description' => strip_tags((string) ($item['description'] ?? '')),
@@ -68,28 +73,28 @@ class ContentBlockSanitizer
                     ], is_array($data['items'] ?? null) ? $data['items'] : []),
                 ],
                 'faq_accordion' => [
-                    'heading' => strip_tags((string) ($data['heading'] ?? 'Frequently Asked Questions')),
+                    'heading' => strip_tags((string) ($data['heading'] ?? $data['title'] ?? 'Frequently Asked Questions')),
                     'items' => array_map(static fn (array $item): array => [
                         'question' => strip_tags((string) ($item['question'] ?? '')),
                         'answer' => strip_tags((string) ($item['answer'] ?? '')),
                     ], is_array($data['items'] ?? null) ? $data['items'] : []),
                 ],
                 'cta' => [
-                    'heading' => strip_tags((string) ($data['heading'] ?? '')),
-                    'description' => strip_tags((string) ($data['description'] ?? '')),
-                    'button_text' => strip_tags((string) ($data['button_text'] ?? 'Explore Stays')),
+                    'heading' => strip_tags((string) ($data['heading'] ?? $data['headline'] ?? '')),
+                    'description' => strip_tags((string) ($data['description'] ?? $data['text'] ?? '')),
+                    'button_text' => strip_tags((string) ($data['button_text'] ?? $data['button_label'] ?? 'Explore Stays')),
                     'button_url' => $this->sanitizeUrl((string) ($data['button_url'] ?? '/search')),
                     'secondary_button_text' => isset($data['secondary_button_text']) ? strip_tags((string) $data['secondary_button_text']) : null,
                     'secondary_button_url' => isset($data['secondary_button_url']) ? $this->sanitizeUrl((string) $data['secondary_button_url']) : null,
                 ],
                 'property_collection' => [
-                    'heading' => strip_tags((string) ($data['heading'] ?? 'Featured Accommodations')),
+                    'heading' => strip_tags((string) ($data['heading'] ?? $data['title'] ?? 'Featured Accommodations')),
                     'city_id' => isset($data['city_id']) ? (int) $data['city_id'] : null,
                     'limit' => isset($data['limit']) ? min(12, max(1, (int) $data['limit'])) : 6,
                     'view_all_url' => isset($data['view_all_url']) ? $this->sanitizeUrl((string) $data['view_all_url']) : '/search',
                 ],
                 'city_discovery' => [
-                    'heading' => strip_tags((string) ($data['heading'] ?? 'Explore Food-Inclusive Stays by City')),
+                    'heading' => strip_tags((string) ($data['heading'] ?? $data['title'] ?? 'Explore Food-Inclusive Stays by City')),
                     'description' => strip_tags((string) ($data['description'] ?? '')),
                 ],
                 default => null,

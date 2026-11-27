@@ -3,10 +3,12 @@
 namespace App\Http\Middleware;
 
 use App\Models\Admin;
+use App\Models\City;
 use App\Models\Owner;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use Throwable;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -44,6 +46,13 @@ class HandleInertiaRequests extends Middleware
             'appearance' => $request->cookie('appearance') ?? 'light',
             'auth' => $this->resolvePortalAuth($request),
             'wishlistIds' => $this->resolveCustomerWishlistIds($request),
+            'publicCities' => fn (): array => $this->resolvePublicCities($request),
+            'flash' => fn (): array => [
+                'status' => $request->session()->get('status'),
+                'success' => $request->session()->get('success'),
+                'error' => $request->session()->get('error'),
+                'warning' => $request->session()->get('warning'),
+            ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'googleMapsApiKey' => config('services.google.maps_api_key'),
             'pwa' => [
@@ -112,5 +121,39 @@ class HandleInertiaRequests extends Middleware
                 ->map(static fn (mixed $id): int => (int) $id)
                 ->all(),
         );
+    }
+
+    /**
+     * Share active Admin-managed cities for public navigation and footer links.
+     *
+     * @return list<array{name: string, slug: string}>
+     */
+    private function resolvePublicCities(Request $request): array
+    {
+        if (
+            $request->is('owner', 'owner/*')
+            || $request->routeIs('owner.*')
+            || $request->is('admin', 'admin/*')
+            || $request->routeIs('admin.*')
+        ) {
+            return [];
+        }
+
+        try {
+            return array_values(
+                City::query()
+                    ->where('is_active', true)
+                    ->orderBy('sort_order')
+                    ->orderBy('name')
+                    ->get(['name', 'slug'])
+                    ->map(static fn (City $city): array => [
+                        'name' => $city->name,
+                        'slug' => $city->slug,
+                    ])
+                    ->all(),
+            );
+        } catch (Throwable) {
+            return [];
+        }
     }
 }

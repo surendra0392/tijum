@@ -83,6 +83,10 @@ class AdminMarketingEmailCampaignController extends Controller
 
     public function update(Request $request, MarketingEmailCampaign $emailCampaign): RedirectResponse
     {
+        if ($emailCampaign->status === EmailCampaignStatus::Sent) {
+            return back()->with('error', 'Sent email campaigns are locked for audit integrity and cannot be modified.');
+        }
+
         $validated = $request->validate([
             'campaign_id' => ['nullable', 'exists:marketing_campaigns,id'],
             'title' => ['required', 'string', 'max:255'],

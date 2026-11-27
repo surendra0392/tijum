@@ -64,6 +64,11 @@ export default function PublicLayout({ children }: PropsWithChildren) {
     const page = usePage();
     const customer = page.props.auth?.user;
     const serverWishlistIds = page.props.wishlistIds;
+    const activeDestinations =
+        Array.isArray(page.props.publicCities) &&
+        page.props.publicCities.length > 0
+            ? page.props.publicCities
+            : destinations;
     const currentPath = page.url.split('?')[0].split('#')[0] || '/';
     const [mobileOpen, setMobileOpen] = useState(false);
     const [wishlistCount, setWishlistCount] = useState(() =>
@@ -556,7 +561,7 @@ export default function PublicLayout({ children }: PropsWithChildren) {
                         </FooterGroup>
 
                         <FooterGroup title="Destinations">
-                            {destinations.map((destination) => (
+                            {activeDestinations.map((destination) => (
                                 <FooterLink
                                     key={destination.slug}
                                     href={cityShow(destination.slug)}

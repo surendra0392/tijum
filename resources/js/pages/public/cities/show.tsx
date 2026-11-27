@@ -7,7 +7,6 @@ import {
     Compass,
     LayoutGrid,
     LayoutList,
-    Map as MapIcon,
     MapPin,
     SlidersHorizontal,
 } from 'lucide-react';
@@ -253,6 +252,7 @@ export default function CityLandingPage({
                                 className="flex cursor-pointer items-center gap-2 text-xs font-medium text-tijum-plum hover:text-tijum-coral"
                             >
                                 <Checkbox
+                                    aria-label={`Filter by ${c.name}`}
                                     checked={selectedCategories.includes(
                                         c.name,
                                     )}
@@ -312,6 +312,7 @@ export default function CityLandingPage({
                 </p>
                 <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-tijum-plum hover:text-tijum-coral">
                     <Checkbox
+                        aria-label="Food included only"
                         checked={foodOnly}
                         onCheckedChange={(checked) => {
                             setCurrentPage(1);
@@ -429,31 +430,32 @@ export default function CityLandingPage({
             },
             property_amenities: p.property_amenities ?? [],
             room_summaries: [],
-            price: {
-                amount_minor: 800000,
-                currency: 'INR',
-                duration_type: 'monthly',
-                pricing_basis_label: 'Per Month',
-                is_estimate: false,
-            },
+            price: p.monthly_price_paise
+                ? {
+                      amount_minor: p.monthly_price_paise,
+                      currency: 'INR',
+                      duration_type: 'monthly',
+                      pricing_basis_label: 'Per Month',
+                      is_estimate: false,
+                  }
+                : p.daily_price_paise
+                  ? {
+                        amount_minor: p.daily_price_paise,
+                        currency: 'INR',
+                        duration_type: 'daily',
+                        pricing_basis_label: 'Per Day',
+                        is_estimate: false,
+                    }
+                  : null,
             average_rating: p.rating_average ?? null,
             review_count: p.reviews_count ?? 0,
         })) as unknown as SearchResultCard[];
     }, [properties, city]);
 
-    const safeSeo = seo
-        ? {
-              ...seo,
-              title: `Accommodation in ${city.name} | TIJUM`,
-              description: `Explore TIJUM accommodation in ${city.name} with transparent room-type pricing and exact meal information.`,
-              structuredData: undefined,
-          }
-        : undefined;
-
     return (
         <>
             <PublicSeoHead
-                seo={safeSeo}
+                seo={seo}
                 fallbackTitle={`Accommodation in ${city.name} | TIJUM`}
                 fallbackDescription={`Explore TIJUM accommodation in ${city.name} with transparent room-type pricing and exact meal information.`}
             />

@@ -111,8 +111,9 @@ class PropertySearchRequest extends FormRequest
         if ($this->has('category')) {
             $catInput = $this->input('category');
             if ($catInput !== null && $catInput !== '') {
-                $rawList = is_array($catInput) ? $catInput : explode(',', (string) $catInput);
+                $rawList = array_slice(is_array($catInput) ? $catInput : explode(',', (string) $catInput), 0, 10);
                 $normalizedIds = [];
+                $slugsToResolve = [];
 
                 $legacySlugMap = [
                     'independent-hostel' => 'hostels-pg',
@@ -140,14 +141,19 @@ class PropertySearchRequest extends FormRequest
                 foreach ($rawList as $item) {
                     if (is_numeric($item)) {
                         $normalizedIds[] = (int) $item;
-                    } elseif (is_string($item)) {
+                    } elseif (is_string($item) && trim($item) !== '') {
                         $slug = strtolower(trim($item));
-                        $targetSlug = $legacySlugMap[$slug] ?? $slug;
-                        $id = PropertyCategory::query()->where('slug', $targetSlug)->value('id');
-                        if ($id !== null) {
-                            $normalizedIds[] = (int) $id;
-                        }
+                        $slugsToResolve[] = $legacySlugMap[$slug] ?? $slug;
                     }
+                }
+
+                if ($slugsToResolve !== []) {
+                    $resolvedIds = PropertyCategory::query()
+                        ->whereIn('slug', array_values(array_unique($slugsToResolve)))
+                        ->pluck('id')
+                        ->map(static fn (mixed $id): int => (int) $id)
+                        ->all();
+                    $normalizedIds = array_merge($normalizedIds, $resolvedIds);
                 }
 
                 $this->merge(['category' => array_values(array_unique($normalizedIds))]);

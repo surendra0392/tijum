@@ -127,12 +127,6 @@ parameters:
 			path: app/Http/Controllers/Admin/Financial/AdminSettlementController.php
 
 		-
-			message: '#^Strict comparison using \=\=\= between string and App\\Enums\\EmailCampaignStatus\:\:Sent will always evaluate to false\.$#'
-			identifier: identical.alwaysFalse
-			count: 1
-			path: app/Http/Controllers/Admin/Marketing/AdminMarketingEmailCampaignController.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
 			identifier: property.notFound
 			count: 1
@@ -565,12 +559,6 @@ parameters:
 			path: app/Http/Resources/Api/V1/OwnerProfileResource.php
 
 		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Api\\V1\\ReservationResource\:\:\$check_out_date\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Api/V1/ReservationResource.php
-
-		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.expr
 			count: 1
@@ -628,24 +616,6 @@ parameters:
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.expr
 			count: 4
-			path: app/Services/Admin/AdminActivityFeedService.php
-
-		-
-			message: '#^Match arm comparison between ''approved''\|''cancelled''\|''draft''\|''failed''\|''on_hold''\|''pending_approval''\|''reversed''\|''settled''\|''transfer_pending'' and ''completed'' is always false\.$#'
-			identifier: match.alwaysFalse
-			count: 1
-			path: app/Services/Admin/AdminActivityFeedService.php
-
-		-
-			message: '#^Match arm comparison between ''approved''\|''cancelled''\|''draft''\|''failed''\|''on_hold''\|''pending_approval''\|''reversed''\|''settled''\|''transfer_pending'' and ''pending'' is always false\.$#'
-			identifier: match.alwaysFalse
-			count: 1
-			path: app/Services/Admin/AdminActivityFeedService.php
-
-		-
-			message: '#^Match arm comparison between ''cancelled''\|''draft''\|''failed''\|''on_hold''\|''pending_approval''\|''reversed''\|''settled''\|''transfer_pending'' and ''processing'' is always false\.$#'
-			identifier: match.alwaysFalse
-			count: 1
 			path: app/Services/Admin/AdminActivityFeedService.php
 
 		-
@@ -710,12 +680,6 @@ parameters:
 
 		-
 			message: '#^Method App\\Services\\Admin\\AdminOperationsQueueService\:\:getPropertyApprovalQueue\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\{id\: int, property_id\: int, property_name\: string, city\: string, category\: string, owner_name\: string, status\: App\\Enums\\PropertyVerificationStatus, submitted_at\: string\|null, \.\.\.\}\>\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Services/Admin/AdminOperationsQueueService.php
-
-		-
-			message: '#^Method App\\Services\\Admin\\AdminOperationsQueueService\:\:getReservationOperationsQueue\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\{id\: int, booking_reference\: string, property_name\: string, city\: string, guest_name\: mixed, stay_dates\: string, status\: string, status_label\: string, \.\.\.\}\>\.$#'
 			identifier: return.type
 			count: 1
 			path: app/Services/Admin/AdminOperationsQueueService.php
@@ -847,12 +811,6 @@ parameters:
 			path: app/Services/LocationAutocompleteService.php
 
 		-
-			message: '#^Call to function in_array\(\) with arguments string, array\{App\\Enums\\EmailCampaignStatus\:\:Sending, App\\Enums\\EmailCampaignStatus\:\:Sent\} and true will always evaluate to false\.$#'
-			identifier: function.impossibleType
-			count: 1
-			path: app/Services/Marketing/MarketingCampaignService.php
-
-		-
 			message: '#^Offset 0 on array\{0\: int\<0, max\>, 1\: int\<0, max\>, 2\: int, 3\: string, mime\: string, channels\?\: int, bits\?\: int\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
@@ -905,18 +863,6 @@ parameters:
 			identifier: nullsafe.neverNull
 			count: 4
 			path: app/Services/Notifications/NotificationPreferenceService.php
-
-		-
-			message: '#^Method App\\Services\\Notifications\\WebhookProcessingService\:\:updateDeliveryFromWhatsAppStatus\(\) has parameter \$raw with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: app/Services/Notifications/WebhookProcessingService.php
-
-		-
-			message: '#^Parameter \#3 \$timestamp of method App\\Services\\Notifications\\WebhookProcessingService\:\:updateDeliveryFromWhatsAppStatus\(\) expects Illuminate\\Support\\Carbon, Carbon\\CarbonImmutable\|Illuminate\\Support\\Carbon given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/Notifications/WebhookProcessingService.php
 
 		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
@@ -1009,20 +955,8 @@ parameters:
 			path: app/Services/ReservationData.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\PropertyRatingSummary\:\:\$total_published_reviews\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/Seo/SeoService.php
-
-		-
 			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
 			identifier: method.nonObject
-			count: 1
-			path: app/Services/Seo/SeoService.php
-
-		-
-			message: '#^Cannot cast array\<mixed\>\|string to string\.$#'
-			identifier: cast.string
 			count: 1
 			path: app/Services/Seo/SeoService.php
 

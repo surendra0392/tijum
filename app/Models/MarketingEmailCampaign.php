@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property EmailCampaignStatus $status
+ */
 class MarketingEmailCampaign extends Model
 {
     protected $fillable = [

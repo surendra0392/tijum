@@ -5,16 +5,24 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Public;
 
 use App\Enums\BannerPlacement;
+use App\Enums\OwnerStatus;
 use App\Enums\PropertyOperationalStatus;
 use App\Http\Controllers\Controller;
+use App\Models\ContentFaq;
 use App\Models\MarketingBanner;
+use App\Models\PlatformSetting;
 use App\Models\Property;
+use App\Models\SeoSetting;
 use App\Services\PropertySearchCustomerData;
 use App\Services\PropertySearchEligibility;
 use App\Services\Seo\SeoService;
 use App\Services\Seo\SitemapService;
 use App\Services\StayTimingPolicy;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -51,6 +59,9 @@ class PublicPageController extends Controller
             ->where('is_verified', true)
             ->where('booking_eligible', true)
             ->where('status', PropertyOperationalStatus::Active->value)
+            ->whereNotNull('approved_at')
+            ->whereHas('owner', static fn ($q) => $q->where('status', OwnerStatus::Active))
+            ->whereHas('category', static fn ($q) => $q->where('is_active', true))
             ->with([
                 'city',
                 'category',
@@ -155,6 +166,20 @@ class PublicPageController extends Controller
             'address' => 'TIJUM Marketplace Pvt. Ltd., Level 4, Cyber Gateway, HITEC City, Hyderabad, Telangana 500081, India',
         ]);
 
+        $settingPhone = trim((string) PlatformSetting::get('general.support_phone', ''));
+        $settingEmail = trim((string) PlatformSetting::get('general.support_email', ''));
+        $settingAddress = trim((string) PlatformSetting::get('general.default_address', ''));
+
+        if ($settingPhone !== '') {
+            $contactConfig['phone'] = $settingPhone;
+        }
+        if ($settingEmail !== '') {
+            $contactConfig['email'] = $settingEmail;
+        }
+        if ($settingAddress !== '') {
+            $contactConfig['address'] = $settingAddress;
+        }
+
         /** @var array<string, array{username?: string, number?: string, url: string}> $socialConfig */
         $socialConfig = config('tijum.social', [
             'facebook' => [
@@ -171,9 +196,19 @@ class PublicPageController extends Controller
             ],
         ]);
 
+        $whatsappDigits = preg_replace('/\D+/', '', (string) ($contactConfig['whatsapp'] ?? ''));
+        if (is_string($whatsappDigits) && $whatsappDigits !== '') {
+            $waInternational = strlen($whatsappDigits) === 10 ? '91'.$whatsappDigits : $whatsappDigits;
+            $socialConfig['whatsapp'] = [
+                'number' => (string) $contactConfig['whatsapp'],
+                'url' => "https://wa.me/{$waInternational}",
+            ];
+        }
+
         return Inertia::render('public/contact', [
             'contact' => $contactConfig,
             'social' => $socialConfig,
+            'status' => request()->session()->get('status'),
             'seo' => $this->buildSeoPayload(
                 title: 'Contact Us — Customer Support, Partner Desk & WhatsApp | TIJUM',
                 description: 'Contact TIJUM via WhatsApp (8142334033), call, or email support@tijum.com. Connect with us on Instagram and Facebook (tijum.official) for accommodations across Hyderabad, Vijayawada, Guntur, and Visakhapatnam.',
@@ -195,6 +230,28 @@ class PublicPageController extends Controller
         ]);
     }
 
+    public function submitContact(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'min:2', 'max:120'],
+            'email' => ['required', 'email', 'max:150'],
+            'mobile' => ['required', 'string', 'min:7', 'max:25'],
+            'subject' => ['required', 'string', 'in:booking,partner,general'],
+            'message' => ['required', 'string', 'min:10', 'max:3000'],
+        ]);
+
+        Log::info('Public contact inquiry received.', [
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'mobile' => $validated['mobile'],
+            'subject' => $validated['subject'],
+            'message' => $validated['message'],
+            'ip' => $request->ip(),
+        ]);
+
+        return back()->with('status', 'Thank you! Your inquiry has been received by the TIJUM team. We will get back to you within business hours.');
+    }
+
     public function grievanceRedressal(): Response
     {
         /** @var array<string, string> $officer */
@@ -204,6 +261,28 @@ class PublicPageController extends Controller
             'acknowledgement_hours' => 48,
             'resolution_days' => 30,
         ]);
+
+        $officerOverrides = [
+            'name' => trim((string) PlatformSetting::get('grievance.officer_name', '')),
+            'designation' => trim((string) PlatformSetting::get('grievance.officer_designation', '')),
+            'email' => trim((string) PlatformSetting::get('grievance.officer_email', '')),
+            'phone' => trim((string) PlatformSetting::get('grievance.officer_phone', '')),
+            'address' => trim((string) PlatformSetting::get('grievance.officer_address', '')),
+        ];
+        foreach ($officerOverrides as $key => $value) {
+            if ($value !== '') {
+                $officer[$key] = $value;
+            }
+        }
+
+        $ackHours = PlatformSetting::get('grievance.sla_acknowledgement_hours');
+        if (is_numeric($ackHours) && (int) $ackHours > 0) {
+            $slas['acknowledgement_hours'] = (int) $ackHours;
+        }
+        $resDays = PlatformSetting::get('grievance.sla_resolution_days');
+        if (is_numeric($resDays) && (int) $resDays > 0) {
+            $slas['resolution_days'] = (int) $resDays;
+        }
 
         return Inertia::render('public/grievance-redressal', [
             'grievanceOfficer' => $officer,
@@ -279,8 +358,97 @@ class PublicPageController extends Controller
 
     public function faqs(): Response
     {
+        $publishedFaqs = ContentFaq::query()->published()->get();
+
+        $cmsFaqGroups = $publishedFaqs
+            ->groupBy(fn (ContentFaq $faq): string => trim((string) ($faq->category ?: 'General')))
+            ->map(function ($items, string $categoryName): array {
+                return [
+                    'id' => Str::slug($categoryName) ?: 'general',
+                    'category' => $categoryName,
+                    'description' => "Published answers for {$categoryName} maintained by TIJUM.",
+                    'items' => $items->map(fn (ContentFaq $faq): array => [
+                        'id' => 'cms-faq-'.$faq->id,
+                        'question' => $faq->question,
+                        'answer' => $faq->answer,
+                    ])->values()->all(),
+                ];
+            })
+            ->values()
+            ->all();
+
+        $faqEntities = [
+            [
+                '@type' => 'Question',
+                'name' => 'What is TIJUM?',
+                'acceptedAnswer' => [
+                    '@type' => 'Answer',
+                    'text' => 'TIJUM is an accommodation aggregation and booking marketplace connecting customers with verified Hostels/PG, Homestays, and Co-Living spaces, featuring transparent property-specific food flags on every listing.',
+                ],
+            ],
+            [
+                '@type' => 'Question',
+                'name' => 'What accommodation categories are available on TIJUM?',
+                'acceptedAnswer' => [
+                    '@type' => 'Answer',
+                    'text' => 'TIJUM consolidates accommodation into three canonical categories: Hostels/PG (hostel and paying guest accommodation with room options and meal arrangements shown per property), Homestays (accommodation in residential homes with property details and available services shown per property), and Co-Living (shared-living accommodation with room options and amenities shown per space).',
+                ],
+            ],
+            [
+                '@type' => 'Question',
+                'name' => 'Is food included in every bookable stay?',
+                'acceptedAnswer' => [
+                    '@type' => 'Answer',
+                    'text' => 'Search-eligible TIJUM stays provide food and display property-specific food flags for breakfast, lunch, and dinner. Exact meal inclusions are declared by each property and clearly highlighted before booking.',
+                ],
+            ],
+            [
+                '@type' => 'Question',
+                'name' => 'What are property-specific food flags?',
+                'acceptedAnswer' => [
+                    '@type' => 'Answer',
+                    'text' => 'Property-specific food flags indicate whether food is provided and distinguish individual meal offerings (Breakfast, Lunch, Dinner). Each property specifies its meal schedules, so guests know exactly what to expect before booking.',
+                ],
+            ],
+            [
+                '@type' => 'Question',
+                'name' => 'What are the standard check-in and checkout timings?',
+                'acceptedAnswer' => [
+                    '@type' => 'Answer',
+                    'text' => sprintf(
+                        'Standard check-in is %s and checkout is %s on the stay end date. Eligible room types may allow early check-in from %s subject to room availability and operational readiness; earlier arrival is not permitted.',
+                        $this->timing->getStandardCheckInTime(),
+                        $this->timing->getStandardCheckOutTime(),
+                        $this->timing->getEarliestEarlyCheckInTime(),
+                    ),
+                ],
+            ],
+        ];
+
+        $existingQuestions = array_map(
+            static fn (array $entity): string => strtolower(trim((string) $entity['name'])),
+            $faqEntities,
+        );
+
+        foreach ($publishedFaqs as $cmsFaq) {
+            $normalizedQuestion = strtolower(trim($cmsFaq->question));
+            if (in_array($normalizedQuestion, $existingQuestions, true)) {
+                continue;
+            }
+            $existingQuestions[] = $normalizedQuestion;
+            $faqEntities[] = [
+                '@type' => 'Question',
+                'name' => $cmsFaq->question,
+                'acceptedAnswer' => [
+                    '@type' => 'Answer',
+                    'text' => $cmsFaq->answer,
+                ],
+            ];
+        }
+
         return Inertia::render('public/faqs', [
             'timing' => $this->timing->timingSummary(),
+            'cmsFaqGroups' => $cmsFaqGroups,
             'seo' => $this->buildSeoPayload(
                 title: 'Frequently Asked Questions — Stays, Food Flags & Check-In | TIJUM',
                 description: 'Answers about TIJUM\'s property-specific food flags, Hostels/PG, Homestays, and Co-Living stays, standard timing, early check-in rules, and partners.',
@@ -292,53 +460,7 @@ class PublicPageController extends Controller
                         $this->breadcrumbSchema('FAQs', route('public.faqs')),
                         [
                             '@type' => 'FAQPage',
-                            'mainEntity' => [
-                                [
-                                    '@type' => 'Question',
-                                    'name' => 'What is TIJUM?',
-                                    'acceptedAnswer' => [
-                                        '@type' => 'Answer',
-                                        'text' => 'TIJUM is an accommodation aggregation and booking marketplace connecting customers with verified Hostels/PG, Homestays, and Co-Living spaces, featuring transparent property-specific food flags on every listing.',
-                                    ],
-                                ],
-                                [
-                                    '@type' => 'Question',
-                                    'name' => 'What accommodation categories are available on TIJUM?',
-                                    'acceptedAnswer' => [
-                                        '@type' => 'Answer',
-                                        'text' => 'TIJUM consolidates accommodation into three canonical categories: Hostels/PG (hostel and paying guest accommodation with room options and meal arrangements shown per property), Homestays (accommodation in residential homes with property details and available services shown per property), and Co-Living (shared-living accommodation with room options and amenities shown per space).',
-                                    ],
-                                ],
-                                [
-                                    '@type' => 'Question',
-                                    'name' => 'Is food included in every bookable stay?',
-                                    'acceptedAnswer' => [
-                                        '@type' => 'Answer',
-                                        'text' => 'Search-eligible TIJUM stays provide food and display property-specific food flags for breakfast, lunch, and dinner. Exact meal inclusions are declared by each property and clearly highlighted before booking.',
-                                    ],
-                                ],
-                                [
-                                    '@type' => 'Question',
-                                    'name' => 'What are property-specific food flags?',
-                                    'acceptedAnswer' => [
-                                        '@type' => 'Answer',
-                                        'text' => 'Property-specific food flags indicate whether food is provided and distinguish individual meal offerings (Breakfast, Lunch, Dinner). Each property specifies its meal schedules, so guests know exactly what to expect before booking.',
-                                    ],
-                                ],
-                                [
-                                    '@type' => 'Question',
-                                    'name' => 'What are the standard check-in and checkout timings?',
-                                    'acceptedAnswer' => [
-                                        '@type' => 'Answer',
-                                        'text' => sprintf(
-                                            'Standard check-in is %s and checkout is %s on the stay end date. Eligible room types may allow early check-in from %s subject to room availability and operational readiness; earlier arrival is not permitted.',
-                                            $this->timing->getStandardCheckInTime(),
-                                            $this->timing->getStandardCheckOutTime(),
-                                            $this->timing->getEarliestEarlyCheckInTime(),
-                                        ),
-                                    ],
-                                ],
-                            ],
+                            'mainEntity' => $faqEntities,
                         ],
                     ],
                 ],
@@ -369,6 +491,14 @@ class PublicPageController extends Controller
                 'Disallow: /settings',
                 'Disallow: /dashboard',
                 'Disallow: /reservations',
+                'Disallow: /wishlist',
+                'Disallow: /rewards',
+                'Disallow: /notifications',
+                'Disallow: /my-support',
+                'Disallow: /support/',
+                'Disallow: /customer/',
+                'Disallow: /reviews/',
+                'Disallow: /unsubscribe/',
                 'Disallow: /login',
                 'Disallow: /register',
                 'Disallow: /forgot-password',
@@ -400,12 +530,23 @@ class PublicPageController extends Controller
         string $canonical,
         array $structuredData,
     ): array {
+        $seoSettings = SeoSetting::current();
+        $ogImagePath = $seoSettings->default_og_image ?: self::OG_IMAGE_PATH;
+        $googleVerification = $seoSettings->google_site_verification
+            ?: (string) PlatformSetting::get('seo.google_site_verification', '');
+        $bingVerification = $seoSettings->bing_site_verification
+            ?: (string) PlatformSetting::get('seo.bing_site_verification', '');
+
         return [
             'title' => $title,
             'description' => $description,
             'canonical' => $canonical,
+            'robots' => $seoSettings->default_robots ?: 'index, follow',
             'ogType' => 'website',
-            'ogImage' => url(self::OG_IMAGE_PATH),
+            'ogImage' => url($ogImagePath),
+            'ogSiteName' => $seoSettings->site_name ?: 'TIJUM',
+            'googleSiteVerification' => $googleVerification !== '' ? $googleVerification : null,
+            'bingSiteVerification' => $bingVerification !== '' ? $bingVerification : null,
             'structuredData' => $structuredData,
         ];
     }

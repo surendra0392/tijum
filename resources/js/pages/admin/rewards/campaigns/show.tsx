@@ -438,14 +438,10 @@ export default function ShowCampaign({
                                                     {r.customer_name || 'Guest'}
                                                 </TableCell>
                                                 <TableCell className="text-xs text-tijum-plum-muted tabular-nums dark:text-muted-foreground">
-                                                    ₹
-                                                    {(
-                                                        (r.booking_amount_minor ??
-                                                            (r.discount_minor
-                                                                ? r.discount_minor *
-                                                                  4
-                                                                : 0)) / 100
-                                                    ).toLocaleString()}
+                                                    {r.booking_amount_minor !=
+                                                    null
+                                                        ? `₹${(r.booking_amount_minor / 100).toLocaleString()}`
+                                                        : '—'}
                                                 </TableCell>
                                                 <TableCell className="font-heading text-xs font-bold text-status-success-fg tabular-nums">
                                                     -₹

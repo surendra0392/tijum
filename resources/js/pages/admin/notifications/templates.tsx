@@ -1,5 +1,5 @@
-import { Head, Link } from '@inertiajs/react';
-import { Activity, ArrowLeft, Eye, Layers, Search } from 'lucide-react';
+import { Head } from '@inertiajs/react';
+import { Eye, Layers, Search } from 'lucide-react';
 import { useState } from 'react';
 import { EmptyState } from '@/components/shared/empty-state';
 import { PageHeader } from '@/components/shared/page-header';
@@ -162,28 +162,6 @@ export default function AdminNotificationTemplatesIndex({
                     eyebrow="Template Governance"
                     title="Notification Template Registry & Event Catalogue"
                     description="Pre-approved message definitions, DLT compliance codes, and Meta WhatsApp utility templates."
-                    actions={
-                        <>
-                            <Button asChild variant="outline" size="sm">
-                                <Link href="/admin/notifications">
-                                    <ArrowLeft
-                                        className="size-3.5"
-                                        aria-hidden="true"
-                                    />
-                                    <span>Back to Deliveries</span>
-                                </Link>
-                            </Button>
-                            <Button asChild variant="outline" size="sm">
-                                <Link href="/admin/notifications/providers">
-                                    <Activity
-                                        className="size-3.5 text-tijum-coral"
-                                        aria-hidden="true"
-                                    />
-                                    <span>Provider Gateways</span>
-                                </Link>
-                            </Button>
-                        </>
-                    }
                 />
 
                 {/* Filter & Role Pill Tabs Strip + Search Bar */}

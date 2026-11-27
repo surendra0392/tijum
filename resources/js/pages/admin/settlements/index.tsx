@@ -6,7 +6,6 @@ import {
     IndianRupee,
     Percent,
     Plus,
-    RefreshCw,
     Scale,
     ShieldCheck,
 } from 'lucide-react';
@@ -147,23 +146,12 @@ export default function AdminSettlementsIndex({
                     </>
                 }
                 actions={
-                    <>
-                        <Button variant="outline" asChild>
-                            <Link href="/admin/financial-reconciliation">
-                                <RefreshCw
-                                    className="size-4"
-                                    aria-hidden="true"
-                                />
-                                <span>Reconciliation</span>
-                            </Link>
-                        </Button>
-                        <Button variant="default" asChild>
-                            <Link href="/admin/settlements/candidates">
-                                <Plus className="size-4" aria-hidden="true" />
-                                <span>Discover Eligible Batches</span>
-                            </Link>
-                        </Button>
-                    </>
+                    <Button variant="default" asChild>
+                        <Link href="/admin/settlements/candidates">
+                            <Plus className="size-4" aria-hidden="true" />
+                            <span>Discover Eligible Batches</span>
+                        </Link>
+                    </Button>
                 }
             />
 

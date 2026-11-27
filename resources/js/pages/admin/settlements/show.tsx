@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
     ArrowLeft,
@@ -126,7 +126,10 @@ function getStatusSemantic(status: string): SemanticStatus {
 }
 
 export default function AdminSettlementShow({ settlement }: Props) {
+    const pageErrors =
+        (usePage().props.errors as Record<string, string> | undefined) ?? {};
     const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
     const [releaseDialogOpen, setReleaseDialogOpen] = useState(false);
     const [holdDialogOpen, setHoldDialogOpen] = useState(false);
     const [holdReason, setHoldReason] = useState('');
@@ -145,20 +148,38 @@ export default function AdminSettlementShow({ settlement }: Props) {
 
     const handleApprove = () => {
         setActionLoading('approve');
+        setActionError(null);
         router.post(
             `/admin/settlements/${settlement.id}/approve`,
             {},
-            { onFinish: () => setActionLoading(null) },
+            {
+                onError: (errors) =>
+                    setActionError(
+                        errors.settlement ??
+                            Object.values(errors)[0] ??
+                            'Unable to approve settlement batch.',
+                    ),
+                onFinish: () => setActionLoading(null),
+            },
         );
     };
 
     const handleReleaseConfirm = () => {
         setActionLoading('release');
+        setActionError(null);
         router.post(
             `/admin/settlements/${settlement.id}/release`,
             {},
             {
                 onSuccess: () => setReleaseDialogOpen(false),
+                onError: (errors) => {
+                    setReleaseDialogOpen(false);
+                    setActionError(
+                        errors.settlement ??
+                            Object.values(errors)[0] ??
+                            'Unable to release settlement payout.',
+                    );
+                },
                 onFinish: () => setActionLoading(null),
             },
         );
@@ -192,6 +213,8 @@ export default function AdminSettlementShow({ settlement }: Props) {
         settlement.refund_adjustments_minor !== 0 ||
         settlement.relocation_adjustments_minor !== 0 ||
         settlement.other_adjustments_minor !== 0;
+
+    const displayedSettlementError = actionError ?? pageErrors.settlement ?? null;
 
     return (
         <div className="space-y-6">
@@ -239,7 +262,9 @@ export default function AdminSettlementShow({ settlement }: Props) {
                             </a>
                         </Button>
 
-                        {settlement.status === 'draft' && (
+                        {['draft', 'pending_approval'].includes(
+                            settlement.status,
+                        ) && (
                             <Button
                                 type="button"
                                 variant="default"
@@ -292,6 +317,19 @@ export default function AdminSettlementShow({ settlement }: Props) {
             />
 
             {/* Error or Notes Alerts */}
+            {displayedSettlementError && (
+                <Alert
+                    variant="destructive"
+                    className="border-l-4 border-l-destructive"
+                >
+                    <AlertCircle className="size-4" />
+                    <AlertTitle>Settlement Action Blocked</AlertTitle>
+                    <AlertDescription>
+                        {displayedSettlementError}
+                    </AlertDescription>
+                </Alert>
+            )}
+
             {settlement.failure_reason && (
                 <Alert
                     variant="destructive"

@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, useForm, usePage } from '@inertiajs/react';
 import {
     Building2,
     Clock,
@@ -10,6 +10,7 @@ import {
     ShieldCheck,
 } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
+import InputError from '@/components/input-error';
 import { PublicPageHero } from '@/components/public/public-page-hero';
 import { PublicSeoHead } from '@/components/public/public-seo-head';
 import { SocialIcon, WhatsAppIcon } from '@/components/public/social-links';
@@ -56,37 +57,52 @@ type ContactProps = {
 };
 
 export default function Contact({ contact, social, seo }: ContactProps) {
+    const { publicCities } = usePage().props;
+    const activeCities =
+        Array.isArray(publicCities) && publicCities.length > 0
+            ? publicCities
+            : LAUNCH_CITIES;
     const phoneDisplay = contact?.phone ?? CONTACT_INFO.phone.display;
     const whatsappDisplay = contact?.whatsapp ?? CONTACT_INFO.whatsapp.number;
+    const whatsappHref = social?.whatsapp?.url ?? CONTACT_INFO.whatsapp.href;
     const supportEmail = contact?.email ?? CONTACT_INFO.emails.support;
     const partnersEmail =
         contact?.partners_email ?? CONTACT_INFO.emails.partners;
     const operatingHours = contact?.hours ?? CONTACT_INFO.hours;
     const officeAddress = contact?.address ?? CONTACT_INFO.officeAddress;
 
-    // Contact form state
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [mobile, setMobile] = useState('');
-    const [subject, setSubject] = useState<'booking' | 'partner' | 'general'>(
-        'booking',
-    );
-    const [message, setMessage] = useState('');
+    // Contact form state (submitted to POST /contact)
+    const contactForm = useForm<{
+        name: string;
+        email: string;
+        mobile: string;
+        subject: 'booking' | 'partner' | 'general';
+        message: string;
+    }>({
+        name: '',
+        email: '',
+        mobile: '',
+        subject: 'booking',
+        message: '',
+    });
     const [submitted, setSubmitted] = useState(false);
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
-        // Since inquiries are currently routed to WhatsApp and support mail,
-        // we provide immediate feedback and offer WhatsApp quick-send
-        setSubmitted(true);
+        contactForm.post('/contact', {
+            preserveScroll: true,
+            onSuccess: () => {
+                setSubmitted(true);
+            },
+        });
     };
 
     const handleWhatsAppPrefilled = () => {
         const text = encodeURIComponent(
-            `Hi TIJUM Support,\nName: ${name || 'Guest'}\nSubject: ${subject}\nMessage: ${message || 'I would like to inquire about stays.'}`,
+            `Hi TIJUM Support,\nName: ${contactForm.data.name || 'Guest'}\nSubject: ${contactForm.data.subject}\nMessage: ${contactForm.data.message || 'I would like to inquire about stays.'}`,
         );
         window.open(
-            `https://wa.me/918142334033?text=${text}`,
+            `${whatsappHref}?text=${text}`,
             '_blank',
             'noopener,noreferrer',
         );
@@ -359,7 +375,7 @@ export default function Contact({ contact, social, seo }: ContactProps) {
                                                 <div>
                                                     <h3 className="font-heading text-lg font-bold">
                                                         Thank you,{' '}
-                                                        {name ||
+                                                        {contactForm.data.name ||
                                                             'valued customer'}
                                                         !
                                                     </h3>
@@ -391,9 +407,10 @@ export default function Contact({ contact, social, seo }: ContactProps) {
                                                 <Button
                                                     type="button"
                                                     variant="ghost"
-                                                    onClick={() =>
-                                                        setSubmitted(false)
-                                                    }
+                                                    onClick={() => {
+                                                        contactForm.reset();
+                                                        setSubmitted(false);
+                                                    }}
                                                 >
                                                     Send another inquiry
                                                 </Button>
@@ -412,14 +429,21 @@ export default function Contact({ contact, social, seo }: ContactProps) {
                                                     <Input
                                                         id="contact-name"
                                                         type="text"
-                                                        value={name}
+                                                        value={contactForm.data.name}
                                                         onChange={(e) =>
-                                                            setName(
+                                                            contactForm.setData(
+                                                                'name',
                                                                 e.target.value,
                                                             )
                                                         }
                                                         placeholder="Enter your name"
                                                         required
+                                                    />
+                                                    <InputError
+                                                        message={
+                                                            contactForm.errors
+                                                                .name
+                                                        }
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
@@ -430,14 +454,21 @@ export default function Contact({ contact, social, seo }: ContactProps) {
                                                     <Input
                                                         id="contact-mobile"
                                                         type="tel"
-                                                        value={mobile}
+                                                        value={contactForm.data.mobile}
                                                         onChange={(e) =>
-                                                            setMobile(
+                                                            contactForm.setData(
+                                                                'mobile',
                                                                 e.target.value,
                                                             )
                                                         }
                                                         placeholder="+91 9876543210"
                                                         required
+                                                    />
+                                                    <InputError
+                                                        message={
+                                                            contactForm.errors
+                                                                .mobile
+                                                        }
                                                     />
                                                 </div>
                                             </div>
@@ -450,14 +481,21 @@ export default function Contact({ contact, social, seo }: ContactProps) {
                                                     <Input
                                                         id="contact-email"
                                                         type="email"
-                                                        value={email}
+                                                        value={contactForm.data.email}
                                                         onChange={(e) =>
-                                                            setEmail(
+                                                            contactForm.setData(
+                                                                'email',
                                                                 e.target.value,
                                                             )
                                                         }
                                                         placeholder="you@example.com"
                                                         required
+                                                    />
+                                                    <InputError
+                                                        message={
+                                                            contactForm.errors
+                                                                .email
+                                                        }
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
@@ -465,13 +503,18 @@ export default function Contact({ contact, social, seo }: ContactProps) {
                                                         Topic / Purpose *
                                                     </Label>
                                                     <Select
-                                                        value={subject}
+                                                        value={contactForm.data.subject}
                                                         onValueChange={(
                                                             value:
                                                                 | 'booking'
                                                                 | 'partner'
                                                                 | 'general',
-                                                        ) => setSubject(value)}
+                                                        ) =>
+                                                            contactForm.setData(
+                                                                'subject',
+                                                                value,
+                                                            )
+                                                        }
                                                     >
                                                         <SelectTrigger
                                                             id="contact-subject"
@@ -494,6 +537,12 @@ export default function Contact({ contact, social, seo }: ContactProps) {
                                                             </SelectItem>
                                                         </SelectContent>
                                                     </Select>
+                                                    <InputError
+                                                        message={
+                                                            contactForm.errors
+                                                                .subject
+                                                        }
+                                                    />
                                                 </div>
                                             </div>
 
@@ -503,15 +552,22 @@ export default function Contact({ contact, social, seo }: ContactProps) {
                                                 </Label>
                                                 <Textarea
                                                     id="contact-message"
-                                                    value={message}
+                                                    value={contactForm.data.message}
                                                     onChange={(e) =>
-                                                        setMessage(
+                                                        contactForm.setData(
+                                                            'message',
                                                             e.target.value,
                                                         )
                                                     }
                                                     rows={4}
                                                     placeholder="Tell us about the property, dates, food requirements, or questions you have..."
                                                     required
+                                                />
+                                                <InputError
+                                                    message={
+                                                        contactForm.errors
+                                                            .message
+                                                    }
                                                 />
                                             </div>
 
@@ -524,13 +580,16 @@ export default function Contact({ contact, social, seo }: ContactProps) {
                                                 </p>
                                                 <Button
                                                     type="submit"
+                                                    disabled={contactForm.processing}
                                                     className="min-w-36"
                                                 >
                                                     <Send
                                                         className="size-4"
                                                         aria-hidden="true"
                                                     />
-                                                    Send Message
+                                                    {contactForm.processing
+                                                        ? 'Sending…'
+                                                        : 'Send Message'}
                                                 </Button>
                                             </div>
                                         </form>
@@ -585,7 +644,7 @@ export default function Contact({ contact, social, seo }: ContactProps) {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="flex flex-wrap gap-2">
-                                        {LAUNCH_CITIES.map((city) => (
+                                        {activeCities.map((city) => (
                                             <Link
                                                 key={city.slug}
                                                 href={cityShow(city.slug)}

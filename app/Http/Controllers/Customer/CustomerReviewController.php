@@ -127,6 +127,8 @@ class CustomerReviewController extends Controller
             abort(403);
         }
 
+        abort_if($review->user_id !== $user->id, 403);
+
         if (! $review->canBeEditedByUser($user)) {
             return redirect()
                 ->route('reservations.show', ['reservation' => $review->reservation->booking_reference])
@@ -172,6 +174,8 @@ class CustomerReviewController extends Controller
         if (! $user instanceof User) {
             abort(403);
         }
+
+        abort_if($review->user_id !== $user->id, 403);
 
         if (! $review->canBeEditedByUser($user)) {
             abort(403, 'Review cannot be edited.');

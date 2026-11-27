@@ -198,9 +198,8 @@ export function VerificationStatusPanel({
                         <span>
                             Partner approval verifies your operator entity. Each
                             individual Hostel/PG, Homestay, or Co-Living
-                            property will still undergo property, room, bed, and
-                            food-package verification in Phase 06 before going
-                            live.
+                            property also undergoes property, room, and
+                            meal-inclusion verification before going live.
                         </span>
                     </div>
                 )}

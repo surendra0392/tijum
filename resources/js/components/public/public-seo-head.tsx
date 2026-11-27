@@ -34,7 +34,7 @@ export function PublicSeoHead({
             <meta
                 head-key="og-site-name"
                 property="og:site_name"
-                content="TIJUM"
+                content={seo?.ogSiteName ?? 'TIJUM'}
             />
             <meta head-key="og-title" property="og:title" content={title} />
             <meta
@@ -73,6 +73,20 @@ export function PublicSeoHead({
                     head-key="twitter-image"
                     name="twitter:image"
                     content={ogImage}
+                />
+            )}
+            {seo?.googleSiteVerification && (
+                <meta
+                    head-key="google-site-verification"
+                    name="google-site-verification"
+                    content={seo.googleSiteVerification}
+                />
+            )}
+            {seo?.bingSiteVerification && (
+                <meta
+                    head-key="bing-site-verification"
+                    name="msvalidate.01"
+                    content={seo.bingSiteVerification}
                 />
             )}
             {seo?.structuredData && (

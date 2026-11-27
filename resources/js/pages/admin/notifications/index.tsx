@@ -1,12 +1,10 @@
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    Activity,
     AlertCircle,
     ArrowRight,
     Bell,
     CheckCircle2,
     Clock,
-    Layers,
     Mail,
     MessageSquare,
     RefreshCw,
@@ -294,29 +292,7 @@ export default function AdminNotificationDeliveriesIndex({
                     eyebrow="Communication Operations"
                     title="Notification Operations & Delivery Monitor"
                     description="Audit real-time transactional dispatches across In-App, Email, SMS (DLT), and Meta WhatsApp Business API."
-                    actions={
-                        <>
-                            <WebPushToggle compact />
-                            <Button asChild variant="outline" size="sm">
-                                <Link href="/admin/notifications/templates">
-                                    <Layers
-                                        className="size-3.5 text-tijum-coral"
-                                        aria-hidden="true"
-                                    />
-                                    <span>Template Registry</span>
-                                </Link>
-                            </Button>
-                            <Button asChild variant="outline" size="sm">
-                                <Link href="/admin/notifications/providers">
-                                    <Activity
-                                        className="size-3.5 text-tijum-coral"
-                                        aria-hidden="true"
-                                    />
-                                    <span>Gateway Readiness</span>
-                                </Link>
-                            </Button>
-                        </>
-                    }
+                    actions={<WebPushToggle compact />}
                 />
 
                 {/* KPI Metrics Strip */}

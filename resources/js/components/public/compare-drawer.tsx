@@ -4,7 +4,6 @@ import {
     Check,
     Layers,
     MapPin,
-    Star,
     Utensils,
     X,
 } from 'lucide-react';
@@ -123,12 +122,12 @@ export function CompareDrawer() {
 
             {/* Comparison Dialog / Modal */}
             <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-                <DialogContent className="max-h-[90vh] w-[95vw] max-w-6xl overflow-y-auto rounded-[24px] border-tijum-surface bg-tijum-cream p-6 sm:p-8">
-                    <DialogHeader className="border-b border-tijum-surface pb-4">
-                        <DialogTitle className="font-heading text-2xl font-bold text-tijum-plum">
+                <DialogContent className="max-h-[90vh] w-[95vw] max-w-6xl overflow-y-auto rounded-[24px] border-tijum-surface bg-tijum-cream p-6 sm:p-8 dark:border-border dark:bg-card">
+                    <DialogHeader className="border-b border-tijum-surface pb-4 dark:border-border">
+                        <DialogTitle className="font-heading text-2xl font-bold text-tijum-plum dark:text-foreground">
                             Side-by-Side Property Comparison
                         </DialogTitle>
-                        <DialogDescription className="text-tijum-lavender">
+                        <DialogDescription className="text-tijum-lavender dark:text-muted-foreground">
                             Compare meal inclusions, resident policies,
                             amenities, and transparent prices across your
                             selected stays.
@@ -143,13 +142,13 @@ export function CompareDrawer() {
                             }}
                         >
                             {/* Header row: Property details */}
-                            <div className="self-end pb-2 font-heading text-sm font-semibold text-tijum-lavender">
+                            <div className="self-end pb-2 font-heading text-sm font-semibold text-tijum-lavender dark:text-muted-foreground">
                                 Stay Profile
                             </div>
                             {items.map((item) => (
                                 <div
                                     key={item.slug}
-                                    className="space-y-3 rounded-2xl border border-tijum-surface bg-white p-4 shadow-sm"
+                                    className="space-y-3 rounded-2xl border border-tijum-surface bg-white p-4 shadow-sm dark:border-border dark:bg-muted/40"
                                 >
                                     <div className="relative aspect-16/10 overflow-hidden rounded-xl bg-tijum-surface/40">
                                         {item.imageUrl ? (
@@ -159,7 +158,7 @@ export function CompareDrawer() {
                                                 className="h-full w-full object-cover"
                                             />
                                         ) : (
-                                            <div className="flex h-full items-center justify-center text-xs text-tijum-lavender">
+                                            <div className="flex h-full items-center justify-center text-xs text-tijum-lavender dark:text-muted-foreground">
                                                 Image pending
                                             </div>
                                         )}
@@ -169,10 +168,10 @@ export function CompareDrawer() {
                                             </Badge>
                                         )}
                                     </div>
-                                    <h4 className="line-clamp-1 font-heading text-base font-bold text-tijum-plum">
+                                    <h4 className="line-clamp-1 font-heading text-base font-bold text-tijum-plum dark:text-foreground">
                                         {item.name}
                                     </h4>
-                                    <p className="flex items-center gap-1 text-xs text-tijum-lavender">
+                                    <p className="flex items-center gap-1 text-xs text-tijum-lavender dark:text-muted-foreground">
                                         <MapPin className="size-3 text-tijum-coral" />
                                         {[item.locality, item.city]
                                             .filter(Boolean)
@@ -191,13 +190,13 @@ export function CompareDrawer() {
                             ))}
 
                             {/* Row: Price */}
-                            <div className="flex items-center border-t border-tijum-surface/60 py-3 text-xs font-semibold text-tijum-plum">
+                            <div className="flex items-center border-t border-tijum-surface/60 py-3 text-xs font-semibold text-tijum-plum dark:border-border dark:text-foreground">
                                 Starting Price
                             </div>
                             {items.map((item) => (
                                 <div
                                     key={item.slug}
-                                    className="border-t border-tijum-surface/60 py-3 font-heading text-lg font-bold text-tijum-plum"
+                                    className="border-t border-tijum-surface/60 py-3 font-heading text-lg font-bold text-tijum-plum dark:border-border dark:text-foreground"
                                 >
                                     {item.price ? (
                                         <>
@@ -205,12 +204,12 @@ export function CompareDrawer() {
                                                 item.price.amountMinor,
                                                 item.price.currency,
                                             )}
-                                            <span className="block text-xs font-normal text-tijum-lavender">
+                                            <span className="block text-xs font-normal text-tijum-lavender dark:text-muted-foreground">
                                                 {item.price.rateLabel}
                                             </span>
                                         </>
                                     ) : (
-                                        <span className="text-xs text-tijum-lavender">
+                                        <span className="text-xs text-tijum-lavender dark:text-muted-foreground">
                                             Pricing upon search
                                         </span>
                                     )}
@@ -218,13 +217,13 @@ export function CompareDrawer() {
                             ))}
 
                             {/* Row: Gender Policy */}
-                            <div className="flex items-center border-t border-tijum-surface/60 py-3 text-xs font-semibold text-tijum-plum">
+                            <div className="flex items-center border-t border-tijum-surface/60 py-3 text-xs font-semibold text-tijum-plum dark:border-border dark:text-foreground">
                                 Resident Eligibility
                             </div>
                             {items.map((item) => (
                                 <div
                                     key={item.slug}
-                                    className="border-t border-tijum-surface/60 py-3 text-xs text-tijum-plum"
+                                    className="border-t border-tijum-surface/60 py-3 text-xs text-tijum-plum dark:border-border dark:text-foreground"
                                 >
                                     {item.genderEligibility ||
                                         'All Genders Welcome'}
@@ -232,22 +231,22 @@ export function CompareDrawer() {
                             ))}
 
                             {/* Row: Meals / Food */}
-                            <div className="flex items-center border-t border-tijum-surface/60 py-3 text-xs font-semibold text-tijum-plum">
+                            <div className="flex items-center border-t border-tijum-surface/60 py-3 text-xs font-semibold text-tijum-plum dark:border-border dark:text-foreground">
                                 Meal Inclusions
                             </div>
                             {items.map((item) => (
                                 <div
                                     key={item.slug}
-                                    className="space-y-1 border-t border-tijum-surface/60 py-3 text-xs"
+                                    className="space-y-1 border-t border-tijum-surface/60 py-3 text-xs dark:border-border"
                                 >
-                                    <div className="flex items-center gap-1.5 font-medium text-tijum-plum">
+                                    <div className="flex items-center gap-1.5 font-medium text-tijum-plum dark:text-foreground">
                                         <Utensils className="size-3.5 text-tijum-coral" />
                                         {item.food.food_provided
                                             ? 'Meals Provided'
                                             : 'No Meals Included'}
                                     </div>
                                     {item.food.food_provided && (
-                                        <p className="text-[11px] text-tijum-lavender">
+                                        <p className="text-[11px] text-tijum-lavender dark:text-muted-foreground">
                                             {[
                                                 item.food.breakfast_included &&
                                                     'Breakfast',

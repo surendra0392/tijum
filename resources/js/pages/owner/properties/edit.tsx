@@ -15,9 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { dashboard } from '@/routes/owner';
 import {
-    edit as editPropertyRoute,
     index as propertiesIndexRoute,
-    show as showPropertyRoute,
     update as updatePropertyRoute,
 } from '@/routes/owner/properties';
 import {
@@ -241,7 +239,6 @@ EditPropertyPage.layout = {
     breadcrumbs: [
         { title: 'Partner Overview', href: dashboard() },
         { title: 'My Properties', href: propertiesIndexRoute() },
-        { title: 'Property Overview', href: showPropertyRoute(1) },
-        { title: 'Edit Details', href: editPropertyRoute(1) },
+        { title: 'Edit Details', href: '#' },
     ],
 };

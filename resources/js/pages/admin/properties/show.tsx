@@ -2021,6 +2021,7 @@ export default function AdminPropertyShow({
                                             >
                                                 <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-tijum-plum dark:text-foreground">
                                                     <Checkbox
+                                                        aria-label={`Flag ${doc.document_type_label} for replacement`}
                                                         checked={isChecked}
                                                         onCheckedChange={(
                                                             checked,

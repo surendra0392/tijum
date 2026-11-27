@@ -166,7 +166,7 @@ class ReconcilePartnerTransfer
                 'amount' => '₹'.number_format($transfer->amount_minor / 100, 2),
                 'settlement_reference' => $settlement->settlement_reference,
                 'transfer_reference' => $transfer->gateway_transfer_id ?: $transfer->transfer_reference,
-                'action_url' => url("/owner/settlements/{$settlement->id}"),
+                'action_url' => route('owner.settlements.show', $settlement),
             ];
 
             if ($processed) {

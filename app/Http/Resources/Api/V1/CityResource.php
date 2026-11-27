@@ -25,7 +25,7 @@ class CityResource extends JsonResource
             'state' => $this->state,
             'is_active' => (bool) $this->is_active,
             'property_count' => $this->whenCounted('properties', $this->properties_count, 0),
-            'discovery_url' => url("/hostels-in-{$this->slug}"),
+            'discovery_url' => url("/stays-in-{$this->slug}"),
         ];
     }
 }

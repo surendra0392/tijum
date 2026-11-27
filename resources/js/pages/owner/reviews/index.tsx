@@ -388,10 +388,12 @@ export default function OwnerReviewIndex({
                                             <span className="text-xs text-muted-foreground">
                                                 · {rev.room_type_name}
                                             </span>
-                                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200/60 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-400">
-                                                <ShieldCheck className="h-3 w-3" />
-                                                Verified Booking
-                                            </span>
+                                            {rev.verified_booking && (
+                                                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200/60 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-400">
+                                                    <ShieldCheck className="h-3 w-3" />
+                                                    Verified Booking
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="mt-1 flex items-center gap-2">
                                             <StarRating
@@ -532,8 +534,10 @@ export default function OwnerReviewIndex({
                                                     {rev.response.status_label}
                                                 </Badge>
                                             </div>
-                                            {rev.response.status ===
-                                                'pending_moderation' && (
+                                            {(rev.response.status ===
+                                                'pending_moderation' ||
+                                                rev.response.status ===
+                                                    'rejected') && (
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
@@ -545,7 +549,10 @@ export default function OwnerReviewIndex({
                                                     }
                                                     className="h-7 px-2.5 text-xs"
                                                 >
-                                                    Edit Response
+                                                    {rev.response.status ===
+                                                    'rejected'
+                                                        ? 'Revise Response'
+                                                        : 'Edit Response'}
                                                 </Button>
                                             )}
                                         </div>

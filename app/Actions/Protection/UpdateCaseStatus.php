@@ -47,7 +47,7 @@ class UpdateCaseStatus
 
             $updates = [];
 
-            if (isset($attributes['assigned_admin_id'])) {
+            if (array_key_exists('assigned_admin_id', $attributes)) {
                 $assignedId = $attributes['assigned_admin_id'] ? (int) $attributes['assigned_admin_id'] : null;
                 $updates['assigned_admin_id'] = $assignedId;
             }

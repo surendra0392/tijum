@@ -19,7 +19,7 @@ import {
 import { propertyVerificationStatusMap } from '@/components/owner/properties/property-status-helpers';
 import { PropertyStepNavigation } from '@/components/owner/properties/property-step-navigation';
 import { ConfirmationDialog } from '@/components/shared/confirmation-dialog';
-import { FileUploadField, FormField } from '@/components/shared/form-field';
+import { FileUploadField } from '@/components/shared/form-field';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -34,19 +34,14 @@ import {
 } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { dashboard } from '@/routes/owner';
-import {
-    index as propertiesIndexRoute,
-    show as showPropertyRoute,
-} from '@/routes/owner/properties';
+import { index as propertiesIndexRoute } from '@/routes/owner/properties';
 import { cancel as cancelAmendmentRoute } from '@/routes/owner/properties/amendment';
 import {
     destroy as deleteDocRoute,
     store as uploadDocRoute,
 } from '@/routes/owner/properties/verification/documents';
 import {
-    show as verificationShowRoute,
     startRevision as startRevisionRoute,
     submit as submitVerificationRoute,
     withdraw as withdrawVerificationRoute,
@@ -258,7 +253,6 @@ export default function PropertyVerificationPage({
 }: PropertyVerificationPageProps) {
     const [withdrawOpen, setWithdrawOpen] = useState(false);
     const [cancelAmendmentOpen, setCancelAmendmentOpen] = useState(false);
-    const [withdrawReason, setWithdrawReason] = useState('');
     const [busy, setBusy] = useState(false);
 
     const submitForm = useForm<{
@@ -279,7 +273,7 @@ export default function PropertyVerificationPage({
         setBusy(true);
         router.post(
             withdrawVerificationRoute.url(property.id),
-            { reason: withdrawReason || undefined },
+            {},
             {
                 onFinish: () => {
                     setBusy(false);
@@ -315,7 +309,7 @@ export default function PropertyVerificationPage({
                 <PageHeader
                     eyebrow={`Step 6 & 7 · ${property.property_reference}`}
                     title={`Property Verification — ${property.name}`}
-                    description="Independent property verification operates separately from Phase 05 partner approval. Upload supporting property documents, review readiness checks, and submit for administrative approval."
+                    description="Independent property verification operates separately from partner account approval. Upload supporting property documents, review readiness checks, and submit for administrative approval."
                     badges={
                         application && (
                             <>
@@ -425,9 +419,10 @@ export default function PropertyVerificationPage({
                         </AlertTitle>
                         <AlertDescription>
                             This property has passed TIJUM property verification
-                            and approved photographs are published cleanly. Food
-                            packages, amenities, pricing, and customer
-                            availability launch in upcoming phases.
+                            and approved photographs are published. Configure
+                            meal inclusions, amenities, room-type rates, and
+                            availability blocks from your property steps to make
+                            this stay discoverable for live customer bookings.
                         </AlertDescription>
                     </Alert>
                 )}
@@ -570,10 +565,10 @@ export default function PropertyVerificationPage({
                                         <p className="text-xs text-tijum-plum-muted dark:text-muted-foreground">
                                             Submitting moves this revision to
                                             TIJUM administrative verification.
-                                            Customer booking eligibility awaits
-                                            property approval and future Phase
-                                            07–09 meal, amenity, and pricing
-                                            setup.
+                                            Customer booking eligibility starts
+                                            once property verification is
+                                            approved and your meal, amenity, and
+                                            pricing details are configured.
                                         </p>
                                     </div>
                                 </div>
@@ -729,22 +724,6 @@ export default function PropertyVerificationPage({
                     loading={busy}
                     onConfirm={handleCancelAmendment}
                 />
-
-                {withdrawOpen && (
-                    <div className="sr-only">
-                        <FormField id="withdraw-reason" label="Reason">
-                            {(a11y) => (
-                                <Textarea
-                                    {...a11y}
-                                    value={withdrawReason}
-                                    onChange={(e) =>
-                                        setWithdrawReason(e.target.value)
-                                    }
-                                />
-                            )}
-                        </FormField>
-                    </div>
-                )}
             </div>
         </>
     );
@@ -754,7 +733,6 @@ PropertyVerificationPage.layout = {
     breadcrumbs: [
         { title: 'Partner Overview', href: dashboard() },
         { title: 'My Properties', href: propertiesIndexRoute() },
-        { title: 'Property Overview', href: showPropertyRoute(1) },
-        { title: 'Verification', href: verificationShowRoute(1) },
+        { title: 'Verification', href: '#' },
     ],
 };

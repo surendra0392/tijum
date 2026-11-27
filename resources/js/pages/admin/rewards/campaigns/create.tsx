@@ -768,6 +768,7 @@ export default function CreateCampaign({
                                                     }`}
                                                 >
                                                     <Checkbox
+                                                        aria-label={`Include ${cat.name} category`}
                                                         checked={isChecked}
                                                         onCheckedChange={() =>
                                                             toggleCategory(

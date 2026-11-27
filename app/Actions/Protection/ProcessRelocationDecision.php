@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Services\ReservationAvailabilityService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -60,9 +61,23 @@ class ProcessRelocationDecision
         }
 
         $now = CarbonImmutable::now();
+        $capacityUnavailable = false;
 
-        return DB::transaction(function () use ($relocation, $decision, $now): ReservationRelocation {
+        $result = DB::transaction(function () use ($relocation, $decision, $now, &$capacityUnavailable): ReservationRelocation {
             $lockedRelocation = ReservationRelocation::query()->whereKey($relocation->id)->lockForUpdate()->firstOrFail();
+
+            if ($lockedRelocation->status !== RelocationStatus::Offered) {
+                throw ValidationException::withMessages([
+                    'relocation' => 'This relocation offer is no longer actionable.',
+                ]);
+            }
+
+            if ($lockedRelocation->isExpired()) {
+                $lockedRelocation->forceFill(['status' => RelocationStatus::Expired])->save();
+
+                return $lockedRelocation;
+            }
+
             $source = Reservation::query()->whereKey($lockedRelocation->source_reservation_id)->lockForUpdate()->firstOrFail();
             $destinationProperty = $lockedRelocation->destinationProperty()->lockForUpdate()->firstOrFail();
             $destinationRoomType = $lockedRelocation->destinationRoomType()->lockForUpdate()->firstOrFail();
@@ -101,10 +116,9 @@ class ProcessRelocationDecision
                     'status' => RelocationStatus::Cancelled,
                     'admin_notes' => 'Alternative capacity became unavailable prior to customer acceptance.',
                 ])->save();
+                $capacityUnavailable = true;
 
-                throw ValidationException::withMessages([
-                    'relocation' => 'The alternative room became unavailable. We have alerted our operations team to find another option or process a full refund.',
-                ]);
+                return $lockedRelocation;
             }
 
             // 2. Commit linked replacement reservation using established booking architecture
@@ -148,7 +162,7 @@ class ProcessRelocationDecision
                 'snapshot_lunch_included' => (bool) $destinationProperty->lunch_included,
                 'snapshot_dinner_included' => (bool) $destinationProperty->dinner_included,
                 'currency_code' => $source->currency_code,
-                'unit_rate_minor' => $lockedRelocation->alternative_amount_minor / max(1, $source->duration_quantity * $source->quantity),
+                'unit_rate_minor' => intdiv((int) $lockedRelocation->alternative_amount_minor, max(1, $source->duration_quantity * $source->quantity)),
                 'rate_unit' => $source->rate_unit,
                 'total_amount_minor' => $lockedRelocation->alternative_amount_minor,
                 'cancellation_policy_version' => $source->cancellation_policy_version,
@@ -192,12 +206,16 @@ class ProcessRelocationDecision
                                 $lockedRelocation->customer_protection_case_id,
                             );
                             $lockedRelocation->forceFill(['difference_refund_id' => $refund->id])->save();
-                        } catch (\Throwable) {
-                            // Gateway error handled gracefully; refund remains under admin oversight
+                        } catch (\Throwable $e) {
+                            Log::error('Relocation price difference refund failed and requires admin follow-up: '.$e->getMessage(), [
+                                'exception' => $e,
+                                'relocation_id' => $lockedRelocation->id,
+                                'source_reservation_id' => $source->id,
+                            ]);
                         }
                     }
                 }
-            } elseif ($destinationRoomType->daily_rate_minor > $source->unit_rate_minor) {
+            } elseif ($replacement->total_amount_minor > $source->total_amount_minor) {
                 // If alternative is more expensive, customer is never charged extra; platform absorbs difference
                 try {
                     app(RecordRelocationSubsidy::class)->execute(
@@ -207,8 +225,12 @@ class ProcessRelocationDecision
                         destinationAmountMinor: (int) $replacement->total_amount_minor,
                         case: $lockedRelocation->case,
                     );
-                } catch (\Throwable) {
-                    // Subsidy recorded gracefully
+                } catch (\Throwable $e) {
+                    Log::error('Relocation subsidy recording failed and requires finance review: '.$e->getMessage(), [
+                        'exception' => $e,
+                        'relocation_id' => $lockedRelocation->id,
+                        'replacement_reservation_id' => $replacement->id,
+                    ]);
                 }
             }
 
@@ -224,5 +246,19 @@ class ProcessRelocationDecision
 
             return $lockedRelocation;
         }, 3);
+
+        if ($result->status === RelocationStatus::Expired) {
+            throw ValidationException::withMessages([
+                'relocation' => 'This relocation offer has expired. Our team will coordinate your refund review.',
+            ]);
+        }
+
+        if ($capacityUnavailable) {
+            throw ValidationException::withMessages([
+                'relocation' => 'The alternative room became unavailable. We have alerted our operations team to find another option or process a full refund.',
+            ]);
+        }
+
+        return $result;
     }
 }
